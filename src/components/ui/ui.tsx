@@ -62,8 +62,17 @@ export function Badge({ tone = "neutral", children, className, dot }: { tone?: T
   );
 }
 
-export function NextBadge() {
-  return <span className="inline-flex items-center rounded-md border border-dashed border-line-2 px-1.5 py-0.5 text-[0.65rem] font-bold tracking-wide text-ink-3">NEXT</span>;
+export function NextBadge({ tone = "ink" }: { tone?: "ink" | "shell" }) {
+  return (
+    <span
+      className={cx(
+        "inline-flex items-center rounded-md border border-dashed px-1.5 py-0.5 text-[0.65rem] font-bold tracking-wide",
+        tone === "shell" ? "border-white/25 text-shell-text-3" : "border-line-2 text-ink-3",
+      )}
+    >
+      NEXT
+    </span>
+  );
 }
 export function DemoBadge({ className }: { className?: string }) {
   return <span className={cx("inline-flex items-center rounded-md bg-warning-bg px-1.5 py-0.5 text-[0.65rem] font-bold tracking-wide text-warning", className)}>DEMO DATA</span>;

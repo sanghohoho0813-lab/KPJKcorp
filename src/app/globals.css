@@ -55,6 +55,17 @@
   --mod-doc: #4e8fd6;
   --mod-schedule: #c8763b;
 
+  /* Sidebar group colors — one family per nav group, fixed.
+     *-on-dark is for the dark shell sidebar, *-on-light for the mobile drawer. */
+  --nav-core: #8fb0d6;
+  --nav-core-ink: #4c74a3;
+  --nav-ai: #a99cdf;
+  --nav-ai-ink: #6560a8;
+  --nav-sys: #96a0ac;
+  --nav-sys-ink: #616c79;
+  --nav-next: #c99464;
+  --nav-next-ink: #96682f;
+
   --radius-card: 16px;
   --radius-btn: 10px;
   --sidebar-w: 280px;

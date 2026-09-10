@@ -1,7 +1,7 @@
 # PROJECT_STATE — KPJK Consulting AX + Client Portal
 
 > SPEC = 어디까지 갈 것인가 / STATE = 지금 어디까지 왔는가
-> Last updated: 2026-09-08 (First Build 완료)
+> Last updated: 2026-09-10 (Sidebar IA 재편)
 
 ## PROJECT FINAL OBJECTIVE
 KPJK의 경영컨설팅 업무를 기억·카톡·개별파일 의존 구조에서 **기업고객 중심 통합 데이터 운영체계**로 전환. 고객 문의→상담→계약→자료요청→제출→검토→진행→결과→사후관리가 하나의 시스템에서 이어지고, 고객이 Portal로 직접 참여한다.
@@ -88,4 +88,5 @@ KPJK의 경영컨설팅 업무를 기억·카톡·개별파일 의존 구조에�
 - [OPTIONAL] Vercel 배포: `npm run build` 통과 확인됨, 환경변수 불필요
 
 ## 최근 주요 변경
+- 2026-09-10 Sidebar IA 재편 — 12개 메뉴를 4 Group(핵심 운영 / AI · 분석 / 시스템 / 향후 확장)으로 분류. 그룹당 아이콘 색 1계열 통일(`--nav-*`), 메뉴별 개별 색 제거. 핵심 운영 순서를 실제 흐름(고객 → 상담·계약 → 프로젝트 → 실행 → 소통 → 결과)으로 조정. Active = 좌측 Accent Bar + Pill. 향후 확장은 기본 접힘 Accordion. 모바일 더보기 Sheet도 동일 구조. Route·기능 변경 없음
 - 2026-09-08 First Build 완료 (PASS 1 설계 잠금 → PASS 2 구현 → PASS 3 Red Team 1회)

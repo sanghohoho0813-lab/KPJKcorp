@@ -23,6 +23,7 @@ import {
   RotateCcw,
   Settings,
   Sparkles,
+  ChevronDown,
   ChevronRight,
 } from "lucide-react";
 import { useStore, useCurrentUser } from "@/lib/store";
@@ -43,54 +44,144 @@ interface NavItem {
   href: string;
   label: string;
   icon: ReactNode;
-  color: string;
+  /** Hover tooltip — used where the label is shortened. */
+  hint?: string;
   id?: string;
 }
 
-const NAV_MAIN: NavItem[] = [
-  { href: "/ax/dashboard", label: "대시보드", icon: <LayoutDashboard size={19} />, color: "var(--mod-overview)", id: "tut-nav-dashboard" },
-  { href: "/ax/clients", label: "기업고객", icon: <Building2 size={19} />, color: "var(--mod-customer)", id: "tut-nav-clients" },
-  { href: "/ax/projects", label: "프로젝트", icon: <Briefcase size={19} />, color: "var(--mod-ops)", id: "tut-nav-projects" },
-  { href: "/ax/consultations", label: "상담 / 계약", icon: <ClipboardList size={19} />, color: "var(--mod-sales)" },
-  { href: "/ax/documents", label: "자료관리", icon: <FolderOpen size={19} />, color: "var(--mod-doc)", id: "tut-nav-documents" },
-  { href: "/ax/schedule", label: "일정", icon: <CalendarDays size={19} />, color: "var(--mod-schedule)" },
-  { href: "/ax/tasks", label: "업무 / 후속관리", icon: <CheckSquare size={19} />, color: "var(--mod-ops)" },
-  { href: "/ax/inquiries", label: "문의 / 커뮤니케이션", icon: <MessageSquare size={19} />, color: "var(--mod-customer)" },
-  { href: "/ax/results", label: "결과자료", icon: <FileCheck2 size={19} />, color: "var(--mod-evidence)" },
-];
-const NAV_GROWTH: NavItem[] = [
-  { href: "/ax/brief", label: "AI 브리핑", icon: <Sparkles size={19} />, color: "var(--mod-ai)" },
-  { href: "/ax/reports", label: "리포트", icon: <BarChart3 size={19} />, color: "var(--mod-evidence)" },
-];
-const NAV_SYSTEM: NavItem[] = [
-  { href: "/ax/why", label: "Why AX · 기획의도", icon: <BookOpen size={19} />, color: "var(--mod-ai)", id: "tut-nav-why" },
-  { href: "/ax/settings", label: "설정", icon: <Settings size={19} />, color: "var(--mod-system)", id: "tut-nav-settings" },
+interface NavGroup {
+  key: string;
+  label: string;
+  /** Icon color on the dark sidebar. One family per group — never per item. */
+  color: string;
+  /** Same family, darkened for the light mobile drawer. */
+  inkColor: string;
+  items: NavItem[];
+}
+
+/**
+ * Sidebar IA — 4 groups. Order inside 핵심 운영 follows the real consulting
+ * lifecycle: 고객 → 상담·계약 → 프로젝트 → 실행(자료·일정·업무) → 소통 → 결과.
+ */
+const NAV_GROUPS: NavGroup[] = [
+  {
+    key: "core",
+    label: "핵심 운영",
+    color: "var(--nav-core)",
+    inkColor: "var(--nav-core-ink)",
+    items: [
+      { href: "/ax/dashboard", label: "대시보드", icon: <LayoutDashboard size={18} />, id: "tut-nav-dashboard" },
+      { href: "/ax/clients", label: "기업고객", icon: <Building2 size={18} />, id: "tut-nav-clients" },
+      { href: "/ax/consultations", label: "상담 · 계약", icon: <ClipboardList size={18} /> },
+      { href: "/ax/projects", label: "프로젝트", icon: <Briefcase size={18} />, id: "tut-nav-projects" },
+      { href: "/ax/documents", label: "자료관리", icon: <FolderOpen size={18} />, id: "tut-nav-documents" },
+      { href: "/ax/schedule", label: "일정", icon: <CalendarDays size={18} /> },
+      { href: "/ax/tasks", label: "업무 · 후속관리", icon: <CheckSquare size={18} /> },
+      { href: "/ax/inquiries", label: "문의 · 커뮤니케이션", icon: <MessageSquare size={18} /> },
+      { href: "/ax/results", label: "결과자료", icon: <FileCheck2 size={18} /> },
+    ],
+  },
+  {
+    key: "ai",
+    label: "AI · 분석",
+    color: "var(--nav-ai)",
+    inkColor: "var(--nav-ai-ink)",
+    items: [
+      { href: "/ax/brief", label: "AI 브리핑", icon: <Sparkles size={18} /> },
+      { href: "/ax/reports", label: "리포트", icon: <BarChart3 size={18} />, hint: "KPI 측정지점 · 운영 현황 · Evidence Log" },
+    ],
+  },
+  {
+    key: "sys",
+    label: "시스템",
+    color: "var(--nav-sys)",
+    inkColor: "var(--nav-sys-ink)",
+    items: [
+      { href: "/ax/why", label: "Why AX", icon: <BookOpen size={18} />, hint: "기획의도 — 왜 이 시스템을 만들었는가", id: "tut-nav-why" },
+      { href: "/ax/settings", label: "설정", icon: <Settings size={18} />, id: "tut-nav-settings" },
+    ],
+  },
 ];
 
-function NavLink({ item, onClick, mobile }: { item: NavItem; onClick?: () => void; mobile?: boolean }) {
+/** Routes already reachable from the mobile bottom bar — excluded from 더보기. */
+const MOBILE_PRIMARY = ["/ax/dashboard", "/ax/clients", "/ax/projects", "/ax/documents"];
+
+function NavLink({ item, color, onClick, mobile }: { item: NavItem; color: string; onClick?: () => void; mobile?: boolean }) {
   const pathname = usePathname();
   const active = pathname === item.href || pathname.startsWith(item.href + "/");
   return (
     <Link
       id={item.id}
       href={item.href}
+      title={item.hint}
       onClick={onClick}
+      aria-current={active ? "page" : undefined}
       className={cx(
-        "pressable group flex items-center gap-3 rounded-xl px-3 py-2.5 text-[0.95rem] font-semibold transition-colors",
-        mobile ? (active ? "bg-surface-2 text-ink" : "text-ink-2 hover:bg-surface-2") : active ? "bg-white/10 text-white" : "text-shell-text-2 hover:bg-white/5 hover:text-white",
+        "pressable relative flex items-center gap-2.5 rounded-lg px-3 py-[0.35rem] text-[0.9rem] font-semibold transition-colors",
+        mobile
+          ? active
+            ? "bg-surface-2 text-ink"
+            : "text-ink-2 hover:bg-surface-2"
+          : active
+            ? "bg-white/[0.10] text-white"
+            : "text-shell-text-2 hover:bg-white/[0.05] hover:text-white",
       )}
     >
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ background: `color-mix(in srgb, ${item.color} ${active ? 28 : 16}%, transparent)`, color: item.color }}>
+      {active && !mobile && <span aria-hidden className="absolute left-0 top-1/2 h-[18px] w-[3px] -translate-y-1/2 rounded-r-full bg-accent" />}
+      <span className="flex h-5 w-5 shrink-0 items-center justify-center transition-opacity" style={{ color, opacity: active ? 1 : 0.75 }}>
         {item.icon}
       </span>
-      <span className="flex-1">{item.label}</span>
-      {active && !mobile && <span className="h-5 w-1 rounded-full bg-accent" />}
+      <span className="flex-1 truncate">{item.label}</span>
     </Link>
   );
 }
 
-function Sidebar() {
+/** 향후 확장 — one level quieter than a real menu, collapsed by default. */
+function NextGroup({ mobile }: { mobile?: boolean }) {
   const openNext = useUi((s) => s.openNext);
+  const [open, setOpen] = useState(false);
+  return (
+    <div className={cx("mt-3 pt-2.5", mobile ? "border-t border-line" : "border-t border-white/[0.07]")}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className={cx(
+          "pressable flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-[0.66rem] font-bold tracking-[0.16em] transition-colors",
+          mobile ? "text-ink-3 hover:text-ink-2" : "text-shell-text-3 hover:text-shell-text-2",
+        )}
+      >
+        <span>향후 확장</span>
+        <NextBadge tone={mobile ? "ink" : "shell"} />
+        <span className="flex-1" />
+        <ChevronDown size={14} className={cx("shrink-0 transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div className="mt-0.5 space-y-0.5">
+          {NEXT_FEATURES.map((f) => (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => openNext(f.key)}
+              className={cx(
+                "pressable flex w-full items-center gap-2.5 rounded-lg px-3 py-1.5 text-left text-[0.82rem] font-medium transition-colors",
+                mobile ? "text-ink-2 hover:bg-surface-2" : "text-shell-text-3 hover:bg-white/[0.05] hover:text-shell-text-2",
+              )}
+            >
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center">
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: mobile ? "var(--nav-next-ink)" : "var(--nav-next)" }} />
+              </span>
+              <span className="flex-1 truncate">{f.title}</span>
+              <ChevronRight size={13} className="shrink-0 opacity-60" />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Sidebar() {
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-[var(--sidebar-w)] flex-col bg-shell text-shell-text lg:flex">
       <div className="flex h-[var(--header-h)] items-center gap-3 px-5">
@@ -101,25 +192,17 @@ function Sidebar() {
         </div>
       </div>
       <nav className="thin-scroll flex-1 overflow-y-auto px-3 pb-4">
-        <div className="px-3 pb-2 pt-3 text-[0.7rem] font-bold tracking-widest text-shell-text-3">핵심 운영</div>
-        <div className="space-y-0.5">{NAV_MAIN.map((i) => <NavLink key={i.href} item={i} />)}</div>
-        <div className="px-3 pb-2 pt-5 text-[0.7rem] font-bold tracking-widest text-shell-text-3">성장 · 실증</div>
-        <div className="space-y-0.5">{NAV_GROWTH.map((i) => <NavLink key={i.href} item={i} />)}</div>
-        <div className="px-3 pb-2 pt-5 text-[0.7rem] font-bold tracking-widest text-shell-text-3">시스템</div>
-        <div className="space-y-0.5">{NAV_SYSTEM.map((i) => <NavLink key={i.href} item={i} />)}</div>
-        <div className="mt-5 rounded-xl border border-dashed border-white/15 p-3">
-          <div className="mb-2 flex items-center gap-2 text-[0.72rem] font-bold tracking-widest text-shell-text-3">
-            향후 확장 <NextBadge />
+        {NAV_GROUPS.map((g, i) => (
+          <div key={g.key} className={cx(i > 0 && "mt-3 border-t border-white/[0.07] pt-2.5")}>
+            <div className="px-3 pb-1 pt-0.5 text-[0.66rem] font-bold tracking-[0.16em] text-shell-text-3">{g.label}</div>
+            <div className="space-y-0.5">
+              {g.items.map((item) => (
+                <NavLink key={item.href} item={item} color={g.color} />
+              ))}
+            </div>
           </div>
-          <div className="space-y-0.5">
-            {NEXT_FEATURES.map((f) => (
-              <button key={f.key} onClick={() => openNext(f.key)} className="pressable flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-[0.85rem] text-shell-text-3 hover:bg-white/5 hover:text-shell-text-2">
-                <span>{f.title}</span>
-                <ChevronRight size={14} />
-              </button>
-            ))}
-          </div>
-        </div>
+        ))}
+        <NextGroup />
       </nav>
       <div className="border-t border-white/10 px-5 py-3 text-[0.75rem] text-shell-text-3">
         <div className="flex items-center justify-between">
@@ -250,7 +333,6 @@ function MoreSheet() {
   const open = useUi((s) => s.moreSheet);
   const setMore = useUi((s) => s.setMoreSheet);
   const openTutorial = useUi((s) => s.openTutorial);
-  const openNext = useUi((s) => s.openNext);
   const user = useCurrentUser();
   const session = useStore((s) => s.session);
   const login = useStore((s) => s.login);
@@ -261,7 +343,6 @@ function MoreSheet() {
   const [pick, setPick] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const close = () => setMore(false);
-  const rest = [...NAV_MAIN.slice(4), ...NAV_GROWTH, ...NAV_SYSTEM];
   const btn = "pressable flex items-center gap-2 rounded-xl border border-line px-3 py-3 text-[0.85rem] font-semibold text-ink-2 hover:bg-surface-2";
   return (
     <>
@@ -282,15 +363,21 @@ function MoreSheet() {
           <button onClick={() => setConfirmReset(true)} className={btn}><RotateCcw size={18} /> 데모 초기화</button>
           <button onClick={() => { logout(); router.push("/login"); }} className={btn}><LogOut size={18} /> 로그아웃</button>
         </div>
-        <div className="space-y-0.5">{rest.map((i) => <NavLink key={i.href} item={i} onClick={close} mobile />)}</div>
-        <div className="mt-4 rounded-xl border border-dashed border-line-2 p-3">
-          <div className="mb-2 flex items-center gap-2 text-[0.72rem] font-bold tracking-widest text-ink-3">향후 확장 <NextBadge /></div>
-          {NEXT_FEATURES.map((f) => (
-            <button key={f.key} onClick={() => openNext(f.key)} className="pressable flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-[0.88rem] text-ink-2 hover:bg-surface-2">
-              {f.title} <ChevronRight size={14} className="text-ink-3" />
-            </button>
-          ))}
-        </div>
+        {NAV_GROUPS.map((g, gi) => {
+          const items = g.items.filter((i) => !MOBILE_PRIMARY.includes(i.href));
+          if (!items.length) return null;
+          return (
+            <div key={g.key} className={cx(gi > 0 && "mt-3 border-t border-line pt-2.5")}>
+              <div className="px-3 pb-1 pt-0.5 text-[0.66rem] font-bold tracking-[0.16em] text-ink-3">{g.label}</div>
+              <div className="space-y-0.5">
+                {items.map((item) => (
+                  <NavLink key={item.href} item={item} color={g.inkColor} onClick={close} mobile />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+        <NextGroup mobile />
       </Sheet>
       <CompanyPickerModal open={pick} onClose={() => setPick(false)} />
       <Confirm open={confirmReset} onClose={() => setConfirmReset(false)} onConfirm={() => { resetDemo(); toast("데모 데이터를 초기화했습니다."); }} title="데모 초기화" desc="모든 Action 상태, 고객 제출, 문의를 초기 상태로 되돌립니다." confirmText="초기화" danger />

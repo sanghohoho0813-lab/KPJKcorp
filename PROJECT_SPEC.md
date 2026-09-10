@@ -66,10 +66,21 @@ Demo 계정: 대표(admin) / 박성훈 이사(consultant) / 이주연 컨설턴�
 
 ## 3. INFORMATION ARCHITECTURE
 
-### Business AX (`/ax/*`) — Sidebar 280px
-01 대시보드 `/ax/dashboard` · 02 기업고객 `/ax/clients`, `/ax/clients/[id]` · 03 프로젝트 `/ax/projects`, `/ax/projects/[id]` · 04 상담/계약 `/ax/consultations` · 05 자료관리 `/ax/documents` · 06 일정 `/ax/schedule` · 07 업무/후속관리 `/ax/tasks` · 08 문의/커뮤니케이션 `/ax/inquiries` · 09 결과자료 `/ax/results` · 10 AI 브리핑 `/ax/brief` · 11 리포트 `/ax/reports` · 12 설정 `/ax/settings` · Why AX `/ax/why` · NEXT(확장) Preview Sheet
+### Business AX (`/ax/*`) — Sidebar 280px · 4 Group
 
-Mobile Bottom Nav: 오늘 / 고객 / 프로젝트 / 자료 / 더보기(Sheet: 나머지 전부)
+메뉴 12개는 **4개 그룹**으로 묶는다. 그룹 = 분류 단위이며, 아이콘 색은 **그룹당 1색 계열**로 통일한다(메뉴별 개별 색 금지).
+
+| Group | 아이콘 색 계열 | 메뉴 |
+|---|---|---|
+| 핵심 운영 | 블루 · 슬레이트 `--nav-core` | 01 대시보드 `/ax/dashboard` · 02 기업고객 `/ax/clients`, `/ax/clients/[id]` · 03 상담 · 계약 `/ax/consultations` · 04 프로젝트 `/ax/projects`, `/ax/projects/[id]` · 05 자료관리 `/ax/documents` · 06 일정 `/ax/schedule` · 07 업무 · 후속관리 `/ax/tasks` · 08 문의 · 커뮤니케이션 `/ax/inquiries` · 09 결과자료 `/ax/results` |
+| AI · 분석 | 퍼플 · 인디고 `--nav-ai` | 10 AI 브리핑 `/ax/brief` · 11 리포트 `/ax/reports` |
+| 시스템 | 그레이 · 뉴트럴 `--nav-sys` | 12 Why AX `/ax/why` · 13 설정 `/ax/settings` |
+| 향후 확장 (NEXT) | 오렌지 · 앰버 `--nav-next` | NEXT Preview Sheet 5종 — 기본 **접힘**, 클릭 시 펼침 |
+
+핵심 운영의 순서는 실제 컨설팅 흐름(고객 → 상담·계약 → 프로젝트 → 실행(자료·일정·업무) → 소통 → 결과)을 따른다.
+Active 표시: 좌측 Accent Bar 3px + 배경 Pill. Hover는 배경만 변한다(색 변화 없음).
+
+Mobile Bottom Nav: 오늘 / 고객 / 프로젝트 / 자료 / 더보기(Sheet: 하단바에 없는 나머지 전부, **Sidebar와 동일한 4 Group 구조**)
 
 ### Client Portal (`/portal/*`)
 01 홈 `/portal` · 02 내 프로젝트 `/portal/projects` · 03 요청자료 `/portal/documents` · 04 일정 `/portal/schedule` · 05 완료자료 `/portal/results` · 06 문의하기 `/portal/inquiries` · 07 알림 `/portal/notifications` · 08 내 정보 `/portal/me`
