@@ -72,7 +72,7 @@ export function buildSeed(now = new Date()): SeedData {
     { id: "pj_c2", companyId: "co_c", name: "법인 경영자문", type: "법인자문", consultantId: "u_park", startDate: d(-5), dueDate: d(60), stage: "contract", description: "가지급금·배당·정관 정비 연간 자문", stageChangedAt: d(-1), clientVisible: true },
     { id: "pj_d1", companyId: "co_d", name: "기업 운영개선 컨설팅", type: "운영개선", consultantId: "u_jung", startDate: d(-60), dueDate: d(10), stage: "in_progress", description: "현장-본사 보고체계 표준화 및 원가 누락 개선", stageChangedAt: d(-9), clientVisible: true },
     { id: "pj_e1", companyId: "co_e", name: "법인 경영자문", type: "법인자문", consultantId: "u_lee", startDate: d(-3), dueDate: d(45), stage: "consult", description: "벤처기업확인·정관 정비·초기 세무 구조 자문", stageChangedAt: d(-3), clientVisible: true },
-    { id: "pj_f1", companyId: "co_f", name: "기업 운영개선 컨설팅", type: "운영개선", consultantId: "u_jung", startDate: d(-115), dueDate: d(-30), stage: "aftercare", description: "배차·정산 프로세스 개선. 완료 후 3개월 사후관리", stageChangedAt: d(-28), clientVisible: true },
+    { id: "pj_f1", companyId: "co_f", name: "기업 운영개선 컨설팅", type: "운영개선", consultantId: "u_jung", startDate: d(-115), dueDate: d(-30), stage: "aftercare", description: "배차·정산 프로세스 개선. 완료 후 3개월 사후관리", stageChangedAt: d(-48), clientVisible: true },
     { id: "pj_a2", companyId: "co_a", name: "기업인증 자문 (메인비즈)", type: "기업인증", consultantId: "u_park", startDate: d(-80), dueDate: d(-20), stage: "done", description: "메인비즈 인증 신청 자문. 완료.", stageChangedAt: d(-20), clientVisible: true },
   ];
 

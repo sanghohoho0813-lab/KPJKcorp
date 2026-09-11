@@ -1,7 +1,7 @@
 # PROJECT_STATE — KPJK Consulting AX + Client Portal
 
 > SPEC = 어디까지 갈 것인가 / STATE = 지금 어디까지 왔는가
-> Last updated: 2026-09-11 (매출기회 · 대표 승인 · 설문 · 테마 정화)
+> Last updated: 2026-09-11 (AI Action · 이탈/재상담 규칙 · 상담 기록 작성)
 
 ## PROJECT FINAL OBJECTIVE
 KPJK의 경영컨설팅 업무를 기억·카톡·개별파일 의존 구조에서 **기업고객 중심 통합 데이터 운영체계**로 전환. 고객 문의→상담→계약→자료요청→제출→검토→진행→결과→사후관리가 하나의 시스템에서 이어지고, 고객이 Portal로 직접 참여한다.
@@ -39,13 +39,13 @@ KPJK의 경영컨설팅 업무를 기억·카톡·개별파일 의존 구조에�
 - [x] Dashboard — KPI 6 + Today Brief(규칙 엔진, 왜?) + 먼저 확인할 기업 + 최근 프로젝트 + 이번 주 일정 + 최근 문의
 - [x] Enterprise Client Card — Header/Quick Status/9 Tab(Overview·상담·계약·프로젝트·요청자료·일정·문의·결과자료·History)
 - [x] Projects — Board(8 컬럼)/List, Detail(Dual Progress 11↔7, 요약, 누락 체크, 이력, 단계 변경, 자료 요청, 일정/업무 등록, 결과자료 공유)
-- [x] 상담/계약 — 구조화 요약 + AI READY, 계약 상태
+- [x] 상담/계약 — 구조화 요약 + AI READY, 계약 상태, **상담 기록 직접 작성**(다음 Action → 후속 업무 자동 등록)
 - [x] Documents — KPI 4 + 필터 + 검토 Modal(검토 시작/보완 요청/검토 완료) + 안내 초안
 - [x] Schedule — List(일자 그룹) + Calendar + 등록
 - [x] Tasks — 오늘/미완료/초과/완료 + 상태 변경 + 자동 생성 표시 + 등록
 - [x] Inquiries — Queue + 대화형 답변 + 초안 제안 + 종료
 - [x] Results — 공유 목록 + 열람 횟수
-- [x] AI Brief — 긴급/오늘 중 + 담당자별 + 판단 규칙 공개
+- [x] AI Brief — 긴급/오늘 중 + 담당자별 + 판단 규칙 공개 + **항목별 즉시 실행 버튼**(초안·업무·일정·단계변경·기회등록·완료처리)
 - [x] Reports — KPI 측정지점 표 + 운영 현황 + Evidence Log + CSV
 
 ### PLATFORM CORE
@@ -72,7 +72,6 @@ KPJK의 경영컨설팅 업무를 기억·카톡·개별파일 의존 구조에�
 - [ ] LLM API 연결 (AI-01 상담 요약, AI-05 톤 조정)
 - [ ] 알림 발송 채널 (카카오/이메일) — NEXT-01
 - [ ] AX Owner 지정 필드 (설정)
-- [ ] 상담 기록 직접 작성 UI (현재 Seed 표시)
 
 ## 현재 Demo 기능 / 실제 연결된 기능
 - Demo: 전부 (브라우저 로컬 Store). 파일은 메타만 기록
@@ -96,6 +95,7 @@ KPJK의 경영컨설팅 업무를 기억·카톡·개별파일 의존 구조에�
 - [OPTIONAL] Vercel 배포: `npm run build` 통과 확인됨, 환경변수 불필요
 
 ## 최근 주요 변경
+- 2026-09-11 고도화 2차 — AI 브리핑을 "말하는 화면"에서 "처리하는 화면"으로 전환(항목별 실행 버튼 7종), 이탈 위험·재상담 규칙 2종 추가, 상담 기록 직접 작성 UI. 브리핑 모바일 레이아웃 압축
 - 2026-09-11 고도화 1차 — 매출기회 Closed Loop(TERTIARY), 대표 승인 Workflow, AX 고도화 설문, 테마 뿌연 현상 제거, 모바일 가로스크롤 전면 제거, 대시보드 우선순위 재구성, 리포트 4축 Evidence. 상세는 `BACKLOG.md`
 - 2026-09-10 Sidebar IA 재편 — 12개 메뉴를 4 Group(핵심 운영 / AI · 분석 / 시스템 / 향후 확장)으로 분류. 그룹당 아이콘 색 1계열 통일(`--nav-*`), 메뉴별 개별 색 제거. 핵심 운영 순서를 실제 흐름(고객 → 상담·계약 → 프로젝트 → 실행 → 소통 → 결과)으로 조정. Active = 좌측 Accent Bar + Pill. 향후 확장은 기본 접힘 Accordion. 모바일 더보기 Sheet도 동일 구조. Route·기능 변경 없음
 - 2026-09-08 First Build 완료 (PASS 1 설계 잠금 → PASS 2 구현 → PASS 3 Red Team 1회)

@@ -8,6 +8,7 @@ import type {
   ActivityType,
   Approval,
   ApprovalKind,
+  Consultation,
   DocumentRequest,
   InternalStage,
   Inquiry,
@@ -50,6 +51,7 @@ export interface StoreState extends SeedData {
   reviewDocument: (requestId: string, outcome: "done" | "revision" | "reviewing", note: string | undefined, byUserId: string) => void;
   changeProjectStage: (projectId: string, stage: InternalStage, byUserId: string) => void;
   createDocRequest: (projectId: string, data: { name: string; description: string; dueDate: string }, byUserId: string) => void;
+  createConsultation: (data: Omit<Consultation, "id">, byUserId: string, followUp?: { create: boolean; dueDate: string }) => void;
   createInquiry: (data: { companyId: string; projectId?: string; title: string; category: Inquiry["category"]; body: string }, byUserId: string) => void;
   replyInquiry: (inquiryId: string, body: string, byUserId: string, role: Role) => void;
   closeInquiry: (inquiryId: string, byUserId: string) => void;
@@ -241,6 +243,38 @@ export const useStore = create<StoreState>()(
           docRequests: [req, ...st.docRequests],
           activities: [makeActivity({ type: "document_requested", companyId: p.companyId, projectId, actorId: byUserId, actorRole: "consultant", text: `자료 요청: ${data.name}` }), ...st.activities],
           notifications: [makeNotification({ audience: "client", companyId: p.companyId, title: "새 자료 요청이 등록되었습니다", body: `${data.name} — 요청자료에서 확인 후 제출해 주세요.`, href: "/portal/documents" }), ...st.notifications],
+        });
+      },
+
+      // ---------- 상담 기록 ----------
+      createConsultation: (data, byUserId, followUp) => {
+        const st = get();
+        const company = st.companies.find((c) => c.id === data.companyId);
+        const cs: Consultation = { ...data, id: uid("cs") };
+        // 상담에서 정한 "다음 Action"이 업무로 넘어가지 않으면 결국 기억에 의존하게 된다.
+        const tasks = followUp?.create && data.summary.nextAction
+          ? [{
+              id: uid("tk"),
+              companyId: data.companyId,
+              projectId: data.projectId,
+              title: `${company?.name ?? ""} ${data.summary.nextAction}`,
+              type: "후속연락" as const,
+              dueDate: followUp.dueDate,
+              assigneeId: data.consultantId,
+              status: "todo" as TaskStatus,
+              priority: "normal" as const,
+              createdAt: nowIso(),
+              source: "auto" as const,
+            }, ...st.tasks]
+          : st.tasks;
+        set({
+          consultations: [cs, ...st.consultations],
+          tasks,
+          activities: [
+            ...(tasks !== st.tasks ? [makeActivity({ type: "task_created", companyId: data.companyId, projectId: data.projectId, actorId: "system", actorRole: "system", text: `자동 생성: ${data.summary.nextAction}` })] : []),
+            makeActivity({ type: "consultation_logged", companyId: data.companyId, projectId: data.projectId, actorId: byUserId, actorRole: "consultant", text: `상담 기록: ${data.type} (${data.channel})${company ? ` — ${company.name}` : ""}`, meta: { consultationId: cs.id } }),
+            ...st.activities,
+          ],
         });
       },
 

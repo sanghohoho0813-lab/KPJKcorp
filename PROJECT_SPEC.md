@@ -131,6 +131,10 @@ Data Source: **DEMO** (zustand + localStorage persist). Repository 분리: `src/
 
 **TERTIARY (매출)**: Portal 추가서비스 `[관심 있어요]/[상담 요청]` → [Event: opportunity_created] → Opportunity 생성 + 담당자 상담연락 Task 자동 생성 + 내부 알림 → 담당자 확인 → **대표 승인 요청** → [Event: approval_requested] → 대표 승인/반려 → [Event: approval_decided] → 승인 시 제안·견적 발송 Task 자동 생성 + 기회 단계 자동 이동 → 추가계약 → 리포트 매출 축에 집계
 
+**AI Action 원칙** — 브리핑은 발견에서 멈추지 않는다. 각 항목은 `문제 → 근거 → 추천 행동 → 실행`까지 한 카드 안에서 끝난다.
+실행은 전부 기존 store action(초안·Task·Schedule·단계 변경·Opportunity)을 호출하므로 별도 기록 경로가 생기지 않고 Evidence Log에 그대로 남는다.
+규칙이 발견한 이탈 위험·재상담 대상은 **자동으로 기회를 만들지 않는다**. 발견은 규칙이, 확정은 담당자가 버튼으로 한다.
+
 **승인 대상 원칙** — 리스크가 실제로 있는 것만 올린다: 할인 / 최종 제안·견적 / 고객과의 중요한 약속(일정 변경 등). 일상 업무는 승인 대상이 아니다.
 
 ---

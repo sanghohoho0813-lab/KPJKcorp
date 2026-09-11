@@ -7,8 +7,9 @@ import { useUi } from "@/lib/ui-store";
 import { buildBrief, briefSummaryCounts } from "@/lib/brief";
 import { useNow } from "@/lib/hooks";
 import { fmtFull, fmtClock } from "@/lib/format";
-import { AiReadyBadge, Badge, Card, KpiCard, PageHeader, SectionTitle } from "@/components/ui/ui";
+import { AiReadyBadge, Badge, Card, KpiCard, PageHeader, SectionTitle, cx } from "@/components/ui/ui";
 import { BriefList } from "@/components/domain/domain";
+import { BriefActionHint } from "@/components/domain/BriefActions";
 
 export default function BriefPage() {
   const st = useStore();
@@ -27,13 +28,32 @@ export default function BriefPage() {
   return (
     <div>
       <PageHeader title={<span className="flex items-center gap-2"><Sparkles size={26} className="text-accent" /> AI 브리핑</span>} desc={`${fmtFull(now)} ${fmtClock(now).slice(0, 5)} 기준 · ${user?.name} ${user?.title}님을 위한 오늘의 업무 브리핑`} actions={<AiReadyBadge onClick={() => openAi({ title: "오늘의 업무 브리핑 — AI 적용 설명", key: "brief" })} />} />
-      <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-5">
+      {/* 모바일: 숫자 타일 7개가 화면을 다 먹지 않게 한 줄 칩으로. 이 화면의 본체는 목록이다. */}
+      <div className="mb-4 flex flex-wrap gap-1.5 md:hidden">
+        {[
+          { label: "후속연락", n: counts.followups, hot: true },
+          { label: "자료 기한", n: counts.docs, hot: true },
+          { label: "정체", n: counts.stalled, hot: true },
+          { label: "오늘 미팅", n: counts.meetings },
+          { label: "미답변", n: counts.inquiries, hot: true },
+          { label: "이탈 위험", n: counts.churn, hot: true },
+          { label: "재상담", n: counts.reengage },
+        ].map((c) => (
+          <span key={c.label} className={cx("inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[0.8rem] font-semibold", c.n && c.hot ? "border-error/30 bg-error-bg text-error" : "border-line text-ink-2")}>
+            {c.label} <span className="tnum">{c.n}</span>
+          </span>
+        ))}
+      </div>
+      <div className="mb-4 hidden gap-3 md:grid md:grid-cols-4 xl:grid-cols-7">
         <KpiCard label="후속연락 필요" value={counts.followups} tone={counts.followups ? "error" : undefined} />
         <KpiCard label="자료 기한 이슈" value={counts.docs} tone={counts.docs ? "error" : undefined} />
         <KpiCard label="정체 프로젝트" value={counts.stalled} tone={counts.stalled ? "error" : undefined} />
         <KpiCard label="오늘 미팅" value={counts.meetings} />
         <KpiCard label="미답변 문의" value={counts.inquiries} tone={counts.inquiries ? "error" : undefined} />
+        <KpiCard label="이탈 위험" value={counts.churn} tone={counts.churn ? "error" : undefined} />
+        <KpiCard label="재상담 대상" value={counts.reengage} accentValue={counts.reengage > 0} />
       </div>
+      <div className="mb-5 hidden md:block"><BriefActionHint items={brief} /></div>
       <div className="grid gap-5 xl:grid-cols-[1.5fr_1fr]">
         <div className="space-y-5">
           <Card className="p-5">
@@ -66,8 +86,10 @@ export default function BriefPage() {
               <li>· 업무 기한 초과 → <b>긴급</b></li>
               <li>· 계약 서명 대기 1일 이상 → 확인</li>
               <li>· 오늘 고객 미팅/상담 → 사전자료 확인</li>
+              <li>· 접촉 기록이 21일 이상 없으면 → <b>이탈 위험</b>, 35일 이상 → 긴급</li>
+              <li>· 마지막 프로젝트 완료 후 30일 경과 + 진행 건 없음 → <b>재상담 대상</b></li>
             </ul>
-            <div className="mt-3 rounded-xl bg-surface-2 px-3 py-2 text-[0.78rem] text-ink-3">규칙 기반으로 실제 데이터에서 계산됩니다. LLM은 향후 문장화·요약에만 적용 예정입니다 (AI READY).</div>
+            <div className="mt-3 rounded-xl bg-surface-2 px-3 py-2 text-[0.78rem] text-ink-3">규칙 기반으로 실제 데이터에서 계산됩니다. 각 항목의 실행 버튼은 실제 Action을 호출하므로 처리 이력이 Evidence Log에 그대로 남습니다. LLM은 향후 문장화·요약에만 적용 예정입니다 (AI READY).</div>
           </Card>
         </div>
       </div>

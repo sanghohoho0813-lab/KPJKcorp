@@ -16,7 +16,7 @@ interface Step {
 }
 
 const AX_STEPS: Step[] = [
-  { route: "/ax/dashboard", target: "tut-brief", title: "오늘의 업무 브리핑", body: "시스템을 열면 가장 먼저 '오늘 먼저 확인할 것'이 우선순위로 정리됩니다. 각 항목의 '왜?'를 눌러 근거를 확인할 수 있습니다." },
+  { route: "/ax/dashboard", target: "tut-brief", title: "오늘의 업무 브리핑", body: "시스템을 열면 가장 먼저 '오늘 먼저 확인할 것'이 우선순위로 정리됩니다. '왜?'로 근거를 보고, 바로 아래 버튼으로 안내 초안 작성·업무 등록·단계 변경까지 이 화면에서 끝낼 수 있습니다." },
   { route: "/ax/dashboard", target: "tut-kpi", title: "핵심 지표", body: "진행 프로젝트, 자료 검토 대기, 미처리 문의, 지연 프로젝트를 한눈에 봅니다. 카드를 누르면 해당 목록으로 이동합니다." },
   { route: "/ax/clients", target: "tut-nav-clients", title: "기업고객 카드", body: "기업고객 하나를 열면 상담·계약·프로젝트·자료·일정·문의·결과자료·이력이 한 화면에서 연결됩니다." },
   { route: "/ax/documents", target: "tut-nav-documents", title: "자료 · 누락 관리", body: "고객이 Portal에서 제출한 자료가 여기에 도착합니다. 검토 완료 또는 보완 요청을 하면 고객 Portal 상태가 자동으로 바뀝니다." },

@@ -14,6 +14,7 @@ import { Badge, Button, Card, EmptyState, IconTile, KpiCard, SectionTitle, Stat,
 import { ActivityFeed, DocStatusBadge, InquiryStatusBadge, ScheduleItem, StageBadge, StageProgressBar, DueText } from "@/components/domain/domain";
 import { ReviewDocModal } from "@/components/domain/DocActions";
 import { NewDocRequestModal, NewScheduleModal } from "@/components/domain/CreateModals";
+import { NewConsultationModal } from "@/components/domain/ConsultationModal";
 
 type TabKey = "overview" | "consult" | "contract" | "project" | "docs" | "schedule" | "inquiry" | "results" | "history";
 
@@ -27,6 +28,7 @@ export default function ClientCardPage() {
   const [tab, setTab] = useState<TabKey>("overview");
   const [reviewReq, setReviewReq] = useState<DocumentRequest | null>(null);
   const [newDoc, setNewDoc] = useState<string | null>(null);
+  const [newConsult, setNewConsult] = useState(false);
   const [newSchedule, setNewSchedule] = useState(false);
 
   const c = st.companies.find((x) => x.id === id);
@@ -195,6 +197,10 @@ export default function ClientCardPage() {
 
       {tab === "consult" && (
         <div className="space-y-3">
+          <div className="flex justify-end">
+            <Button variant="accent" icon={<Plus size={15} />} onClick={() => setNewConsult(true)}>상담 기록 작성</Button>
+          </div>
+          {consultations.length === 0 && <Card><EmptyState icon={<FileText size={30} />} title="상담 기록이 없습니다" desc="상담이 끝나면 바로 기록해 두면 다음 담당자도 같은 맥락에서 이어갈 수 있습니다." /></Card>}
           {consultations.map((cs) => (
             <Card key={cs.id} className="p-5">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -356,6 +362,7 @@ export default function ClientCardPage() {
 
       <ReviewDocModal req={reviewReq} open={!!reviewReq} onClose={() => setReviewReq(null)} />
       <NewDocRequestModal projectId={newDoc} open={!!newDoc} onClose={() => setNewDoc(null)} />
+      <NewConsultationModal open={newConsult} onClose={() => setNewConsult(false)} companyId={c.id} />
       <NewScheduleModal open={newSchedule} onClose={() => setNewSchedule(false)} companyId={c.id} projectId={active[0]?.id} />
     </div>
   );

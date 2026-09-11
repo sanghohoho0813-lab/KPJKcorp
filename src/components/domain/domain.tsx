@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { type ReactNode, useState } from "react";
-import { AlertTriangle, ArrowRight, CalendarDays, CheckCircle2, ChevronDown, FileUp, MessageSquare, Clock, FileText, RefreshCw, Sparkles, Upload, UserCheck, Search, Briefcase, Bell, LogIn, Download, RotateCcw, TrendingUp, ShieldCheck, ClipboardList } from "lucide-react";
+import { AlertTriangle, ArrowRight, CalendarDays, CheckCircle2, ChevronDown, FileUp, MessageSquare, Clock, FileText, RefreshCw, Sparkles, Upload, UserCheck, Search, Briefcase, Bell, LogIn, Download, RotateCcw, TrendingUp, ShieldCheck, ClipboardList, UserMinus, Repeat } from "lucide-react";
 import type { Activity, DocStatus, InternalStage, Schedule, TaskStatus, Priority, InquiryStatus } from "@/lib/types";
 import { DOC_STATUS, INQUIRY_STATUS, PRIORITY, SCHEDULE_TYPE, TASK_STATUS, stageLabel, stageProgress } from "@/lib/stages";
 import type { BriefItem } from "@/lib/brief";
 import { fmtDateTime, fmtRelative, fmtTime, relativeDay, fmtDate } from "@/lib/format";
 import { Badge, cx, type Tone } from "@/components/ui/ui";
 import { useStore } from "@/lib/store";
+import { BriefActionBar } from "./BriefActions";
 
 export function DocStatusBadge({ status, client }: { status: DocStatus; client?: boolean }) {
   const s = DOC_STATUS[status];
@@ -58,6 +59,8 @@ const KIND_ICON: Record<BriefItem["kind"], ReactNode> = {
   inquiry_open: <MessageSquare size={18} />,
   task_overdue: <CheckCircle2 size={18} />,
   contract_pending: <FileText size={18} />,
+  churn_risk: <UserMinus size={18} />,
+  reengage: <Repeat size={18} />,
 };
 
 export function BriefList({ items, limit, compact }: { items: BriefItem[]; limit?: number; compact?: boolean }) {
@@ -75,22 +78,31 @@ export function BriefList({ items, limit, compact }: { items: BriefItem[]; limit
         const expanded = open === it.id;
         return (
           <div key={it.id} className={cx("card overflow-hidden transition-colors", it.priority === "urgent" ? "border-l-4 border-l-error" : "border-l-4 border-l-line-2")}>
-            <div className="flex items-center gap-3 px-4 py-3">
+            <div className="flex items-start gap-3 px-4 py-3">
               <span className={cx("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg", it.priority === "urgent" ? "bg-error-bg text-error" : "bg-surface-2 text-ink-2")}>{KIND_ICON[it.kind]}</span>
               <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <Badge tone={it.priority === "urgent" ? "error" : "neutral"}>{it.priority === "urgent" ? "긴급" : "보통"}</Badge>
-                  <span className="truncate font-semibold">{it.title}</span>
+                  <span className="font-semibold">{it.title}</span>
                 </div>
                 {!compact && <div className="mt-0.5 text-[0.82rem] text-ink-2">다음 Action: {it.nextAction}</div>}
               </div>
-              <button onClick={() => setOpen(expanded ? null : it.id)} className="pressable flex items-center gap-1 rounded-lg px-2 py-1.5 text-[0.8rem] font-semibold text-ink-2 hover:bg-surface-2" aria-expanded={expanded}>
-                <Sparkles size={14} className="text-accent" /> 왜? <ChevronDown size={14} className={cx("transition-transform", expanded && "rotate-180")} />
-              </button>
-              <Link href={it.href} className="pressable hidden items-center gap-1 rounded-lg border border-line-2 px-3 py-1.5 text-[0.85rem] font-semibold hover:bg-surface-2 sm:flex">
-                열기 <ArrowRight size={14} />
-              </Link>
             </div>
+            {!compact && (
+              <div className="flex flex-wrap items-center gap-1.5 border-t border-line px-4 py-2.5">
+                <BriefActionBar item={it} />
+                <button onClick={() => setOpen(expanded ? null : it.id)} className="pressable ml-auto flex shrink-0 items-center gap-1 rounded-lg px-2 py-1.5 text-[0.8rem] font-semibold text-ink-2 hover:bg-surface-2" aria-expanded={expanded}>
+                  <Sparkles size={14} className="text-accent" /> 왜? <ChevronDown size={14} className={cx("transition-transform", expanded && "rotate-180")} />
+                </button>
+              </div>
+            )}
+            {compact && (
+              <div className="border-t border-line px-4 py-2">
+                <button onClick={() => setOpen(expanded ? null : it.id)} className="pressable flex items-center gap-1 rounded-lg px-2 py-1 text-[0.8rem] font-semibold text-ink-2 hover:bg-surface-2" aria-expanded={expanded}>
+                  <Sparkles size={14} className="text-accent" /> 왜? <ChevronDown size={14} className={cx("transition-transform", expanded && "rotate-180")} />
+                </button>
+              </div>
+            )}
             {expanded && (
               <div className="anim-fade border-t border-line bg-surface-2/60 px-4 py-3 text-[0.85rem]">
                 <div className="mb-1 font-bold text-ink-2">근거</div>
@@ -99,9 +111,9 @@ export function BriefList({ items, limit, compact }: { items: BriefItem[]; limit
                     <li key={r}>{r}</li>
                   ))}
                 </ul>
-                <div className="mt-2 flex items-center justify-between">
+                <div className="mt-2 flex items-center justify-between gap-2">
                   <span className="text-ink-3">규칙 기반 판단 · 실제 데이터에서 계산됨</span>
-                  <Link href={it.href} className="font-semibold text-accent sm:hidden">열기 →</Link>
+                  <Link href={it.href} className="shrink-0 font-semibold text-accent">해당 화면 →</Link>
                 </div>
               </div>
             )}

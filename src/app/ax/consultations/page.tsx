@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ClipboardList, FileSignature, Percent, ShieldCheck, Sparkles } from "lucide-react";
+import { ClipboardList, FileSignature, Percent, Plus, ShieldCheck, Sparkles } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useUi } from "@/lib/ui-store";
 import { fmtDate, fmtDateTime, fmtWon } from "@/lib/format";
 import { AiReadyBadge, Badge, Button, Card, Field, Input, PageHeader, Tabs, EmptyState } from "@/components/ui/ui";
 import { Modal } from "@/components/ui/overlay";
+import { NewConsultationModal } from "@/components/domain/ConsultationModal";
 import type { Contract } from "@/lib/types";
 
 /** 할인은 대표 승인 후 진행 — 요청은 여기서 시작한다. */
@@ -76,10 +77,11 @@ export default function ConsultationsPage() {
   const consultations = [...st.consultations].sort((a, b) => b.date.localeCompare(a.date));
   const contracts = [...st.contracts].sort((a, b) => (b.sentAt ?? "").localeCompare(a.sentAt ?? ""));
   const [discount, setDiscount] = useState<Contract | null>(null);
+  const [newConsult, setNewConsult] = useState(false);
   const pendingDiscount = (ct: Contract) => st.approvals.some((a) => a.kind === "discount" && a.projectId === ct.projectId && a.status === "pending");
   return (
     <div>
-      <PageHeader title="상담 · 계약" desc="상담 기록은 구조화 요약으로 남기고, 계약 상태는 프로젝트 단계와 연결됩니다." />
+      <PageHeader title="상담 · 계약" desc="상담 기록은 구조화 요약으로 남기고, 계약 상태는 프로젝트 단계와 연결됩니다." actions={<Button variant="accent" icon={<Plus size={16} />} onClick={() => setNewConsult(true)}>상담 기록 작성</Button>} />
       <Tabs tabs={[{ key: "consult", label: "상담 기록", count: consultations.length }, { key: "contract", label: "계약", count: contracts.length }]} value={tab} onChange={setTab} />
       <div className="mt-5">
         {tab === "consult" ? (
@@ -106,7 +108,7 @@ export default function ConsultationsPage() {
                 </Card>
               );
             })}
-            {consultations.length === 0 && <Card><EmptyState icon={<ClipboardList size={30} />} title="상담 기록이 없습니다" /></Card>}
+            {consultations.length === 0 && <Card><EmptyState icon={<ClipboardList size={30} />} title="상담 기록이 없습니다" desc="오른쪽 위 '상담 기록 작성'으로 첫 기록을 남길 수 있습니다." action={<Button variant="accent" icon={<Plus size={16} />} onClick={() => setNewConsult(true)}>상담 기록 작성</Button>} /></Card>}
           </div>
         ) : (
           <>
@@ -162,6 +164,7 @@ export default function ConsultationsPage() {
         )}
       </div>
       <DiscountModal ct={discount} onClose={() => setDiscount(null)} />
+      <NewConsultationModal open={newConsult} onClose={() => setNewConsult(false)} />
     </div>
   );
 }
