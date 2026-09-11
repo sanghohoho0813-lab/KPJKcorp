@@ -284,6 +284,30 @@ export interface Approval {
   decisionNote?: string;
 }
 
+/* ---------- 도입 전 기준선 (Before) ---------- */
+
+/**
+ * 도입 전 값은 시스템 안에 존재할 수 없다. 그래서 대표가 직접 입력한다.
+ * 화면에는 반드시 "대표 입력값"으로 표시해, 실측값(After)과 섞이지 않게 한다.
+ */
+export interface Baseline {
+  /** 자료요청 → 제출까지 걸리던 평균 일수 */
+  docLeadDays?: number;
+  /** 주간 후속 누락 건수 */
+  missedFollowupsPerWeek?: number;
+  /** 고객 문의에 답하기까지 걸리던 평균 시간 */
+  inquiryResponseHours?: number;
+  /** 월 상담 기록 건수 */
+  consultationsPerMonth?: number;
+  /** 담당자 1인당 동시 관리 기업 수 */
+  clientsPerConsultant?: number;
+  /** 대표가 직접 챙겨야 했던 업무 비중 (%) */
+  ceoHandledPct?: number;
+  recordedAt?: string;
+  recordedBy?: string;
+  note?: string;
+}
+
 /* ---------- AX 고도화 설문 ---------- */
 
 export interface SurveyResponse {
@@ -382,6 +406,8 @@ export interface Settings {
   tutorialDoneAx: boolean;
   /** AX 실증 스프린트 시작 시각. 없으면 아직 시작 전 */
   sprintStartedAt?: string;
+  /** 도입 전 기준선 (대표 입력값) */
+  baseline?: Baseline;
   tutorialDonePortal: boolean;
   timezone: string;
 }

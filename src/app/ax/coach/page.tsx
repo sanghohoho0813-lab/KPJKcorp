@@ -6,7 +6,8 @@ import { ArrowRight, Check, Compass, Play, RotateCcw } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { coachLine, coverageOf } from "@/lib/evidence";
 import { fmtDate } from "@/lib/format";
-import { AreaBar, useSprint } from "@/components/domain/Coach";
+import { AreaBar, WhyEvidence, useSprint } from "@/components/domain/Coach";
+import { BaselineCard } from "@/components/domain/BaselineCard";
 import { Badge, Button, Card, MoreButton, PageHeader, Progress, SectionTitle, cx } from "@/components/ui/ui";
 import { Confirm } from "@/components/ui/overlay";
 
@@ -36,6 +37,11 @@ export default function CoachPage() {
         }
       />
 
+      {/* 이 화면에서 가장 먼저 읽혀야 하는 것 — 왜 이걸 하는가 */}
+      <Card className="coach-box p-5">
+        <WhyEvidence />
+      </Card>
+
       {!s.active && (
         <Card className="p-5">
           <h2 className="text-[1.05rem] font-bold">실증 모드는 무엇을 합니까?</h2>
@@ -58,6 +64,8 @@ export default function CoachPage() {
             <p className="mt-2.5 text-[0.9rem] font-semibold">{coachLine(s)}</p>
             {s.startedAt && <p className="mt-1 text-[0.8rem] text-ink-3">{fmtDate(s.startedAt, { year: true })} 시작 · 측정 {s.day}일차</p>}
           </Card>
+
+          <BaselineCard />
 
           {openMissions.length > 0 && (
             <Card className="p-5">

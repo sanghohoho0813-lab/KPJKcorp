@@ -7,7 +7,8 @@ import { daysBetween, fmtDateTime } from "@/lib/format";
 import { INTERNAL_STAGES } from "@/lib/stages";
 import { Badge, Button, Card, DemoBadge, PageHeader, SectionTitle, Tabs, cx } from "@/components/ui/ui";
 import { ActivityFeed } from "@/components/domain/domain";
-import { AreaBar, useSprint } from "@/components/domain/Coach";
+import { AreaBar, WhyEvidence, useSprint } from "@/components/domain/Coach";
+import { BaselineCard } from "@/components/domain/BaselineCard";
 import { coverageOf } from "@/lib/evidence";
 import Link from "next/link";
 import { ArrowRight, Compass } from "lucide-react";
@@ -174,6 +175,8 @@ export default function ReportsPage() {
               </div>
             </Card>
 
+            <BaselineCard />
+
             <Card className="p-5">
               <SectionTitle action={<span className="tnum text-[0.85rem] text-ink-3">평균 {sprint.score} / 100</span>}>Evidence Coverage</SectionTitle>
               <p className="-mt-1 mb-4 text-[0.85rem] text-ink-2">
@@ -193,6 +196,10 @@ export default function ReportsPage() {
                   </div>
                 ))}
               </div>
+            </Card>
+
+            <Card className="coach-box p-5">
+              <WhyEvidence />
             </Card>
 
             <Card className="p-5">

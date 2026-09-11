@@ -1,5 +1,26 @@
 # QA_REPORT — KPJK Consulting AX + Client Portal
 
+## 0-E. 고도화 5차 검증 (2026-09-11)
+
+| 항목 | 결과 |
+|---|---|
+| TypeScript / ESLint | PASS (0 / 0) |
+| Production build | PASS — 30 routes |
+| 가로 overflow (390 / 768 / 1440 × 29 Route) | **0건** |
+| Runtime pageerror | **0건** |
+| 코치 박스 강조 + 3초 glow | PASS (`coachGlow 3s`) |
+| 모션 끄기 시 glow 정지 | PASS (`animationName: none`) |
+| 심사 관점 설명 (자금조달 · 전후 비교 · 소급 불가) | PASS |
+| Baseline 입력 → 전후 비교 표시 | PASS |
+| 회귀 (Coach 6단계 · AI Action · 견적 · 매출기회) | PASS |
+
+전후 비교 실측 예: 자료요청→제출 7일(입력) → 7.8일(실측) `+0.8일` · 주간 후속 누락 4건(입력) → 2건(실측) `-2건`.
+차이는 자동 계산하지만 표본 수를 함께 표시하고 성과로 단정하지 않는다.
+
+모바일 세로 길이 (390px): 코치 4813 → **4050px**, 리포트 4956 → **4193px** (근거 4가지를 모바일에서 접음).
+
+---
+
 ## 0-D. 고도화 4차 검증 (2026-09-11)
 
 | 항목 | 결과 |

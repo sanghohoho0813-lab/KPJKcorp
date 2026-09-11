@@ -239,6 +239,21 @@ h1, h2, h3, h4 { letter-spacing: -0.01em; line-height: 1.25; }
 .stagger > *:nth-child(4) { animation-delay: 120ms; }
 .stagger > *:nth-child(5) { animation-delay: 160ms; }
 
+/* AX 코치 강조 — 3초 주기로 아주 옅게 빛난다.
+   시선을 뺏는 게 아니라 "여기가 시작점"이라는 표시라서 진폭을 작게 잡는다. */
+.coach-box {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--theme-soft) 70%, var(--neutral-surface)) 0%, var(--neutral-surface) 62%);
+  border-color: color-mix(in srgb, var(--theme-accent) 34%, var(--neutral-border));
+}
+@keyframes coachGlow {
+  0%, 72%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--theme-accent) 0%, transparent), var(--neutral-shadow); }
+  86% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--theme-accent) 13%, transparent), 0 6px 22px color-mix(in srgb, var(--theme-accent) 16%, transparent); }
+}
+.coach-glow { animation: coachGlow 3s ease-in-out infinite; }
+html[data-motion="reduce"] .coach-glow { animation: none; }
+@media (prefers-reduced-motion: reduce) { .coach-glow { animation: none; } }
+
 /* Print-friendly hidden */
 .hide-scrollbar { scrollbar-width: none; }
 .hide-scrollbar::-webkit-scrollbar { display: none; }

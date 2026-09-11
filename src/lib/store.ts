@@ -8,6 +8,7 @@ import type {
   ActivityType,
   Approval,
   ApprovalKind,
+  Baseline,
   Consultation,
   DocumentRequest,
   InternalStage,
@@ -74,6 +75,8 @@ export interface StoreState extends SeedData {
   // AX 실증 (Evidence / Coach)
   startSprint: () => void;
   resetSprint: () => void;
+  /** 도입 전 기준선 기록 — 전후 비교의 Before 쪽 */
+  saveBaseline: (data: Baseline, byUserId: string) => void;
   /** 브리핑 추천을 실제로 실행했을 때 — "추천 후 실행" 건수의 근거가 된다. */
   logAiAction: (label: string, ctx: { companyId?: string; kind: string }, byUserId: string) => void;
   logEvidenceExport: (byUserId: string, rows: number) => void;
@@ -666,6 +669,14 @@ export const useStore = create<StoreState>()(
         set({
           settings: { ...st.settings, sprintStartedAt: now },
           activities: [makeActivity({ type: "task_created", actorId: st.session?.userId ?? "u_admin", actorRole: "admin", text: "AX 실증 14일 시작", meta: { sprint: "start" } }), ...st.activities],
+        });
+      },
+      saveBaseline: (data, byUserId) => {
+        const st = get();
+        const now = nowIso();
+        set({
+          settings: { ...st.settings, baseline: { ...data, recordedAt: now, recordedBy: byUserId } },
+          activities: [makeActivity({ type: "evidence_exported", actorId: byUserId, actorRole: "admin", text: "도입 전 기준선 기록", meta: { fields: Object.values(data).filter((v) => typeof v === "number").length } }), ...st.activities],
         });
       },
       resetSprint: () => {
