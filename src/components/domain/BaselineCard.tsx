@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ArrowRight, Pencil, Ruler } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { useNow } from "@/lib/hooks";
 import type { Baseline } from "@/lib/types";
 import { daysBetween, fmtDate } from "@/lib/format";
 import { Badge, Button, Card, Field, Input, SectionTitle, Textarea, cx } from "@/components/ui/ui";
@@ -29,14 +30,20 @@ const METRICS: Metric[] = [
 /** 실측(After) 값 — 시스템이 계산할 수 있는 것만 채운다. */
 export function useAfterValues() {
   const st = useStore();
-  const now = new Date().toISOString();
+  // 렌더 중 new Date()를 쓰면 서버/클라이언트 값이 갈려 기한 초과 건수가 어긋난다.
+  const tick = useNow(60000);
+  const now = (tick ?? new Date(0)).toISOString();
 
   const submitted = st.docRequests.filter((d) => d.submittedAt && d.requestedAt);
   const lead = submitted.map((d) => daysBetween(d.requestedAt, d.submittedAt!));
   const docLeadDays = lead.length ? +(lead.reduce((a, b) => a + b, 0) / lead.length).toFixed(1) : undefined;
 
-  const overdue = st.docRequests.filter((d) => (d.status === "requested" || d.status === "revision") && daysBetween(d.dueDate, now) > 0).length
-    + st.tasks.filter((t) => (t.status === "todo" || t.status === "doing") && daysBetween(t.dueDate, now) > 0).length;
+  // 하이드레이션 전(tick === null)에는 기한 비교 자체를 하지 않는다.
+  // 0으로 두면 "누락 0건"이 잠깐 보였다가 튀므로, 그동안은 "수집 중"으로 남긴다.
+  const overdue = !tick
+    ? undefined
+    : st.docRequests.filter((d) => (d.status === "requested" || d.status === "revision") && daysBetween(d.dueDate, now) > 0).length +
+      st.tasks.filter((t) => (t.status === "todo" || t.status === "doing") && daysBetween(t.dueDate, now) > 0).length;
 
   const answered = st.inquiries.filter((i) => i.status !== "open" && i.messages.length >= 2);
   const hrs = answered.map((i) => (new Date(i.messages[1].createdAt).getTime() - new Date(i.messages[0].createdAt).getTime()) / 3600000);

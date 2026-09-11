@@ -147,10 +147,13 @@ export default function ClientCardPage() {
                 <SectionTitle action={<Link href="/ax/opportunities?tab=pipeline" className="text-[0.85rem] font-semibold text-ink-2 hover:text-ink">기회 →</Link>}>매출기회</SectionTitle>
                 <div className="divide-y divide-line">
                   {opps.map((o) => (
-                    <div key={o.id} className="flex flex-wrap items-center gap-2 py-2.5">
-                      <Badge tone={OPP_STATUS[o.status].tone}>{OPP_STATUS[o.status].label}</Badge>
-                      <span className="min-w-0 flex-1 truncate font-semibold">{o.serviceName}</span>
-                      <span className="text-[0.78rem] text-ink-3">{o.source === "portal_interest" || o.source === "portal_request" ? "고객 발신" : o.source === "rule" ? "규칙 발견" : "내부"} · {fmtRelative(o.updatedAt)}</span>
+                    // 한 줄에 다 넣으면 좁은 화면에서 서비스명이 먼저 잘린다 — 이름이 가장 중요한 정보다.
+                    <div key={o.id} className="py-2.5">
+                      <div className="flex items-center gap-2">
+                        <Badge tone={OPP_STATUS[o.status].tone}>{OPP_STATUS[o.status].label}</Badge>
+                        <span className="min-w-0 flex-1 font-semibold">{o.serviceName}</span>
+                      </div>
+                      <div className="mt-0.5 pl-0.5 text-[0.78rem] text-ink-3">{o.source === "portal_interest" || o.source === "portal_request" ? "고객 발신" : o.source === "rule" ? "규칙 발견" : "내부"} · {fmtRelative(o.updatedAt)}</div>
                     </div>
                   ))}
                 </div>

@@ -72,7 +72,9 @@ function TasksInner() {
               const isDone = t.status === "done";
               return (
                 <div key={t.id} className={cx("flex items-center gap-3 px-4 py-3 md:px-5", isDone && "opacity-60")}>
-                  <button onClick={() => setStatus(t, isDone ? "todo" : "done")} className={cx("pressable flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 transition-colors", isDone ? "border-success bg-success text-white" : "border-line-2 hover:border-accent")} aria-label={isDone ? "완료 취소" : "완료"}>
+                  <button onClick={() => setStatus(t, isDone ? "todo" : "done")} // 체크박스는 이 화면에서 가장 자주 누르는 버튼이다. 보이는 크기는 24px로 두되
+                    // 실제 터치 영역만 44px로 넓힌다(after 의사요소).
+                    className={cx("pressable relative flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 transition-colors after:absolute after:-inset-2.5 after:content-[''] md:after:content-none", isDone ? "border-success bg-success text-white" : "border-line-2 hover:border-accent")} aria-label={isDone ? "완료 취소" : "완료"}>
                     {isDone && <CheckSquare size={14} />}
                   </button>
                   <div className="min-w-0 flex-1">

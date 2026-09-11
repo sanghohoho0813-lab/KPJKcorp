@@ -76,7 +76,7 @@ function DocumentsInner() {
               const overdue = (d.status === "requested" || d.status === "revision") && daysBetween(d.dueDate, now) > 0;
               return (
                 <button key={d.id} onClick={() => setReview(d)} className={cx("pressable block w-full px-4 py-3 text-left", overdue && "bg-error-bg/30")}>
-                  <div className="flex items-center gap-2"><DocStatusBadge status={d.status} /><span className="truncate font-semibold">{d.name}</span></div>
+                  <div className="flex items-center gap-2"><DocStatusBadge status={d.status} /><span className="min-w-0 flex-1 line-clamp-2 font-semibold md:line-clamp-1">{d.name}</span></div>
                   <div className="mt-1 truncate text-[0.85rem] text-ink-2">{c?.name} · {st.projects.find((p) => p.id === d.projectId)?.name}</div>
                   <div className="mt-1 flex flex-wrap items-center gap-x-3 text-[0.78rem] text-ink-3">
                     <DueText iso={d.dueDate} pending={d.status === "requested" || d.status === "revision"} />
@@ -134,7 +134,7 @@ function DocumentsInner() {
               const consultant = st.users.find((u) => u.id === d.assigneeId);
               return (
                 <div key={d.id} className="flex items-center gap-3 px-4 py-3">
-                  <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><DocStatusBadge status={d.status} /><span className="truncate font-semibold">{d.name}</span></div><div className="text-[0.8rem] text-ink-3">{c?.name} · {c?.contactName} {c?.contactTitle} · <DueText iso={d.dueDate} /></div></div>
+                  <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><DocStatusBadge status={d.status} /><span className="min-w-0 flex-1 line-clamp-2 font-semibold md:line-clamp-1">{d.name}</span></div><div className="text-[0.8rem] text-ink-3">{c?.name} · {c?.contactName} {c?.contactTitle} · <DueText iso={d.dueDate} /></div></div>
                   <Button size="sm" variant="outline" icon={<MessageSquareText size={14} />} onClick={() => openDraft({ kind: d.status === "revision" ? "revision_reminder" : "doc_reminder", ctx: { companyName: c?.name, contactName: c?.contactName, consultantName: consultant?.name, docName: d.name, dueText: `${fmtDate(d.dueDate)} (${relativeDay(d.dueDate)})`, note: d.reviewNote } })}>안내 초안</Button>
                 </div>
               );

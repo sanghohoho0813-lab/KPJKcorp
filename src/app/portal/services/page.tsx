@@ -3,8 +3,9 @@
 import { useMemo, useState } from "react";
 import { Check, MessageSquarePlus, Receipt, Sparkles, ThumbsUp } from "lucide-react";
 import { useStore, usePortalCompanyId, useCurrentUser, quoteGross, quoteNet } from "@/lib/store";
+import { useNow } from "@/lib/hooks";
 import { OPP_STATUS, recommendServices, type ServiceDef } from "@/lib/services";
-import { fmtDate, fmtRelative, fmtWon } from "@/lib/format";
+import { daysBetween, fmtDate, fmtRelative, fmtWon } from "@/lib/format";
 import { Badge, Button, Card, EmptyState, SectionTitle, Textarea, cx } from "@/components/ui/ui";
 import type { Quote } from "@/lib/types";
 import { Modal } from "@/components/ui/overlay";
@@ -22,6 +23,8 @@ export default function PortalServicesPage() {
   const [replyNote, setReplyNote] = useState("");
 
   const c = st.companies.find((x) => x.id === companyId);
+  const tick = useNow(60000);
+  const nowIso = (tick ?? new Date(0)).toISOString();
   const mine = useMemo(() => st.opportunities.filter((o) => o.companyId === companyId && o.status !== "dropped").sort((a, b) => b.createdAt.localeCompare(a.createdAt)), [st.opportunities, companyId]);
   // 고객에게는 발송된 견적만 보인다. 작성 중·승인 대기는 내부 상태다.
   const myQuotes = useMemo(() => st.quotes.filter((q) => q.companyId === companyId && ["sent", "accepted", "declined", "converted"].includes(q.status)).sort((a, b) => (b.sentAt ?? b.createdAt).localeCompare(a.sentAt ?? a.createdAt)), [st.quotes, companyId]);
@@ -68,6 +71,10 @@ export default function PortalServicesPage() {
         <div className="space-y-3">
           {myQuotes.map((q) => {
             const waiting = q.status === "sent";
+            // 유효기간이 지난 제안을 아무 표시 없이 수락 버튼과 함께 두면
+            // 고객이 이미 만료된 금액으로 결정하게 된다. 상태는 바꾸지 않고 사실만 알린다.
+            const expiredDays = waiting ? daysBetween(q.validUntil, nowIso) : 0;
+            const expired = expiredDays > 0;
             return (
               <Card key={q.id} className={cx("p-5", waiting && "border-accent")}>
                 <div className="flex flex-wrap items-center gap-2">
@@ -94,6 +101,12 @@ export default function PortalServicesPage() {
                 </div>
 
                 <div className="mt-2 text-[0.8rem] text-ink-3">기간 {q.period} · 유효기간 {fmtDate(q.validUntil)}{q.sentAt ? ` · ${fmtRelative(q.sentAt)} 받음` : ""}</div>
+
+                {expired && (
+                  <div className="mt-3 rounded-xl bg-warning-bg px-4 py-2.5 text-[0.85rem] text-warning">
+                    <b>유효기간이 {expiredDays}일 지났습니다.</b> 지금 회신하셔도 괜찮습니다. 금액과 일정은 담당 컨설턴트가 다시 확인한 뒤 안내드립니다.
+                  </div>
+                )}
 
                 {waiting ? (
                   <div className="mt-4 flex flex-wrap gap-2">

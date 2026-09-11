@@ -125,7 +125,7 @@ export default function ProjectDetailPage() {
                 {docs.map((d) => (
                   <button key={d.id} onClick={() => setReviewReq(d)} className="flex w-full items-center gap-3 px-5 py-3 text-left hover:bg-surface-2/60">
                     <span className={cx("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", d.status === "done" ? "bg-success-bg text-success" : d.status === "requested" || d.status === "revision" ? "bg-error-bg text-error" : "bg-warning-bg text-warning")}>{d.status === "done" ? <CheckCircle2 size={16} /> : d.status === "requested" || d.status === "revision" ? <Upload size={16} /> : <FileText size={16} />}</span>
-                    <div className="min-w-0 flex-1"><div className="truncate font-semibold">{d.name}</div><div className="text-[0.78rem] text-ink-3">{d.files.length ? `${d.files[d.files.length - 1].fileName} · ${fmtSize(d.files[d.files.length - 1].size)}` : d.description || "-"}</div></div>
+                    <div className="min-w-0 flex-1"><div className="line-clamp-2 font-semibold md:line-clamp-1">{d.name}</div><div className="text-[0.78rem] text-ink-3">{d.files.length ? `${d.files[d.files.length - 1].fileName} · ${fmtSize(d.files[d.files.length - 1].size)}` : d.description || "-"}</div></div>
                     <DocStatusBadge status={d.status} />
                     <span className="hidden w-24 text-right sm:block"><DueText iso={d.dueDate} pending={d.status === "requested" || d.status === "revision"} /></span>
                   </button>
@@ -147,7 +147,7 @@ export default function ProjectDetailPage() {
           <Card className="p-5">
             <SectionTitle>미완료 업무</SectionTitle>
             {tasks.length === 0 ? <div className="text-[0.9rem] text-ink-3">미완료 업무가 없습니다.</div> : tasks.map((t) => (
-              <Link key={t.id} href="/ax/tasks" className="flex items-center justify-between border-b border-line py-2 text-[0.88rem] last:border-0"><span className="truncate font-semibold">{t.title}</span><DueText iso={t.dueDate} /></Link>
+              <Link key={t.id} href="/ax/tasks" className="flex items-center justify-between border-b border-line py-2 text-[0.88rem] last:border-0"><span className="min-w-0 flex-1 line-clamp-2 font-semibold md:line-clamp-1">{t.title}</span><DueText iso={t.dueDate} /></Link>
             ))}
           </Card>
           <Card className="p-5">

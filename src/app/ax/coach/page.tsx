@@ -29,7 +29,7 @@ export default function CoachPage() {
       <PageHeader
         title={<span className="flex items-center gap-2"><Compass size={24} className="text-accent" /> AX 코치</span>}
         desc="설명을 읽는 화면이 아닙니다. 오늘 처리할 것을 순서대로 제안하고, 그 행동이 그대로 실증 기록이 됩니다."
-        badge={s.active ? <Badge tone="accent">Day {s.day} / {s.totalDays}</Badge> : <Badge>시작 전</Badge>}
+        badge={!s.active ? <Badge>시작 전</Badge> : s.finished ? <Badge tone="success">14일 완료</Badge> : <Badge tone="accent">Day {s.day} / {s.totalDays}</Badge>}
         actions={
           s.active
             ? <Button variant="ghost" icon={<RotateCcw size={15} />} onClick={() => setConfirmReset(true)}>실증 초기화</Button>
@@ -62,7 +62,20 @@ export default function CoachPage() {
             </SectionTitle>
             <Progress value={pct} height={10} />
             <p className="mt-2.5 text-[0.9rem] font-semibold">{coachLine(s)}</p>
-            {s.startedAt && <p className="mt-1 text-[0.8rem] text-ink-3">{fmtDate(s.startedAt, { year: true })} 시작 · 측정 {s.day}일차</p>}
+            {s.startedAt && (
+              <p className="mt-1 text-[0.8rem] text-ink-3">
+                {fmtDate(s.startedAt, { year: true })} 시작 · {s.finished ? `${s.elapsedDays}일 경과 (14일 기간 종료)` : `측정 ${s.day}일차`}
+              </p>
+            )}
+            {s.finished && (
+              <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-success-bg px-4 py-3 text-[0.85rem] text-success">
+                <Check size={16} className="shrink-0" />
+                <span className="min-w-0 flex-1">
+                  14일 기간이 끝났습니다. 기록은 계속 쌓이며, 지금 내보내면 &ldquo;{fmtDate(s.startedAt!)}부터 14일&rdquo; 구간의 실측 자료가 됩니다.
+                </span>
+                <Link href="/ax/reports" className="pressable shrink-0 rounded-lg bg-success px-3 py-1.5 text-[0.82rem] font-semibold text-white">리포트 열기</Link>
+              </div>
+            )}
           </Card>
 
           <BaselineCard />

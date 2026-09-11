@@ -177,7 +177,16 @@ export function SegmentedControl<T extends string>({ options, value, onChange, s
   return (
     <div className="hide-scrollbar inline-flex max-w-full overflow-x-auto rounded-[10px] bg-surface-2 p-1">
       {options.map((o) => (
-        <button key={o.key} onClick={() => onChange(o.key)} className={cx("pressable whitespace-nowrap rounded-lg font-semibold transition-colors", size === "sm" ? "px-2.5 py-1 text-[0.75rem]" : "px-3.5 py-1.5 text-[0.85rem]", o.key === value ? "bg-surface text-ink shadow-sm" : "text-ink-3 hover:text-ink-2")}>
+        <button
+          key={o.key}
+          onClick={() => onChange(o.key)}
+          // 모바일에서 31px짜리 칩은 손가락으로 정확히 누르기 어렵다. 터치 기기에서만 40px로 키운다.
+          className={cx(
+            "pressable flex items-center justify-center whitespace-nowrap rounded-lg font-semibold transition-colors",
+            size === "sm" ? "min-h-8 px-2.5 text-[0.75rem] md:min-h-0 md:py-1" : "min-h-10 px-3.5 text-[0.85rem] md:min-h-0 md:py-1.5",
+            o.key === value ? "bg-surface text-ink shadow-sm" : "text-ink-3 hover:text-ink-2",
+          )}
+        >
           {o.label}
         </button>
       ))}

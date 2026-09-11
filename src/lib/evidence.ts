@@ -264,8 +264,12 @@ export function buildMissions(ctx: EvidenceCtx): Mission[] {
 
 export interface SprintState {
   active: boolean;
-  /** 1부터 시작. 시작 전이면 0 */
+  /** 1부터 시작. 시작 전이면 0. 14일이 지나도 14에서 멈춘다 */
   day: number;
+  /** 시작일로부터 실제 경과일 (14를 넘어갈 수 있다) */
+  elapsedDays: number;
+  /** 14일 기간이 끝났는가 */
+  finished: boolean;
   totalDays: number;
   startedAt?: string;
   missions: Mission[];
@@ -281,7 +285,11 @@ export interface SprintState {
 export function buildSprint(ctx: EvidenceCtx): SprintState {
   const areas = evidenceAreas(ctx);
   const missions = buildMissions(ctx);
-  const day = ctx.startedAt ? Math.min(SPRINT_DAYS, daysBetween(ctx.startedAt, ctx.now.toISOString()) + 1) : 0;
+  const elapsedDays = ctx.startedAt ? daysBetween(ctx.startedAt, ctx.now.toISOString()) + 1 : 0;
+  const day = Math.min(SPRINT_DAYS, elapsedDays);
+  // 14일이 지나면 기간은 끝난다. 그 뒤에도 "Day 14 / 14"로 계속 두면
+  // 실증이 끝났는지 진행 중인지 화면만 봐서는 알 수 없다.
+  const finished = !!ctx.startedAt && elapsedDays > SPRINT_DAYS;
   const open = missions.filter((m) => !m.done);
   // 오늘 제안할 것: 예정일이 지났거나 오늘인 것 우선, 없으면 남은 것 중 가장 앞선 것
   const due = open.filter((m) => m.day <= Math.max(day, 1));
@@ -290,6 +298,8 @@ export function buildSprint(ctx: EvidenceCtx): SprintState {
   return {
     active: !!ctx.startedAt,
     day,
+    elapsedDays,
+    finished,
     totalDays: SPRINT_DAYS,
     startedAt: ctx.startedAt,
     missions,
@@ -336,7 +346,13 @@ export const WHY_EVIDENCE = {
 /** 코치가 지금 하는 말 한 줄. 설명이 아니라 지시여야 한다. */
 export function coachLine(s: SprintState): string {
   if (!s.active) return "실증 모드를 시작하면 오늘부터 무엇을 해야 하는지 순서대로 안내합니다.";
-  if (s.today.length === 0) return `14개 미션을 모두 처리했습니다. 이제부터는 평소대로 쓰시면 기록이 계속 쌓입니다.`;
+  if (s.today.length === 0) return `${s.missions.length}개 미션을 모두 처리했습니다. 이제부터는 평소대로 쓰시면 기록이 계속 쌓입니다.`;
+  if (s.finished) {
+    const w0 = s.weakest;
+    return w0 && coverageOf(w0) < 100
+      ? `14일 기간이 끝났습니다. ${w0.label} 기록이 ${w0.count}/${w0.target}건이니, 이것부터 채우고 리포트를 내보내세요.`
+      : "14일 기간이 끝났습니다. 리포트에서 Evidence를 내보내 기록을 정리하세요.";
+  }
   const w = s.weakest;
   if (w && coverageOf(w) < 40) return `${w.label} 기록이 가장 부족합니다. ${w.how}부터 처리해 주세요.`;
   return `${s.today[0].title} — 오늘 이것부터 처리해 주세요.`;

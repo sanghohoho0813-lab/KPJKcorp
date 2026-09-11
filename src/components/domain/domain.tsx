@@ -230,7 +230,8 @@ export function ScheduleItem({ s, showCompany, client }: { s: Schedule; showComp
       </div>
       <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: t.color }} />
       <div className="min-w-0 flex-1">
-        <div className="truncate font-semibold">{s.title}</div>
+        {/* 모바일에서는 시간 열을 빼면 200px 남짓이라 제목이 절반쯤 잘린다. 두 줄까지 허용한다. */}
+        <div className="line-clamp-2 font-semibold md:line-clamp-1">{s.title}</div>
         <div className="text-[0.8rem] text-ink-3">
           {t.label}
           {s.location ? ` · ${s.location}` : ""}

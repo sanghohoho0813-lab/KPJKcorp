@@ -75,9 +75,11 @@ export default function DashboardPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge tone={ap.kind === "discount" ? "warning" : ap.kind === "promise" ? "info" : "accent"}>{ap.kind === "discount" ? "할인" : ap.kind === "promise" ? "고객 약속" : "제안"}</Badge>
-                      <span className="truncate font-semibold">{ap.title}</span>
+                      {/* 대표가 승인 여부를 판단하려면 무엇을 승인하는지 읽혀야 한다.
+                          좁은 화면에서 한 줄로 자르면 제목도 요약도 절반만 보였다. */}
+                      <span className="min-w-0 flex-1 line-clamp-2 font-semibold md:line-clamp-1">{ap.title}</span>
                     </div>
-                    <div className="mt-0.5 truncate text-[0.82rem] text-ink-2">{ap.summary}</div>
+                    <div className="mt-0.5 line-clamp-2 text-[0.82rem] text-ink-2 md:line-clamp-1">{ap.summary}</div>
                     <div className="mt-0.5 text-[0.78rem] text-ink-3">{co?.name} · {who?.name} {who?.title} 요청 · {fmtRelative(ap.requestedAt)}{ap.baseAmount ? ` · ${fmtWon(ap.baseAmount)} / 할인 ${ap.discountPct}%` : ""}</div>
                   </div>
                   <ArrowRight size={16} className="shrink-0 text-ink-3" />
@@ -108,7 +110,7 @@ export default function DashboardPage() {
               <div className="divide-y divide-line">
                 {newOpps.slice(0, 3).map((o) => (
                   <Link key={o.id} href="/ax/opportunities?tab=pipeline" className="block py-3 hover:bg-surface-2/60">
-                    <div className="flex items-center gap-2"><Badge tone={OPP_STATUS[o.status].tone}>{o.source === "rule" ? "규칙 발견" : "고객 관심"}</Badge><span className="truncate font-semibold">{o.serviceName}</span></div>
+                    <div className="flex items-center gap-2"><Badge tone={OPP_STATUS[o.status].tone}>{o.source === "rule" ? "규칙 발견" : "고객 관심"}</Badge><span className="min-w-0 flex-1 line-clamp-2 font-semibold md:line-clamp-1">{o.serviceName}</span></div>
                     <div className="mt-0.5 text-[0.8rem] text-ink-3">{st.companies.find((c) => c.id === o.companyId)?.name} · {fmtRelative(o.createdAt)}</div>
                   </Link>
                 ))}

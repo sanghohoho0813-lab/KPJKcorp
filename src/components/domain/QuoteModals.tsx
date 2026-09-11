@@ -4,7 +4,8 @@ import { useState } from "react";
 import { Plus, X } from "lucide-react";
 import { useStore, quoteGross, quoteNet } from "@/lib/store";
 import type { Quote, QuoteItem, QuoteStatus } from "@/lib/types";
-import { addDays, fmtWon } from "@/lib/format";
+import { addDays, daysBetween, fmtWon } from "@/lib/format";
+import { useNow } from "@/lib/hooks";
 import { Badge, Button, Field, Input, Select, Textarea, cx, type Tone } from "@/components/ui/ui";
 import { Modal } from "@/components/ui/overlay";
 
@@ -204,12 +205,15 @@ export function QuoteDetailModal({ quote, onClose }: { quote: Quote | null; onCl
   const toast = useStore((s) => s.toast);
   const me = st.session?.userId ?? "u_admin";
   const [approvalFor, setApprovalFor] = useState<Quote | null>(null);
+  // 유효기간은 지나도 상태를 자동으로 바꾸지 않는다 — 사람이 연장할지 재발송할지 정한다. 사실만 알린다.
+  const tick = useNow(60000);
   if (!quote) return null;
   const q = st.quotes.find((x) => x.id === quote.id) ?? quote;
   const c = st.companies.find((x) => x.id === q.companyId);
   const s = QUOTE_STATUS[q.status];
   // 할인이 있는데 아직 승인 기록(approvalId)이 붙지 않았으면 발송할 수 없다.
   const needsApproval = q.discountPct > 0 && !q.approvalId;
+  const expiredDays = tick ? daysBetween(q.validUntil, tick.toISOString()) : 0;
 
   return (
     <>
@@ -257,7 +261,9 @@ export function QuoteDetailModal({ quote, onClose }: { quote: Quote | null; onCl
         {needsApproval && <div className="mt-3 rounded-xl bg-warning-bg px-4 py-2.5 text-[0.85rem] font-semibold text-warning">할인 {q.discountPct}%가 포함되어 있어 대표 승인 전에는 발송할 수 없습니다.</div>}
         {q.status === "draft" && q.discountPct > 0 && q.approvalId && <div className="mt-3 rounded-xl bg-success-bg px-4 py-2.5 text-[0.85rem] font-semibold text-success">대표 승인 완료 — 할인 {q.discountPct}%로 발송할 수 있습니다.</div>}
         {q.status === "approval_pending" && <div className="mt-3 rounded-xl bg-warning-bg px-4 py-2.5 text-[0.85rem] font-semibold text-warning">대표 승인 대기 중입니다. 승인 · 매출기회 화면에서 처리할 수 있습니다.</div>}
-        {q.status === "sent" && <div className="mt-3 rounded-xl bg-info-bg px-4 py-2.5 text-[0.85rem] text-info">고객 Portal에 표시되어 있습니다. 회신이 오면 알림과 업무로 도착합니다.</div>}
+        {q.status === "sent" && (expiredDays > 0
+          ? <div className="mt-3 rounded-xl bg-warning-bg px-4 py-2.5 text-[0.85rem] text-warning"><b>유효기간이 {expiredDays}일 지났습니다.</b> 고객 화면에도 같은 안내가 표시됩니다. 연장하려면 새 견적으로 재발송하세요.</div>
+          : <div className="mt-3 rounded-xl bg-info-bg px-4 py-2.5 text-[0.85rem] text-info">고객 Portal에 표시되어 있습니다. 회신이 오면 알림과 업무로 도착합니다.</div>)}
         {q.status === "declined" && <div className="mt-3 rounded-xl bg-error-bg px-4 py-2.5 text-[0.85rem] text-error"><b>고객 보류</b>{q.clientNote ? ` — ${q.clientNote}` : ""}</div>}
         {q.status === "converted" && <div className="mt-3 rounded-xl bg-success-bg px-4 py-2.5 text-[0.85rem] text-success">계약으로 전환되었습니다.</div>}
       </Modal>

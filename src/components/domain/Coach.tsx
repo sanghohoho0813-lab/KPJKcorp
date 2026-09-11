@@ -138,7 +138,7 @@ export function CoachCard() {
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line px-5 py-3">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-ink"><Compass size={17} /></span>
         <span className="font-bold">오늘의 AX 코치</span>
-        <Badge tone="accent">Day {s.day} / {s.totalDays}</Badge>
+        {s.finished ? <Badge tone="success">14일 완료</Badge> : <Badge tone="accent">Day {s.day} / {s.totalDays}</Badge>}
         <span className="tnum ml-auto text-[0.82rem] text-ink-3">미션 {s.doneCount} / {s.missions.length}</span>
         <Link href="/ax/coach" className="whitespace-nowrap text-[0.85rem] font-semibold text-ink-2 hover:text-ink">전체 보기 →</Link>
       </div>

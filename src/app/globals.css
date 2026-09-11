@@ -11,6 +11,8 @@
   --theme-primary: #343b44;
   --theme-secondary: #6b7680;
   --theme-accent: #d47a4a;
+  /* 흰 배경 위 글자 / 글자가 올라가는 채움면에 쓰는 값. accent 원색은 대비가 2.2~3.4:1 밖에 안 나온다. */
+  --theme-accent-strong: #b75b2a;
   --theme-highlight: #e8b89a;
   --theme-soft: #f4ebe4;
   --theme-accent-ink: #ffffff;
@@ -18,21 +20,26 @@
   /* Neutral — fixed */
   --neutral-canvas: #fafaf8;
   --neutral-surface: #ffffff;
-  --neutral-surface-2: #f3f4f2;
+  --neutral-surface-2: #f5f6f4;
   --neutral-text: #171b20;
   --neutral-text-2: #5c6570;
-  --neutral-text-3: #8a939d;
+  /* #8a939d는 흰 배경에서 3.1:1 밖에 안 나온다. 주석·단위·각주가 전부 이 색이라
+     "왜 이 숫자가 이렇게 나왔는지" 설명하는 문장이 가장 안 읽히는 문장이 되어 있었다. */
+  --neutral-text-3: #697280;
   --neutral-border: #e7eaee;
   --neutral-border-2: #d5dae0;
   --neutral-shadow: 0 1px 2px rgba(23, 27, 32, 0.04), 0 4px 16px rgba(23, 27, 32, 0.05);
   --neutral-shadow-lg: 0 8px 32px rgba(23, 27, 32, 0.12);
 
-  /* Semantic — fixed, theme-independent */
-  --sem-success: #2f8a63;
+  /* Semantic — fixed, theme-independent.
+     값은 전부 흰 배경과 각자의 -bg 위에서 4.5:1 이상이 되도록 낮춘 것이다.
+     이전 값(success #2f8a63 / warning #b7791f)은 3.2~3.7:1이라 상태 배지와
+     경고 박스의 본문이 가장 안 읽히는 글자가 되어 있었다. */
+  --sem-success: #277352;
   --sem-success-bg: #e6f3ec;
-  --sem-warning: #b7791f;
+  --sem-warning: #8f5e0a;
   --sem-warning-bg: #fbf0dc;
-  --sem-error: #c2493d;
+  --sem-error: #b03c31;
   --sem-error-bg: #fbe7e3;
   --sem-info: #2f6bb0;
   --sem-info-bg: #e5eef9;
@@ -85,16 +92,16 @@
    Page background, Card, Surface and Table always use the fixed Neutral tokens above.
    `--theme-soft` is a large-area fill (chat bubble, memo box, selected row) so it is kept
    near-neutral: 12% accent on white. Raising its chroma is what makes a theme look hazy. */
-html[data-theme="kpjk"] { --theme-shell:#171b20; --theme-shell-2:#22272e; --theme-primary:#343b44; --theme-secondary:#6b7680; --theme-accent:#d47a4a; --theme-highlight:#e8b89a; --theme-soft:#faefe9; }
-html[data-theme="navy"] { --theme-shell:#0b1830; --theme-shell-2:#132447; --theme-primary:#2457d6; --theme-secondary:#1687a7; --theme-accent:#17a889; --theme-highlight:#e7c873; --theme-soft:#e3f5f1; }
-html[data-theme="navygold"] { --theme-shell:#111a2d; --theme-shell-2:#1a2640; --theme-primary:#2847a7; --theme-secondary:#a37a28; --theme-accent:#d0a84b; --theme-highlight:#f0d995; --theme-soft:#f9f5e9; --theme-accent-ink:#171b20; }
-html[data-theme="emerald"] { --theme-shell:#11332b; --theme-shell-2:#19453b; --theme-primary:#0e7663; --theme-secondary:#2c9277; --theme-accent:#b4862a; --theme-highlight:#e8ce88; --theme-soft:#f6f0e5; }
-html[data-theme="forest"] { --theme-shell:#17352c; --theme-shell-2:#20473c; --theme-primary:#356e58; --theme-secondary:#73977e; --theme-accent:#a58e4d; --theme-highlight:#d9d2aa; --theme-soft:#f4f1ea; }
-html[data-theme="teal"] { --theme-shell:#08323a; --theme-shell-2:#0e434d; --theme-primary:#087a83; --theme-secondary:#1597a3; --theme-accent:#d2704c; --theme-highlight:#e9b59b; --theme-soft:#faeeea; }
-html[data-theme="onyx"] { --theme-shell:#15171c; --theme-shell-2:#1f222a; --theme-primary:#343942; --theme-secondary:#6a717c; --theme-accent:#b89032; --theme-highlight:#e0c76f; --theme-soft:#f6f2e6; }
-html[data-theme="burgundy"] { --theme-shell:#3a1724; --theme-shell-2:#4c2032; --theme-primary:#7a2c49; --theme-secondary:#7c6873; --theme-accent:#b8405f; --theme-highlight:#f0b9a6; --theme-soft:#fbecef; }
-html[data-theme="plum"] { --theme-shell:#291a3d; --theme-shell-2:#362451; --theme-primary:#573f91; --theme-secondary:#4e63a8; --theme-accent:#8a4fb5; --theme-highlight:#cbb3ec; --theme-soft:#f3ecf8; }
-html[data-theme="steel"] { --theme-shell:#24303b; --theme-shell-2:#2f3e4c; --theme-primary:#44647a; --theme-secondary:#6d8899; --theme-accent:#4c9aaa; --theme-highlight:#c9d6de; --theme-soft:#eaf3f5; }
+html[data-theme="kpjk"] { --theme-shell:#171b20; --theme-shell-2:#22272e; --theme-primary:#343b44; --theme-secondary:#6b7680; --theme-accent:#d47a4a; --theme-accent-strong:#b75b2a; --theme-highlight:#e8b89a; --theme-soft:#faefe9; }
+html[data-theme="navy"] { --theme-shell:#0b1830; --theme-shell-2:#132447; --theme-primary:#2457d6; --theme-secondary:#1687a7; --theme-accent:#17a889; --theme-accent-strong:#11836b; --theme-highlight:#e7c873; --theme-soft:#e3f5f1; }
+html[data-theme="navygold"] { --theme-shell:#111a2d; --theme-shell-2:#1a2640; --theme-primary:#2847a7; --theme-secondary:#a37a28; --theme-accent:#d0a84b; --theme-accent-strong:#917024; --theme-highlight:#f0d995; --theme-soft:#f9f5e9; }
+html[data-theme="emerald"] { --theme-shell:#11332b; --theme-shell-2:#19453b; --theme-primary:#0e7663; --theme-secondary:#2c9277; --theme-accent:#b4862a; --theme-accent-strong:#946e21; --theme-highlight:#e8ce88; --theme-soft:#f6f0e5; }
+html[data-theme="forest"] { --theme-shell:#17352c; --theme-shell-2:#20473c; --theme-primary:#356e58; --theme-secondary:#73977e; --theme-accent:#a58e4d; --theme-accent-strong:#86733e; --theme-highlight:#d9d2aa; --theme-soft:#f4f1ea; }
+html[data-theme="teal"] { --theme-shell:#08323a; --theme-shell-2:#0e434d; --theme-primary:#087a83; --theme-secondary:#1597a3; --theme-accent:#d2704c; --theme-accent-strong:#bd542e; --theme-highlight:#e9b59b; --theme-soft:#faeeea; }
+html[data-theme="onyx"] { --theme-shell:#15171c; --theme-shell-2:#1f222a; --theme-primary:#343942; --theme-secondary:#6a717c; --theme-accent:#b89032; --theme-accent-strong:#8f6f26; --theme-highlight:#e0c76f; --theme-soft:#f6f2e6; }
+html[data-theme="burgundy"] { --theme-shell:#3a1724; --theme-shell-2:#4c2032; --theme-primary:#7a2c49; --theme-secondary:#7c6873; --theme-accent:#b8405f; --theme-accent-strong:#b8405f; --theme-highlight:#f0b9a6; --theme-soft:#fbecef; }
+html[data-theme="plum"] { --theme-shell:#291a3d; --theme-shell-2:#362451; --theme-primary:#573f91; --theme-secondary:#4e63a8; --theme-accent:#8a4fb5; --theme-accent-strong:#8a4fb5; --theme-highlight:#cbb3ec; --theme-soft:#f3ecf8; }
+html[data-theme="steel"] { --theme-shell:#24303b; --theme-shell-2:#2f3e4c; --theme-primary:#44647a; --theme-secondary:#6d8899; --theme-accent:#4c9aaa; --theme-accent-strong:#3d7e8b; --theme-highlight:#c9d6de; --theme-soft:#eaf3f5; }
 
 /* Font scale */
 html { font-size: 19px; }
@@ -113,7 +120,10 @@ html[data-motion="reduce"] *::after {
   --color-shell-2: var(--theme-shell-2);
   --color-primary: var(--theme-primary);
   --color-secondary: var(--theme-secondary);
-  --color-accent: var(--theme-accent);
+  /* text-accent / bg-accent / border-accent 는 전부 글자와 맞닿는다 → 대비 확보된 strong.
+     원색(--theme-accent)은 진행바·glow·포커스링 같은 비텍스트 면에만 직접 쓴다. */
+  --color-accent: var(--theme-accent-strong);
+  --color-accent-bright: var(--theme-accent);
   --color-accent-ink: var(--theme-accent-ink);
   --color-highlight: var(--theme-highlight);
   --color-soft: var(--theme-soft);
