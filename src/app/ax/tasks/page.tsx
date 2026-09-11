@@ -1,21 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { CheckSquare, Plus } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { daysBetween, fmtDate, isSameDay } from "@/lib/format";
 import type { Task, TaskStatus } from "@/lib/types";
-import { Badge, Button, Card, EmptyState, KpiCard, PageHeader, SegmentedControl, cx } from "@/components/ui/ui";
+import { Badge, Button, Card, EmptyState, KpiCard, PageHeader, SegmentedControl, Tabs, cx } from "@/components/ui/ui";
 import { DueText, PriorityBadge, TaskStatusBadge } from "@/components/domain/domain";
 import { NewTaskModal } from "@/components/domain/CreateModals";
+import { InquiryConsole } from "@/components/domain/InquiryConsole";
 
 type Filter = "today" | "open" | "overdue" | "done" | "all";
 
-export default function TasksPage() {
+function TasksInner() {
   const st = useStore();
   const update = useStore((s) => s.updateTaskStatus);
   const toast = useStore((s) => s.toast);
+  const params = useSearchParams();
+  const [tab, setTab] = useState<"task" | "inquiry">(params.get("tab") === "inquiry" ? "inquiry" : "task");
   const [filter, setFilter] = useState<Filter>("today");
   const [open, setOpen] = useState(false);
   const now = new Date();
@@ -39,8 +43,21 @@ export default function TasksPage() {
 
   return (
     <div>
-      <PageHeader title="업무 · 후속관리" desc="후속연락·자료검토·문의응대·미팅준비를 놓치지 않도록 관리합니다. 고객 제출·문의 시 검토 업무가 자동 생성됩니다." actions={<Button variant="accent" icon={<Plus size={16} />} onClick={() => setOpen(true)}>업무 등록</Button>} />
-      <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+      <PageHeader
+        title="업무함"
+        desc="내가 처리할 업무와 고객 문의를 한 곳에서 봅니다. 고객이 자료를 제출하거나 문의를 남기면 여기에 자동으로 생깁니다."
+        actions={tab === "task" ? <Button variant="accent" icon={<Plus size={16} />} onClick={() => setOpen(true)}>업무 등록</Button> : undefined}
+      />
+      <Tabs
+        tabs={[
+          { key: "task", label: "내 업무", count: openTasks.length },
+          { key: "inquiry", label: "고객 문의", count: st.inquiries.filter((i) => i.status === "open" && (!me || i.assigneeId === me)).length },
+        ]}
+        value={tab}
+        onChange={setTab}
+      />
+      {tab === "inquiry" ? <div className="mt-5"><InquiryConsole embedded /></div> : <>
+      <div className="mb-5 mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
         <KpiCard label="오늘 처리" value={today.length} sub={overdue.length ? `기한 초과 ${overdue.length} 포함` : "기한 내"} accentValue={today.length > 0} />
         <KpiCard label="기한 초과" value={overdue.length} sub="먼저 처리" tone={overdue.length ? "error" : undefined} />
         <KpiCard label="미완료 전체" value={openTasks.length} sub={`자동 생성 ${openTasks.filter((t) => t.source === "auto").length}건`} />
@@ -84,7 +101,12 @@ export default function TasksPage() {
           </div>
         )}
       </Card>
+      </>}
       <NewTaskModal open={open} onClose={() => setOpen(false)} />
     </div>
   );
+}
+
+export default function TasksPage() {
+  return <Suspense><TasksInner /></Suspense>;
 }

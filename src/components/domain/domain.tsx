@@ -7,7 +7,7 @@ import type { Activity, DocStatus, InternalStage, Schedule, TaskStatus, Priority
 import { DOC_STATUS, INQUIRY_STATUS, PRIORITY, SCHEDULE_TYPE, TASK_STATUS, stageLabel, stageProgress } from "@/lib/stages";
 import type { BriefItem } from "@/lib/brief";
 import { fmtDateTime, fmtRelative, fmtTime, relativeDay, fmtDate } from "@/lib/format";
-import { Badge, cx, type Tone } from "@/components/ui/ui";
+import { Badge, MoreButton, cx, type Tone } from "@/components/ui/ui";
 import { useStore } from "@/lib/store";
 import { BriefActionBar } from "./BriefActions";
 
@@ -71,12 +71,15 @@ export function BriefList({ items, limit, compact }: { items: BriefItem[]; limit
   const updateTask = useStore((s) => s.updateTaskStatus);
   const toast = useStore((s) => s.toast);
   const me = useStore((s) => s.session?.userId) ?? "u_admin";
-  const list = limit ? items.slice(0, limit) : items;
+  const [expanded, setExpanded] = useState(false);
+  const INITIAL = 5;
+  const list = limit ? items.slice(0, limit) : expanded ? items : items.slice(0, INITIAL);
+  const hiddenCount = limit ? 0 : items.length - list.length;
 
   const undoStrip = handled.length > 0 && (
     <div className="space-y-2">
       {handled.map((h) => (
-        <div key={h.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-success/30 bg-success-bg px-4 py-2.5 text-[0.85rem]">
+        <div key={h.id} className="anim-pop-in flex flex-wrap items-center gap-2 rounded-xl border border-success/30 bg-success-bg px-4 py-2.5 text-[0.85rem]">
           <CheckCircle2 size={16} className="shrink-0 text-success" />
           <span className="min-w-0 flex-1 truncate font-semibold text-success">{h.title}</span>
           <button
@@ -149,6 +152,9 @@ export function BriefList({ items, limit, compact }: { items: BriefItem[]; limit
           </div>
         );
       })}
+      {!limit && items.length > INITIAL && (
+        <MoreButton hidden={expanded ? items.length - INITIAL : hiddenCount} open={expanded} onToggle={() => setExpanded((v) => !v)} />
+      )}
     </div>
   );
 }
@@ -181,6 +187,8 @@ const ACT_ICON: Record<Activity["type"], ReactNode> = {
   quote_sent: <Receipt size={14} />,
   quote_responded: <Receipt size={14} />,
   quote_converted: <UserCheck size={14} />,
+  ai_action_taken: <Sparkles size={14} />,
+  evidence_exported: <Download size={14} />,
   demo_reset: <RotateCcw size={14} />,
 };
 

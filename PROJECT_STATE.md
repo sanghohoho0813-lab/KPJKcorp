@@ -1,13 +1,13 @@
 # PROJECT_STATE — KPJK Consulting AX + Client Portal
 
 > SPEC = 어디까지 갈 것인가 / STATE = 지금 어디까지 왔는가
-> Last updated: 2026-09-11 (견적 워크플로 · 할인 승인 · 브리핑 Undo)
+> Last updated: 2026-09-11 (AX Coach · Evidence Coverage · IA 재단순화)
 
 ## PROJECT FINAL OBJECTIVE
 KPJK의 경영컨설팅 업무를 기억·카톡·개별파일 의존 구조에서 **기업고객 중심 통합 데이터 운영체계**로 전환. 고객 문의→상담→계약→자료요청→제출→검토→진행→결과→사후관리가 하나의 시스템에서 이어지고, 고객이 Portal로 직접 참여한다.
 
 ## 현재 상태
-**Demo Ready** (2단계 완료 + 3단계 일부 · 목표 대비 약 85%)
+**Demo Ready** (2단계 완료 + 3단계 상당부분 · 목표 대비 약 90%)
 
 ## STRATEGIC GATES
 | Gate | 상태 |
@@ -50,6 +50,13 @@ KPJK의 경영컨설팅 업무를 기억·카톡·개별파일 의존 구조에�
 
 ### PLATFORM CORE
 - [x] Portal Home(5초 테스트: 진행률·현재 단계·다음 일정·요청자료·담당자) / Timeline(7 Step) / Documents(업로드·재제출·보완 사유) / Schedule / Results(열람 기록) / Inquiries(작성·추가문의) / Notifications / Me
+
+### AX 실증 (2026-09-11 추가)
+- [x] AX 코치 — 14일 스프린트, 오늘의 미션 1~3개, 코치 한 줄 지시, 실증 시작/초기화
+- [x] 미션 14종 — 전부 실제 업무. Event 기록 여부로 자동 완료 판정
+- [x] Evidence Coverage 6영역 — Activity Log 실측 건수 / 14일 목표 건수
+- [x] 리포트 첫 탭 "실증 진행" — Coverage + 미션 진행 + AX 코치 연결
+- [x] `ai_action_taken` / `evidence_exported` Event — 추천 후 실행, 내보내기 기록
 
 ### 매출 · 승인 (2026-09-11 추가)
 - [x] Opportunity — 고객 관심표시/상담요청, 내부 등록, 규칙 발견 4개 소스. 6단계 파이프라인
@@ -96,6 +103,7 @@ KPJK의 경영컨설팅 업무를 기억·카톡·개별파일 의존 구조에�
 - [OPTIONAL] Vercel 배포: `npm run build` 통과 확인됨, 환경변수 불필요
 
 ## 최근 주요 변경
+- 2026-09-11 고도화 4차 — AX Coach / Evidence 모듈 신설(14일 실증, 미션 14개, Coverage 6영역, 리포트 실증 탭). 사이드바 13 → 9개(3그룹 + Utility), 문의를 업무함 탭으로 통합, 대시보드 KPI 6 → 4. 모바일 세로 길이 축소(MoreButton), 기능적 모션(CountUp · stagger · pop-in)
 - 2026-09-11 고도화 3차 — 견적 워크플로(상담 → 견적 → 계약) 신설. 할인은 승인 전 발송 차단, 고객 Portal 회신, 계약 전환 시 기회 자동 종료. 브리핑에 견적 회신 대기 규칙 + 완료 되돌리기. 리포트 매출 축에 견적 4지표
 - 2026-09-11 고도화 2차 — AI 브리핑을 "말하는 화면"에서 "처리하는 화면"으로 전환(항목별 실행 버튼 7종), 이탈 위험·재상담 규칙 2종 추가, 상담 기록 직접 작성 UI. 브리핑 모바일 레이아웃 압축
 - 2026-09-11 고도화 1차 — 매출기회 Closed Loop(TERTIARY), 대표 승인 Workflow, AX 고도화 설문, 테마 뿌연 현상 제거, 모바일 가로스크롤 전면 제거, 대시보드 우선순위 재구성, 리포트 4축 Evidence. 상세는 `BACKLOG.md`

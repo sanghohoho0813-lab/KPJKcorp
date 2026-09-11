@@ -71,6 +71,13 @@ export interface StoreState extends SeedData {
   decideApproval: (id: string, decision: "approved" | "rejected", byUserId: string, note?: string) => void;
   submitSurvey: (data: Omit<SurveyResponse, "id" | "submittedAt">) => void;
 
+  // AX 실증 (Evidence / Coach)
+  startSprint: () => void;
+  resetSprint: () => void;
+  /** 브리핑 추천을 실제로 실행했을 때 — "추천 후 실행" 건수의 근거가 된다. */
+  logAiAction: (label: string, ctx: { companyId?: string; kind: string }, byUserId: string) => void;
+  logEvidenceExport: (byUserId: string, rows: number) => void;
+
   // 견적 (상담 → 견적 → 계약)
   createQuote: (data: { companyId: string; projectId?: string; opportunityId?: string; title: string; scope: string; period: string; items: QuoteItem[]; discountPct: number; validUntil: string }, byUserId: string) => void;
   requestQuoteApproval: (quoteId: string, reason: string, byUserId: string) => void;
@@ -648,6 +655,33 @@ export const useStore = create<StoreState>()(
           opportunities,
           activities: [makeActivity({ type: "quote_converted", companyId: q.companyId, projectId: q.projectId, actorId: byUserId, actorRole: "consultant", text: `계약 전환: ${q.title}`, meta: { amount: quoteNet(q) } }), ...st.activities],
           notifications: [makeNotification({ audience: "client", companyId: q.companyId, title: "계약서를 보내드렸습니다", body: `${q.title} 계약 진행을 시작합니다.`, href: "/portal/projects" }), ...st.notifications],
+        });
+      },
+
+      // ---------- AX 실증 ----------
+      startSprint: () => {
+        const st = get();
+        if (st.settings.sprintStartedAt) return;
+        const now = nowIso();
+        set({
+          settings: { ...st.settings, sprintStartedAt: now },
+          activities: [makeActivity({ type: "task_created", actorId: st.session?.userId ?? "u_admin", actorRole: "admin", text: "AX 실증 14일 시작", meta: { sprint: "start" } }), ...st.activities],
+        });
+      },
+      resetSprint: () => {
+        const st = get();
+        set({ settings: { ...st.settings, sprintStartedAt: undefined } });
+      },
+      logAiAction: (label, c, byUserId) => {
+        const st = get();
+        set({
+          activities: [makeActivity({ type: "ai_action_taken", companyId: c.companyId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `AI 추천 실행: ${label}`, meta: { kind: c.kind } }), ...st.activities],
+        });
+      },
+      logEvidenceExport: (byUserId, rows) => {
+        const st = get();
+        set({
+          activities: [makeActivity({ type: "evidence_exported", actorId: byUserId, actorRole: st.session?.role ?? "admin", text: `Evidence Log 내보내기 (${rows}건)`, meta: { rows } }), ...st.activities],
         });
       },
 

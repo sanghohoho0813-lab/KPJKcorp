@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { type ReactNode, type ButtonHTMLAttributes, type InputHTMLAttributes, type SelectHTMLAttributes, type TextareaHTMLAttributes, forwardRef } from "react";
+import { type ReactNode, type ButtonHTMLAttributes, type InputHTMLAttributes, type SelectHTMLAttributes, type TextareaHTMLAttributes, forwardRef, useEffect, useRef, useState } from "react";
 import { ChevronRight, Sparkles } from "lucide-react";
 
 export function cx(...parts: (string | false | null | undefined)[]) {
@@ -102,7 +102,9 @@ export function KpiCard({ label, value, sub, tone, href, icon, id, accentValue }
         {icon}
       </div>
       <div>
-        <div className={cx("tnum text-[2.1rem] font-bold leading-none", accentValue ? "text-accent" : tone === "error" ? "text-error" : "text-ink")}>{value}</div>
+        <div className={cx("tnum text-[2.1rem] font-bold leading-none", accentValue ? "text-accent" : tone === "error" ? "text-error" : "text-ink")}>
+          {typeof value === "number" ? <CountUp value={value} /> : value}
+        </div>
         {sub && <div className="mt-2 text-[0.85rem] text-ink-2">{sub}</div>}
       </div>
     </div>
@@ -184,6 +186,23 @@ export function SegmentedControl<T extends string>({ options, value, onChange, s
 }
 
 /* ---------- Empty / Skeleton ---------- */
+/**
+ * 목록이 길어지면 모바일에서 화면 몇 개를 그냥 스크롤하게 된다.
+ * 처음에는 몇 개만 보여주고 나머지는 눌러서 펼친다.
+ */
+export function MoreButton({ hidden, open, onToggle }: { hidden: number; open: boolean; onToggle: () => void }) {
+  if (hidden <= 0) return null;
+  return (
+    <button
+      onClick={onToggle}
+      className="pressable mt-2 flex w-full items-center justify-center gap-1 rounded-xl border border-line px-4 py-2.5 text-[0.85rem] font-semibold text-ink-2 transition-colors hover:bg-surface-2"
+    >
+      {open ? "접기" : `${hidden}개 더 보기`}
+      <ChevronRight size={14} className={cx("transition-transform", open ? "-rotate-90" : "rotate-90")} />
+    </button>
+  );
+}
+
 export function EmptyState({ icon, title, desc, action }: { icon?: ReactNode; title: string; desc?: string; action?: ReactNode }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 px-6 py-14 text-center">
@@ -244,6 +263,32 @@ export function Avatar({ name, size = 36, className }: { name: string; size?: nu
       {name.slice(0, 1)}
     </span>
   );
+}
+
+/**
+ * 숫자가 바뀔 때 짧게 세어 올린다. 값이 변했다는 걸 눈으로 잡게 하는 용도라
+ * 260ms 안에 끝내고, 모션을 끈 사용자에게는 첫 프레임에 바로 최종값이 된다.
+ */
+export function CountUp({ value, className }: { value: number; className?: string }) {
+  const [shown, setShown] = useState(value);
+  const prev = useRef(value);
+  useEffect(() => {
+    const from = prev.current;
+    prev.current = value;
+    if (from === value) return;
+    const reduce = typeof document !== "undefined" && document.documentElement.dataset.motion === "reduce";
+    const dur = reduce ? 0 : 260;
+    const start = performance.now();
+    let raf = 0;
+    const step = (t: number) => {
+      const k = dur === 0 ? 1 : Math.min(1, (t - start) / dur);
+      setShown(Math.round(from + (value - from) * (1 - Math.pow(1 - k, 3))));
+      if (k < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+  return <span className={className}>{shown}</span>;
 }
 
 export function Progress({ value, className, height = 10 }: { value: number; className?: string; height?: number }) {

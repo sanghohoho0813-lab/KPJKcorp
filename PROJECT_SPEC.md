@@ -66,25 +66,31 @@ Demo 계정: 대표(admin) / 박성훈 이사(consultant) / 이주연 컨설턴�
 
 ## 3. INFORMATION ARCHITECTURE
 
-### Business AX (`/ax/*`) — Sidebar 280px · 4 Group
+### Business AX (`/ax/*`) — Sidebar 280px · 3 Group + Utility
 
-메뉴는 **4개 그룹**으로 묶는다. 그룹 = 분류 단위이며, 아이콘 색은 **그룹당 1색 계열**로 통일한다(메뉴별 개별 색 금지).
-세부 기능은 독립 메뉴로 늘리지 않고 상세 화면 안으로 흡수한다 (결과자료 → 자료관리 탭).
+메뉴는 **사고 흐름 순서**로 3그룹 9개다. 세부 기능은 독립 메뉴로 늘리지 않고 상세 화면의 탭으로 흡수한다.
+아이콘 색은 **그룹당 1색 계열**로 통일한다(메뉴별 개별 색 금지).
 
 | Group | 아이콘 색 계열 | 메뉴 |
 |---|---|---|
-| 핵심 운영 | 블루 · 슬레이트 `--nav-core` | 01 대시보드 `/ax/dashboard` · 02 승인 · 매출기회 `/ax/opportunities` · 03 기업고객 `/ax/clients`, `/ax/clients/[id]` · 04 상담 · 계약 `/ax/consultations` · 05 프로젝트 `/ax/projects`, `/ax/projects/[id]` · 06 자료관리 `/ax/documents` (요청자료 / 결과자료 탭) · 07 일정 `/ax/schedule` · 08 업무 · 후속관리 `/ax/tasks` · 09 문의 · 커뮤니케이션 `/ax/inquiries` |
-| AI · 분석 | 퍼플 · 인디고 `--nav-ai` | 10 AI 브리핑 `/ax/brief` · 11 리포트 `/ax/reports` |
-| 시스템 | 그레이 · 뉴트럴 `--nav-sys` | 12 Why AX `/ax/why` · 13 설정 `/ax/settings` |
-| 향후 확장 (NEXT) | 오렌지 · 앰버 `--nav-next` | NEXT Preview Sheet 5종 — 기본 **접힘** |
+| 오늘 | 블루 · 슬레이트 `--nav-core` | 대시보드 `/ax/dashboard` · 승인 · 매출기회 `/ax/opportunities` · 업무함 `/ax/tasks` (내 업무 / 고객 문의 탭) |
+| 고객 · 프로젝트 | 틸 · 슬레이트 `--nav-client` | 기업고객 `/ax/clients` · 상담 · 견적 · 계약 `/ax/consultations` (상담/견적/계약 탭) · 프로젝트 `/ax/projects` · 자료관리 `/ax/documents` (요청자료/결과자료 탭) |
+| 운영 | 퍼플 · 인디고 `--nav-ai` | 일정 `/ax/schedule` · 리포트 · 실증 `/ax/reports` |
 
-Sidebar 하단 고정: **시스템 개선 의견** `/ax/survey` (제작사 표기 없음). `/ax/results`는 기존 링크용으로 라우트만 유지한다.
-핵심 운영의 순서는 실제 흐름(오늘 → 대표 결정 → 고객 → 상담·계약 → 프로젝트 → 실행 → 소통)을 따른다.
-Active 표시: 좌측 Accent Bar 3px + 배경 Pill. 승인 대기 건수는 사이드바에 숫자 배지로 표시한다.
+**Utility (하단, 한 단계 작게)**: AX 코치 `/ax/coach` · 설정 `/ax/settings` · Why AX `/ax/why` · 시스템 개선 의견 `/ax/survey`.
+설명성 메뉴(Why AX)는 운영 메뉴와 같은 무게로 보이면 안 되므로 본문 나열에서 제외한다.
+`/ax/brief`, `/ax/inquiries`, `/ax/results`는 라우트만 유지하고 사이드바에서는 뺀다(대시보드·업무함·자료관리 안으로 흡수).
 
-Mobile Bottom Nav: 오늘 / 고객 / 프로젝트 / 자료 / 더보기(Sheet: 나머지 전부, **Sidebar와 동일한 4 Group 구조** + 시스템 개선 의견)
+승인 대기 / 미처리(업무+문의) 건수는 사이드바에 숫자 배지로 표시한다.
+Active 표시: 좌측 Accent Bar 3px + 배경 Pill.
 
-**모바일은 축소판이 아니다.** 가로 스크롤은 두지 않는다. Kanban은 `단계 요약 → 선택 → 목록`, 넓은 표(기업고객·자료관리·상담/계약·기업카드)는 `한 건 = 한 카드`로 대체하고, 표는 `lg` 이상에서만 렌더한다.
+**첫 화면 정보 밀도** — 대시보드는 ① AX 코치(오늘의 미션) ② 지금 문제가 있는 KPI 4개 ③ 대표 승인 대기 ④ 오늘의 브리핑 순서다.
+상태만 보여주는 숫자(진행 중 프로젝트 수 등)와 브리핑에서 파생되는 중복 카드는 첫 화면에 두지 않는다.
+
+Mobile Bottom Nav: 오늘 / 고객 / 프로젝트 / 자료 / 더보기(Sheet: 나머지 + 시스템 그룹)
+
+**모바일은 축소판이 아니다.** 가로 스크롤 0을 유지하고, 세로도 무한정 길어지지 않게 한다:
+긴 목록은 처음 4~5개만 보여주고 나머지는 `MoreButton`으로 펼친다. 코치 카드의 미션은 모바일에서 1개만 크게 보여준다.
 
 ### Client Portal (`/portal/*`)
 01 홈 `/portal` · 02 내 프로젝트 `/portal/projects` · 03 요청자료 `/portal/documents` · 04 일정 `/portal/schedule` · 05 완료자료 `/portal/results` · 06 함께 검토 `/portal/services` · 07 문의하기 `/portal/inquiries` · 08 알림 `/portal/notifications` · 09 내 정보 `/portal/me`
@@ -135,6 +141,14 @@ Data Source: **DEMO** (zustand + localStorage persist). Repository 분리: `src/
 **QUATERNARY (견적)**: 상담 → 견적 작성 → (할인 있으면) 대표 승인 → 발송 [Event: quote_sent] + 회신 확인 Task 자동 생성 → 고객 Portal에서 수락/보류 [Event: quote_responded] → 내부 알림 + 후속 Task → 수락 시 계약 전환 [Event: quote_converted] → 연결된 매출기회 자동 종료(won)
 
 **할인 규칙** — 할인이 0보다 큰 견적은 `approvalId`가 붙기 전에는 발송 버튼이 열리지 않는다. 대표가 반려하면 할인이 0%로 되돌아가 정가로 발송하거나 다시 요청할 수 있다.
+
+**AX EVIDENCE / COACH** — `src/lib/evidence.ts`
+- **14일 실증 스프린트**: `settings.sprintStartedAt`부터 Day 1~14. 시작 전에는 전체 기간 기준으로 계산한다.
+- **미션 14개**: 전부 실제 업무다. 완료 판정은 "버튼을 눌렀는가"가 아니라 **그 행동의 Event가 기록됐는가**로 한다. 그래서 미션을 위한 가짜 행동이 불가능하다.
+- **Evidence Coverage 6영역**: 운영 기록 / 고객 Portal 사용 / 자료 순환 / AI 추천 활용 / 대표 승인 / 매출 흐름. 각 영역은 Activity Log에서 센 실제 건수와 14일 기준 목표 건수만 표시한다. 개선율·효과는 계산하지 않는다.
+- **코치는 먼저 말한다**: 질문을 기다리는 챗봇이 아니라 "지금 이것부터 하세요"를 대시보드 최상단에서 지시한다. 가장 비어 있는 영역을 근거로 문장을 만든다.
+- **Report 연결**: 리포트 첫 탭이 실증 진행이다. 행동 → Event → Coverage → 리포트가 한 줄로 이어진다.
+- `ai_action_taken`은 projectId를 담지 않는다. 담으면 "프로젝트에 활동이 있었다"로 계산되어 정체 판정이 즉시 풀리고, 모달이 열리기 전에 항목이 사라진다.
 
 **AI Action 원칙** — 브리핑은 발견에서 멈추지 않는다. 각 항목은 `문제 → 근거 → 추천 행동 → 실행`까지 한 카드 안에서 끝난다.
 실행은 전부 기존 store action(초안·Task·Schedule·단계 변경·Opportunity)을 호출하므로 별도 기록 경로가 생기지 않고 Evidence Log에 그대로 남는다.

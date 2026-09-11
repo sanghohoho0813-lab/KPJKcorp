@@ -328,6 +328,8 @@ export type ActivityType =
   | "quote_responded"
   | "quote_converted"
   | "survey_submitted"
+  | "ai_action_taken"
+  | "evidence_exported"
   | "demo_reset";
 
 export interface Activity {
@@ -378,6 +380,8 @@ export interface Settings {
   fontScale: "small" | "base" | "large";
   reduceMotion: boolean;
   tutorialDoneAx: boolean;
+  /** AX 실증 스프린트 시작 시각. 없으면 아직 시작 전 */
+  sprintStartedAt?: string;
   tutorialDonePortal: boolean;
   timezone: string;
 }

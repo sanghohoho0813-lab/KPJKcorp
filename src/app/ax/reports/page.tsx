@@ -7,11 +7,18 @@ import { daysBetween, fmtDateTime } from "@/lib/format";
 import { INTERNAL_STAGES } from "@/lib/stages";
 import { Badge, Button, Card, DemoBadge, PageHeader, SectionTitle, Tabs, cx } from "@/components/ui/ui";
 import { ActivityFeed } from "@/components/domain/domain";
+import { AreaBar, useSprint } from "@/components/domain/Coach";
+import { coverageOf } from "@/lib/evidence";
+import Link from "next/link";
+import { ArrowRight, Compass } from "lucide-react";
 
 export default function ReportsPage() {
   const st = useStore();
   const toast = useStore((s) => s.toast);
-  const [tab, setTab] = useState<"kpi" | "ops" | "evidence">("kpi");
+  const logExport = useStore((s) => s.logEvidenceExport);
+  const me = useStore((s) => s.session?.userId) ?? "u_admin";
+  const [tab, setTab] = useState<"sprint" | "kpi" | "ops" | "evidence">("sprint");
+  const sprint = useSprint();
   const now = new Date().toISOString();
 
   const m = useMemo(() => {
@@ -82,6 +89,7 @@ export default function ReportsPage() {
     const a = document.createElement("a");
     a.href = url; a.download = `kpjk_evidence_${now.slice(0, 10)}.csv`; a.click();
     URL.revokeObjectURL(url);
+    logExport(me, st.activities.length);
     toast("Evidence Log CSV를 내려받았습니다.");
   };
 
@@ -149,6 +157,58 @@ export default function ReportsPage() {
       <PageHeader title="리포트 · 실증" desc="KPI 측정지점과 Evidence Log입니다. 실제 Baseline이 없는 숫자는 개선율로 표시하지 않습니다." badge={<DemoBadge />} actions={<Button variant="outline" icon={<Download size={16} />} onClick={exportCsv}>Evidence CSV</Button>} />
       <Tabs tabs={[{ key: "kpi", label: "KPI 측정지점" }, { key: "ops", label: "운영 현황" }, { key: "evidence", label: "Evidence Log", count: st.activities.length }]} value={tab} onChange={setTab} />
       <div className="mt-5">
+        {tab === "sprint" && (
+          <div className="space-y-5">
+            <Card className="p-5">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-soft text-accent"><Compass size={18} /></span>
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-[1.05rem] font-bold">{sprint.active ? `AX 실증 ${sprint.day}일차` : "실증 모드 시작 전"}</h2>
+                  <p className="mt-0.5 text-[0.85rem] text-ink-2">
+                    {sprint.active
+                      ? `미션 ${sprint.doneCount} / ${sprint.missions.length} 완료 · 이 기간에 기록된 Event만 집계합니다.`
+                      : "AX 코치에서 실증을 시작하면 이 화면이 기간 기준으로 집계됩니다. 지금은 전체 기간 기준입니다."}
+                  </p>
+                </div>
+                <Link href="/ax/coach" className="flex shrink-0 items-center gap-1 whitespace-nowrap text-[0.85rem] font-semibold text-accent">AX 코치 <ArrowRight size={14} /></Link>
+              </div>
+            </Card>
+
+            <Card className="p-5">
+              <SectionTitle action={<span className="tnum text-[0.85rem] text-ink-3">평균 {sprint.score} / 100</span>}>Evidence Coverage</SectionTitle>
+              <p className="-mt-1 mb-4 text-[0.85rem] text-ink-2">
+                6개 영역이 각각 얼마나 채워졌는지입니다. 목표치는 14일 실증 기준 최소 건수이며, 성과나 개선율이 아닙니다.
+              </p>
+              <div className="grid gap-4 md:grid-cols-2">
+                {sprint.areas.map((a) => (
+                  <div key={a.key} className="rounded-xl border border-line p-4">
+                    <AreaBar a={a} />
+                    <p className="mt-2 text-[0.8rem] leading-relaxed text-ink-2">{a.why}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <Badge tone={coverageOf(a) >= 100 ? "success" : coverageOf(a) >= 40 ? "warning" : "error"}>
+                        {coverageOf(a) >= 100 ? "충분" : coverageOf(a) >= 40 ? "수집 중" : a.count === 0 ? "기록 없음" : "부족"}
+                      </Badge>
+                      <Link href={a.href} className="text-[0.8rem] font-semibold text-ink-2 hover:text-ink">{a.how} →</Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            <Card className="p-5">
+              <SectionTitle>미션 진행</SectionTitle>
+              <div className="divide-y divide-line">
+                {sprint.missions.map((m) => (
+                  <div key={m.key} className="flex items-center gap-3 py-2.5">
+                    <span className={cx("flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[0.7rem] font-bold", m.done ? "bg-success text-white" : "bg-surface-2 text-ink-3")}>{m.done ? "✓" : `D${m.day}`}</span>
+                    <span className={cx("min-w-0 flex-1 text-[0.9rem]", m.done ? "font-semibold" : "text-ink-2")}>{m.title}</span>
+                    <span className="shrink-0 text-[0.78rem] text-ink-3">{m.progress}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
+        )}
         {tab === "kpi" && (
           <div className="space-y-5">
             <div className="rounded-xl border border-warning/30 bg-warning-bg px-4 py-3 text-[0.88rem] text-warning">

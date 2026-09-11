@@ -131,6 +131,7 @@ const ICON: Partial<Record<BriefAction["kind"], React.ReactNode>> = {
  */
 export function BriefActionBar({ item, onCompleted }: { item: BriefItem; onCompleted?: (item: BriefItem) => void }) {
   const updateTask = useStore((s) => s.updateTaskStatus);
+  const logAi = useStore((s) => s.logAiAction);
   const toast = useStore((s) => s.toast);
   const me = useStore((s) => s.session?.userId) ?? "u_admin";
   const openDraft = useUi((s) => s.openDraft);
@@ -140,6 +141,10 @@ export function BriefActionBar({ item, onCompleted }: { item: BriefItem; onCompl
   const [taskFor, setTaskFor] = useState<{ companyId?: string; projectId?: string } | null>(null);
 
   const run = (a: BriefAction) => {
+    // 추천이 실제 행동으로 이어졌는지는 이 기록으로만 구분된다 (Evidence: AI 추천 활용).
+    // projectId는 일부러 넣지 않는다 — 넣으면 "프로젝트에 활동이 있었다"로 계산되어
+    // 정체 판정이 즉시 풀리고, 모달이 열리기도 전에 이 항목이 목록에서 사라진다.
+    if (a.kind !== "open") logAi(`${item.title} — ${a.label}`, { companyId: item.companyId, kind: a.kind }, me);
     switch (a.kind) {
       case "draft": {
         const { draftKind, ...ctx } = a.payload ?? {};
