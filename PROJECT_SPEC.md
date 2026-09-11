@@ -68,22 +68,28 @@ Demo 계정: 대표(admin) / 박성훈 이사(consultant) / 이주연 컨설턴�
 
 ### Business AX (`/ax/*`) — Sidebar 280px · 4 Group
 
-메뉴 12개는 **4개 그룹**으로 묶는다. 그룹 = 분류 단위이며, 아이콘 색은 **그룹당 1색 계열**로 통일한다(메뉴별 개별 색 금지).
+메뉴는 **4개 그룹**으로 묶는다. 그룹 = 분류 단위이며, 아이콘 색은 **그룹당 1색 계열**로 통일한다(메뉴별 개별 색 금지).
+세부 기능은 독립 메뉴로 늘리지 않고 상세 화면 안으로 흡수한다 (결과자료 → 자료관리 탭).
 
 | Group | 아이콘 색 계열 | 메뉴 |
 |---|---|---|
-| 핵심 운영 | 블루 · 슬레이트 `--nav-core` | 01 대시보드 `/ax/dashboard` · 02 기업고객 `/ax/clients`, `/ax/clients/[id]` · 03 상담 · 계약 `/ax/consultations` · 04 프로젝트 `/ax/projects`, `/ax/projects/[id]` · 05 자료관리 `/ax/documents` · 06 일정 `/ax/schedule` · 07 업무 · 후속관리 `/ax/tasks` · 08 문의 · 커뮤니케이션 `/ax/inquiries` · 09 결과자료 `/ax/results` |
+| 핵심 운영 | 블루 · 슬레이트 `--nav-core` | 01 대시보드 `/ax/dashboard` · 02 승인 · 매출기회 `/ax/opportunities` · 03 기업고객 `/ax/clients`, `/ax/clients/[id]` · 04 상담 · 계약 `/ax/consultations` · 05 프로젝트 `/ax/projects`, `/ax/projects/[id]` · 06 자료관리 `/ax/documents` (요청자료 / 결과자료 탭) · 07 일정 `/ax/schedule` · 08 업무 · 후속관리 `/ax/tasks` · 09 문의 · 커뮤니케이션 `/ax/inquiries` |
 | AI · 분석 | 퍼플 · 인디고 `--nav-ai` | 10 AI 브리핑 `/ax/brief` · 11 리포트 `/ax/reports` |
 | 시스템 | 그레이 · 뉴트럴 `--nav-sys` | 12 Why AX `/ax/why` · 13 설정 `/ax/settings` |
-| 향후 확장 (NEXT) | 오렌지 · 앰버 `--nav-next` | NEXT Preview Sheet 5종 — 기본 **접힘**, 클릭 시 펼침 |
+| 향후 확장 (NEXT) | 오렌지 · 앰버 `--nav-next` | NEXT Preview Sheet 5종 — 기본 **접힘** |
 
-핵심 운영의 순서는 실제 컨설팅 흐름(고객 → 상담·계약 → 프로젝트 → 실행(자료·일정·업무) → 소통 → 결과)을 따른다.
-Active 표시: 좌측 Accent Bar 3px + 배경 Pill. Hover는 배경만 변한다(색 변화 없음).
+Sidebar 하단 고정: **시스템 개선 의견** `/ax/survey` (제작사 표기 없음). `/ax/results`는 기존 링크용으로 라우트만 유지한다.
+핵심 운영의 순서는 실제 흐름(오늘 → 대표 결정 → 고객 → 상담·계약 → 프로젝트 → 실행 → 소통)을 따른다.
+Active 표시: 좌측 Accent Bar 3px + 배경 Pill. 승인 대기 건수는 사이드바에 숫자 배지로 표시한다.
 
-Mobile Bottom Nav: 오늘 / 고객 / 프로젝트 / 자료 / 더보기(Sheet: 하단바에 없는 나머지 전부, **Sidebar와 동일한 4 Group 구조**)
+Mobile Bottom Nav: 오늘 / 고객 / 프로젝트 / 자료 / 더보기(Sheet: 나머지 전부, **Sidebar와 동일한 4 Group 구조** + 시스템 개선 의견)
+
+**모바일은 축소판이 아니다.** 가로 스크롤은 두지 않는다. Kanban은 `단계 요약 → 선택 → 목록`, 넓은 표(기업고객·자료관리·상담/계약·기업카드)는 `한 건 = 한 카드`로 대체하고, 표는 `lg` 이상에서만 렌더한다.
 
 ### Client Portal (`/portal/*`)
-01 홈 `/portal` · 02 내 프로젝트 `/portal/projects` · 03 요청자료 `/portal/documents` · 04 일정 `/portal/schedule` · 05 완료자료 `/portal/results` · 06 문의하기 `/portal/inquiries` · 07 알림 `/portal/notifications` · 08 내 정보 `/portal/me`
+01 홈 `/portal` · 02 내 프로젝트 `/portal/projects` · 03 요청자료 `/portal/documents` · 04 일정 `/portal/schedule` · 05 완료자료 `/portal/results` · 06 함께 검토 `/portal/services` · 07 문의하기 `/portal/inquiries` · 08 알림 `/portal/notifications` · 09 내 정보 `/portal/me`
+
+Portal은 진행조회가 아니라 **고객관계 채널**이다. 고객 상황에 맞는 추가서비스를 **근거 문장과 함께** 보여주고, `[관심 있어요] / [상담 요청]` 수준의 가벼운 CTA만 둔다. 강매 UI·기간 한정·혜택 문구는 쓰지 않는다.
 
 Mobile Bottom Nav: 홈 / 진행현황 / 자료제출 / 문의 / MY
 
@@ -94,7 +100,7 @@ Mobile Bottom Nav: 홈 / 진행현황 / 자료제출 / 문의 / MY
 
 ## 4. DATA MODEL / SSOT
 
-Core Entity: Company, Contact(User role=client), Consultation, Contract, Project, DocumentRequest, Document, Schedule, Task, Inquiry, Message, ResultFile, Activity, Notification, User
+Core Entity: Company, Contact(User role=client), Consultation, Contract, Project, DocumentRequest, Document, Schedule, Task, Inquiry, Message, ResultFile, **Opportunity, Approval, SurveyResponse**, Activity, Notification, User
 
 | Entity | System of Record | 입력 주체 | 업데이트 | 민감도 | AI 사용 |
 |---|---|---|---|---|---|
@@ -104,6 +110,9 @@ Core Entity: Company, Contact(User role=client), Consultation, Contract, Project
 | Schedule | store.schedules | 내부 (고객 공개 flag) | — | 중 | 브리핑 |
 | Task | store.tasks | 내부 + 자동 생성 | 상태 변경 | 낮음 | 브리핑 |
 | Inquiry/Message | store.inquiries | 고객 작성 / 내부 답변 | Secondary Loop | 중 | 초안 |
+| Opportunity | store.opportunities | 고객 관심 / 내부 등록 / 규칙 발견 | Tertiary Loop | 중 | 추천 근거(규칙) |
+| Approval | store.approvals | 담당자 요청 → 대표 결정 | 승인/반려 | 높음(금액) | 사용 안 함 (사람 판단) |
+| SurveyResponse | store.surveys | 내부 사용자 | 제출 시 1회 | 낮음 | 집계 |
 | Activity (Evidence) | store.activities | 시스템 자동 | Append-only | 중 | 브리핑 근거 |
 | Notification | store.notifications | 시스템 자동 | 읽음 처리 | 낮음 | — |
 
@@ -119,6 +128,10 @@ Data Source: **DEMO** (zustand + localStorage persist). Repository 분리: `src/
 **PRIMARY**: Portal 요청자료 확인 → 파일 제출(메타 저장) → [Event: document_uploaded] → 내부 알림 + 검토 Task 자동 생성 + 자료상태 `submitted` → 담당자 검토(`done`/`revision`) → [Event] → 프로젝트 단계 변경 → 고객 알림 + Portal Timeline/진행률 자동 반영
 
 **SECONDARY**: Portal 문의 작성 → [Event] → 내부 문의 Queue + 알림 → 담당자 답변 → [Event] → Portal 답변/상태 확인 + 알림
+
+**TERTIARY (매출)**: Portal 추가서비스 `[관심 있어요]/[상담 요청]` → [Event: opportunity_created] → Opportunity 생성 + 담당자 상담연락 Task 자동 생성 + 내부 알림 → 담당자 확인 → **대표 승인 요청** → [Event: approval_requested] → 대표 승인/반려 → [Event: approval_decided] → 승인 시 제안·견적 발송 Task 자동 생성 + 기회 단계 자동 이동 → 추가계약 → 리포트 매출 축에 집계
+
+**승인 대상 원칙** — 리스크가 실제로 있는 것만 올린다: 할인 / 최종 제안·견적 / 고객과의 중요한 약속(일정 변경 등). 일상 업무는 승인 대상이 아니다.
 
 ---
 

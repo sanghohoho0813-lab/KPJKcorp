@@ -1,13 +1,13 @@
 # PROJECT_STATE — KPJK Consulting AX + Client Portal
 
 > SPEC = 어디까지 갈 것인가 / STATE = 지금 어디까지 왔는가
-> Last updated: 2026-09-10 (Sidebar IA 재편)
+> Last updated: 2026-09-11 (매출기회 · 대표 승인 · 설문 · 테마 정화)
 
 ## PROJECT FINAL OBJECTIVE
 KPJK의 경영컨설팅 업무를 기억·카톡·개별파일 의존 구조에서 **기업고객 중심 통합 데이터 운영체계**로 전환. 고객 문의→상담→계약→자료요청→제출→검토→진행→결과→사후관리가 하나의 시스템에서 이어지고, 고객이 Portal로 직접 참여한다.
 
 ## 현재 상태
-**Demo Ready** (First Build · 목표 대비 약 75%)
+**Demo Ready** (2단계 완료 + 3단계 일부 · 목표 대비 약 85%)
 
 ## STRATEGIC GATES
 | Gate | 상태 |
@@ -51,13 +51,21 @@ KPJK의 경영컨설팅 업무를 기억·카톡·개별파일 의존 구조에�
 ### PLATFORM CORE
 - [x] Portal Home(5초 테스트: 진행률·현재 단계·다음 일정·요청자료·담당자) / Timeline(7 Step) / Documents(업로드·재제출·보완 사유) / Schedule / Results(열람 기록) / Inquiries(작성·추가문의) / Notifications / Me
 
+### 매출 · 승인 (2026-09-11 추가)
+- [x] Opportunity — 고객 관심표시/상담요청, 내부 등록, 규칙 발견 4개 소스. 6단계 파이프라인
+- [x] 대표 승인 Workflow — 제안 승인 / 할인 승인 / 고객 약속 3종. 승인은 대표 계정에서만, 결정 시 후속 Task 자동 생성
+- [x] 할인 승인 요청 진입점 — 상담·계약 화면의 계약별 요청 모달 (금액·할인율·사유)
+- [x] Portal 함께 검토 — 서비스 7종 카탈로그 + 규칙 기반 추천 + 근거 문장 노출 + 내 요청 현황
+- [x] AX 고도화 설문 — 9섹션 20문항 전부 클릭형, 자유입력 1개, `SurveyResponse`로 저장
+
 ### CLOSED LOOP (실동작 검증)
 - [x] PRIMARY: Portal 업로드 → AX 알림 + 검토 Task 자동 생성 + 상태 submitted → 검토 완료/보완 요청 → Portal 상태·알림 반영 → 단계 변경 → Portal Timeline 반영
 - [x] SECONDARY: Portal 문의 → AX Queue + 응대 Task → 답변 → Portal 반영 + 알림
+- [x] TERTIARY: Portal 관심표시 → 기회 생성 + 상담연락 Task → 담당자 확인 → 대표 승인 요청 → 승인 → 제안 Task 자동 생성 + 기회 단계 이동
 - [x] 자료 요청 등록 / 일정 등록 / 결과자료 공유 → 고객 알림
 
 ## 진행중
-- 없음 (First Build 종료)
+- 없음 (고도화 1차 종료). 다음 작업은 `BACKLOG.md` 상단부터.
 
 ## 미완료 (CONDITIONAL / NEXT)
 - [ ] Supabase Auth · RLS · Storage (실데이터 연결)
@@ -88,5 +96,6 @@ KPJK의 경영컨설팅 업무를 기억·카톡·개별파일 의존 구조에�
 - [OPTIONAL] Vercel 배포: `npm run build` 통과 확인됨, 환경변수 불필요
 
 ## 최근 주요 변경
+- 2026-09-11 고도화 1차 — 매출기회 Closed Loop(TERTIARY), 대표 승인 Workflow, AX 고도화 설문, 테마 뿌연 현상 제거, 모바일 가로스크롤 전면 제거, 대시보드 우선순위 재구성, 리포트 4축 Evidence. 상세는 `BACKLOG.md`
 - 2026-09-10 Sidebar IA 재편 — 12개 메뉴를 4 Group(핵심 운영 / AI · 분석 / 시스템 / 향후 확장)으로 분류. 그룹당 아이콘 색 1계열 통일(`--nav-*`), 메뉴별 개별 색 제거. 핵심 운영 순서를 실제 흐름(고객 → 상담·계약 → 프로젝트 → 실행 → 소통 → 결과)으로 조정. Active = 좌측 Accent Bar + Pill. 향후 확장은 기본 접힘 Accordion. 모바일 더보기 Sheet도 동일 구조. Route·기능 변경 없음
 - 2026-09-08 First Build 완료 (PASS 1 설계 잠금 → PASS 2 구현 → PASS 3 Red Team 1회)

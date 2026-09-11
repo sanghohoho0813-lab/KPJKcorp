@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { type ReactNode, useState } from "react";
-import { AlertTriangle, ArrowRight, CalendarDays, CheckCircle2, ChevronDown, FileUp, MessageSquare, Clock, FileText, RefreshCw, Sparkles, Upload, UserCheck, Search, Briefcase, Bell, LogIn, Download, RotateCcw } from "lucide-react";
+import { AlertTriangle, ArrowRight, CalendarDays, CheckCircle2, ChevronDown, FileUp, MessageSquare, Clock, FileText, RefreshCw, Sparkles, Upload, UserCheck, Search, Briefcase, Bell, LogIn, Download, RotateCcw, TrendingUp, ShieldCheck, ClipboardList } from "lucide-react";
 import type { Activity, DocStatus, InternalStage, Schedule, TaskStatus, Priority, InquiryStatus } from "@/lib/types";
 import { DOC_STATUS, INQUIRY_STATUS, PRIORITY, SCHEDULE_TYPE, TASK_STATUS, stageLabel, stageProgress } from "@/lib/stages";
 import type { BriefItem } from "@/lib/brief";
@@ -131,6 +131,11 @@ const ACT_ICON: Record<Activity["type"], ReactNode> = {
   task_completed: <CheckCircle2 size={14} />,
   portal_login: <LogIn size={14} />,
   result_downloaded: <Download size={14} />,
+  opportunity_created: <TrendingUp size={14} />,
+  opportunity_status_changed: <TrendingUp size={14} />,
+  approval_requested: <ShieldCheck size={14} />,
+  approval_decided: <ShieldCheck size={14} />,
+  survey_submitted: <ClipboardList size={14} />,
   demo_reset: <RotateCcw size={14} />,
 };
 

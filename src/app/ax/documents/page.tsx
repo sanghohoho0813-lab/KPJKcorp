@@ -8,7 +8,8 @@ import { useStore } from "@/lib/store";
 import { useUi } from "@/lib/ui-store";
 import { daysBetween, fmtDate, fmtSize, relativeDay } from "@/lib/format";
 import type { DocStatus, DocumentRequest } from "@/lib/types";
-import { Badge, Button, Card, EmptyState, KpiCard, PageHeader, SegmentedControl, NextBadge, cx } from "@/components/ui/ui";
+import { Badge, Button, Card, EmptyState, KpiCard, PageHeader, SegmentedControl, NextBadge, Tabs, cx } from "@/components/ui/ui";
+import { ResultsGrid } from "@/components/domain/ResultsGrid";
 import { Modal } from "@/components/ui/overlay";
 import { DocStatusBadge, DueText, SearchBox } from "@/components/domain/domain";
 import { ReviewDocModal } from "@/components/domain/DocActions";
@@ -19,6 +20,7 @@ function DocumentsInner() {
   const st = useStore();
   const params = useSearchParams();
   const openDraft = useUi((s) => s.openDraft);
+  const [top, setTop] = useState<"requests" | "results">(params.get("tab") === "results" ? "results" : "requests");
   const [filter, setFilter] = useState<Filter>("all");
   const [q, setQ] = useState("");
   const [remind, setRemind] = useState(false);
@@ -50,8 +52,10 @@ function DocumentsInner() {
 
   return (
     <div>
-      <PageHeader title="자료 · 누락 관리" desc="마감 임박 자료와 보완필요 항목을 먼저 처리합니다. 고객이 Portal에서 제출한 자료가 여기에 도착합니다." actions={<Button variant="primary" icon={<BellRing size={16} />} onClick={() => setRemind(true)}>리마인드 대상 {remindTargets.length}</Button>} />
-      <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+      <PageHeader title="자료관리" desc="고객이 Portal에서 제출한 자료가 여기에 도착합니다. 마감 임박·보완필요 항목을 먼저 처리하고, 완성된 결과자료는 결과자료 탭에서 공유 이력을 확인합니다." actions={top === "requests" ? <Button variant="primary" icon={<BellRing size={16} />} onClick={() => setRemind(true)}>리마인드 대상 {remindTargets.length}</Button> : undefined} />
+      <Tabs tabs={[{ key: "requests", label: "요청자료", count: counts.missing + counts.waiting + counts.revision }, { key: "results", label: "결과자료", count: st.results.length }]} value={top} onChange={setTop} />
+      {top === "results" ? <div className="mt-5"><ResultsGrid /><p className="mt-3 text-[0.8rem] text-ink-3">결과자료를 공유하면 고객 Portal 완료자료에 표시되고 알림이 전송됩니다. 등록은 프로젝트 상세에서 합니다.</p></div> : <>
+      <div className="mb-5 mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
         <KpiCard label="미제출" value={counts.missing} sub={counts.overdue ? `기한 초과 ${counts.overdue}` : "기한 초과 없음"} tone={counts.overdue ? "error" : undefined} />
         <KpiCard label="검토 대기 · 검토중" value={counts.waiting} sub="담당자 검토 필요" accentValue={counts.waiting > 0} />
         <KpiCard label="보완필요" value={counts.revision} sub="고객 재제출 대기" tone={counts.revision ? "error" : undefined} />
@@ -63,8 +67,28 @@ function DocumentsInner() {
       </div>
       <Card className="overflow-hidden">
         {rows.length === 0 ? <EmptyState icon={<FolderOpen size={30} />} title="해당 조건의 자료가 없습니다" /> : (
-          <div className="overflow-x-auto">
-            <table className="tbl min-w-[880px]">
+          <>
+          {/* 모바일: 가로 스크롤 대신 한 건 = 한 카드 */}
+          <div className="divide-y divide-line lg:hidden">
+            {rows.map((d) => {
+              const c = st.companies.find((x) => x.id === d.companyId);
+              const consultant = st.users.find((u) => u.id === d.assigneeId);
+              const overdue = (d.status === "requested" || d.status === "revision") && daysBetween(d.dueDate, now) > 0;
+              return (
+                <button key={d.id} onClick={() => setReview(d)} className={cx("pressable block w-full px-4 py-3 text-left", overdue && "bg-error-bg/30")}>
+                  <div className="flex items-center gap-2"><DocStatusBadge status={d.status} /><span className="truncate font-semibold">{d.name}</span></div>
+                  <div className="mt-1 truncate text-[0.85rem] text-ink-2">{c?.name} · {st.projects.find((p) => p.id === d.projectId)?.name}</div>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 text-[0.78rem] text-ink-3">
+                    <DueText iso={d.dueDate} pending={d.status === "requested" || d.status === "revision"} />
+                    <span>담당 {consultant?.name}</span>
+                    {d.files.length > 0 && <span className="truncate">{d.files[d.files.length - 1].fileName}</span>}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          <div className="hidden lg:block">
+            <table className="tbl">
               <thead><tr><th>기업명</th><th>자료명</th><th>프로젝트</th><th>상태</th><th>마감</th><th>제출</th><th>담당자</th><th></th></tr></thead>
               <tbody>
                 {rows.map((d) => {
@@ -95,9 +119,11 @@ function DocumentsInner() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </Card>
       <div className="mt-3 flex items-center gap-2 text-[0.78rem] text-ink-3"><Badge tone="info">RULE</Badge> 자료 누락 체크는 규칙 기반으로 동작합니다. 기한 초과 항목은 오늘의 업무 브리핑에 자동 반영됩니다.</div>
+      </>}
       <ReviewDocModal req={review} open={!!review} onClose={() => setReview(null)} />
       <Modal open={remind} onClose={() => setRemind(false)} title={<span className="flex items-center gap-2"><BellRing size={18} /> 리마인드 대상 {remindTargets.length}건</span>} size="md">
         <p className="mb-3 text-[0.85rem] text-ink-2">기한이 어제·오늘이거나 지난 미제출·보완필요 자료입니다. 각 건의 안내 초안을 복사해 발송하세요.</p>

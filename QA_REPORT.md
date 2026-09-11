@@ -1,4 +1,33 @@
-# QA_REPORT — KPJK Consulting AX + Client Portal (First Build)
+# QA_REPORT — KPJK Consulting AX + Client Portal
+
+## 0. 고도화 1차 검증 (2026-09-11)
+
+| 항목 | 결과 |
+|---|---|
+| TypeScript / ESLint | PASS (0 / 0) |
+| Production build | PASS — 29 routes, exit 0 |
+| 가로 overflow (390 / 768 / 1440 × 26 Route) | **0건** |
+| Runtime pageerror (전 시나리오) | **0건** |
+| TERTIARY Closed Loop 자동 시나리오 | PASS (아래 5단계 전부) |
+| 설문 제출 → 저장 → 리포트 반영 | PASS |
+| Theme 뿌연 현상 (Burgundy / Plum) | 해소 확인 (스크린샷 육안) |
+| 모바일 하단바 중첩 (설문 제출바 vs Bottom Nav) | 발견 → `--bottomnav-h` 도입으로 수정, 재측정 겹침 0 |
+
+TERTIARY 자동 시나리오:
+1. 관리자 미리보기로 고객 Portal 진입 → 추천 3건 노출 → 상담 요청 → 내 요청 목록 반영
+2. 내부 AX 매출기회에 `고객 상담요청` 소스로 생성 확인
+3. 담당자 상담연락 Task 자동 생성 확인
+4. 담당자 확인 → 대표 승인 요청 → 대표 승인 → 제안·견적 발송 Task 자동 생성 확인
+5. 설문 20문항 전부 클릭 제출 → 리포트 운영 사용량 축에 반영
+
+수정 이력 (이번 회차):
+- **P1** 설문 하단 제출바가 모바일 Bottom Nav에 가려짐 → `--bottomnav-h` CSS 변수로 오프셋, 겹침 0 재확인
+- **P2** 화면 제목과 사이드바 라벨 불일치(`상담 / 계약` vs `상담 · 계약`) → 제목 통일
+- **P2** 모바일 단계 요약 타일이 2열이라 세로가 길어짐 → 3열로 압축
+
+---
+
+# (First Build 최초 검증 기록)
 
 > 2026-09-08 · Next.js 16.3 / React 19 / Tailwind 4 · 검증 도구: tsc, eslint, `next build`, Playwright(Chromium) 자동 시나리오 + 스크린샷 육안 검토
 

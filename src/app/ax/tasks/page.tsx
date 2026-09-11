@@ -39,7 +39,7 @@ export default function TasksPage() {
 
   return (
     <div>
-      <PageHeader title="업무 / 후속관리" desc="후속연락·자료검토·문의응대·미팅준비를 놓치지 않도록 관리합니다. 고객 제출·문의 시 검토 업무가 자동 생성됩니다." actions={<Button variant="accent" icon={<Plus size={16} />} onClick={() => setOpen(true)}>업무 등록</Button>} />
+      <PageHeader title="업무 · 후속관리" desc="후속연락·자료검토·문의응대·미팅준비를 놓치지 않도록 관리합니다. 고객 제출·문의 시 검토 업무가 자동 생성됩니다." actions={<Button variant="accent" icon={<Plus size={16} />} onClick={() => setOpen(true)}>업무 등록</Button>} />
       <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
         <KpiCard label="오늘 처리" value={today.length} sub={overdue.length ? `기한 초과 ${overdue.length} 포함` : "기한 내"} accentValue={today.length > 0} />
         <KpiCard label="기한 초과" value={overdue.length} sub="먼저 처리" tone={overdue.length ? "error" : undefined} />

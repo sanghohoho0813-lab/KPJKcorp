@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowRight, Bell, CalendarDays, FileCheck2, FolderUp, MessageSquare, Briefcase } from "lucide-react";
+import { ArrowRight, Bell, CalendarDays, FileCheck2, FolderUp, MessageSquare, Briefcase, Sparkles } from "lucide-react";
 import { useStore, usePortalCompanyId, useCurrentUser } from "@/lib/store";
 import { CUSTOMER_STEPS, customerStageMessage, stageProgress, stageToCustomerStep } from "@/lib/stages";
+import { OPP_STATUS, recommendServices } from "@/lib/services";
 import { daysBetween, fmtDate, fmtRelative, fmtTime, relativeDay } from "@/lib/format";
 import type { DocumentRequest } from "@/lib/types";
 import { Badge, Button, Card, IconTile, Progress, cx } from "@/components/ui/ui";
@@ -33,6 +34,13 @@ export default function PortalHome() {
   const results = st.results.filter((r) => r.companyId === c.id).length;
   const step = main ? stageToCustomerStep(main.stage) : 0;
   const consultant = st.users.find((u) => u.id === c.consultantId);
+  const myOpps = st.opportunities.filter((o) => o.companyId === c.id && o.status !== "dropped");
+  const recos = recommendServices({
+    company: c,
+    projects: st.projects.filter((p) => p.companyId === c.id),
+    contracts: st.contracts.filter((x) => x.companyId === c.id),
+    existing: new Set(st.opportunities.filter((o) => o.companyId === c.id).map((o) => o.serviceKey)),
+  }, 2);
 
   return (
     <div className="space-y-5">
@@ -104,6 +112,37 @@ export default function PortalHome() {
           {results > 0 && <Link href="/portal/results" className="mt-3 flex items-center justify-between rounded-xl bg-surface-2 px-4 py-2.5 text-[0.88rem] font-semibold"><span className="flex items-center gap-2"><FileCheck2 size={16} className="text-success" /> 완료자료 {results}건</span><ArrowRight size={14} /></Link>}
         </Card>
       </div>
+
+      {/* 추가서비스 — 강매가 아니라 "지금 상황에서 검토 대상" 수준으로만 */}
+      {(recos.length > 0 || myOpps.length > 0) && (
+        <Card className="p-5">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="flex items-center gap-2 text-[1.1rem] font-bold"><Sparkles size={18} className="text-accent" /> 함께 검토해볼 수 있는 것</h2>
+            <Link href="/portal/services" className="whitespace-nowrap text-[0.85rem] font-semibold text-ink-2">전체 보기 →</Link>
+          </div>
+          {myOpps.length > 0 && (
+            <div className="mb-3 space-y-1.5">
+              {myOpps.slice(0, 2).map((o) => (
+                <div key={o.id} className="flex items-center gap-2 rounded-xl bg-surface-2 px-4 py-2.5 text-[0.88rem]">
+                  <span className="min-w-0 flex-1 truncate font-semibold">{o.serviceName}</span>
+                  <Badge tone={OPP_STATUS[o.status].tone}>{OPP_STATUS[o.status].clientLabel}</Badge>
+                </div>
+              ))}
+            </div>
+          )}
+          {recos.length > 0 && (
+            <div className="grid gap-2 md:grid-cols-2">
+              {recos.map(({ service, reason }) => (
+                <Link key={service.key} href="/portal/services" className="card card-hover block p-4">
+                  <div className="font-bold">{service.name}</div>
+                  <div className="mt-1 text-[0.82rem] leading-relaxed text-ink-2">{reason}</div>
+                  <div className="mt-2 text-[0.82rem] font-semibold text-accent">관심 표시하기 →</div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
 
       {projects.length > 1 && (
         <Card className="p-5">

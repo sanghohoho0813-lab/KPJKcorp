@@ -18,6 +18,7 @@ function ProjectsInner() {
   const [view, setView] = useState<"board" | "list">("board");
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"all" | "mine" | "delayed" | "done">(params.get("filter") === "delayed" ? "delayed" : "all");
+  const [stage, setStage] = useState<InternalStage | "all">("all");
   const now = new Date().toISOString();
   const me = st.session?.userId;
 
@@ -49,7 +50,42 @@ function ProjectsInner() {
       </div>
 
       {view === "board" ? (
-        <div className="thin-scroll -mx-4 overflow-x-auto px-4 pb-3 md:mx-0 md:px-0">
+        <>
+        {/* 모바일: 가로로 미는 Kanban 대신 단계 요약 → 선택 → 목록 */}
+        <div className="lg:hidden">
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+            <button onClick={() => setStage("all")} className={cx("pressable rounded-xl border px-3 py-2.5 text-left transition-colors", stage === "all" ? "border-accent bg-soft/60" : "border-line hover:bg-surface-2")}>
+              <div className="text-[0.75rem] font-bold text-ink-3">전체</div>
+              <div className="tnum text-[1.3rem] font-bold">{rows.length}</div>
+            </button>
+            {KANBAN_STAGES.map((k) => {
+              const items = grouped(k);
+              const hot = items.some((i) => i.delayed);
+              return (
+                <button key={k} onClick={() => setStage(k)} className={cx("pressable rounded-xl border px-3 py-2.5 text-left transition-colors", stage === k ? "border-accent bg-soft/60" : "border-line hover:bg-surface-2")}>
+                  <div className="truncate text-[0.75rem] font-bold text-ink-3">{stageLabel(k)}</div>
+                  <div className={cx("tnum text-[1.3rem] font-bold", hot && "text-error")}>{items.length}</div>
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-3 space-y-2">
+            {(stage === "all" ? rows : grouped(stage)).map(({ p, c, missing, idle, delayed }) => (
+              <Link key={p.id} href={`/ax/projects/${p.id}`} className={cx("card card-hover block p-4", delayed && "border-l-4 border-l-error")}>
+                <div className="flex items-center gap-2"><span className="truncate font-bold">{c?.name}</span><StageBadge stage={p.stage} /></div>
+                <div className="truncate text-[0.85rem] text-ink-2">{p.name}</div>
+                <StageProgressBar stage={p.stage} className="mt-2.5" />
+                <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[0.75rem]">
+                  {missing.length > 0 && <Badge tone="error">미제출 {missing.length}</Badge>}
+                  {delayed && <Badge tone="warning">{idle}일 정체</Badge>}
+                  {!["done", "aftercare"].includes(p.stage) && <span className="ml-auto text-ink-3">마감 {relativeDay(p.dueDate)}</span>}
+                </div>
+              </Link>
+            ))}
+            {(stage === "all" ? rows : grouped(stage)).length === 0 && <div className="rounded-xl border border-dashed border-line-2 py-10 text-center text-[0.85rem] text-ink-3">해당 단계의 프로젝트가 없습니다.</div>}
+          </div>
+        </div>
+        <div className="thin-scroll hidden overflow-x-auto pb-3 lg:block">
           <div className="flex min-w-max gap-3">
             {KANBAN_STAGES.map((stage) => {
               const items = grouped(stage);
@@ -77,9 +113,28 @@ function ProjectsInner() {
             })}
           </div>
         </div>
+        </>
       ) : (
-        <Card className="overflow-x-auto">
-          <table className="tbl min-w-[900px]">
+        <>
+        {/* 목록 뷰도 모바일에서는 표 대신 카드 */}
+        <div className="space-y-2 lg:hidden">
+          {rows.map(({ p, c, docs, missing, idle, delayed, consultant }) => (
+            <Link key={p.id} href={`/ax/projects/${p.id}`} className={cx("card card-hover block p-4", delayed && "border-l-4 border-l-error")}>
+              <div className="flex items-center gap-2"><span className="truncate font-bold">{c?.name}</span><StageBadge stage={p.stage} /></div>
+              <div className="truncate text-[0.85rem] text-ink-2">{p.name}</div>
+              <StageProgressBar stage={p.stage} className="mt-2.5" />
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.78rem] text-ink-3">
+                <span>담당 {consultant?.name}</span>
+                <span>{missing.length ? <b className="text-error">미제출 {missing.length}/{docs.length}</b> : `자료 ${docs.filter((d) => d.status === "done").length}/${docs.length}`}</span>
+                <span className="ml-auto">마감 {fmtDate(p.dueDate)}</span>
+                {delayed && <Badge tone="warning">{idle}일 정체</Badge>}
+              </div>
+            </Link>
+          ))}
+          {rows.length === 0 && <div className="rounded-xl border border-dashed border-line-2 py-10 text-center text-[0.85rem] text-ink-3">해당 조건의 프로젝트가 없습니다.</div>}
+        </div>
+        <Card className="hidden lg:block">
+          <table className="tbl">
             <thead><tr><th>기업</th><th>프로젝트</th><th>단계</th><th>진행</th><th>자료</th><th>담당</th><th>시작</th><th>마감</th><th>상태</th></tr></thead>
             <tbody>
               {rows.map(({ p, c, docs, missing, idle, delayed, consultant }) => (
@@ -98,6 +153,7 @@ function ProjectsInner() {
             </tbody>
           </table>
         </Card>
+        </>
       )}
       <div className="mt-4 text-[0.78rem] text-ink-3">내부 단계 {INTERNAL_STAGES.length}개 중 문의·자료접수·사후관리는 인접 컬럼에 합쳐 표시됩니다.</div>
     </div>

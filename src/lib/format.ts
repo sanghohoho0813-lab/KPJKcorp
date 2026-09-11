@@ -129,3 +129,14 @@ export function fmtRelative(isoStr: string, now = new Date()) {
 export function uid(prefix = "id") {
   return `${prefix}_${Math.random().toString(36).slice(2, 8)}${Date.now().toString(36).slice(-4)}`;
 }
+
+/** 12,000,000 → "1,200만원". 금액은 항상 만원 단위로 읽는다. */
+export function fmtWon(n: number) {
+  if (!Number.isFinite(n)) return "-";
+  if (n >= 100000000) {
+    const eok = n / 100000000;
+    return `${eok % 1 === 0 ? eok : eok.toFixed(1)}억원`;
+  }
+  if (n >= 10000) return `${Math.round(n / 10000).toLocaleString("ko-KR")}만원`;
+  return `${n.toLocaleString("ko-KR")}원`;
+}

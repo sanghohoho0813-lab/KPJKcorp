@@ -20,13 +20,15 @@ const AX_STEPS: Step[] = [
   { route: "/ax/dashboard", target: "tut-kpi", title: "핵심 지표", body: "진행 프로젝트, 자료 검토 대기, 미처리 문의, 지연 프로젝트를 한눈에 봅니다. 카드를 누르면 해당 목록으로 이동합니다." },
   { route: "/ax/clients", target: "tut-nav-clients", title: "기업고객 카드", body: "기업고객 하나를 열면 상담·계약·프로젝트·자료·일정·문의·결과자료·이력이 한 화면에서 연결됩니다." },
   { route: "/ax/documents", target: "tut-nav-documents", title: "자료 · 누락 관리", body: "고객이 Portal에서 제출한 자료가 여기에 도착합니다. 검토 완료 또는 보완 요청을 하면 고객 Portal 상태가 자동으로 바뀝니다." },
-  { route: "/ax/documents", target: "tut-surface", title: "고객 화면으로 이동", body: "'고객 화면 보기'로 고객이 보는 Portal을 그대로 확인할 수 있습니다. 설정에서 테마·글자크기·튜토리얼 다시 보기가 가능합니다." },
+  { route: "/ax/opportunities", target: "tut-nav-approvals", title: "승인 · 매출기회", body: "할인·제안처럼 대표 확인이 필요한 건과, 고객이 관심을 표시한 추가서비스가 여기 모입니다. 승인하면 담당자 업무가 자동으로 생성됩니다." },
+  { route: "/ax/opportunities", target: "tut-surface", title: "고객 화면으로 이동", body: "'고객 화면 보기'로 고객이 보는 Portal을 그대로 확인할 수 있습니다. 설정에서 테마·글자크기·튜토리얼 다시 보기가 가능합니다." },
 ];
 
 const PORTAL_STEPS: Step[] = [
   { route: "/portal", target: "tut-p-progress", title: "현재 진행률", body: "내 컨설팅이 어디까지 진행됐는지, 지금 어떤 단계인지 바로 확인할 수 있습니다." },
   { route: "/portal", target: "tut-p-actions", title: "지금 해야 할 일", body: "제출할 자료가 있으면 여기에 표시됩니다. '요청자료 제출'을 누르면 바로 업로드할 수 있습니다." },
   { route: "/portal/documents", target: "tut-p-docs", title: "요청자료 제출", body: "요청받은 자료를 상태별로 확인하고 파일을 업로드합니다. 제출하면 담당 컨설턴트에게 바로 전달됩니다." },
+  { route: "/portal/services", target: "tut-p-services", title: "함께 검토해볼 수 있는 것", body: "현재 상황에서 검토 대상이 되는 항목을 근거와 함께 보여드립니다. 관심을 표시하면 담당 컨설턴트가 확인 후 연락드립니다. 비용은 발생하지 않습니다." },
 ];
 
 type Spot = { top: number; left: number; width: number; height: number };

@@ -5,7 +5,7 @@ import { BarChart3, Download } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { daysBetween, fmtDateTime } from "@/lib/format";
 import { INTERNAL_STAGES } from "@/lib/stages";
-import { Badge, Button, Card, DemoBadge, PageHeader, SectionTitle, Tabs } from "@/components/ui/ui";
+import { Badge, Button, Card, DemoBadge, PageHeader, SectionTitle, Tabs, cx } from "@/components/ui/ui";
 import { ActivityFeed } from "@/components/domain/domain";
 
 export default function ReportsPage() {
@@ -29,7 +29,41 @@ export default function ReportsPage() {
     const perConsultant = consultants.map((u) => ({ u, companies: st.companies.filter((c) => c.consultantId === u.id).length, projects: st.projects.filter((p) => p.consultantId === u.id && !["done", "aftercare"].includes(p.stage)).length }));
     const portalLogins = st.activities.filter((a) => a.type === "portal_login").length;
     const stageCount = INTERNAL_STAGES.map((s) => ({ s, n: st.projects.filter((p) => p.stage === s.key).length }));
-    return { avgLead, portalUploads, inquiries, progressInq, avgResp, overdueDocs, perConsultant, portalLogins, stageCount, activeProjects: st.projects.filter((p) => !["done", "aftercare"].includes(p.stage)).length };
+
+    // 매출 축 — 전부 실제 Event 건수. 표본이 적으면 비율 대신 건수로만 말한다.
+    const opps = st.opportunities;
+    const oppFromClient = opps.filter((o) => o.source === "portal_interest" || o.source === "portal_request").length;
+    const oppContacted = opps.filter((o) => o.status !== "interest").length;
+    const oppWon = opps.filter((o) => o.status === "won").length;
+    const approvals = st.approvals;
+    const approvalPending = approvals.filter((a) => a.status === "pending").length;
+    const approvalDecided = approvals.filter((a) => a.status !== "pending");
+    const approvalHrs = approvalDecided.filter((a) => a.decidedAt).map((a) => (new Date(a.decidedAt!).getTime() - new Date(a.requestedAt).getTime()) / 3600000);
+    const avgApproval = approvalHrs.length ? (approvalHrs.reduce((x, y) => x + y, 0) / approvalHrs.length).toFixed(1) : "-";
+    const contractsSigned = st.contracts.filter((c) => c.status === "signed").length;
+    const contractsSent = st.contracts.filter((c) => c.status === "sent").length;
+    const consultCount = st.consultations.length;
+
+    // 운영 사용량 축
+    const aiSuggested = st.activities.filter((a) => a.actorRole === "system").length;
+    const portalCompanies = new Set(st.activities.filter((a) => a.actorRole === "client" && a.companyId).map((a) => a.companyId)).size;
+    const autoTasks = st.tasks.filter((t) => t.source === "auto").length;
+    const autoTasksDone = st.tasks.filter((t) => t.source === "auto" && t.status === "done").length;
+    const surveys = st.surveys.length;
+
+    // 기록 보유 기간 — "성과 기간"이 아니라 "이 로그가 담고 있는 기간"
+    const ats = st.activities.map((a) => a.at).sort();
+    const logSpanDays = ats.length ? Math.max(1, daysBetween(ats[0], ats[ats.length - 1]) + 1) : 0;
+
+    return {
+      avgLead, portalUploads, inquiries, progressInq, avgResp, overdueDocs, perConsultant, portalLogins, stageCount,
+      activeProjects: st.projects.filter((p) => !["done", "aftercare"].includes(p.stage)).length,
+      oppTotal: opps.length, oppFromClient, oppContacted, oppWon,
+      approvalPending, approvalDecided: approvalDecided.length, avgApproval,
+      contractsSigned, contractsSent, consultCount,
+      aiSuggested, portalCompanies, autoTasks, autoTasksDone, surveys,
+      events: st.activities.length, logSpanDays,
+    };
   }, [st, now]);
 
   const exportCsv = () => {
@@ -43,22 +77,59 @@ export default function ReportsPage() {
     toast("Evidence Log CSV를 내려받았습니다.");
   };
 
-  const kpis: { group: string; items: { name: string; point: string; demo: string; baseline: string }[] }[] = [
-    { group: "EFFICIENCY", items: [
-      { name: "자료요청 → 제출 완료 소요기간", point: "document_requested → document_uploaded 시각 차이", demo: `${m.avgLead}일 (Demo 평균)`, baseline: "측정 필요" },
-      { name: "후속업무 누락건수", point: "기한 초과 상태의 Task/DocRequest 수 (주간)", demo: `${m.overdueDocs}건 (현재)`, baseline: "측정 필요" },
-      { name: "고객 문의 대응시간", point: "inquiry_created → inquiry_answered", demo: `${m.avgResp}시간 (Demo 평균)`, baseline: "측정 필요" },
-      { name: "고객정보 검색/확인 시간", point: "사용자 설문 + 화면 체류 (실운영 시)", demo: "-", baseline: "측정 필요" },
-    ] },
-    { group: "CUSTOMER", items: [
-      { name: "진행상황 단순문의 건수", point: "Inquiry.category = 진행상황 (월간)", demo: `${m.progressInq} / ${m.inquiries}건`, baseline: "측정 필요" },
-      { name: "Portal 직접 자료제출 비율", point: "document_uploaded(actor=client) / 전체 제출", demo: `${m.portalUploads}건 (Demo 전부 Portal)`, baseline: "측정 필요" },
-      { name: "Portal Self-Service 이용률", point: "portal_login 사용자 / 전체 고객 (주간)", demo: `${m.portalLogins}회 접속`, baseline: "측정 필요" },
-    ] },
-    { group: "SCALE", items: [
-      { name: "담당자 1인당 동시 관리 기업 수", point: "Company.consultantId 집계", demo: m.perConsultant.map((x) => `${x.u.name} ${x.companies}`).join(" · "), baseline: "측정 필요" },
-      { name: "동시 진행 프로젝트 수", point: "stage ∉ {done, aftercare}", demo: `${m.activeProjects}건`, baseline: "측정 필요" },
-    ] },
+  interface Metric { name: string; point: string; value: string; baseline?: string }
+  const axes: { key: string; title: string; desc: string; items: Metric[] }[] = [
+    {
+      key: "usage",
+      title: "운영 사용량",
+      desc: "시스템이 실제로 쓰이고 있는가 — 사용량이 없으면 그 뒤의 어떤 숫자도 의미가 없다.",
+      items: [
+        { name: "기록된 Event", point: "Activity append-only 로그", value: `${m.events}건` },
+        { name: "기록 보유 기간", point: "최초 ~ 최신 Event 간격", value: m.logSpanDays ? `${m.logSpanDays}일` : "-" },
+        { name: "Portal 이용 기업", point: "고객 행동(로그인·제출·문의)이 있는 기업 수", value: `${m.portalCompanies} / ${st.companies.length}개사` },
+        { name: "자동 생성 업무", point: "Task.source = auto", value: `${m.autoTasks}건 (완료 ${m.autoTasksDone})` },
+        { name: "규칙·시스템 제안 건수", point: "actorRole = system 인 Event", value: `${m.aiSuggested}건` },
+        { name: "개선 의견 제출", point: "survey_submitted", value: `${m.surveys}건` },
+      ],
+    },
+    {
+      key: "efficiency",
+      title: "업무 효율",
+      desc: "같은 인력으로 더 많은 고객을 놓치지 않고 관리할 수 있는가.",
+      items: [
+        { name: "자료요청 → 제출 소요기간", point: "document_requested → document_uploaded", value: `${m.avgLead}일`, baseline: "측정 필요" },
+        { name: "후속업무 누락 (기한 초과)", point: "기한 지난 미제출·보완필요", value: `${m.overdueDocs}건`, baseline: "측정 필요" },
+        { name: "고객 문의 대응시간", point: "inquiry_created → inquiry_answered", value: `${m.avgResp}시간`, baseline: "측정 필요" },
+        { name: "대표 승인 소요시간", point: "approval_requested → approval_decided", value: m.avgApproval === "-" ? "표본 없음" : `${m.avgApproval}시간`, baseline: "측정 필요" },
+        { name: "담당자 1인당 관리 기업", point: "Company.consultantId 집계", value: m.perConsultant.map((x) => `${x.u.name} ${x.companies}`).join(" · "), baseline: "측정 필요" },
+        { name: "동시 진행 프로젝트", point: "stage ∉ {done, aftercare}", value: `${m.activeProjects}건` },
+      ],
+    },
+    {
+      key: "customer",
+      title: "고객",
+      desc: "고객이 직접 참여하고 있는가. 참여가 늘면 단순 확인 문의가 줄어든다.",
+      items: [
+        { name: "Portal 접속", point: "portal_login", value: `${m.portalLogins}회` },
+        { name: "고객 직접 자료제출", point: "document_uploaded (actor = client)", value: `${m.portalUploads}건` },
+        { name: "진행상황 단순문의 비중", point: "Inquiry.category = 진행상황", value: `${m.progressInq} / ${m.inquiries}건`, baseline: "측정 필요" },
+        { name: "고객 발신 추가요청", point: "portal_interest · portal_request", value: `${m.oppFromClient}건` },
+        { name: "결과자료 열람", point: "result_downloaded", value: `${st.activities.filter((a) => a.type === "result_downloaded").length}회` },
+      ],
+    },
+    {
+      key: "revenue",
+      title: "매출",
+      desc: "고객 행동이 상담과 계약으로 이어지는가. 표본이 쌓이기 전에는 비율 대신 건수로만 본다.",
+      items: [
+        { name: "누적 상담 기록", point: "Consultation", value: `${m.consultCount}건` },
+        { name: "매출기회", point: "Opportunity 생성", value: `${m.oppTotal}건 (고객 발신 ${m.oppFromClient})` },
+        { name: "기회 → 담당자 접촉", point: "status ≠ interest", value: `${m.oppContacted} / ${m.oppTotal}건` },
+        { name: "기회 → 추가계약", point: "status = won", value: `${m.oppWon} / ${m.oppTotal}건`, baseline: "표본 부족" },
+        { name: "계약 체결 / 발송", point: "Contract.status", value: `${m.contractsSigned}건 / 발송 ${m.contractsSent}건` },
+        { name: "대표 승인 처리", point: "approval_decided", value: `처리 ${m.approvalDecided}건 · 대기 ${m.approvalPending}건` },
+      ],
+    },
   ];
 
   return (
@@ -68,16 +139,44 @@ export default function ReportsPage() {
       <div className="mt-5">
         {tab === "kpi" && (
           <div className="space-y-5">
-            <div className="rounded-xl border border-warning/30 bg-warning-bg px-4 py-3 text-[0.88rem] text-warning"><b>BASELINE STATUS: REQUIRED / UNKNOWN</b> — 도입 전 실제 값(Before)은 운영 시작 시 4주간 측정합니다. 아래 Demo 값은 샘플 데이터에서 계산된 값이며 성과가 아닙니다.</div>
-            {kpis.map((g) => (
-              <Card key={g.group} className="overflow-x-auto">
-                <div className="border-b border-line px-5 py-3 font-bold">{g.group} KPI</div>
-                <table className="tbl min-w-[760px]">
-                  <thead><tr><th>지표</th><th>측정지점 (Event)</th><th>현재 Demo 값</th><th>Baseline (Before)</th><th>Target</th></tr></thead>
-                  <tbody>{g.items.map((k) => <tr key={k.name}><td className="font-semibold">{k.name}</td><td className="text-ink-2">{k.point}</td><td className="tnum">{k.demo}</td><td><Badge tone="warning">{k.baseline}</Badge></td><td className="text-ink-3">실측 후 설정</td></tr>)}</tbody>
-                </table>
+            <div className="rounded-xl border border-warning/30 bg-warning-bg px-4 py-3 text-[0.88rem] text-warning">
+              <b>BASELINE STATUS: REQUIRED / UNKNOWN</b> — 도입 전 값(Before)이 아직 없습니다. 운영 시작 후 4주간 수집하며, 그 전까지는 개선율을 만들지 않고 <b>현재 표본 수</b>만 표시합니다.
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="card p-4"><div className="text-[0.75rem] font-bold text-ink-3">기록된 Event</div><div className="tnum text-[1.5rem] font-bold">{m.events}</div></div>
+              <div className="card p-4"><div className="text-[0.75rem] font-bold text-ink-3">기록 보유 기간</div><div className="tnum text-[1.5rem] font-bold">{m.logSpanDays}일</div></div>
+              <div className="card p-4"><div className="text-[0.75rem] font-bold text-ink-3">Baseline 수집</div><div className="text-[1.1rem] font-bold text-warning">미시작</div></div>
+            </div>
+
+            {axes.map((g) => (
+              <Card key={g.key} className="p-5">
+                <SectionTitle>{g.title}</SectionTitle>
+                <p className="-mt-1 mb-3 text-[0.85rem] text-ink-2">{g.desc}</p>
+                <div className="divide-y divide-line">
+                  {g.items.map((k) => (
+                    <div key={k.name} className="flex flex-col gap-1 py-3 md:flex-row md:items-center md:gap-4">
+                      <div className="min-w-0 md:w-[34%]">
+                        <div className="font-semibold">{k.name}</div>
+                        <div className="mt-0.5 text-[0.78rem] text-ink-3">{k.point}</div>
+                      </div>
+                      <div className={cx("tnum min-w-0 flex-1 font-semibold", k.value === "표본 없음" && "text-ink-3")}>{k.value}</div>
+                      <div className="shrink-0">{k.baseline ? <Badge tone="warning">{k.baseline}</Badge> : <span className="text-[0.78rem] text-ink-3">측정 중</span>}</div>
+                    </div>
+                  ))}
+                </div>
               </Card>
             ))}
+
+            <Card className="p-5">
+              <SectionTitle>이 리포트를 외부에 설명할 때</SectionTitle>
+              <ol className="list-decimal space-y-1.5 pl-5 text-[0.88rem] text-ink-2">
+                <li><b className="text-ink">무엇이 바뀌었나</b> — 기억·카톡·개별파일 → 고객이 직접 참여하는 하나의 기록 체계</li>
+                <li><b className="text-ink">근거는 무엇인가</b> — 위 지표는 전부 Event Log에서 계산되며 수기 입력이 없습니다</li>
+                <li><b className="text-ink">아직 없는 것은 무엇인가</b> — 도입 전 Baseline. 그래서 개선율을 제시하지 않습니다</li>
+                <li><b className="text-ink">언제 말할 수 있나</b> — 운영 4주 후 Before/After 비교가 가능해집니다</li>
+              </ol>
+              <p className="mt-3 text-[0.8rem] text-ink-3">Evidence Pack 구조: Baseline → Trigger → Recommendation → Human Approval → Action → Result → KPI Delta → Provenance.</p>
+            </Card>
           </div>
         )}
         {tab === "ops" && (

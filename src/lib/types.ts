@@ -188,6 +188,78 @@ export interface ResultFile {
   description: string;
 }
 
+/* ---------- Opportunity (추가서비스 관심 → 매출) ---------- */
+
+export type OpportunityStatus =
+  | "interest"          // 고객이 Portal에서 관심 표시
+  | "contacted"         // 담당자 확인 · 고객 연락 완료
+  | "approval_pending"  // 대표 승인 대기 (제안/견적)
+  | "proposed"          // 승인 후 제안·견적 발송
+  | "won"               // 추가계약
+  | "dropped";          // 종료
+
+export type OpportunitySource = "portal_interest" | "portal_request" | "internal" | "rule";
+
+export interface Opportunity {
+  id: string;
+  companyId: string;
+  serviceKey: string;
+  serviceName: string;
+  source: OpportunitySource;
+  status: OpportunityStatus;
+  assigneeId: string;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  /** 고객이 남긴 한 줄 또는 내부 메모 */
+  note?: string;
+  /** 왜 이 서비스를 추천했는가 (규칙 근거) */
+  reason?: string;
+  history: { at: string; status: OpportunityStatus; by: string; note?: string }[];
+}
+
+/* ---------- 대표 승인 (할인·제안·중요 약속) ---------- */
+
+export type ApprovalKind = "opportunity" | "discount" | "promise";
+export type ApprovalStatus = "pending" | "approved" | "rejected";
+
+export interface Approval {
+  id: string;
+  kind: ApprovalKind;
+  title: string;
+  /** 승인자가 5초 안에 판단할 수 있는 요약 */
+  summary: string;
+  companyId?: string;
+  projectId?: string;
+  opportunityId?: string;
+  /** 할인 승인일 때만 */
+  baseAmount?: number;
+  discountPct?: number;
+  requestedBy: string;
+  requestedAt: string;
+  status: ApprovalStatus;
+  decidedBy?: string;
+  decidedAt?: string;
+  decisionNote?: string;
+}
+
+/* ---------- AX 고도화 설문 ---------- */
+
+export interface SurveyResponse {
+  id: string;
+  /** 문항 세트 버전 — 저장소 연결 후에도 비교 가능하게 */
+  surveyVersion: string;
+  /** 어느 개발단계를 위한 설문인가 (예: "stage2-to-stage3") */
+  stage: string;
+  userId: string;
+  userName: string;
+  role: Role;
+  answers: Record<string, string | string[] | number>;
+  freeText?: string;
+  submittedAt: string;
+  durationSec?: number;
+}
+
 export type ActivityType =
   | "consultation_logged"
   | "contract_sent"
@@ -206,6 +278,11 @@ export type ActivityType =
   | "task_completed"
   | "portal_login"
   | "result_downloaded"
+  | "opportunity_created"
+  | "opportunity_status_changed"
+  | "approval_requested"
+  | "approval_decided"
+  | "survey_submitted"
   | "demo_reset";
 
 export interface Activity {

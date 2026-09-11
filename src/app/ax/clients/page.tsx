@@ -80,8 +80,27 @@ export default function ClientsPage() {
           ))}
         </div>
       ) : (
-        <Card className="overflow-x-auto">
-          <table className="tbl min-w-[900px]">
+        <>
+        {/* 모바일에서는 표를 가로로 밀지 않는다 — 한 기업 = 한 줄 카드 */}
+        <div className="space-y-2 lg:hidden">
+          {rows.map(({ c, active, missing, overdue, openIq, next, consultant }) => (
+            <Link key={c.id} href={`/ax/clients/${c.id}`} className="card card-hover block p-4">
+              <div className="flex items-center gap-2">
+                <span className="tnum flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-shell text-[0.7rem] font-bold text-white">{c.code}</span>
+                <span className="truncate font-bold">{c.name}</span>
+                {active[0] && <StageBadge stage={active[0].stage} />}
+              </div>
+              <div className="mt-1 truncate text-[0.82rem] text-ink-2">{active[0]?.name ?? "진행 중 프로젝트 없음"}{active.length > 1 ? ` 외 ${active.length - 1}` : ""}</div>
+              <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[0.78rem] text-ink-3">
+                {overdue > 0 ? <Badge tone="error">기한초과 {overdue}</Badge> : missing.length > 0 ? <Badge tone="warning">미제출 {missing.length}</Badge> : null}
+                {openIq > 0 && <Badge tone="error">미답변 {openIq}</Badge>}
+                <span className="ml-auto">담당 {consultant?.name} · 다음 {next ? fmtDate(next.start) : "-"}</span>
+              </div>
+            </Link>
+          ))}
+        </div>
+        <Card className="hidden lg:block">
+          <table className="tbl">
             <thead><tr><th>기업명</th><th>업종</th><th>담당</th><th>진행 프로젝트</th><th>현재 단계</th><th>미제출</th><th>문의</th><th>다음 일정</th><th>최초 상담</th></tr></thead>
             <tbody>
               {rows.map(({ c, active, missing, overdue, openIq, next, consultant }) => (
@@ -100,6 +119,7 @@ export default function ClientsPage() {
             </tbody>
           </table>
         </Card>
+        </>
       )}
     </div>
   );

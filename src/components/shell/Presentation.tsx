@@ -26,8 +26,10 @@ const STEPS: PStep[] = [
   { route: "/portal/documents", title: "⑥ 고객이 직접 자료 제출", body: "고객이 요청자료를 업로드하면 내부 AX에 즉시 도착하고 담당자 검토 Task가 자동 생성됩니다. (직접 눌러보세요)", portal: true },
   { route: "/ax/documents", title: "⑦ 내부 검토 → 상태 반영", body: "담당자가 검토 완료 또는 보완 요청을 하면 고객 Portal의 상태와 알림이 자동으로 바뀝니다. 이것이 Closed Loop입니다." },
   { route: "/ax/inquiries", title: "⑧ 문의 → 답변 Loop", body: "고객 문의는 내부 Queue에 자동 등록되고, 답변하면 고객 Portal에 반영됩니다. 진행상황 전화 문의가 줄어듭니다." },
-  { route: "/ax/reports", title: "⑨ 실증 · Evidence", body: "모든 행동이 Event와 Timestamp로 남습니다. 실제 Baseline이 쌓이면 소요기간·누락건수·Self-Service 비율을 측정합니다. Demo에서는 개선율을 만들지 않습니다." },
-  { route: "/ax/settings", title: "⑩ 다음 단계", body: "알림 자동화, 문서 자동화, 운영 리포트, Portal Self-Service 확대, 외부 연동은 NEXT로 표시되어 현재 기능과 명확히 구분됩니다." },
+  { route: "/portal/services", title: "⑨ 고객이 다음 서비스에 관심을 표시", body: "고객 상황에 맞는 항목을 근거와 함께 보여주고, 관심을 표시하면 담당자에게 상담 연락 업무가 자동으로 생성됩니다. 강매가 아니라 기회를 놓치지 않는 구조입니다.", portal: true },
+  { route: "/ax/opportunities", title: "⑩ 대표 승인 → 실행", body: "할인·제안·고객 약속처럼 리스크가 있는 건만 대표에게 올라옵니다. 승인하면 담당자에게 제안 발송 업무가 자동 생성되고, 기회 단계가 함께 움직입니다." },
+  { route: "/ax/reports", title: "⑪ 실증 · Evidence", body: "운영 사용량·업무 효율·고객·매출 네 축이 전부 Event Log에서 계산됩니다. 도입 전 Baseline이 없으므로 개선율은 만들지 않고 표본 수만 표시합니다." },
+  { route: "/ax/survey", title: "⑫ 다음 단계는 사용자가 정한다", body: "실제 사용자가 남긴 개선 의견이 3단계 개발 우선순위가 됩니다. 만족도 조사가 아니라 제품 결정 자료입니다." },
 ];
 
 export function PresentationButton({ className, labelClass }: { className?: string; labelClass?: string }) {

@@ -6,8 +6,9 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Building2, CalendarDays, ChevronRight, Eye, FileCheck2, FileText, FolderOpen, Mail, MapPin, MessageSquare, MessageSquareText, Phone, Plus, Sparkles, UserRound } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useUi } from "@/lib/ui-store";
-import { daysBetween, fmtDate, fmtDateTime, fmtSize, relativeDay, fmtTime } from "@/lib/format";
+import { daysBetween, fmtDate, fmtDateTime, fmtSize, relativeDay, fmtRelative, fmtTime } from "@/lib/format";
 import { stageLabel } from "@/lib/stages";
+import { OPP_STATUS } from "@/lib/services";
 import type { DocumentRequest } from "@/lib/types";
 import { Badge, Button, Card, EmptyState, IconTile, KpiCard, SectionTitle, Stat, Tabs, AiReadyBadge } from "@/components/ui/ui";
 import { ActivityFeed, DocStatusBadge, InquiryStatusBadge, ScheduleItem, StageBadge, StageProgressBar, DueText } from "@/components/domain/domain";
@@ -46,8 +47,9 @@ export default function ClientCardPage() {
     const inquiries = st.inquiries.filter((x) => x.companyId === c.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     const results = st.results.filter((x) => x.companyId === c.id).sort((a, b) => b.sharedAt.localeCompare(a.sharedAt));
     const activities = st.activities.filter((x) => x.companyId === c.id);
+    const opps = st.opportunities.filter((x) => x.companyId === c.id && x.status !== "dropped").sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     const consultant = st.users.find((u) => u.id === c.consultantId);
-    return { projects, active, consultations, contracts, docs, missing, waiting, schedules, upcoming, inquiries, results, activities, consultant };
+    return { projects, active, consultations, contracts, docs, missing, waiting, schedules, upcoming, inquiries, results, activities, opps, consultant };
   }, [c, st, nowIso]);
 
   if (!c || !data) {
@@ -57,7 +59,7 @@ export default function ClientCardPage() {
       </Card>
     );
   }
-  const { projects, active, consultations, contracts, docs, missing, waiting, schedules, upcoming, inquiries, results, activities, consultant } = data;
+  const { projects, active, consultations, contracts, docs, missing, waiting, schedules, upcoming, inquiries, results, activities, opps, consultant } = data;
   const openIq = inquiries.filter((i) => i.status === "open");
 
   const actions: { text: string; href?: string; onClick?: () => void; tone: "error" | "warning" | "info" }[] = [];
@@ -138,6 +140,20 @@ export default function ClientCardPage() {
                 </Link>
               ))}
             </Card>
+            {opps.length > 0 && (
+              <Card className="p-5">
+                <SectionTitle action={<Link href="/ax/opportunities?tab=pipeline" className="text-[0.85rem] font-semibold text-ink-2 hover:text-ink">기회 →</Link>}>매출기회</SectionTitle>
+                <div className="divide-y divide-line">
+                  {opps.map((o) => (
+                    <div key={o.id} className="flex flex-wrap items-center gap-2 py-2.5">
+                      <Badge tone={OPP_STATUS[o.status].tone}>{OPP_STATUS[o.status].label}</Badge>
+                      <span className="min-w-0 flex-1 truncate font-semibold">{o.serviceName}</span>
+                      <span className="text-[0.78rem] text-ink-3">{o.source === "portal_interest" || o.source === "portal_request" ? "고객 발신" : o.source === "rule" ? "규칙 발견" : "내부"} · {fmtRelative(o.updatedAt)}</span>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
             <Card className="p-5">
               <SectionTitle action={<AiReadyBadge onClick={() => openAi({ title: "상담 요약 — AI 적용 설명", key: "consult" })} />}>최근 상담 요약</SectionTitle>
               {consultations[0] ? (
@@ -199,8 +215,19 @@ export default function ClientCardPage() {
       )}
 
       {tab === "contract" && (
-        <Card className="overflow-x-auto">
-          <table className="tbl min-w-[720px]">
+        <>
+        <div className="space-y-2 lg:hidden">
+          {contracts.map((ct) => (
+            <div key={ct.id} className="card p-4">
+              <div className="flex items-center gap-2"><span className="truncate font-bold">{ct.title}</span><Badge tone={ct.status === "signed" ? "success" : ct.status === "sent" ? "warning" : "neutral"}>{ct.status === "signed" ? "서명 완료" : ct.status === "sent" ? "서명 대기" : "초안"}</Badge></div>
+              <div className="mt-1 truncate text-[0.85rem] text-ink-2">{ct.scope}</div>
+              <div className="mt-2 flex flex-wrap gap-x-3 text-[0.78rem] text-ink-3"><span>{ct.period}</span><span>송부 {ct.sentAt ? fmtDate(ct.sentAt) : "-"}</span><span>서명 {ct.signedAt ? fmtDate(ct.signedAt) : "-"}</span></div>
+            </div>
+          ))}
+          {contracts.length === 0 && <div className="rounded-xl border border-dashed border-line-2 py-8 text-center text-[0.85rem] text-ink-3">계약 기록이 없습니다.</div>}
+        </div>
+        <Card className="hidden lg:block">
+          <table className="tbl">
             <thead><tr><th>계약명</th><th>프로젝트</th><th>상태</th><th>기간</th><th>송부일</th><th>서명일</th><th>범위</th></tr></thead>
             <tbody>
               {contracts.map((ct) => (
@@ -217,6 +244,7 @@ export default function ClientCardPage() {
             </tbody>
           </table>
         </Card>
+        </>
       )}
 
       {tab === "project" && (
@@ -238,8 +266,21 @@ export default function ClientCardPage() {
             <span className="font-bold">요청자료 {docs.length}건</span>
             {active[0] && <Button size="sm" variant="accent" icon={<Plus size={15} />} onClick={() => setNewDoc(active[0].id)}>자료 요청</Button>}
           </div>
-          <div className="overflow-x-auto">
-            <table className="tbl min-w-[760px]">
+          <div className="divide-y divide-line lg:hidden">
+            {docs.map((d) => (
+              <button key={d.id} onClick={() => setReviewReq(d)} className="pressable block w-full px-4 py-3 text-left">
+                <div className="flex items-center gap-2"><DocStatusBadge status={d.status} /><span className="truncate font-semibold">{d.name}</span></div>
+                <div className="mt-1 truncate text-[0.82rem] text-ink-2">{st.projects.find((p) => p.id === d.projectId)?.name}</div>
+                <div className="mt-1 flex flex-wrap items-center gap-x-3 text-[0.78rem] text-ink-3">
+                  <DueText iso={d.dueDate} pending={d.status === "requested" || d.status === "revision"} />
+                  <span>담당 {st.users.find((u) => u.id === d.assigneeId)?.name}</span>
+                </div>
+              </button>
+            ))}
+            {docs.length === 0 && <div className="py-8 text-center text-[0.85rem] text-ink-3">요청자료가 없습니다.</div>}
+          </div>
+          <div className="hidden lg:block">
+            <table className="tbl">
               <thead><tr><th>자료명</th><th>프로젝트</th><th>상태</th><th>제출기한</th><th>제출일</th><th>파일</th><th>담당</th></tr></thead>
               <tbody>
                 {docs.map((d) => (

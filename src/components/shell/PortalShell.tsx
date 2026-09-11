@@ -3,7 +3,7 @@
 import { type ReactNode, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, Briefcase, CalendarDays, FileCheck2, FolderUp, HelpCircle, Home, LayoutDashboard, LogOut, MessageSquare, UserRound, ChevronRight } from "lucide-react";
+import { Bell, Briefcase, CalendarDays, FileCheck2, FolderUp, HelpCircle, Home, LayoutDashboard, LogOut, MessageSquare, Sparkles, UserRound, ChevronRight } from "lucide-react";
 import { useStore, useCurrentUser, usePortalCompanyId } from "@/lib/store";
 import { useUi } from "@/lib/ui-store";
 import { useIsMobile, useIsPreviewFrame } from "@/lib/hooks";
@@ -22,6 +22,7 @@ const NAV = [
   { href: "/portal/documents", label: "요청자료", icon: <FolderUp size={20} /> },
   { href: "/portal/schedule", label: "일정", icon: <CalendarDays size={20} /> },
   { href: "/portal/results", label: "완료자료", icon: <FileCheck2 size={20} /> },
+  { href: "/portal/services", label: "함께 검토", icon: <Sparkles size={20} /> },
   { href: "/portal/inquiries", label: "문의하기", icon: <MessageSquare size={20} /> },
   { href: "/portal/notifications", label: "알림", icon: <Bell size={20} /> },
   { href: "/portal/me", label: "내 정보", icon: <UserRound size={20} /> },
@@ -111,7 +112,7 @@ export function PortalShell({ children }: { children: ReactNode }) {
             <span className="text-[1rem] font-bold"><span className="hidden xl:inline">KPJK Consulting </span>Portal</span>
           </Link>
           <nav className="ml-4 hidden items-center gap-0.5 lg:flex">
-            {NAV.slice(0, 6).map((n) => (
+            {NAV.slice(0, 7).map((n) => (
               <Link key={n.href} href={n.href} className={cx("pressable whitespace-nowrap rounded-lg px-2.5 py-2 text-[0.85rem] font-semibold transition-colors", isActive(pathname, n.href) ? "bg-surface-2 text-ink" : "text-ink-2 hover:bg-surface-2 hover:text-ink")}>
                 {n.label}
               </Link>

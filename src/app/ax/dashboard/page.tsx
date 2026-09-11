@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { AlertTriangle, ArrowRight, BookOpen, Briefcase, Building2, CalendarDays, FolderOpen, MessageSquare, Sparkles } from "lucide-react";
+import { AlertTriangle, ArrowRight, BookOpen, Briefcase, CalendarDays, FolderOpen, MessageSquare, ShieldCheck, Sparkles, TrendingUp } from "lucide-react";
 import { useStore, useCurrentUser } from "@/lib/store";
 import { useUi } from "@/lib/ui-store";
 import { buildBrief, briefSummaryCounts } from "@/lib/brief";
-import { daysBetween, isSameDay, fmtRelative, fmtFull } from "@/lib/format";
+import { daysBetween, isSameDay, fmtRelative, fmtFull, fmtWon } from "@/lib/format";
 import { stageLabel } from "@/lib/stages";
+import { OPP_STATUS } from "@/lib/services";
 import { useNow } from "@/lib/hooks";
 import { AiReadyBadge, Card, KpiCard, SectionTitle, Badge, IconTile } from "@/components/ui/ui";
 import { BriefList, ScheduleItem, StageBadge, StageProgressBar } from "@/components/domain/domain";
@@ -30,6 +31,12 @@ export default function DashboardPage() {
   const todaySchedules = weekSchedules.filter((s) => isSameDay(s.start, now));
   const openInquiries = st.inquiries.filter((i) => i.status === "open" && (!assigneeId || i.assigneeId === assigneeId)).length;
   const delayed = active.filter((p) => daysBetween(p.stageChangedAt, now.toISOString()) >= 7 || daysBetween(now.toISOString(), p.dueDate) < 0).length;
+
+  // 대표가 막고 있는 것 — 다른 무엇보다 먼저 보여야 팀이 멈추지 않는다.
+  const pendingApprovals = st.approvals.filter((a) => a.status === "pending").sort((a, b) => a.requestedAt.localeCompare(b.requestedAt));
+  const isAdmin = st.session?.role === "admin";
+  const newOpps = st.opportunities.filter((o) => o.status === "interest" && (!assigneeId || o.assigneeId === assigneeId));
+  const liveOpps = st.opportunities.filter((o) => !["won", "dropped"].includes(o.status) && (!assigneeId || o.assigneeId === assigneeId));
 
   // 먼저 확인할 기업 — companies with urgent brief items
   const focusCompanies = Array.from(new Set(brief.filter((b) => b.companyId).map((b) => b.companyId!))).slice(0, 4).map((cid) => {
@@ -55,13 +62,40 @@ export default function DashboardPage() {
       </div>
 
       <div id="tut-kpi" className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-6">
+        <KpiCard label={isAdmin ? "내 승인 대기" : "대표 승인 대기"} value={pendingApprovals.length} sub={pendingApprovals.length ? (isAdmin ? "지금 확인 필요" : "대표 확인 대기 중") : "대기 없음"} href="/ax/opportunities?tab=approvals" tone={pendingApprovals.length ? "error" : undefined} icon={<IconTile color="var(--mod-alert)" size={32}><ShieldCheck size={16} /></IconTile>} />
+        <KpiCard label="매출기회" value={liveOpps.length} sub={newOpps.length ? `새 관심 ${newOpps.length}건` : "진행 중"} href="/ax/opportunities?tab=pipeline" accentValue={newOpps.length > 0} icon={<IconTile color="var(--mod-sales)" size={32}><TrendingUp size={16} /></IconTile>} />
         <KpiCard label="진행 중 프로젝트" value={active.length} sub={`전체 ${st.projects.length}건`} href="/ax/projects" icon={<IconTile color="var(--mod-ops)" size={32}><Briefcase size={16} /></IconTile>} />
-        <KpiCard label="전체 기업고객" value={st.companies.length} sub="Demo 기업" href="/ax/clients" icon={<IconTile color="var(--mod-customer)" size={32}><Building2 size={16} /></IconTile>} />
         <KpiCard label="자료 검토 대기" value={docWaiting} sub={counts.docs ? `기한 이슈 ${counts.docs}건` : "기한 이슈 없음"} href="/ax/documents" tone={counts.docs ? "error" : undefined} icon={<IconTile color="var(--mod-doc)" size={32}><FolderOpen size={16} /></IconTile>} />
-        <KpiCard label="오늘 · 이번 주 일정" value={<>{todaySchedules.length}<span className="text-[1rem] text-ink-3"> / {weekSchedules.length}</span></>} sub={todaySchedules[0] ? `다음: ${todaySchedules[0].title.slice(0, 14)}…` : "오늘 일정 없음"} href="/ax/schedule" icon={<IconTile color="var(--mod-schedule)" size={32}><CalendarDays size={16} /></IconTile>} />
         <KpiCard label="미처리 문의" value={openInquiries} sub={openInquiries ? "답변 필요" : "모두 답변됨"} href="/ax/inquiries" tone={openInquiries ? "error" : undefined} icon={<IconTile color="var(--mod-customer)" size={32}><MessageSquare size={16} /></IconTile>} />
         <KpiCard label="지연 프로젝트" value={delayed} sub={delayed ? "대표 확인 필요" : "정상"} href="/ax/projects?filter=delayed" tone={delayed ? "error" : undefined} icon={<IconTile color="var(--mod-alert)" size={32}><AlertTriangle size={16} /></IconTile>} />
       </div>
+
+      {pendingApprovals.length > 0 && (
+        <Card className="border-accent/50 p-5">
+          <SectionTitle action={<Link href="/ax/opportunities?tab=approvals" className="text-[0.85rem] font-semibold text-ink-2 hover:text-ink">전체 보기 →</Link>}>
+            <span className="flex items-center gap-2"><ShieldCheck size={18} className="text-accent" /> {isAdmin ? "대표님 확인이 필요합니다" : "대표 승인 대기"}</span>
+          </SectionTitle>
+          <div className="divide-y divide-line">
+            {pendingApprovals.slice(0, 3).map((ap) => {
+              const co = st.companies.find((c) => c.id === ap.companyId);
+              const who = st.users.find((u) => u.id === ap.requestedBy);
+              return (
+                <Link key={ap.id} href="/ax/opportunities?tab=approvals" className="flex items-center gap-3 py-3 hover:bg-surface-2/60">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge tone={ap.kind === "discount" ? "warning" : ap.kind === "promise" ? "info" : "accent"}>{ap.kind === "discount" ? "할인" : ap.kind === "promise" ? "고객 약속" : "제안"}</Badge>
+                      <span className="truncate font-semibold">{ap.title}</span>
+                    </div>
+                    <div className="mt-0.5 truncate text-[0.82rem] text-ink-2">{ap.summary}</div>
+                    <div className="mt-0.5 text-[0.78rem] text-ink-3">{co?.name} · {who?.name} {who?.title} 요청 · {fmtRelative(ap.requestedAt)}{ap.baseAmount ? ` · ${fmtWon(ap.baseAmount)} / 할인 ${ap.discountPct}%` : ""}</div>
+                  </div>
+                  <ArrowRight size={16} className="shrink-0 text-ink-3" />
+                </Link>
+              );
+            })}
+          </div>
+        </Card>
+      )}
 
       <div className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
         <div className="space-y-6">
@@ -135,8 +169,25 @@ export default function DashboardPage() {
         </div>
 
         <div className="space-y-6">
+          {newOpps.length > 0 && (
+            <Card className="p-5">
+              <SectionTitle action={<Link href="/ax/opportunities?tab=pipeline" className="text-[0.85rem] font-semibold text-ink-2 hover:text-ink">기회 →</Link>}>
+                <span className="flex items-center gap-2"><TrendingUp size={18} className="text-accent" /> 새 매출기회</span>
+              </SectionTitle>
+              <div className="divide-y divide-line">
+                {newOpps.slice(0, 3).map((o) => (
+                  <Link key={o.id} href="/ax/opportunities?tab=pipeline" className="block py-3 hover:bg-surface-2/60">
+                    <div className="flex items-center gap-2"><Badge tone={OPP_STATUS[o.status].tone}>{o.source === "rule" ? "규칙 발견" : "고객 관심"}</Badge><span className="truncate font-semibold">{o.serviceName}</span></div>
+                    <div className="mt-0.5 text-[0.8rem] text-ink-3">{st.companies.find((c) => c.id === o.companyId)?.name} · {fmtRelative(o.createdAt)}</div>
+                  </Link>
+                ))}
+              </div>
+            </Card>
+          )}
           <Card className="p-5">
-            <SectionTitle action={<Link href="/ax/schedule" className="text-[0.85rem] font-semibold text-ink-2 hover:text-ink">일정 →</Link>}>이번 주 일정</SectionTitle>
+            <SectionTitle action={<Link href="/ax/schedule" className="text-[0.85rem] font-semibold text-ink-2 hover:text-ink">일정 →</Link>}>
+              <span className="flex items-center gap-2"><CalendarDays size={18} className="text-ink-3" /> 이번 주 일정 {todaySchedules.length > 0 && <Badge tone="accent">오늘 {todaySchedules.length}</Badge>}</span>
+            </SectionTitle>
             {weekSchedules.length === 0 ? <div className="py-6 text-center text-[0.9rem] text-ink-3">이번 주 일정이 없습니다.</div> : <div className="divide-y divide-line">{weekSchedules.slice(0, 7).map((s) => <ScheduleItem key={s.id} s={s} showCompany />)}</div>}
           </Card>
           <Card className="p-5">

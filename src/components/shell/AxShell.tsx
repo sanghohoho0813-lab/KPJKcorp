@@ -13,7 +13,6 @@ import {
   CheckSquare,
   ClipboardList,
   Eye,
-  FileCheck2,
   FolderOpen,
   HelpCircle,
   LayoutDashboard,
@@ -25,6 +24,8 @@ import {
   Sparkles,
   ChevronDown,
   ChevronRight,
+  ShieldCheck,
+  MessageSquarePlus,
 } from "lucide-react";
 import { useStore, useCurrentUser } from "@/lib/store";
 import { NEXT_FEATURES, useUi } from "@/lib/ui-store";
@@ -47,6 +48,8 @@ interface NavItem {
   /** Hover tooltip — used where the label is shortened. */
   hint?: string;
   id?: string;
+  /** live count key — resolved in NavLink so the sidebar shows what needs attention */
+  badge?: "approvals";
 }
 
 interface NavGroup {
@@ -71,14 +74,14 @@ const NAV_GROUPS: NavGroup[] = [
     inkColor: "var(--nav-core-ink)",
     items: [
       { href: "/ax/dashboard", label: "대시보드", icon: <LayoutDashboard size={18} />, id: "tut-nav-dashboard" },
+      { href: "/ax/opportunities", label: "승인 · 매출기회", icon: <ShieldCheck size={18} />, hint: "대표 승인 대기 · 추가서비스 기회", id: "tut-nav-approvals", badge: "approvals" },
       { href: "/ax/clients", label: "기업고객", icon: <Building2 size={18} />, id: "tut-nav-clients" },
       { href: "/ax/consultations", label: "상담 · 계약", icon: <ClipboardList size={18} /> },
       { href: "/ax/projects", label: "프로젝트", icon: <Briefcase size={18} />, id: "tut-nav-projects" },
-      { href: "/ax/documents", label: "자료관리", icon: <FolderOpen size={18} />, id: "tut-nav-documents" },
+      { href: "/ax/documents", label: "자료관리", icon: <FolderOpen size={18} />, hint: "요청자료 · 결과자료", id: "tut-nav-documents" },
       { href: "/ax/schedule", label: "일정", icon: <CalendarDays size={18} /> },
       { href: "/ax/tasks", label: "업무 · 후속관리", icon: <CheckSquare size={18} /> },
       { href: "/ax/inquiries", label: "문의 · 커뮤니케이션", icon: <MessageSquare size={18} /> },
-      { href: "/ax/results", label: "결과자료", icon: <FileCheck2 size={18} /> },
     ],
   },
   {
@@ -108,6 +111,7 @@ const MOBILE_PRIMARY = ["/ax/dashboard", "/ax/clients", "/ax/projects", "/ax/doc
 
 function NavLink({ item, color, onClick, mobile }: { item: NavItem; color: string; onClick?: () => void; mobile?: boolean }) {
   const pathname = usePathname();
+  const pendingApprovals = useStore((s) => (item.badge === "approvals" ? s.approvals.filter((a) => a.status === "pending").length : 0));
   const active = pathname === item.href || pathname.startsWith(item.href + "/");
   return (
     <Link
@@ -132,6 +136,9 @@ function NavLink({ item, color, onClick, mobile }: { item: NavItem; color: strin
         {item.icon}
       </span>
       <span className="flex-1 truncate">{item.label}</span>
+      {pendingApprovals > 0 && (
+        <span className={cx("tnum shrink-0 rounded-full px-1.5 text-[0.72rem] font-bold", mobile ? "bg-accent text-accent-ink" : "bg-accent text-accent-ink")}>{pendingApprovals}</span>
+      )}
     </Link>
   );
 }
@@ -204,11 +211,16 @@ function Sidebar() {
         ))}
         <NextGroup />
       </nav>
-      <div className="border-t border-white/10 px-5 py-3 text-[0.75rem] text-shell-text-3">
-        <div className="flex items-center justify-between">
-          <span>DEMO DATA · v1.0</span>
-          <span>미래AI랩 제작</span>
-        </div>
+      <div className="border-t border-white/10 p-3">
+        <Link href="/ax/survey" className="pressable flex items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors hover:bg-white/[0.06]">
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center" style={{ color: "var(--nav-next)" }}><MessageSquarePlus size={18} /></span>
+          <span className="min-w-0 flex-1 leading-tight">
+            <span className="block text-[0.85rem] font-semibold text-shell-text-2">시스템 개선 의견</span>
+            <span className="block text-[0.72rem] text-shell-text-3">2단계 사용 설문 · 약 2분</span>
+          </span>
+          <ChevronRight size={14} className="shrink-0 text-shell-text-3" />
+        </Link>
+        <div className="px-3 pt-2 text-[0.72rem] text-shell-text-3">DEMO DATA · v1.1</div>
       </div>
     </aside>
   );
@@ -362,6 +374,7 @@ function MoreSheet() {
           <button onClick={() => openTutorial("ax")} className={btn}><HelpCircle size={18} /> 튜토리얼</button>
           <button onClick={() => setConfirmReset(true)} className={btn}><RotateCcw size={18} /> 데모 초기화</button>
           <button onClick={() => { logout(); router.push("/login"); }} className={btn}><LogOut size={18} /> 로그아웃</button>
+          <Link href="/ax/survey" onClick={close} className={cx(btn, "col-span-2 border-accent/60")}><MessageSquarePlus size={18} className="text-accent" /> 시스템 개선 의견 <span className="ml-auto text-[0.75rem] font-normal text-ink-3">2단계 설문 · 약 2분</span></Link>
         </div>
         {NAV_GROUPS.map((g, gi) => {
           const items = g.items.filter((i) => !MOBILE_PRIMARY.includes(i.href));

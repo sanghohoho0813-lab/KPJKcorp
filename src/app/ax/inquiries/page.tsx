@@ -105,7 +105,7 @@ function InquiriesInner() {
 
   return (
     <div>
-      <PageHeader title="문의 / 커뮤니케이션" desc="고객 Portal에서 들어온 문의가 자동으로 Queue에 등록됩니다. 답변하면 고객 Portal에 즉시 반영됩니다." actions={<SegmentedControl size="sm" value={filter} onChange={(k) => { setFilter(k); if (isMobile) setSel(null); }} options={[{ key: "open", label: `미답변 ${st.inquiries.filter((i) => i.status === "open" && (!me || i.assigneeId === me)).length}` }, { key: "answered", label: "답변완료" }, { key: "all", label: "전체" }]} />} />
+      <PageHeader title="문의 · 커뮤니케이션" desc="고객 Portal에서 들어온 문의가 자동으로 Queue에 등록됩니다. 답변하면 고객 Portal에 즉시 반영됩니다." actions={<SegmentedControl size="sm" value={filter} onChange={(k) => { setFilter(k); if (isMobile) setSel(null); }} options={[{ key: "open", label: `미답변 ${st.inquiries.filter((i) => i.status === "open" && (!me || i.assigneeId === me)).length}` }, { key: "answered", label: "답변완료" }, { key: "all", label: "전체" }]} />} />
       {isMobile ? (sel ? detailPane : listPane) : <div className="grid gap-5 lg:grid-cols-[360px_1fr]">{listPane}{detailPane}</div>}
     </div>
   );

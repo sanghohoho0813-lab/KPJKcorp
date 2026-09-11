@@ -1,14 +1,17 @@
 import type {
   Activity,
+  Approval,
   Company,
   Consultation,
   Contract,
   DocumentRequest,
   Inquiry,
   Notification,
+  Opportunity,
   Project,
   ResultFile,
   Schedule,
+  SurveyResponse,
   Task,
   User,
 } from "../types";
@@ -30,6 +33,9 @@ export interface SeedData {
   tasks: Task[];
   inquiries: Inquiry[];
   results: ResultFile[];
+  opportunities: Opportunity[];
+  approvals: Approval[];
+  surveys: SurveyResponse[];
   activities: Activity[];
   notifications: Notification[];
 }
@@ -254,5 +260,82 @@ export function buildSeed(now = new Date()): SeedData {
 
   activities.sort((a, b) => b.at.localeCompare(a.at));
   notifications.sort((a, b) => b.at.localeCompare(a.at));
-  return { users, companies, consultations, contracts, projects, docRequests, schedules, tasks, inquiries, results, activities, notifications };
+  /* ---------- 매출기회 (고객 관심 → 내부 기회) ---------- */
+  const opportunities: Opportunity[] = [
+    {
+      id: "op_1", companyId: "co_b", serviceKey: "venture", serviceName: "벤처기업확인", source: "portal_interest", status: "interest",
+      assigneeId: "u_lee", createdAt: d(-1, 14), createdBy: "c_b", updatedAt: d(-1, 14),
+      note: "연구소 설립 마무리되면 이어서 검토하고 싶습니다.",
+      reason: "기업부설연구소 관련 진행 이력이 있어 연구개발 유형 요건을 함께 검토할 수 있습니다.",
+      history: [{ at: d(-1, 14), status: "interest", by: "c_b" }],
+    },
+    {
+      id: "op_2", companyId: "co_a", serviceKey: "cert", serviceName: "기업인증 (메인비즈 · 이노비즈)", source: "portal_request", status: "contacted",
+      assigneeId: "u_park", createdAt: d(-5, 10), createdBy: "c_a", updatedAt: d(-3, 11),
+      note: "이노비즈도 가능한지 궁금합니다.",
+      reason: "진행 중인 과제가 마무리 단계에 있어, 다음 단계로 인증 요건을 검토하기 좋은 시점입니다.",
+      history: [{ at: d(-5, 10), status: "interest", by: "c_a" }, { at: d(-3, 11), status: "contacted", by: "u_park", note: "전화 통화 완료. 요건 비교표 준비 중." }],
+    },
+    {
+      id: "op_3", companyId: "co_f", serviceKey: "hr_subsidy", serviceName: "고용지원금 진단", source: "rule", status: "interest",
+      assigneeId: "u_jung", createdAt: d(-2, 9), createdBy: "system", updatedAt: d(-2, 9),
+      reason: "상시 인력 54명 규모로, 인력 기준 지원금 해당 여부를 진단해볼 수 있습니다.",
+      history: [{ at: d(-2, 9), status: "interest", by: "system" }],
+    },
+    {
+      id: "op_4", companyId: "co_e", serviceKey: "corp_cleanup", serviceName: "법인 정비 (가지급금 · 정관 · 주식)", source: "internal", status: "approval_pending",
+      assigneeId: "u_lee", createdAt: d(-4, 15), createdBy: "u_lee", updatedAt: d(-1, 9),
+      note: "초기 상담에서 정관 정비 필요성 확인. 연간 자문 범위로 제안 예정.",
+      history: [{ at: d(-4, 15), status: "interest", by: "u_lee" }, { at: d(-2, 10), status: "contacted", by: "u_lee" }, { at: d(-1, 9), status: "approval_pending", by: "u_lee" }],
+    },
+    {
+      id: "op_5", companyId: "co_c", serviceKey: "ip", serviceName: "특허 · 지식재산", source: "internal", status: "won",
+      assigneeId: "u_park", createdAt: d(-30, 11), createdBy: "u_park", updatedAt: d(-18, 16),
+      note: "공정 개선 건으로 출원 1건 진행.",
+      history: [{ at: d(-30, 11), status: "interest", by: "u_park" }, { at: d(-27, 10), status: "contacted", by: "u_park" }, { at: d(-24, 14), status: "approval_pending", by: "u_park" }, { at: d(-22, 9), status: "proposed", by: "u_admin" }, { at: d(-18, 16), status: "won", by: "u_park" }],
+    },
+  ];
+
+  /* ---------- 대표 승인 대기 ---------- */
+  const approvals: Approval[] = [
+    {
+      id: "ap_1", kind: "opportunity", title: "이플러스바이오(주) 법인 정비 연간 자문 제안",
+      summary: "창업 2년차. 정관·주주명부 정비 후 벤처확인까지 연결되는 범위. 제안 전 대표님 확인이 필요합니다.",
+      companyId: "co_e", opportunityId: "op_4", requestedBy: "u_lee", requestedAt: d(-1, 9), status: "pending",
+    },
+    {
+      id: "ap_2", kind: "discount", title: "씨엠푸드(주) 법인 경영자문 계약 할인 요청",
+      summary: "정책자금 건을 함께 진행 중인 기존 고객. 연간 자문 계약에 한해 할인 적용 여부를 결정해 주세요.",
+      companyId: "co_c", projectId: "pj_c2", baseAmount: 12000000, discountPct: 10,
+      requestedBy: "u_park", requestedAt: d(0, 9, 20), status: "pending",
+    },
+    {
+      id: "ap_3", kind: "promise", title: "디원건설(주) 결과보고 일정 2주 연기 요청",
+      summary: "고객 측 자료 제출 지연으로 당초 약속한 보고일을 맞추기 어렵습니다. 고객에게 연기를 안내해도 될지 확인 부탁드립니다.",
+      companyId: "co_d", projectId: "pj_d1", requestedBy: "u_jung", requestedAt: d(-2, 17), status: "pending",
+    },
+    {
+      id: "ap_4", kind: "opportunity", title: "씨엠푸드(주) 특허 출원 자문 제안",
+      summary: "공정 개선 결과물 중 권리화 가능 항목 1건. 제안 범위와 금액 확인 요청.",
+      companyId: "co_c", opportunityId: "op_5", requestedBy: "u_park", requestedAt: d(-24, 14), status: "approved",
+      decidedBy: "u_admin", decidedAt: d(-22, 9), decisionNote: "범위 동의. 금액은 기존 고객 기준으로 진행하세요.",
+    },
+  ];
+
+  const surveys: SurveyResponse[] = [];
+
+  const oppActivities: Activity[] = [
+    { id: "ac_op1", type: "opportunity_created", companyId: "co_b", actorId: "c_b", actorRole: "client", at: d(-1, 14), text: "고객 관심표시: 벤처기업확인" },
+    { id: "ac_op2", type: "approval_requested", companyId: "co_e", actorId: "u_lee", actorRole: "consultant", at: d(-1, 9), text: "대표 승인 요청: 이플러스바이오(주) 법인 정비 연간 자문 제안" },
+    { id: "ac_op3", type: "approval_requested", companyId: "co_c", actorId: "u_park", actorRole: "consultant", at: d(0, 9, 20), text: "대표 승인 요청: 씨엠푸드(주) 법인 경영자문 계약 할인 요청" },
+  ];
+  const oppNotifs: Notification[] = [
+    { id: "nt_op1", audience: "internal", companyId: "co_c", title: "대표 승인 요청", body: "씨엠푸드(주) · 법인 경영자문 계약 할인 요청", at: d(0, 9, 20), read: false, href: "/ax/opportunities?tab=approvals" },
+    { id: "nt_op2", audience: "internal", companyId: "co_b", title: "추가서비스 관심: 비앤테크(주)", body: "벤처기업확인 — 연구소 설립 마무리되면 이어서 검토하고 싶습니다.", at: d(-1, 14), read: false, href: "/ax/opportunities" },
+  ];
+
+  const allActivities = [...oppActivities, ...activities].sort((a, b) => b.at.localeCompare(a.at));
+  const allNotifications = [...oppNotifs, ...notifications].sort((a, b) => b.at.localeCompare(a.at));
+
+  return { users, companies, consultations, contracts, projects, docRequests, schedules, tasks, inquiries, results, opportunities, approvals, surveys, activities: allActivities, notifications: allNotifications };
 }

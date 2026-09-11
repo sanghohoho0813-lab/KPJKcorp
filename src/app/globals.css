@@ -37,10 +37,12 @@
   --sem-info: #2f6bb0;
   --sem-info-bg: #e5eef9;
 
-  /* Shell text (dark sidebar) — fixed white family */
+  /* Shell text (dark sidebar) — translucent white.
+     A fixed grey (#aeb7c3 etc.) carries its own hue and turns muddy on a warm
+     or purple shell. Alpha-white always reads as the shell's own color. */
   --shell-text: #ffffff;
-  --shell-text-2: #e5e7eb;
-  --shell-text-3: #aeb7c3;
+  --shell-text-2: rgba(255, 255, 255, 0.84);
+  --shell-text-3: rgba(255, 255, 255, 0.56);
   --shell-line: rgba(255, 255, 255, 0.08);
 
   /* Module icon colors — fixed */
@@ -69,22 +71,28 @@
   --radius-card: 16px;
   --radius-btn: 10px;
   --sidebar-w: 280px;
+  /* 모바일 하단 Nav 높이 — 하단 고정 바가 서로 겹치지 않게 기준으로 쓴다 */
+  --bottomnav-h: calc(4rem + env(safe-area-inset-bottom));
   --header-h: 64px;
   --motion-fast: 160ms;
   --motion-base: 220ms;
 }
 
-/* Canonical 9 Themes + KPJK Signature */
-html[data-theme="kpjk"] { --theme-shell:#171b20; --theme-shell-2:#22272e; --theme-primary:#343b44; --theme-secondary:#6b7680; --theme-accent:#d47a4a; --theme-highlight:#e8b89a; --theme-soft:#f4ebe4; }
-html[data-theme="navy"] { --theme-shell:#0b1830; --theme-shell-2:#132447; --theme-primary:#2457d6; --theme-secondary:#1687a7; --theme-accent:#17a889; --theme-highlight:#e7c873; --theme-soft:#dce8f7; }
-html[data-theme="navygold"] { --theme-shell:#111a2d; --theme-shell-2:#1a2640; --theme-primary:#2847a7; --theme-secondary:#a37a28; --theme-accent:#d0a84b; --theme-highlight:#f0d995; --theme-soft:#efe8d7; --theme-accent-ink:#171b20; }
-html[data-theme="emerald"] { --theme-shell:#11332b; --theme-shell-2:#19453b; --theme-primary:#0e7663; --theme-secondary:#2c9277; --theme-accent:#b4862a; --theme-highlight:#e8ce88; --theme-soft:#e2f0ea; }
-html[data-theme="forest"] { --theme-shell:#17352c; --theme-shell-2:#20473c; --theme-primary:#356e58; --theme-secondary:#73977e; --theme-accent:#a58e4d; --theme-highlight:#d9d2aa; --theme-soft:#e5ece5; }
-html[data-theme="teal"] { --theme-shell:#08323a; --theme-shell-2:#0e434d; --theme-primary:#087a83; --theme-secondary:#1597a3; --theme-accent:#d2704c; --theme-highlight:#e9b59b; --theme-soft:#ddedef; }
-html[data-theme="onyx"] { --theme-shell:#15171c; --theme-shell-2:#1f222a; --theme-primary:#343942; --theme-secondary:#6a717c; --theme-accent:#b89032; --theme-highlight:#e0c76f; --theme-soft:#e6e8ec; }
-html[data-theme="burgundy"] { --theme-shell:#3a1724; --theme-shell-2:#4c2032; --theme-primary:#7a2c49; --theme-secondary:#667085; --theme-accent:#a85c72; --theme-highlight:#e6b6a5; --theme-soft:#eee4e8; }
-html[data-theme="plum"] { --theme-shell:#291a3d; --theme-shell-2:#362451; --theme-primary:#573f91; --theme-secondary:#4e63a8; --theme-accent:#8b5aa6; --theme-highlight:#c4b0e6; --theme-soft:#e9e5f3; }
-html[data-theme="steel"] { --theme-shell:#24303b; --theme-shell-2:#2f3e4c; --theme-primary:#44647a; --theme-secondary:#6d8899; --theme-accent:#4c9aaa; --theme-highlight:#c9d6de; --theme-soft:#e7edf1; }
+/* Canonical 9 Themes + KPJK Signature
+   RULE — a theme may only color: Sidebar(shell), Active state, Icon, CTA, Badge, Point, Chart accent.
+   Page background, Card, Surface and Table always use the fixed Neutral tokens above.
+   `--theme-soft` is a large-area fill (chat bubble, memo box, selected row) so it is kept
+   near-neutral: 12% accent on white. Raising its chroma is what makes a theme look hazy. */
+html[data-theme="kpjk"] { --theme-shell:#171b20; --theme-shell-2:#22272e; --theme-primary:#343b44; --theme-secondary:#6b7680; --theme-accent:#d47a4a; --theme-highlight:#e8b89a; --theme-soft:#faefe9; }
+html[data-theme="navy"] { --theme-shell:#0b1830; --theme-shell-2:#132447; --theme-primary:#2457d6; --theme-secondary:#1687a7; --theme-accent:#17a889; --theme-highlight:#e7c873; --theme-soft:#e3f5f1; }
+html[data-theme="navygold"] { --theme-shell:#111a2d; --theme-shell-2:#1a2640; --theme-primary:#2847a7; --theme-secondary:#a37a28; --theme-accent:#d0a84b; --theme-highlight:#f0d995; --theme-soft:#f9f5e9; --theme-accent-ink:#171b20; }
+html[data-theme="emerald"] { --theme-shell:#11332b; --theme-shell-2:#19453b; --theme-primary:#0e7663; --theme-secondary:#2c9277; --theme-accent:#b4862a; --theme-highlight:#e8ce88; --theme-soft:#f6f0e5; }
+html[data-theme="forest"] { --theme-shell:#17352c; --theme-shell-2:#20473c; --theme-primary:#356e58; --theme-secondary:#73977e; --theme-accent:#a58e4d; --theme-highlight:#d9d2aa; --theme-soft:#f4f1ea; }
+html[data-theme="teal"] { --theme-shell:#08323a; --theme-shell-2:#0e434d; --theme-primary:#087a83; --theme-secondary:#1597a3; --theme-accent:#d2704c; --theme-highlight:#e9b59b; --theme-soft:#faeeea; }
+html[data-theme="onyx"] { --theme-shell:#15171c; --theme-shell-2:#1f222a; --theme-primary:#343942; --theme-secondary:#6a717c; --theme-accent:#b89032; --theme-highlight:#e0c76f; --theme-soft:#f6f2e6; }
+html[data-theme="burgundy"] { --theme-shell:#3a1724; --theme-shell-2:#4c2032; --theme-primary:#7a2c49; --theme-secondary:#7c6873; --theme-accent:#b8405f; --theme-highlight:#f0b9a6; --theme-soft:#fbecef; }
+html[data-theme="plum"] { --theme-shell:#291a3d; --theme-shell-2:#362451; --theme-primary:#573f91; --theme-secondary:#4e63a8; --theme-accent:#8a4fb5; --theme-highlight:#cbb3ec; --theme-soft:#f3ecf8; }
+html[data-theme="steel"] { --theme-shell:#24303b; --theme-shell-2:#2f3e4c; --theme-primary:#44647a; --theme-secondary:#6d8899; --theme-accent:#4c9aaa; --theme-highlight:#c9d6de; --theme-soft:#eaf3f5; }
 
 /* Font scale */
 html { font-size: 19px; }

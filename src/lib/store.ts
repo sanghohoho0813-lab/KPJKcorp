@@ -6,20 +6,27 @@ import { buildSeed, type SeedData } from "./demo/seed";
 import type {
   Activity,
   ActivityType,
+  Approval,
+  ApprovalKind,
   DocumentRequest,
   InternalStage,
   Inquiry,
   Notification,
+  Opportunity,
+  OpportunitySource,
+  OpportunityStatus,
   ResultFile,
   Role,
   Schedule,
   Session,
   Settings,
+  SurveyResponse,
   Task,
   TaskStatus,
 } from "./types";
 import { nowIso, uid, addDays, iso } from "./format";
 import { stageLabel } from "./stages";
+import { OPP_STATUS, SERVICE_BY_KEY } from "./services";
 
 export interface StoreState extends SeedData {
   hydrated: boolean;
@@ -51,6 +58,13 @@ export interface StoreState extends SeedData {
   createSchedule: (data: Omit<Schedule, "id">, byUserId: string) => void;
   shareResult: (data: Omit<ResultFile, "id" | "sharedAt">, byUserId: string) => void;
   downloadResult: (resultId: string, byUserId: string) => void;
+  // opportunity / approval / survey
+  raiseOpportunity: (data: { companyId: string; serviceKey: string; note?: string; reason?: string; source: OpportunitySource }, byUserId: string, byRole: Role) => void;
+  advanceOpportunity: (id: string, status: OpportunityStatus, byUserId: string, note?: string) => void;
+  requestApproval: (data: { kind: ApprovalKind; title: string; summary: string; companyId?: string; projectId?: string; opportunityId?: string; baseAmount?: number; discountPct?: number }, byUserId: string) => void;
+  decideApproval: (id: string, decision: "approved" | "rejected", byUserId: string, note?: string) => void;
+  submitSurvey: (data: Omit<SurveyResponse, "id" | "submittedAt">) => void;
+
   markNotificationRead: (id: string) => void;
   markAllRead: (audience: "internal" | "client", companyId?: string) => void;
   logActivity: (a: Omit<Activity, "id" | "at">) => void;
@@ -309,6 +323,136 @@ export const useStore = create<StoreState>()(
         const r = st.results.find((x) => x.id === resultId);
         if (!r) return;
         set({ activities: [makeActivity({ type: "result_downloaded", companyId: r.companyId, projectId: r.projectId, actorId: byUserId, actorRole: "client", text: `결과자료 열람: ${r.name}` }), ...st.activities] });
+      },
+
+      // ---------- OPPORTUNITY LOOP (고객 관심 → 내부 기회 → 대표 승인 → 추가계약) ----------
+      raiseOpportunity: (data, byUserId, byRole) => {
+        const st = get();
+        const company = st.companies.find((c) => c.id === data.companyId);
+        const svc = SERVICE_BY_KEY[data.serviceKey];
+        if (!company || !svc) return;
+        const now = nowIso();
+        const fromClient = data.source === "portal_interest" || data.source === "portal_request";
+        const assigneeId = company.consultantId;
+        const opp: Opportunity = {
+          id: uid("op"),
+          companyId: data.companyId,
+          serviceKey: data.serviceKey,
+          serviceName: svc.name,
+          source: data.source,
+          status: "interest",
+          assigneeId,
+          createdAt: now,
+          createdBy: byUserId,
+          updatedAt: now,
+          note: data.note,
+          reason: data.reason,
+          history: [{ at: now, status: "interest", by: byUserId }],
+        };
+        // 관심 표시는 그 자체로는 아무 일도 아니다 — 담당자에게 실제 업무가 생겨야 Loop가 닫힌다.
+        const task: Task = {
+          id: uid("tk"),
+          companyId: data.companyId,
+          title: `${company.name} ${svc.name} 관심 — 상담 연락`,
+          type: "후속연락",
+          dueDate: iso(addDays(new Date(), data.source === "portal_request" ? 1 : 2, 18)),
+          assigneeId,
+          status: "todo",
+          priority: data.source === "portal_request" ? "urgent" : "normal",
+          createdAt: now,
+          source: "auto",
+          memo: data.note,
+        };
+        set({
+          opportunities: [opp, ...st.opportunities],
+          tasks: [task, ...st.tasks],
+          activities: [
+            makeActivity({ type: "task_created", companyId: data.companyId, actorId: "system", actorRole: "system", text: `자동 생성: ${svc.name} 상담 연락 Task` }),
+            makeActivity({ type: "opportunity_created", companyId: data.companyId, actorId: byUserId, actorRole: fromClient ? "client" : byRole, text: `${data.source === "portal_request" ? "고객 상담요청" : data.source === "portal_interest" ? "고객 관심표시" : "내부 등록"}: ${svc.name}`, meta: { serviceKey: data.serviceKey, source: data.source } }),
+            ...st.activities,
+          ],
+          notifications: [
+            makeNotification({ audience: "internal", companyId: data.companyId, title: `${data.source === "portal_request" ? "상담 요청" : "추가서비스 관심"}: ${company.name}`, body: `${svc.name}${data.note ? ` — ${data.note}` : ""}`, href: "/ax/opportunities" }),
+            ...(fromClient ? [makeNotification({ audience: "client", companyId: data.companyId, title: "요청이 접수되었습니다", body: `${svc.name} 관련 문의가 담당 컨설턴트에게 전달되었습니다.`, href: "/portal/services" })] : []),
+            ...st.notifications,
+          ],
+        });
+      },
+
+      advanceOpportunity: (id, status, byUserId, note) => {
+        const st = get();
+        const o = st.opportunities.find((x) => x.id === id);
+        if (!o || o.status === status) return;
+        const now = nowIso();
+        const company = st.companies.find((c) => c.id === o.companyId);
+        const updated: Opportunity = { ...o, status, updatedAt: now, history: [...o.history, { at: now, status, by: byUserId, note }] };
+        // 고객에게는 "검토 중 / 제안 준비 중 / 진행 확정"만 전달한다 — 내부 승인 단계는 노출하지 않는다.
+        const clientNotif =
+          status === "contacted" || status === "won"
+            ? [makeNotification({ audience: "client", companyId: o.companyId, title: status === "won" ? "추가 진행이 확정되었습니다" : "담당자가 확인했습니다", body: `${o.serviceName} — ${status === "won" ? "이어서 안내드리겠습니다." : "곧 연락드리겠습니다."}`, href: "/portal/services" })]
+            : [];
+        set({
+          opportunities: st.opportunities.map((x) => (x.id === id ? updated : x)),
+          activities: [makeActivity({ type: "opportunity_status_changed", companyId: o.companyId, actorId: byUserId, actorRole: "consultant", text: `매출기회 ${o.serviceName} (${company?.name ?? ""}): ${OPP_STATUS[o.status].label} → ${OPP_STATUS[status].label}`, meta: { from: o.status, to: status } }), ...st.activities],
+          notifications: [...clientNotif, ...st.notifications],
+        });
+      },
+
+      // ---------- 대표 승인 ----------
+      requestApproval: (data, byUserId) => {
+        const st = get();
+        const now = nowIso();
+        const ap: Approval = { ...data, id: uid("ap"), requestedBy: byUserId, requestedAt: now, status: "pending" };
+        const company = st.companies.find((c) => c.id === data.companyId);
+        const opportunities = data.opportunityId
+          ? st.opportunities.map((o) => (o.id === data.opportunityId ? { ...o, status: "approval_pending" as OpportunityStatus, updatedAt: now, history: [...o.history, { at: now, status: "approval_pending" as OpportunityStatus, by: byUserId }] } : o))
+          : st.opportunities;
+        set({
+          approvals: [ap, ...st.approvals],
+          opportunities,
+          activities: [makeActivity({ type: "approval_requested", companyId: data.companyId, projectId: data.projectId, actorId: byUserId, actorRole: "consultant", text: `대표 승인 요청: ${data.title}`, meta: { kind: data.kind, ...(data.discountPct ? { discountPct: data.discountPct } : {}) } }), ...st.activities],
+          notifications: [makeNotification({ audience: "internal", companyId: data.companyId, title: "대표 승인 요청", body: `${company ? `${company.name} · ` : ""}${data.title}`, href: "/ax/opportunities?tab=approvals" }), ...st.notifications],
+        });
+      },
+
+      decideApproval: (id, decision, byUserId, note) => {
+        const st = get();
+        const ap = st.approvals.find((x) => x.id === id);
+        if (!ap || ap.status !== "pending") return;
+        const now = nowIso();
+        const company = st.companies.find((c) => c.id === ap.companyId);
+        const updated: Approval = { ...ap, status: decision, decidedBy: byUserId, decidedAt: now, decisionNote: note };
+        // 승인 결과는 기회 상태로 그대로 흘러간다 — 승인만 하고 멈추는 구조를 만들지 않는다.
+        let opportunities = st.opportunities;
+        const extraTasks: Task[] = [];
+        if (ap.opportunityId) {
+          const next: OpportunityStatus = decision === "approved" ? "proposed" : "dropped";
+          opportunities = st.opportunities.map((o) => (o.id === ap.opportunityId ? { ...o, status: next, updatedAt: now, history: [...o.history, { at: now, status: next, by: byUserId, note }] } : o));
+          const o = st.opportunities.find((x) => x.id === ap.opportunityId);
+          if (decision === "approved" && o) {
+            extraTasks.push({ id: uid("tk"), companyId: o.companyId, title: `${company?.name ?? ""} ${o.serviceName} 제안·견적 발송`, type: "내부작업", dueDate: iso(addDays(new Date(), 2, 18)), assigneeId: o.assigneeId, status: "todo", priority: "urgent", createdAt: now, source: "auto", memo: note });
+          }
+        }
+        set({
+          approvals: st.approvals.map((x) => (x.id === id ? updated : x)),
+          opportunities,
+          tasks: [...extraTasks, ...st.tasks],
+          activities: [
+            ...(extraTasks.length ? [makeActivity({ type: "task_created", companyId: ap.companyId, actorId: "system", actorRole: "system", text: `자동 생성: ${extraTasks[0].title}` })] : []),
+            makeActivity({ type: "approval_decided", companyId: ap.companyId, projectId: ap.projectId, actorId: byUserId, actorRole: "admin", text: `대표 ${decision === "approved" ? "승인" : "반려"}: ${ap.title}${note ? ` — ${note}` : ""}`, meta: { kind: ap.kind, decision } }),
+            ...st.activities,
+          ],
+          notifications: [makeNotification({ audience: "internal", companyId: ap.companyId, title: `대표 ${decision === "approved" ? "승인 완료" : "반려"}`, body: `${ap.title}${note ? ` — ${note}` : ""}`, href: "/ax/opportunities?tab=approvals" }), ...st.notifications],
+        });
+      },
+
+      submitSurvey: (data) => {
+        const st = get();
+        const r: SurveyResponse = { ...data, id: uid("sv"), submittedAt: nowIso() };
+        set({
+          surveys: [r, ...st.surveys],
+          activities: [makeActivity({ type: "survey_submitted", actorId: data.userId, actorRole: data.role, text: `AX 고도화 설문 제출 (${data.surveyVersion} · ${data.stage})`, meta: { answered: Object.keys(data.answers).length } }), ...st.activities],
+        });
       },
 
       markNotificationRead: (id) => set({ notifications: get().notifications.map((n) => (n.id === id ? { ...n, read: true } : n)) }),
