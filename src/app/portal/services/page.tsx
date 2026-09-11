@@ -1,11 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, MessageSquarePlus, Sparkles, ThumbsUp } from "lucide-react";
-import { useStore, usePortalCompanyId, useCurrentUser } from "@/lib/store";
+import { Check, MessageSquarePlus, Receipt, Sparkles, ThumbsUp } from "lucide-react";
+import { useStore, usePortalCompanyId, useCurrentUser, quoteGross, quoteNet } from "@/lib/store";
 import { OPP_STATUS, recommendServices, type ServiceDef } from "@/lib/services";
-import { fmtRelative } from "@/lib/format";
-import { Badge, Button, Card, EmptyState, SectionTitle, Textarea } from "@/components/ui/ui";
+import { fmtDate, fmtRelative, fmtWon } from "@/lib/format";
+import { Badge, Button, Card, EmptyState, SectionTitle, Textarea, cx } from "@/components/ui/ui";
+import type { Quote } from "@/lib/types";
 import { Modal } from "@/components/ui/overlay";
 
 export default function PortalServicesPage() {
@@ -13,12 +14,17 @@ export default function PortalServicesPage() {
   const companyId = usePortalCompanyId();
   const user = useCurrentUser();
   const raise = useStore((s) => s.raiseOpportunity);
+  const respond = useStore((s) => s.respondQuote);
   const toast = useStore((s) => s.toast);
   const [ask, setAsk] = useState<{ svc: ServiceDef; reason: string; kind: "interest" | "request" } | null>(null);
   const [note, setNote] = useState("");
+  const [reply, setReply] = useState<{ q: Quote; decision: "accepted" | "declined" } | null>(null);
+  const [replyNote, setReplyNote] = useState("");
 
   const c = st.companies.find((x) => x.id === companyId);
   const mine = useMemo(() => st.opportunities.filter((o) => o.companyId === companyId && o.status !== "dropped").sort((a, b) => b.createdAt.localeCompare(a.createdAt)), [st.opportunities, companyId]);
+  // 고객에게는 발송된 견적만 보인다. 작성 중·승인 대기는 내부 상태다.
+  const myQuotes = useMemo(() => st.quotes.filter((q) => q.companyId === companyId && ["sent", "accepted", "declined", "converted"].includes(q.status)).sort((a, b) => (b.sentAt ?? b.createdAt).localeCompare(a.sentAt ?? a.createdAt)), [st.quotes, companyId]);
 
   const recos = useMemo(() => {
     if (!c) return [];
@@ -56,6 +62,54 @@ export default function PortalServicesPage() {
           {c.name}의 현재 상황에서 검토 대상이 되는 항목입니다. 관심을 표시하면 담당 컨설턴트가 확인 후 연락드립니다.
         </p>
       </div>
+
+      {/* 받은 제안 — 회신을 기다리는 건이 가장 위. 고객이 눌러야 다음이 진행된다. */}
+      {myQuotes.length > 0 && (
+        <div className="space-y-3">
+          {myQuotes.map((q) => {
+            const waiting = q.status === "sent";
+            return (
+              <Card key={q.id} className={cx("p-5", waiting && "border-accent")}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge tone={waiting ? "accent" : q.status === "declined" ? "neutral" : "success"}>
+                    {waiting ? "확인 요청" : q.status === "accepted" ? "수락함" : q.status === "converted" ? "계약 진행 중" : "보류"}
+                  </Badge>
+                  <h2 className="flex items-center gap-2 text-[1.1rem] font-bold"><Receipt size={18} className="text-accent" /> {q.title}</h2>
+                </div>
+                {q.scope && <p className="mt-1 text-[0.9rem] text-ink-2">{q.scope}</p>}
+
+                <div className="mt-3 overflow-hidden rounded-xl border border-line">
+                  {q.items.map((it, i) => (
+                    <div key={i} className="flex items-center gap-3 border-b border-line px-4 py-2.5 text-[0.88rem] last:border-0">
+                      <span className="min-w-0 flex-1">{it.name}</span>
+                      <span className="tnum shrink-0">{fmtWon(it.amount)}</span>
+                    </div>
+                  ))}
+                  <div className="flex flex-wrap items-center gap-2 bg-surface-2 px-4 py-3">
+                    <span className="flex-1 font-bold">합계</span>
+                    {q.discountPct > 0 && <span className="tnum text-[0.85rem] text-ink-3 line-through">{fmtWon(quoteGross(q))}</span>}
+                    {q.discountPct > 0 && <Badge tone="success">{q.discountPct}% 할인</Badge>}
+                    <span className="tnum text-[1.2rem] font-bold text-accent">{fmtWon(quoteNet(q))}</span>
+                  </div>
+                </div>
+
+                <div className="mt-2 text-[0.8rem] text-ink-3">기간 {q.period} · 유효기간 {fmtDate(q.validUntil)}{q.sentAt ? ` · ${fmtRelative(q.sentAt)} 받음` : ""}</div>
+
+                {waiting ? (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button variant="accent" icon={<Check size={15} />} onClick={() => { setReply({ q, decision: "accepted" }); setReplyNote(""); }}>이대로 진행할게요</Button>
+                    <Button variant="outline" onClick={() => { setReply({ q, decision: "declined" }); setReplyNote(""); }}>조금 더 생각해볼게요</Button>
+                  </div>
+                ) : q.status === "declined" ? (
+                  <div className="mt-3 rounded-xl bg-surface-2 px-4 py-2.5 text-[0.85rem] text-ink-2">보류로 회신하셨습니다{q.clientNote ? ` — “${q.clientNote}”` : ""}. 담당 컨설턴트가 확인 후 연락드립니다.</div>
+                ) : (
+                  <div className="mt-3 rounded-xl bg-success-bg px-4 py-2.5 text-[0.85rem] text-success">회신 감사합니다. {q.status === "converted" ? "계약 절차를 진행하고 있습니다." : "담당 컨설턴트가 다음 절차를 안내드립니다."}</div>
+                )}
+              </Card>
+            );
+          })}
+        </div>
+      )}
 
       {/* 내가 요청한 것 — 먼저 보여준다. 요청하고 나서 아무 반응이 없으면 신뢰가 깨진다. */}
       {mine.length > 0 && (
@@ -110,6 +164,40 @@ export default function PortalServicesPage() {
       <p className="text-[0.8rem] leading-relaxed text-ink-3">
         관심 표시는 계약이나 비용 발생과 무관합니다. 담당 컨설턴트가 현재 상황을 먼저 확인한 뒤 안내드립니다.
       </p>
+
+      <Modal
+        open={!!reply}
+        onClose={() => setReply(null)}
+        title={reply?.decision === "accepted" ? "이대로 진행합니다" : "조금 더 생각해볼게요"}
+        size="sm"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setReply(null)}>취소</Button>
+            <Button
+              variant={reply?.decision === "accepted" ? "accent" : "primary"}
+              onClick={() => {
+                if (!reply) return;
+                respond(reply.q.id, reply.decision, actorId, replyNote.trim() || undefined);
+                toast(reply.decision === "accepted" ? "회신이 전달되었습니다. 담당 컨설턴트가 계약 절차를 안내드립니다." : "회신이 전달되었습니다. 담당 컨설턴트가 연락드립니다.");
+                setReply(null);
+                setReplyNote("");
+              }}
+            >
+              회신 보내기
+            </Button>
+          </>
+        }
+      >
+        <div className="rounded-xl bg-surface-2 px-4 py-3 text-[0.88rem]">
+          <b>{reply?.q.title}</b>
+          <div className="tnum mt-0.5 text-ink-2">{reply ? fmtWon(quoteNet(reply.q)) : ""}</div>
+        </div>
+        <div className="mt-3">
+          <label className="mb-1 block text-[0.85rem] font-semibold text-ink-2">{reply?.decision === "accepted" ? "전달할 말 (선택)" : "어떤 점이 걸리시나요? (선택)"}</label>
+          <Textarea rows={3} value={replyNote} onChange={(e) => setReplyNote(e.target.value)} placeholder={reply?.decision === "accepted" ? "예: 다음 주부터 시작 가능합니다." : "예: 예산 확정이 다음 달이라 그때 다시 논의하고 싶습니다."} />
+        </div>
+        <p className="mt-2 text-[0.8rem] text-ink-3">{reply?.decision === "accepted" ? "회신 즉시 담당 컨설턴트에게 전달되며, 계약서는 별도로 안내드립니다." : "보류로 회신해도 제안이 사라지지 않습니다. 언제든 다시 논의할 수 있습니다."}</p>
+      </Modal>
 
       <Modal
         open={!!ask}

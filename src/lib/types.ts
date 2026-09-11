@@ -218,6 +218,46 @@ export interface Opportunity {
   history: { at: string; status: OpportunityStatus; by: string; note?: string }[];
 }
 
+/* ---------- 견적 (상담 → 견적 → 계약) ---------- */
+
+export type QuoteStatus =
+  | "draft"             // 작성 중
+  | "approval_pending"  // 할인 포함 → 대표 승인 대기
+  | "sent"              // 고객에게 발송 (Portal 노출)
+  | "accepted"          // 고객 수락
+  | "declined"          // 고객 보류 · 거절
+  | "converted";        // 계약으로 전환
+
+export interface QuoteItem {
+  name: string;
+  /** 원 단위. 화면에서는 만원으로 입력받아 변환한다. */
+  amount: number;
+  note?: string;
+}
+
+export interface Quote {
+  id: string;
+  companyId: string;
+  projectId?: string;
+  opportunityId?: string;
+  title: string;
+  scope: string;
+  period: string;
+  items: QuoteItem[];
+  /** 할인율(%) — 0보다 크면 대표 승인 없이는 발송할 수 없다. */
+  discountPct: number;
+  validUntil: string;
+  status: QuoteStatus;
+  createdBy: string;
+  createdAt: string;
+  sentAt?: string;
+  respondedAt?: string;
+  /** 고객이 보류·거절할 때 남긴 사유 */
+  clientNote?: string;
+  approvalId?: string;
+  contractId?: string;
+}
+
 /* ---------- 대표 승인 (할인·제안·중요 약속) ---------- */
 
 export type ApprovalKind = "opportunity" | "discount" | "promise";
@@ -232,6 +272,7 @@ export interface Approval {
   companyId?: string;
   projectId?: string;
   opportunityId?: string;
+  quoteId?: string;
   /** 할인 승인일 때만 */
   baseAmount?: number;
   discountPct?: number;
@@ -282,6 +323,10 @@ export type ActivityType =
   | "opportunity_status_changed"
   | "approval_requested"
   | "approval_decided"
+  | "quote_created"
+  | "quote_sent"
+  | "quote_responded"
+  | "quote_converted"
   | "survey_submitted"
   | "demo_reset";
 

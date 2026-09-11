@@ -1,7 +1,7 @@
 # PROJECT_STATE — KPJK Consulting AX + Client Portal
 
 > SPEC = 어디까지 갈 것인가 / STATE = 지금 어디까지 왔는가
-> Last updated: 2026-09-11 (AI Action · 이탈/재상담 규칙 · 상담 기록 작성)
+> Last updated: 2026-09-11 (견적 워크플로 · 할인 승인 · 브리핑 Undo)
 
 ## PROJECT FINAL OBJECTIVE
 KPJK의 경영컨설팅 업무를 기억·카톡·개별파일 의존 구조에서 **기업고객 중심 통합 데이터 운영체계**로 전환. 고객 문의→상담→계약→자료요청→제출→검토→진행→결과→사후관리가 하나의 시스템에서 이어지고, 고객이 Portal로 직접 참여한다.
@@ -39,7 +39,7 @@ KPJK의 경영컨설팅 업무를 기억·카톡·개별파일 의존 구조에�
 - [x] Dashboard — KPI 6 + Today Brief(규칙 엔진, 왜?) + 먼저 확인할 기업 + 최근 프로젝트 + 이번 주 일정 + 최근 문의
 - [x] Enterprise Client Card — Header/Quick Status/9 Tab(Overview·상담·계약·프로젝트·요청자료·일정·문의·결과자료·History)
 - [x] Projects — Board(8 컬럼)/List, Detail(Dual Progress 11↔7, 요약, 누락 체크, 이력, 단계 변경, 자료 요청, 일정/업무 등록, 결과자료 공유)
-- [x] 상담/계약 — 구조화 요약 + AI READY, 계약 상태, **상담 기록 직접 작성**(다음 Action → 후속 업무 자동 등록)
+- [x] 상담 · 견적 · 계약 — 구조화 요약 + AI READY, 상담 기록 직접 작성(다음 Action → 후속 업무 자동 등록), **견적 작성·할인 승인·발송·계약 전환**
 - [x] Documents — KPI 4 + 필터 + 검토 Modal(검토 시작/보완 요청/검토 완료) + 안내 초안
 - [x] Schedule — List(일자 그룹) + Calendar + 등록
 - [x] Tasks — 오늘/미완료/초과/완료 + 상태 변경 + 자동 생성 표시 + 등록
@@ -61,6 +61,7 @@ KPJK의 경영컨설팅 업무를 기억·카톡·개별파일 의존 구조에�
 ### CLOSED LOOP (실동작 검증)
 - [x] PRIMARY: Portal 업로드 → AX 알림 + 검토 Task 자동 생성 + 상태 submitted → 검토 완료/보완 요청 → Portal 상태·알림 반영 → 단계 변경 → Portal Timeline 반영
 - [x] SECONDARY: Portal 문의 → AX Queue + 응대 Task → 답변 → Portal 반영 + 알림
+- [x] QUATERNARY: 견적 작성 → (할인 시) 대표 승인 → 발송 + 회신 확인 Task → 고객 Portal 수락/보류 → 후속 Task → 계약 전환 + 매출기회 자동 종료
 - [x] TERTIARY: Portal 관심표시 → 기회 생성 + 상담연락 Task → 담당자 확인 → 대표 승인 요청 → 승인 → 제안 Task 자동 생성 + 기회 단계 이동
 - [x] 자료 요청 등록 / 일정 등록 / 결과자료 공유 → 고객 알림
 
@@ -95,6 +96,7 @@ KPJK의 경영컨설팅 업무를 기억·카톡·개별파일 의존 구조에�
 - [OPTIONAL] Vercel 배포: `npm run build` 통과 확인됨, 환경변수 불필요
 
 ## 최근 주요 변경
+- 2026-09-11 고도화 3차 — 견적 워크플로(상담 → 견적 → 계약) 신설. 할인은 승인 전 발송 차단, 고객 Portal 회신, 계약 전환 시 기회 자동 종료. 브리핑에 견적 회신 대기 규칙 + 완료 되돌리기. 리포트 매출 축에 견적 4지표
 - 2026-09-11 고도화 2차 — AI 브리핑을 "말하는 화면"에서 "처리하는 화면"으로 전환(항목별 실행 버튼 7종), 이탈 위험·재상담 규칙 2종 추가, 상담 기록 직접 작성 UI. 브리핑 모바일 레이아웃 압축
 - 2026-09-11 고도화 1차 — 매출기회 Closed Loop(TERTIARY), 대표 승인 Workflow, AX 고도화 설문, 테마 뿌연 현상 제거, 모바일 가로스크롤 전면 제거, 대시보드 우선순위 재구성, 리포트 4축 Evidence. 상세는 `BACKLOG.md`
 - 2026-09-10 Sidebar IA 재편 — 12개 메뉴를 4 Group(핵심 운영 / AI · 분석 / 시스템 / 향후 확장)으로 분류. 그룹당 아이콘 색 1계열 통일(`--nav-*`), 메뉴별 개별 색 제거. 핵심 운영 순서를 실제 흐름(고객 → 상담·계약 → 프로젝트 → 실행 → 소통 → 결과)으로 조정. Active = 좌측 Accent Bar + Pill. 향후 확장은 기본 접힘 Accordion. 모바일 더보기 Sheet도 동일 구조. Route·기능 변경 없음

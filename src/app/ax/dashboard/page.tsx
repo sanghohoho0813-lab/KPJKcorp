@@ -22,7 +22,7 @@ export default function DashboardPage() {
   const isConsultant = st.session?.role === "consultant";
   const assigneeId = isConsultant ? st.session?.userId : undefined;
 
-  const brief = useMemo(() => buildBrief({ now, companies: st.companies, projects: st.projects, docRequests: st.docRequests, schedules: st.schedules, tasks: st.tasks, inquiries: st.inquiries, activities: st.activities, users: st.users, assigneeId }), [now, st.companies, st.projects, st.docRequests, st.schedules, st.tasks, st.inquiries, st.activities, st.users, assigneeId]);
+  const brief = useMemo(() => buildBrief({ now, companies: st.companies, projects: st.projects, docRequests: st.docRequests, schedules: st.schedules, tasks: st.tasks, inquiries: st.inquiries, activities: st.activities, users: st.users, quotes: st.quotes, assigneeId }), [now, st.companies, st.projects, st.docRequests, st.schedules, st.tasks, st.inquiries, st.activities, st.users, st.quotes, assigneeId]);
   const counts = briefSummaryCounts(brief);
 
   const active = st.projects.filter((p) => !["done", "aftercare"].includes(p.stage) && (!assigneeId || p.consultantId === assigneeId));

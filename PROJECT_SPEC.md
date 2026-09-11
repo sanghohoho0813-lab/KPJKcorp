@@ -100,7 +100,7 @@ Mobile Bottom Nav: 홈 / 진행현황 / 자료제출 / 문의 / MY
 
 ## 4. DATA MODEL / SSOT
 
-Core Entity: Company, Contact(User role=client), Consultation, Contract, Project, DocumentRequest, Document, Schedule, Task, Inquiry, Message, ResultFile, **Opportunity, Approval, SurveyResponse**, Activity, Notification, User
+Core Entity: Company, Contact(User role=client), Consultation, **Quote**, Contract, Project, DocumentRequest, Document, Schedule, Task, Inquiry, Message, ResultFile, **Opportunity, Approval, SurveyResponse**, Activity, Notification, User
 
 | Entity | System of Record | 입력 주체 | 업데이트 | 민감도 | AI 사용 |
 |---|---|---|---|---|---|
@@ -110,6 +110,7 @@ Core Entity: Company, Contact(User role=client), Consultation, Contract, Project
 | Schedule | store.schedules | 내부 (고객 공개 flag) | — | 중 | 브리핑 |
 | Task | store.tasks | 내부 + 자동 생성 | 상태 변경 | 낮음 | 브리핑 |
 | Inquiry/Message | store.inquiries | 고객 작성 / 내부 답변 | Secondary Loop | 중 | 초안 |
+| Quote | store.quotes | 담당자 작성 / 고객 회신 | Quaternary Loop | 높음(금액) | 사용 안 함 |
 | Opportunity | store.opportunities | 고객 관심 / 내부 등록 / 규칙 발견 | Tertiary Loop | 중 | 추천 근거(규칙) |
 | Approval | store.approvals | 담당자 요청 → 대표 결정 | 승인/반려 | 높음(금액) | 사용 안 함 (사람 판단) |
 | SurveyResponse | store.surveys | 내부 사용자 | 제출 시 1회 | 낮음 | 집계 |
@@ -130,6 +131,10 @@ Data Source: **DEMO** (zustand + localStorage persist). Repository 분리: `src/
 **SECONDARY**: Portal 문의 작성 → [Event] → 내부 문의 Queue + 알림 → 담당자 답변 → [Event] → Portal 답변/상태 확인 + 알림
 
 **TERTIARY (매출)**: Portal 추가서비스 `[관심 있어요]/[상담 요청]` → [Event: opportunity_created] → Opportunity 생성 + 담당자 상담연락 Task 자동 생성 + 내부 알림 → 담당자 확인 → **대표 승인 요청** → [Event: approval_requested] → 대표 승인/반려 → [Event: approval_decided] → 승인 시 제안·견적 발송 Task 자동 생성 + 기회 단계 자동 이동 → 추가계약 → 리포트 매출 축에 집계
+
+**QUATERNARY (견적)**: 상담 → 견적 작성 → (할인 있으면) 대표 승인 → 발송 [Event: quote_sent] + 회신 확인 Task 자동 생성 → 고객 Portal에서 수락/보류 [Event: quote_responded] → 내부 알림 + 후속 Task → 수락 시 계약 전환 [Event: quote_converted] → 연결된 매출기회 자동 종료(won)
+
+**할인 규칙** — 할인이 0보다 큰 견적은 `approvalId`가 붙기 전에는 발송 버튼이 열리지 않는다. 대표가 반려하면 할인이 0%로 되돌아가 정가로 발송하거나 다시 요청할 수 있다.
 
 **AI Action 원칙** — 브리핑은 발견에서 멈추지 않는다. 각 항목은 `문제 → 근거 → 추천 행동 → 실행`까지 한 카드 안에서 끝난다.
 실행은 전부 기존 store action(초안·Task·Schedule·단계 변경·Opportunity)을 호출하므로 별도 기록 경로가 생기지 않고 Evidence Log에 그대로 남는다.

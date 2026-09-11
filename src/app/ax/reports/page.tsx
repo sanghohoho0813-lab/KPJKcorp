@@ -43,6 +43,13 @@ export default function ReportsPage() {
     const contractsSigned = st.contracts.filter((c) => c.status === "signed").length;
     const contractsSent = st.contracts.filter((c) => c.status === "sent").length;
     const consultCount = st.consultations.length;
+    // 견적 — 상담과 계약 사이 구간. 표본이 적으므로 건수로만 말한다.
+    const quotes = st.quotes;
+    const quotesSent = quotes.filter((q) => ["sent", "accepted", "declined", "converted"].includes(q.status)).length;
+    const quotesAccepted = quotes.filter((q) => ["accepted", "converted"].includes(q.status)).length;
+    const quotesConverted = quotes.filter((q) => q.status === "converted").length;
+    const respHrsQ = quotes.filter((q) => q.sentAt && q.respondedAt).map((q) => (new Date(q.respondedAt!).getTime() - new Date(q.sentAt!).getTime()) / 86400000);
+    const avgQuoteResp = respHrsQ.length ? (respHrsQ.reduce((x, y) => x + y, 0) / respHrsQ.length).toFixed(1) : "-";
 
     // 운영 사용량 축
     const aiSuggested = st.activities.filter((a) => a.actorRole === "system").length;
@@ -61,6 +68,7 @@ export default function ReportsPage() {
       oppTotal: opps.length, oppFromClient, oppContacted, oppWon,
       approvalPending, approvalDecided: approvalDecided.length, avgApproval,
       contractsSigned, contractsSent, consultCount,
+      quotesTotal: quotes.length, quotesSent, quotesAccepted, quotesConverted, avgQuoteResp,
       aiSuggested, portalCompanies, autoTasks, autoTasksDone, surveys,
       events: st.activities.length, logSpanDays,
     };
@@ -120,11 +128,15 @@ export default function ReportsPage() {
     {
       key: "revenue",
       title: "매출",
-      desc: "고객 행동이 상담과 계약으로 이어지는가. 표본이 쌓이기 전에는 비율 대신 건수로만 본다.",
+      desc: "문의 → 상담 → 견적 → 계약이 어디서 끊기는가. 표본이 쌓이기 전에는 비율 대신 건수로만 본다.",
       items: [
         { name: "누적 상담 기록", point: "Consultation", value: `${m.consultCount}건` },
         { name: "매출기회", point: "Opportunity 생성", value: `${m.oppTotal}건 (고객 발신 ${m.oppFromClient})` },
         { name: "기회 → 담당자 접촉", point: "status ≠ interest", value: `${m.oppContacted} / ${m.oppTotal}건` },
+        { name: "견적 발송", point: "quote_sent", value: `${m.quotesSent} / 작성 ${m.quotesTotal}건` },
+        { name: "견적 → 수락", point: "Quote.status ∈ {accepted, converted}", value: `${m.quotesAccepted} / ${m.quotesSent}건`, baseline: "표본 부족" },
+        { name: "견적 회신 소요일", point: "quote_sent → quote_responded", value: m.avgQuoteResp === "-" ? "표본 없음" : `${m.avgQuoteResp}일`, baseline: "측정 필요" },
+        { name: "견적 → 계약 전환", point: "quote_converted", value: `${m.quotesConverted} / ${m.quotesSent}건`, baseline: "표본 부족" },
         { name: "기회 → 추가계약", point: "status = won", value: `${m.oppWon} / ${m.oppTotal}건`, baseline: "표본 부족" },
         { name: "계약 체결 / 발송", point: "Contract.status", value: `${m.contractsSigned}건 / 발송 ${m.contractsSent}건` },
         { name: "대표 승인 처리", point: "approval_decided", value: `처리 ${m.approvalDecided}건 · 대기 ${m.approvalPending}건` },

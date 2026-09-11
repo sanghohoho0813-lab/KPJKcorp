@@ -9,6 +9,7 @@ import type {
   Notification,
   Opportunity,
   Project,
+  Quote,
   ResultFile,
   Schedule,
   SurveyResponse,
@@ -34,6 +35,7 @@ export interface SeedData {
   inquiries: Inquiry[];
   results: ResultFile[];
   opportunities: Opportunity[];
+  quotes: Quote[];
   approvals: Approval[];
   surveys: SurveyResponse[];
   activities: Activity[];
@@ -296,6 +298,35 @@ export function buildSeed(now = new Date()): SeedData {
     },
   ];
 
+  /* ---------- 견적 (상담 → 견적 → 계약) ---------- */
+  const quotes: Quote[] = [
+    {
+      id: "qt_1", companyId: "co_e", projectId: "pj_e1", opportunityId: "op_4",
+      title: "법인 경영자문 연간 계약", scope: "정관 정비 · 주주명부 정리 · 분기 자문 4회", period: "12개월",
+      items: [
+        { name: "정관 및 주주명부 정비", amount: 4000000 },
+        { name: "분기 자문 (4회)", amount: 4800000 },
+        { name: "벤처기업확인 연계 검토", amount: 1200000, note: "요건 진단 범위" },
+      ],
+      discountPct: 0, validUntil: d(14), status: "draft", createdBy: "u_lee", createdAt: d(-1, 11),
+    },
+    {
+      id: "qt_2", companyId: "co_a", projectId: "pj_a1",
+      title: "경영진단 2차 — 원가 개선 실행지원", scope: "개선안 실행 동행 · 월 2회 점검 · 성과 리포트", period: "4개월",
+      items: [
+        { name: "실행 동행 (월 2회 × 4개월)", amount: 9600000 },
+        { name: "성과 측정 리포트", amount: 2400000 },
+      ],
+      discountPct: 0, validUntil: d(10), status: "sent", createdBy: "u_park", createdAt: d(-6, 15), sentAt: d(-5, 10),
+    },
+    {
+      id: "qt_3", companyId: "co_b", projectId: "pj_b1",
+      title: "연구소 사후관리 자문", scope: "연구노트 관리 · 변경신고 · 인력 요건 점검", period: "12개월",
+      items: [{ name: "연간 사후관리 자문", amount: 6000000 }],
+      discountPct: 0, validUntil: d(-2), status: "accepted", createdBy: "u_lee", createdAt: d(-20, 14), sentAt: d(-18, 9), respondedAt: d(-12, 16),
+    },
+  ];
+
   /* ---------- 대표 승인 대기 ---------- */
   const approvals: Approval[] = [
     {
@@ -328,6 +359,8 @@ export function buildSeed(now = new Date()): SeedData {
     { id: "ac_op1", type: "opportunity_created", companyId: "co_b", actorId: "c_b", actorRole: "client", at: d(-1, 14), text: "고객 관심표시: 벤처기업확인" },
     { id: "ac_op2", type: "approval_requested", companyId: "co_e", actorId: "u_lee", actorRole: "consultant", at: d(-1, 9), text: "대표 승인 요청: 이플러스바이오(주) 법인 정비 연간 자문 제안" },
     { id: "ac_op3", type: "approval_requested", companyId: "co_c", actorId: "u_park", actorRole: "consultant", at: d(0, 9, 20), text: "대표 승인 요청: 씨엠푸드(주) 법인 경영자문 계약 할인 요청" },
+    { id: "ac_qt1", type: "quote_sent", companyId: "co_a", projectId: "pj_a1", actorId: "u_park", actorRole: "consultant", at: d(-5, 10), text: "견적 발송: 경영진단 2차 — 원가 개선 실행지원" },
+    { id: "ac_qt2", type: "quote_responded", companyId: "co_b", projectId: "pj_b1", actorId: "c_b", actorRole: "client", at: d(-12, 16), text: "고객 회신: 연구소 사후관리 자문 — 수락" },
   ];
   const oppNotifs: Notification[] = [
     { id: "nt_op1", audience: "internal", companyId: "co_c", title: "대표 승인 요청", body: "씨엠푸드(주) · 법인 경영자문 계약 할인 요청", at: d(0, 9, 20), read: false, href: "/ax/opportunities?tab=approvals" },
@@ -337,5 +370,5 @@ export function buildSeed(now = new Date()): SeedData {
   const allActivities = [...oppActivities, ...activities].sort((a, b) => b.at.localeCompare(a.at));
   const allNotifications = [...oppNotifs, ...notifications].sort((a, b) => b.at.localeCompare(a.at));
 
-  return { users, companies, consultations, contracts, projects, docRequests, schedules, tasks, inquiries, results, opportunities, approvals, surveys, activities: allActivities, notifications: allNotifications };
+  return { users, companies, consultations, contracts, projects, docRequests, schedules, tasks, inquiries, results, opportunities, quotes, approvals, surveys, activities: allActivities, notifications: allNotifications };
 }

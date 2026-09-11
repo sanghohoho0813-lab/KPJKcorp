@@ -18,7 +18,7 @@ export default function BriefPage() {
   const tick = useNow(60000);
   const now = useMemo(() => tick ?? new Date(), [tick]);
   const assigneeId = st.session?.role === "consultant" ? st.session.userId : undefined;
-  const brief = useMemo(() => buildBrief({ now, companies: st.companies, projects: st.projects, docRequests: st.docRequests, schedules: st.schedules, tasks: st.tasks, inquiries: st.inquiries, activities: st.activities, users: st.users, assigneeId }), [now, st, assigneeId]);
+  const brief = useMemo(() => buildBrief({ now, companies: st.companies, projects: st.projects, docRequests: st.docRequests, schedules: st.schedules, tasks: st.tasks, inquiries: st.inquiries, activities: st.activities, users: st.users, quotes: st.quotes, assigneeId }), [now, st, assigneeId]);
   const counts = briefSummaryCounts(brief);
   const urgent = brief.filter((b) => b.priority === "urgent");
   const normal = brief.filter((b) => b.priority !== "urgent");
@@ -36,6 +36,7 @@ export default function BriefPage() {
           { label: "정체", n: counts.stalled, hot: true },
           { label: "오늘 미팅", n: counts.meetings },
           { label: "미답변", n: counts.inquiries, hot: true },
+          { label: "견적 회신", n: counts.quotes, hot: true },
           { label: "이탈 위험", n: counts.churn, hot: true },
           { label: "재상담", n: counts.reengage },
         ].map((c) => (
@@ -44,12 +45,13 @@ export default function BriefPage() {
           </span>
         ))}
       </div>
-      <div className="mb-4 hidden gap-3 md:grid md:grid-cols-4 xl:grid-cols-7">
+      <div className="mb-4 hidden gap-3 md:grid md:grid-cols-4 xl:grid-cols-8">
         <KpiCard label="후속연락 필요" value={counts.followups} tone={counts.followups ? "error" : undefined} />
         <KpiCard label="자료 기한 이슈" value={counts.docs} tone={counts.docs ? "error" : undefined} />
         <KpiCard label="정체 프로젝트" value={counts.stalled} tone={counts.stalled ? "error" : undefined} />
         <KpiCard label="오늘 미팅" value={counts.meetings} />
         <KpiCard label="미답변 문의" value={counts.inquiries} tone={counts.inquiries ? "error" : undefined} />
+        <KpiCard label="견적 회신 대기" value={counts.quotes} tone={counts.quotes ? "error" : undefined} />
         <KpiCard label="이탈 위험" value={counts.churn} tone={counts.churn ? "error" : undefined} />
         <KpiCard label="재상담 대상" value={counts.reengage} accentValue={counts.reengage > 0} />
       </div>
@@ -86,6 +88,7 @@ export default function BriefPage() {
               <li>· 업무 기한 초과 → <b>긴급</b></li>
               <li>· 계약 서명 대기 1일 이상 → 확인</li>
               <li>· 오늘 고객 미팅/상담 → 사전자료 확인</li>
+              <li>· 견적 발송 후 3일 무회신 → 확인, 7일 이상 또는 유효기간 초과 → <b>긴급</b></li>
               <li>· 접촉 기록이 21일 이상 없으면 → <b>이탈 위험</b>, 35일 이상 → 긴급</li>
               <li>· 마지막 프로젝트 완료 후 30일 경과 + 진행 건 없음 → <b>재상담 대상</b></li>
             </ul>

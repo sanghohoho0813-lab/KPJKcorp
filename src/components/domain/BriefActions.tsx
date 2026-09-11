@@ -129,7 +129,7 @@ const ICON: Partial<Record<BriefAction["kind"], React.ReactNode>> = {
  * 브리핑이 "무엇을 하라"까지만 말하고 끝나면 결국 다른 화면을 찾아가야 한다.
  * 여기서 바로 실행되게 하고, 실행은 전부 기존 store action을 거치므로 Evidence가 그대로 남는다.
  */
-export function BriefActionBar({ item }: { item: BriefItem }) {
+export function BriefActionBar({ item, onCompleted }: { item: BriefItem; onCompleted?: (item: BriefItem) => void }) {
   const updateTask = useStore((s) => s.updateTaskStatus);
   const toast = useStore((s) => s.toast);
   const me = useStore((s) => s.session?.userId) ?? "u_admin";
@@ -150,7 +150,8 @@ export function BriefActionBar({ item }: { item: BriefItem }) {
         // 완료하면 규칙이 다시 계산되어 이 항목 자체가 브리핑에서 사라진다 — 그게 처리됐다는 신호다.
         if (item.taskId) {
           updateTask(item.taskId, "done", me);
-          toast("업무를 완료 처리했습니다. 브리핑에서 내려갑니다.");
+          onCompleted?.(item);
+          toast("업무를 완료 처리했습니다.");
         }
         break;
       case "add_task":

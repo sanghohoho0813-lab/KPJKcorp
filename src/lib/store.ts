@@ -15,6 +15,10 @@ import type {
   Notification,
   Opportunity,
   OpportunitySource,
+  Quote,
+  QuoteItem,
+  QuoteStatus,
+  Contract,
   OpportunityStatus,
   ResultFile,
   Role,
@@ -63,9 +67,16 @@ export interface StoreState extends SeedData {
   // opportunity / approval / survey
   raiseOpportunity: (data: { companyId: string; serviceKey: string; note?: string; reason?: string; source: OpportunitySource }, byUserId: string, byRole: Role) => void;
   advanceOpportunity: (id: string, status: OpportunityStatus, byUserId: string, note?: string) => void;
-  requestApproval: (data: { kind: ApprovalKind; title: string; summary: string; companyId?: string; projectId?: string; opportunityId?: string; baseAmount?: number; discountPct?: number }, byUserId: string) => void;
+  requestApproval: (data: { kind: ApprovalKind; title: string; summary: string; companyId?: string; projectId?: string; opportunityId?: string; quoteId?: string; baseAmount?: number; discountPct?: number }, byUserId: string) => void;
   decideApproval: (id: string, decision: "approved" | "rejected", byUserId: string, note?: string) => void;
   submitSurvey: (data: Omit<SurveyResponse, "id" | "submittedAt">) => void;
+
+  // 견적 (상담 → 견적 → 계약)
+  createQuote: (data: { companyId: string; projectId?: string; opportunityId?: string; title: string; scope: string; period: string; items: QuoteItem[]; discountPct: number; validUntil: string }, byUserId: string) => void;
+  requestQuoteApproval: (quoteId: string, reason: string, byUserId: string) => void;
+  sendQuote: (quoteId: string, byUserId: string) => void;
+  respondQuote: (quoteId: string, decision: "accepted" | "declined", byUserId: string, note?: string) => void;
+  convertQuote: (quoteId: string, byUserId: string) => void;
 
   markNotificationRead: (id: string) => void;
   markAllRead: (audience: "internal" | "client", companyId?: string) => void;
@@ -81,6 +92,15 @@ const DEFAULT_SETTINGS: Settings = {
   tutorialDonePortal: false,
   timezone: "Asia/Seoul",
 };
+
+/** 견적 합계 (할인 전) */
+export function quoteGross(q: Pick<Quote, "items">) {
+  return q.items.reduce((sum, i) => sum + (Number.isFinite(i.amount) ? i.amount : 0), 0);
+}
+/** 견적 합계 (할인 적용) */
+export function quoteNet(q: Pick<Quote, "items" | "discountPct">) {
+  return Math.round(quoteGross(q) * (1 - (q.discountPct || 0) / 100));
+}
 
 function makeActivity(a: Omit<Activity, "id" | "at">): Activity {
   return { ...a, id: uid("ac"), at: nowIso() };
@@ -458,6 +478,16 @@ export const useStore = create<StoreState>()(
         const updated: Approval = { ...ap, status: decision, decidedBy: byUserId, decidedAt: now, decisionNote: note };
         // 승인 결과는 기회 상태로 그대로 흘러간다 — 승인만 하고 멈추는 구조를 만들지 않는다.
         let opportunities = st.opportunities;
+        // 할인 승인 결과는 견적 상태로 바로 이어진다. 승인 = 발송 가능, 반려 = 초안으로 되돌림.
+        // 승인이면 approvalId를 남겨 "승인된 할인"임을 표시하고, 반려면 할인을 0으로 되돌려
+        // 담당자가 정가로 바로 발송하거나 다시 요청할 수 있게 한다.
+        const quotes = ap.quoteId
+          ? st.quotes.map((q) =>
+              q.id === ap.quoteId
+                ? { ...q, status: "draft" as QuoteStatus, approvalId: decision === "approved" ? ap.id : undefined, discountPct: decision === "approved" ? q.discountPct : 0 }
+                : q,
+            )
+          : st.quotes;
         const extraTasks: Task[] = [];
         if (ap.opportunityId) {
           const next: OpportunityStatus = decision === "approved" ? "proposed" : "dropped";
@@ -470,6 +500,7 @@ export const useStore = create<StoreState>()(
         set({
           approvals: st.approvals.map((x) => (x.id === id ? updated : x)),
           opportunities,
+          quotes,
           tasks: [...extraTasks, ...st.tasks],
           activities: [
             ...(extraTasks.length ? [makeActivity({ type: "task_created", companyId: ap.companyId, actorId: "system", actorRole: "system", text: `자동 생성: ${extraTasks[0].title}` })] : []),
@@ -477,6 +508,146 @@ export const useStore = create<StoreState>()(
             ...st.activities,
           ],
           notifications: [makeNotification({ audience: "internal", companyId: ap.companyId, title: `대표 ${decision === "approved" ? "승인 완료" : "반려"}`, body: `${ap.title}${note ? ` — ${note}` : ""}`, href: "/ax/opportunities?tab=approvals" }), ...st.notifications],
+        });
+      },
+
+      // ---------- 견적 ----------
+      createQuote: (data, byUserId) => {
+        const st = get();
+        const company = st.companies.find((c) => c.id === data.companyId);
+        const q: Quote = {
+          ...data,
+          id: uid("qt"),
+          // 할인이 있으면 발송 전에 대표 승인을 반드시 거친다 (실제 운영 규칙).
+          status: data.discountPct > 0 ? "draft" : "draft",
+          createdBy: byUserId,
+          createdAt: nowIso(),
+        };
+        set({
+          quotes: [q, ...st.quotes],
+          activities: [makeActivity({ type: "quote_created", companyId: data.companyId, projectId: data.projectId, actorId: byUserId, actorRole: "consultant", text: `견적 작성: ${data.title}${company ? ` (${company.name})` : ""}`, meta: { amount: quoteNet(q), discountPct: data.discountPct } }), ...st.activities],
+        });
+      },
+
+      requestQuoteApproval: (quoteId, reason, byUserId) => {
+        const st = get();
+        const q = st.quotes.find((x) => x.id === quoteId);
+        if (!q) return;
+        const company = st.companies.find((c) => c.id === q.companyId);
+        const now = nowIso();
+        const ap: Approval = {
+          id: uid("ap"),
+          kind: "discount",
+          title: `${company?.name ?? ""} ${q.title} 할인 ${q.discountPct}% 요청`,
+          summary: reason.trim() || `${q.scope} · 할인 ${q.discountPct}% 적용 여부를 결정해 주세요.`,
+          companyId: q.companyId,
+          projectId: q.projectId,
+          quoteId: q.id,
+          baseAmount: quoteGross(q),
+          discountPct: q.discountPct,
+          requestedBy: byUserId,
+          requestedAt: now,
+          status: "pending",
+        };
+        set({
+          approvals: [ap, ...st.approvals],
+          quotes: st.quotes.map((x) => (x.id === quoteId ? { ...x, status: "approval_pending" as QuoteStatus, approvalId: ap.id } : x)),
+          activities: [makeActivity({ type: "approval_requested", companyId: q.companyId, projectId: q.projectId, actorId: byUserId, actorRole: "consultant", text: `대표 승인 요청: ${ap.title}`, meta: { kind: "discount", discountPct: q.discountPct } }), ...st.activities],
+          notifications: [makeNotification({ audience: "internal", companyId: q.companyId, title: "대표 승인 요청", body: `${company ? `${company.name} · ` : ""}${ap.title}`, href: "/ax/opportunities?tab=approvals" }), ...st.notifications],
+        });
+      },
+
+      sendQuote: (quoteId, byUserId) => {
+        const st = get();
+        const q = st.quotes.find((x) => x.id === quoteId);
+        if (!q) return;
+        const company = st.companies.find((c) => c.id === q.companyId);
+        const now = nowIso();
+        // 응답이 없으면 그냥 묻힌다 — 발송 시점에 후속 확인 업무를 같이 만든다.
+        const task: Task = {
+          id: uid("tk"),
+          companyId: q.companyId,
+          projectId: q.projectId,
+          title: `${company?.name ?? ""} ${q.title} 견적 회신 확인`,
+          type: "후속연락",
+          dueDate: iso(addDays(new Date(), 3, 18)),
+          assigneeId: company?.consultantId ?? byUserId,
+          status: "todo",
+          priority: "normal",
+          createdAt: now,
+          source: "auto",
+        };
+        set({
+          quotes: st.quotes.map((x) => (x.id === quoteId ? { ...x, status: "sent" as QuoteStatus, sentAt: now } : x)),
+          tasks: [task, ...st.tasks],
+          activities: [
+            makeActivity({ type: "task_created", companyId: q.companyId, actorId: "system", actorRole: "system", text: `자동 생성: ${task.title}` }),
+            makeActivity({ type: "quote_sent", companyId: q.companyId, projectId: q.projectId, actorId: byUserId, actorRole: "consultant", text: `견적 발송: ${q.title}`, meta: { amount: quoteNet(q) } }),
+            ...st.activities,
+          ],
+          notifications: [makeNotification({ audience: "client", companyId: q.companyId, title: "제안서가 도착했습니다", body: `${q.title} — 내용을 확인하고 회신해 주세요.`, href: "/portal/services" }), ...st.notifications],
+        });
+      },
+
+      respondQuote: (quoteId, decision, byUserId, note) => {
+        const st = get();
+        const q = st.quotes.find((x) => x.id === quoteId);
+        if (!q || q.status !== "sent") return;
+        const company = st.companies.find((c) => c.id === q.companyId);
+        const now = nowIso();
+        const accepted = decision === "accepted";
+        const tasks = st.tasks.map((t) => (t.source === "auto" && t.title.includes(`${q.title} 견적 회신 확인`) && t.status !== "done" ? { ...t, status: "done" as TaskStatus, completedAt: now } : t));
+        const followUp: Task = {
+          id: uid("tk"),
+          companyId: q.companyId,
+          projectId: q.projectId,
+          title: accepted ? `${company?.name ?? ""} ${q.title} 계약 진행` : `${company?.name ?? ""} ${q.title} 보류 사유 확인`,
+          type: accepted ? "내부작업" : "후속연락",
+          dueDate: iso(addDays(new Date(), accepted ? 2 : 1, 18)),
+          assigneeId: company?.consultantId ?? "u_admin",
+          status: "todo",
+          priority: "urgent",
+          createdAt: now,
+          source: "auto",
+          memo: note,
+        };
+        set({
+          quotes: st.quotes.map((x) => (x.id === quoteId ? { ...x, status: (accepted ? "accepted" : "declined") as QuoteStatus, respondedAt: now, clientNote: note } : x)),
+          tasks: [followUp, ...tasks],
+          activities: [
+            makeActivity({ type: "task_created", companyId: q.companyId, actorId: "system", actorRole: "system", text: `자동 생성: ${followUp.title}` }),
+            makeActivity({ type: "quote_responded", companyId: q.companyId, projectId: q.projectId, actorId: byUserId, actorRole: "client", text: `고객 회신: ${q.title} — ${accepted ? "수락" : "보류"}${note ? ` (${note})` : ""}`, meta: { decision } }),
+            ...st.activities,
+          ],
+          notifications: [makeNotification({ audience: "internal", companyId: q.companyId, title: `견적 회신: ${company?.name ?? ""}`, body: `${q.title} — ${accepted ? "고객이 수락했습니다." : `보류${note ? `: ${note}` : ""}`}`, href: "/ax/consultations?tab=quote" }), ...st.notifications],
+        });
+      },
+
+      convertQuote: (quoteId, byUserId) => {
+        const st = get();
+        const q = st.quotes.find((x) => x.id === quoteId);
+        if (!q || q.status !== "accepted") return;
+        const now = nowIso();
+        const contract: Contract = {
+          id: uid("ct"),
+          companyId: q.companyId,
+          projectId: q.projectId ?? "",
+          title: q.title,
+          status: "sent",
+          sentAt: now,
+          period: q.period,
+          scope: q.scope,
+        };
+        // 견적이 계약이 되면 연결된 매출기회도 함께 닫힌다 — 두 곳을 따로 정리하게 두지 않는다.
+        const opportunities = q.opportunityId
+          ? st.opportunities.map((o) => (o.id === q.opportunityId ? { ...o, status: "won" as const, updatedAt: now, history: [...o.history, { at: now, status: "won" as const, by: byUserId, note: "견적 수락 → 계약 전환" }] } : o))
+          : st.opportunities;
+        set({
+          contracts: [contract, ...st.contracts],
+          quotes: st.quotes.map((x) => (x.id === quoteId ? { ...x, status: "converted" as QuoteStatus, contractId: contract.id } : x)),
+          opportunities,
+          activities: [makeActivity({ type: "quote_converted", companyId: q.companyId, projectId: q.projectId, actorId: byUserId, actorRole: "consultant", text: `계약 전환: ${q.title}`, meta: { amount: quoteNet(q) } }), ...st.activities],
+          notifications: [makeNotification({ audience: "client", companyId: q.companyId, title: "계약서를 보내드렸습니다", body: `${q.title} 계약 진행을 시작합니다.`, href: "/portal/projects" }), ...st.notifications],
         });
       },
 

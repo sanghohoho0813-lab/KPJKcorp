@@ -40,13 +40,13 @@ function PreviewBar({ companyName }: { companyName: string }) {
     <>
       <div className="flex items-center justify-between gap-2 bg-shell px-4 py-2 text-[0.8rem] text-white md:px-6">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="rounded-md bg-accent px-1.5 py-0.5 text-[0.65rem] font-bold text-accent-ink">관리자 미리보기</span>
-          <span className="truncate">고객이 보는 화면입니다 · <b>{companyName}</b></span>
+          <span className="shrink-0 whitespace-nowrap rounded-md bg-accent px-1.5 py-0.5 text-[0.65rem] font-bold text-accent-ink">미리보기</span>
+          <span className="truncate"><span className="hidden sm:inline">고객이 보는 화면입니다 · </span><b>{companyName}</b></span>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          <button onClick={() => setPick(true)} className="pressable rounded-md px-2 py-1 font-semibold text-shell-text-2 hover:bg-white/10">기업 변경</button>
-          <Link href="/ax/dashboard" className="pressable flex items-center gap-1 rounded-md bg-white/10 px-2.5 py-1 font-semibold hover:bg-white/20">
-            <LayoutDashboard size={14} /> Business AX 보기
+          <button onClick={() => setPick(true)} className="pressable whitespace-nowrap rounded-md px-2 py-1 font-semibold text-shell-text-2 hover:bg-white/10">기업 변경</button>
+          <Link href="/ax/dashboard" className="pressable flex items-center gap-1 whitespace-nowrap rounded-md bg-white/10 px-2.5 py-1 font-semibold hover:bg-white/20">
+            <LayoutDashboard size={14} /> <span className="hidden sm:inline">Business AX 보기</span><span className="sm:hidden">AX</span>
           </Link>
         </div>
       </div>

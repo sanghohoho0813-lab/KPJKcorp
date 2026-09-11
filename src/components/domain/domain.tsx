@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { type ReactNode, useState } from "react";
-import { AlertTriangle, ArrowRight, CalendarDays, CheckCircle2, ChevronDown, FileUp, MessageSquare, Clock, FileText, RefreshCw, Sparkles, Upload, UserCheck, Search, Briefcase, Bell, LogIn, Download, RotateCcw, TrendingUp, ShieldCheck, ClipboardList, UserMinus, Repeat } from "lucide-react";
+import { AlertTriangle, ArrowRight, CalendarDays, CheckCircle2, ChevronDown, FileUp, MessageSquare, Clock, FileText, RefreshCw, Sparkles, Upload, UserCheck, Search, Briefcase, Bell, LogIn, Download, RotateCcw, TrendingUp, ShieldCheck, ClipboardList, UserMinus, Repeat, Receipt } from "lucide-react";
 import type { Activity, DocStatus, InternalStage, Schedule, TaskStatus, Priority, InquiryStatus } from "@/lib/types";
 import { DOC_STATUS, INQUIRY_STATUS, PRIORITY, SCHEDULE_TYPE, TASK_STATUS, stageLabel, stageProgress } from "@/lib/stages";
 import type { BriefItem } from "@/lib/brief";
@@ -61,19 +61,48 @@ const KIND_ICON: Record<BriefItem["kind"], ReactNode> = {
   contract_pending: <FileText size={18} />,
   churn_risk: <UserMinus size={18} />,
   reengage: <Repeat size={18} />,
+  quote_pending: <Receipt size={18} />,
 };
 
 export function BriefList({ items, limit, compact }: { items: BriefItem[]; limit?: number; compact?: boolean }) {
   const [open, setOpen] = useState<string | null>(null);
+  // 처리하면 규칙상 항목이 즉시 사라진다. 잘못 눌렀을 때 되돌릴 수 있게 잠시 붙잡아 둔다.
+  const [handled, setHandled] = useState<BriefItem[]>([]);
+  const updateTask = useStore((s) => s.updateTaskStatus);
+  const toast = useStore((s) => s.toast);
+  const me = useStore((s) => s.session?.userId) ?? "u_admin";
   const list = limit ? items.slice(0, limit) : items;
+
+  const undoStrip = handled.length > 0 && (
+    <div className="space-y-2">
+      {handled.map((h) => (
+        <div key={h.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-success/30 bg-success-bg px-4 py-2.5 text-[0.85rem]">
+          <CheckCircle2 size={16} className="shrink-0 text-success" />
+          <span className="min-w-0 flex-1 truncate font-semibold text-success">{h.title}</span>
+          <button
+            onClick={() => { if (h.taskId) updateTask(h.taskId, "todo", me); setHandled((xs) => xs.filter((x) => x.id !== h.id)); toast("완료를 취소했습니다."); }}
+            className="pressable shrink-0 rounded-lg border border-success/40 px-2.5 py-1 text-[0.8rem] font-semibold text-success hover:bg-success/10"
+          >
+            되돌리기
+          </button>
+          <button onClick={() => setHandled((xs) => xs.filter((x) => x.id !== h.id))} className="pressable shrink-0 rounded-lg px-2 py-1 text-[0.8rem] text-success/80 hover:bg-success/10">확인</button>
+        </div>
+      ))}
+    </div>
+  );
+
   if (list.length === 0)
     return (
-      <div className="flex items-center gap-3 rounded-xl bg-success-bg px-4 py-4 text-[0.95rem] font-semibold text-success">
-        <CheckCircle2 size={20} /> 오늘 먼저 처리할 긴급 항목이 없습니다.
+      <div className="space-y-2">
+        {undoStrip}
+        <div className="flex items-center gap-3 rounded-xl bg-success-bg px-4 py-4 text-[0.95rem] font-semibold text-success">
+          <CheckCircle2 size={20} /> 오늘 먼저 처리할 긴급 항목이 없습니다.
+        </div>
       </div>
     );
   return (
     <div className="space-y-2">
+      {undoStrip}
       {list.map((it) => {
         const expanded = open === it.id;
         return (
@@ -90,7 +119,7 @@ export function BriefList({ items, limit, compact }: { items: BriefItem[]; limit
             </div>
             {!compact && (
               <div className="flex flex-wrap items-center gap-1.5 border-t border-line px-4 py-2.5">
-                <BriefActionBar item={it} />
+                <BriefActionBar item={it} onCompleted={(x) => setHandled((xs) => [x, ...xs.filter((y) => y.id !== x.id)])} />
                 <button onClick={() => setOpen(expanded ? null : it.id)} className="pressable ml-auto flex shrink-0 items-center gap-1 rounded-lg px-2 py-1.5 text-[0.8rem] font-semibold text-ink-2 hover:bg-surface-2" aria-expanded={expanded}>
                   <Sparkles size={14} className="text-accent" /> 왜? <ChevronDown size={14} className={cx("transition-transform", expanded && "rotate-180")} />
                 </button>
@@ -148,6 +177,10 @@ const ACT_ICON: Record<Activity["type"], ReactNode> = {
   approval_requested: <ShieldCheck size={14} />,
   approval_decided: <ShieldCheck size={14} />,
   survey_submitted: <ClipboardList size={14} />,
+  quote_created: <Receipt size={14} />,
+  quote_sent: <Receipt size={14} />,
+  quote_responded: <Receipt size={14} />,
+  quote_converted: <UserCheck size={14} />,
   demo_reset: <RotateCcw size={14} />,
 };
 

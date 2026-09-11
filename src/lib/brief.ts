@@ -1,4 +1,4 @@
-import type { Activity, Company, DocumentRequest, Inquiry, Project, Schedule, Task, User } from "./types";
+import type { Activity, Company, DocumentRequest, Inquiry, Project, Quote, Schedule, Task, User } from "./types";
 import { daysBetween, isSameDay, relativeDay, fmtTime } from "./format";
 import { stageLabel } from "./stages";
 
@@ -17,7 +17,8 @@ export type BriefKind =
   | "contract_pending"
   | "revision_pending"
   | "churn_risk"
-  | "reengage";
+  | "reengage"
+  | "quote_pending";
 
 /**
  * 브리핑 항목에서 그 자리에 실행할 수 있는 행동.
@@ -67,12 +68,13 @@ export interface BriefInput {
   inquiries: Inquiry[];
   activities: Activity[];
   users: User[];
+  quotes: Quote[];
   /** limit to a consultant's own items (consultant role) */
   assigneeId?: string;
 }
 
 export function buildBrief(input: BriefInput): BriefItem[] {
-  const { now, companies, projects, docRequests, schedules, tasks, inquiries, activities, users, assigneeId } = input;
+  const { now, companies, projects, docRequests, schedules, tasks, inquiries, activities, users, quotes, assigneeId } = input;
   const items: BriefItem[] = [];
   const cname = (id?: string) => companies.find((c) => c.id === id)?.name ?? "";
   const uname = (id?: string) => users.find((u) => u.id === id)?.name ?? "담당자";
@@ -268,7 +270,39 @@ export function buildBrief(input: BriefInput): BriefItem[] {
     }
   }
 
-  // 8. 이탈 위험 — 오래 접촉이 없는 고객. "연락처럼 보이는 활동"이 기준이다.
+  // 8. 견적 회신 대기 — 발송하고 묻히면 매출이 그대로 사라진다.
+  for (const q of quotes.filter((q) => q.status === "sent")) {
+    const c = companies.find((x) => x.id === q.companyId);
+    if (!c || (assigneeId && c.consultantId !== assigneeId)) continue;
+    const days = daysBetween(q.sentAt ?? q.createdAt, nowIso);
+    const expired = daysBetween(q.validUntil, nowIso) > 0;
+    if (days >= 3 || expired) {
+      items.push({
+        id: `b_quote_${q.id}`,
+        kind: "quote_pending",
+        priority: expired || days >= 7 ? "urgent" : "normal",
+        title: `${c.name} ${q.title} 회신 대기 ${days}일`,
+        companyId: c.id,
+        companyName: c.name,
+        projectId: q.projectId,
+        reasons: [
+          `발송 후 ${days}일 경과`,
+          expired ? `유효기간이 ${daysBetween(q.validUntil, nowIso)}일 지났습니다` : `유효기간 ${relativeDay(q.validUntil, now)}`,
+          "고객 Portal에서 아직 회신하지 않았습니다",
+        ],
+        nextAction: expired ? "유효기간 연장 또는 재발송 협의" : "회신 여부 확인 연락",
+        href: "/ax/consultations?tab=quote",
+        score: 80 + days,
+        actions: [
+          { kind: "draft", label: "회신 확인 초안", primary: true, payload: { draftKind: "quote_followup", ...draftCtx(c.id, { note: q.title, dueText: relativeDay(q.validUntil, now) }) } },
+          { kind: "add_task", label: "후속 업무", payload: { title: `${c.name} ${q.title} 회신 확인`, type: "후속연락" } },
+          { kind: "open", label: "견적 열기" },
+        ],
+      });
+    }
+  }
+
+  // 9. 이탈 위험 — 오래 접촉이 없는 고객. "연락처럼 보이는 활동"이 기준이다.
   const CONTACT_TYPES = new Set(["consultation_logged", "inquiry_answered", "inquiry_created", "document_reviewed", "document_uploaded", "result_shared", "schedule_created", "project_stage_changed"]);
   for (const c of companies.filter((c) => !assigneeId || c.consultantId === assigneeId)) {
     const last = activities.filter((a) => a.companyId === c.id && CONTACT_TYPES.has(a.type)).sort((x, y) => y.at.localeCompare(x.at))[0];
@@ -300,7 +334,7 @@ export function buildBrief(input: BriefInput): BriefItem[] {
     }
   }
 
-  // 9. 재상담 대상 — 완료/사후관리 이후 일정 기간이 지났고 현재 진행 건이 없는 고객
+  // 10. 재상담 대상 — 완료/사후관리 이후 일정 기간이 지났고 현재 진행 건이 없는 고객
   for (const c of companies.filter((c) => !assigneeId || c.consultantId === assigneeId)) {
     const cp = projects.filter((p) => p.companyId === c.id);
     if (cp.length === 0) continue;
@@ -345,6 +379,7 @@ export function briefSummaryCounts(items: BriefItem[]) {
     stalled: items.filter((i) => i.kind === "project_stalled").length,
     meetings: items.filter((i) => i.kind === "meeting_today").length,
     inquiries: items.filter((i) => i.kind === "inquiry_open").length,
+    quotes: items.filter((i) => i.kind === "quote_pending").length,
     churn: items.filter((i) => i.kind === "churn_risk").length,
     reengage: items.filter((i) => i.kind === "reengage").length,
   };
@@ -368,7 +403,7 @@ export function projectSummary(p: Project, docs: DocumentRequest[], schedules: S
 }
 
 /** AI-05 COMMUNICATION DRAFT — templates (L1, always human-reviewed) */
-export type DraftKind = "doc_reminder" | "revision_reminder" | "schedule_notice" | "meeting_confirm" | "progress_update" | "contract_followup" | "checkin" | "reengage";
+export type DraftKind = "doc_reminder" | "revision_reminder" | "schedule_notice" | "meeting_confirm" | "progress_update" | "contract_followup" | "checkin" | "reengage" | "quote_followup";
 
 export function communicationDraft(kind: DraftKind, ctx: { companyName: string; contactName: string; consultantName: string; docName?: string; dueText?: string; scheduleTitle?: string; scheduleTime?: string; location?: string; stage?: string; note?: string }) {
   const greet = `안녕하세요 ${ctx.contactName}님, KPJK ${ctx.consultantName}입니다.`;
@@ -383,6 +418,8 @@ export function communicationDraft(kind: DraftKind, ctx: { companyName: string; 
       return `${greet}\n\n${ctx.scheduleTime}에 예정된 「${ctx.scheduleTitle}」 미팅을 다시 한번 확인드립니다.\n\n- 장소: ${ctx.location ?? "-"}\n- 준비사항: 특별히 준비하실 것은 없습니다. 당일 현재까지의 분석 결과를 먼저 설명드리겠습니다.\n\n감사합니다.`;
     case "progress_update":
       return `${greet}\n\n${ctx.companyName} 컨설팅 진행상황을 안내드립니다.\n\n- 현재 단계: ${ctx.stage}\n- 다음 진행: ${ctx.note ?? "-"}\n\n자세한 내용은 고객 포털 [내 프로젝트]에서 언제든 확인하실 수 있습니다.\n\n감사합니다.`;
+    case "quote_followup":
+      return `${greet}\n\n앞서 보내드린 「${ctx.note ?? "제안"}」 관련하여 확인차 연락드립니다.\n\n고객 포털에서 내용을 보시고 바로 회신하실 수 있습니다. 유효기간은 ${ctx.dueText ?? "-"}입니다.\n\n범위나 금액 중 조정이 필요한 부분이 있으면 말씀해 주세요. 함께 다시 정리해 드리겠습니다.\n\n감사합니다.`;
     case "contract_followup":
       return `${greet}\n\n앞서 보내드린 「${ctx.note ?? "계약서"}」 관련하여 확인차 연락드립니다.\n\n검토 중 궁금하신 부분이나 조정이 필요한 항목이 있으시면 편하게 말씀해 주세요. 내용을 함께 정리해 드리겠습니다.\n\n서명이 완료되면 바로 다음 단계(자료 요청)를 안내드리겠습니다.\n\n감사합니다.`;
     case "checkin":
