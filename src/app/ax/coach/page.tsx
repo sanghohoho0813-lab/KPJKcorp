@@ -92,7 +92,7 @@ export default function CoachPage() {
                       <div className="mt-0.5 text-[0.82rem] leading-relaxed text-ink-2">{m.why}</div>
                       <div className="mt-0.5 text-[0.78rem] text-ink-3">현재 {m.progress}</div>
                     </div>
-                    <span className="hidden shrink-0 items-center gap-1 text-[0.82rem] font-semibold text-accent sm:flex">{m.cta} <ArrowRight size={13} /></span>
+                    <span className="hidden shrink-0 items-center gap-1 text-[0.82rem] font-semibold text-accent sm:flex">{m.cta} <ArrowRight size={13} className="arrow-slide" /></span>
                   </Link>
                 ))}
                 <MoreButton hidden={allOpen ? openMissions.length - 4 : openMissions.length - 4} open={allOpen} onToggle={() => setAllOpen((v) => !v)} />
@@ -143,7 +143,7 @@ export default function CoachPage() {
                 <b className="text-ink">채우는 방법</b><br />{s.weakest.how}
               </div>
               <Link href={s.weakest.href} className="mt-3 inline-flex items-center gap-1 text-[0.85rem] font-semibold text-accent">
-                해당 화면으로 <ArrowRight size={14} />
+                해당 화면으로 <ArrowRight size={14} className="arrow-slide" />
               </Link>
             </Card>
           )}

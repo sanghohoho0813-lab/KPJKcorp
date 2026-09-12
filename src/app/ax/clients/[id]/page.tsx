@@ -109,7 +109,7 @@ export default function ClientCardPage() {
           </div>
           <div className="flex flex-wrap gap-2 lg:flex-col lg:items-end">
             <div className="flex items-center gap-2 rounded-xl bg-surface-2 px-3 py-2 text-[0.85rem]"><span className="text-ink-3">담당 컨설턴트</span><b>{consultant?.name} {consultant?.title}</b></div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="outline" icon={<Eye size={15} />} onClick={() => { setPreview(c.id); router.push("/portal"); }}>고객 화면 보기</Button>
               <Button size="sm" variant="outline" icon={<MessageSquareText size={15} />} onClick={() => openDraft({ kind: "progress_update", ctx: { companyName: c.name, contactName: c.contactName, consultantName: consultant?.name, stage: active[0] ? stageLabel(active[0].stage) : "-", note: upcoming[0]?.title } })}>진행 안내 초안</Button>
             </div>

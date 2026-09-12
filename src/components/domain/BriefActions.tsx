@@ -121,7 +121,7 @@ function RaiseOppModal({ companyId, onClose }: { companyId: string | null; onClo
 const ICON: Partial<Record<BriefAction["kind"], React.ReactNode>> = {
   draft: <Sparkles size={14} />,
   complete_task: <Check size={14} />,
-  change_stage: <ArrowRight size={14} />,
+  change_stage: <ArrowRight size={14} className="arrow-slide" />,
   raise_opp: <TrendingUp size={14} />,
 };
 
@@ -182,7 +182,7 @@ export function BriefActionBar({ item, onCompleted }: { item: BriefItem; onCompl
         {item.actions.map((a) =>
           a.kind === "open" ? (
             <Link key={a.label} href={item.href} className={cx("pressable inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[0.82rem] font-semibold transition-colors", a.primary ? "border-accent bg-accent text-accent-ink hover:brightness-105" : "border-line-2 text-ink-2 hover:bg-surface-2")}>
-              {a.label} <ArrowRight size={13} />
+              {a.label} <ArrowRight size={13} className="arrow-slide" />
             </Link>
           ) : (
             <button key={a.label} onClick={() => run(a)} className={cx("pressable inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[0.82rem] font-semibold transition-colors", a.primary ? "border-accent bg-accent text-accent-ink hover:brightness-105" : "border-line-2 text-ink-2 hover:bg-surface-2")}>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Database, HelpCircle, Palette, RotateCcw, ShieldCheck, Sparkles, Award, Play } from "lucide-react";
+import { FontScalePicker } from "@/components/shell/FontScale";
 import { useStore } from "@/lib/store";
 import { useUi, NEXT_FEATURES } from "@/lib/ui-store";
 import { THEMES } from "@/lib/themes";
@@ -48,7 +49,7 @@ export default function SettingsPage() {
       <div className="grid gap-5 xl:grid-cols-2">
         <Card className="p-5">
           <SectionTitle><span className="flex items-center gap-2"><Palette size={18} className="text-ink-3" /> 화면</span></SectionTitle>
-          <div className="mb-2 text-[0.85rem] font-semibold text-ink-2">테마 (KPJK Signature + Canonical 9)</div>
+          <div className="mb-2 text-[0.85rem] font-semibold text-ink-2">테마 (KPJK Signature + 7종)</div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 2xl:grid-cols-5">
             {THEMES.map((t) => {
               const active = settings.theme === t.key;
@@ -61,7 +62,7 @@ export default function SettingsPage() {
             })}
           </div>
           <div className="mt-5 grid gap-4 md:grid-cols-2">
-            <div><div className="mb-1.5 text-[0.85rem] font-semibold text-ink-2">글자 크기</div><SegmentedControl value={settings.fontScale} onChange={(k) => setSettings({ fontScale: k })} options={[{ key: "small", label: "작게" }, { key: "base", label: "기본" }, { key: "large", label: "크게" }]} /></div>
+            <div><div className="mb-1.5 text-[0.85rem] font-semibold text-ink-2">글자 크기</div><FontScalePicker /></div>
             <div><div className="mb-1.5 text-[0.85rem] font-semibold text-ink-2">모션 줄이기</div><SegmentedControl value={settings.reduceMotion ? "on" : "off"} onChange={(k) => setSettings({ reduceMotion: k === "on" })} options={[{ key: "off", label: "Off" }, { key: "on", label: "On" }]} /></div>
           </div>
           <div className="mt-4 text-[0.78rem] text-ink-3">테마는 Sidebar·CTA·강조색만 바꾸며 본문·표·폼의 가독성은 항상 고정됩니다. 오류/위험 색은 의미상 고정입니다.</div>

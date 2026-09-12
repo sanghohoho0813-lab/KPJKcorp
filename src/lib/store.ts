@@ -96,7 +96,7 @@ export interface StoreState extends SeedData {
 
 const DEFAULT_SETTINGS: Settings = {
   theme: "kpjk",
-  fontScale: "base",
+  fontScale: "s",
   reduceMotion: false,
   tutorialDoneAx: false,
   tutorialDonePortal: false,

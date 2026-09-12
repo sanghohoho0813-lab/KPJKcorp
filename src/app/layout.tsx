@@ -17,7 +17,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="ko" data-theme="kpjk" data-font="base" suppressHydrationWarning>
+    <html lang="ko" data-theme="kpjk" data-font="s" suppressHydrationWarning>
       <body className="min-h-full">
         <ThemeBoot />
         <FontLoader />

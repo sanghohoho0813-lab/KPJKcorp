@@ -395,13 +395,14 @@ export type ThemeKey =
   | "forest"
   | "teal"
   | "onyx"
-  | "burgundy"
-  | "plum"
   | "steel";
+
+export type FontScale = "s" | "m" | "l" | "xl";
 
 export interface Settings {
   theme: ThemeKey;
-  fontScale: "small" | "base" | "large";
+  /** "s"가 지금까지의 크기이자 최소값. 아래로는 내려가지 않는다. */
+  fontScale: FontScale;
   reduceMotion: boolean;
   tutorialDoneAx: boolean;
   /** AX 실증 스프린트 시작 시각. 없으면 아직 시작 전 */

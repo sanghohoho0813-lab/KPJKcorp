@@ -17,12 +17,12 @@ interface BtnProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   full?: boolean;
 }
 const variantCls: Record<Variant, string> = {
-  primary: "bg-primary text-white hover:brightness-110 border border-transparent",
-  accent: "bg-accent text-accent-ink hover:brightness-105 border border-transparent",
+  primary: "lift bg-primary text-white hover:brightness-110 border border-transparent",
+  accent: "lift bg-accent text-accent-ink hover:brightness-105 border border-transparent",
   secondary: "bg-surface-2 text-ink hover:bg-line border border-transparent",
   outline: "bg-surface text-ink border border-line-2 hover:bg-surface-2",
   ghost: "bg-transparent text-ink-2 hover:bg-surface-2 border border-transparent",
-  danger: "bg-error text-white hover:brightness-110 border border-transparent",
+  danger: "lift bg-error text-white hover:brightness-110 border border-transparent",
 };
 const sizeCls = { sm: "h-9 px-3 text-[0.8rem] gap-1.5", md: "h-11 px-4 text-[0.9rem] gap-2", lg: "h-13 px-6 text-[1rem] gap-2" };
 export const Button = forwardRef<HTMLButtonElement, BtnProps>(function Button({ variant = "primary", size = "md", icon, full, className, children, ...rest }, ref) {
@@ -55,7 +55,9 @@ const toneCls: Record<Tone, string> = {
 };
 export function Badge({ tone = "neutral", children, className, dot }: { tone?: Tone; children: ReactNode; className?: string; dot?: boolean }) {
   return (
-    <span className={cx("inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[0.75rem] font-semibold whitespace-nowrap leading-5", toneCls[tone], className)}>
+    // max-w-full + 말줄임: 글자 크기를 키운 좁은 화면에서 라벨이 길면 배지가 화면을 밀어낸다.
+    // 라벨이 잘리는 것보다 페이지가 가로로 스크롤되는 쪽이 더 나쁘다.
+    <span className={cx("inline-flex max-w-full items-center gap-1.5 overflow-hidden text-ellipsis rounded-full px-2.5 py-0.5 text-[0.75rem] font-semibold whitespace-nowrap leading-5", toneCls[tone], className)}>
       {dot && <span className="h-1.5 w-1.5 rounded-full bg-current" />}
       {children}
     </span>
@@ -99,7 +101,7 @@ export function KpiCard({ label, value, sub, tone, href, icon, id, accentValue }
     <div className="flex h-full flex-col justify-between gap-2 p-5">
       <div className="flex items-center justify-between">
         <span className="text-[0.85rem] font-semibold text-ink-2">{label}</span>
-        {icon}
+        {icon && <span className="hover-pop flex items-center">{icon}</span>}
       </div>
       <div>
         <div className={cx("tnum text-[2.1rem] font-bold leading-none", accentValue ? "text-accent" : tone === "error" ? "text-error" : "text-ink")}>

@@ -15,7 +15,10 @@ export const THEMES: ThemeDef[] = [
   { key: "forest", name: "Forest Sage", desc: "04", colors: ["#17352c", "#356e58", "#73977e", "#a58e4d", "#d9d2aa", "#f4f1ea"] },
   { key: "teal", name: "Deep Teal", desc: "05", colors: ["#08323a", "#087a83", "#1597a3", "#d2704c", "#e9b59b", "#faeeea"] },
   { key: "onyx", name: "Onyx Gold", desc: "06", colors: ["#15171c", "#343942", "#6a717c", "#b89032", "#e0c76f", "#f6f2e6"] },
-  { key: "burgundy", name: "Burgundy Slate", desc: "07", colors: ["#3a1724", "#7a2c49", "#7c6873", "#b8405f", "#f0b9a6", "#fbecef"] },
-  { key: "plum", name: "Plum Indigo", desc: "08", colors: ["#291a3d", "#573f91", "#4e63a8", "#8a4fb5", "#cbb3ec", "#f3ecf8"] },
-  { key: "steel", name: "Steel Platinum", desc: "09", colors: ["#24303b", "#44647a", "#6d8899", "#4c9aaa", "#c9d6de", "#eaf3f5"] },
+  { key: "steel", name: "Steel Platinum", desc: "07", colors: ["#24303b", "#44647a", "#6d8899", "#4c9aaa", "#c9d6de", "#eaf3f5"] },
 ];
+
+/** 목록에서 사라진 테마가 저장돼 있으면 기본 테마로 되돌린다. */
+export function normalizeTheme(k: string): ThemeKey {
+  return (THEMES.some((t) => t.key === k) ? k : "kpjk") as ThemeKey;
+}

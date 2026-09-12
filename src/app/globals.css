@@ -79,10 +79,11 @@
 
   --radius-card: 16px;
   --radius-btn: 10px;
-  --sidebar-w: 280px;
+  /* 글자가 커지면 사이드바도 같이 넓어져야 라벨이 줄바꿈되지 않는다. 단 상한을 둔다. */
+  --sidebar-w: clamp(280px, 15rem, 344px);
   /* 모바일 하단 Nav 높이 — 하단 고정 바가 서로 겹치지 않게 기준으로 쓴다 */
   --bottomnav-h: calc(4rem + env(safe-area-inset-bottom));
-  --header-h: 64px;
+  --header-h: clamp(64px, 3.4rem, 86px);
   --motion-fast: 160ms;
   --motion-base: 220ms;
 }
@@ -99,14 +100,21 @@ html[data-theme="emerald"] { --theme-shell:#11332b; --theme-shell-2:#19453b; --t
 html[data-theme="forest"] { --theme-shell:#17352c; --theme-shell-2:#20473c; --theme-primary:#356e58; --theme-secondary:#73977e; --theme-accent:#a58e4d; --theme-accent-strong:#86733e; --theme-highlight:#d9d2aa; --theme-soft:#f4f1ea; }
 html[data-theme="teal"] { --theme-shell:#08323a; --theme-shell-2:#0e434d; --theme-primary:#087a83; --theme-secondary:#1597a3; --theme-accent:#d2704c; --theme-accent-strong:#bd542e; --theme-highlight:#e9b59b; --theme-soft:#faeeea; }
 html[data-theme="onyx"] { --theme-shell:#15171c; --theme-shell-2:#1f222a; --theme-primary:#343942; --theme-secondary:#6a717c; --theme-accent:#b89032; --theme-accent-strong:#8f6f26; --theme-highlight:#e0c76f; --theme-soft:#f6f2e6; }
-html[data-theme="burgundy"] { --theme-shell:#3a1724; --theme-shell-2:#4c2032; --theme-primary:#7a2c49; --theme-secondary:#7c6873; --theme-accent:#b8405f; --theme-accent-strong:#b8405f; --theme-highlight:#f0b9a6; --theme-soft:#fbecef; }
-html[data-theme="plum"] { --theme-shell:#291a3d; --theme-shell-2:#362451; --theme-primary:#573f91; --theme-secondary:#4e63a8; --theme-accent:#8a4fb5; --theme-accent-strong:#8a4fb5; --theme-highlight:#cbb3ec; --theme-soft:#f3ecf8; }
 html[data-theme="steel"] { --theme-shell:#24303b; --theme-shell-2:#2f3e4c; --theme-primary:#44647a; --theme-secondary:#6d8899; --theme-accent:#4c9aaa; --theme-accent-strong:#3d7e8b; --theme-highlight:#c9d6de; --theme-soft:#eaf3f5; }
 
-/* Font scale */
+/* Font scale — 지금까지의 크기(19px)가 가장 작은 단계다. 위로만 커진다.
+   rem 기반이라 여백·아이콘·버튼 높이까지 같이 커진다. */
 html { font-size: 19px; }
-html[data-font="small"] { font-size: 17px; }
-html[data-font="large"] { font-size: 21px; }
+html[data-font="s"]  { font-size: 19px; }
+html[data-font="m"]  { font-size: 21px; }
+html[data-font="l"]  { font-size: 23px; }
+html[data-font="xl"] { font-size: 25px; }
+
+/* 글자를 키우면 헤더의 모든 것이 같이 넓어지는데 Tailwind의 lg/xl 분기는 뷰포트 기준이라
+   그대로 있다. 그래서 큰 단계에서는 헤더의 "있으면 좋은" 요소를 먼저 접는다.
+   (핵심 = 알림 · 계정 · 로그아웃) */
+html[data-font="l"] .hdr-optional,
+html[data-font="xl"] .hdr-optional { display: none !important; }
 
 html[data-motion="reduce"] *,
 html[data-motion="reduce"] *::before,
@@ -248,6 +256,80 @@ h1, h2, h3, h4 { letter-spacing: -0.01em; line-height: 1.25; }
 .stagger > *:nth-child(3) { animation-delay: 80ms; }
 .stagger > *:nth-child(4) { animation-delay: 120ms; }
 .stagger > *:nth-child(5) { animation-delay: 160ms; }
+.stagger > *:nth-child(6) { animation-delay: 200ms; }
+.stagger > *:nth-child(7) { animation-delay: 235ms; }
+.stagger > *:nth-child(8) { animation-delay: 265ms; }
+.stagger > *:nth-child(9) { animation-delay: 290ms; }
+.stagger > *:nth-child(n+10) { animation-delay: 310ms; }
+
+/* ------------------------------------------------------------------
+   Motion layer
+   원칙 — 전부 140~280ms, 방향이 있고, 끄면 사라진다.
+   "화면이 바뀌었다 / 이게 새로 생겼다 / 지금 누른 건 이것"만 말한다.
+   ------------------------------------------------------------------ */
+
+/* 라우트 전환 — 내용이 아주 살짝 아래에서 올라오며 들어온다.
+   화면이 통째로 교체됐다는 걸 알려주는 최소한의 신호다. */
+@keyframes pageIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.anim-page { animation: pageIn 260ms cubic-bezier(0.22, 0.9, 0.3, 1) both; }
+
+/* 사이드바 / 목록 항목 — 마우스를 올리면 살짝 밀린다 */
+.nav-item { transition: background-color var(--motion-fast) ease-out, transform var(--motion-fast) cubic-bezier(0.22, 0.9, 0.3, 1), color var(--motion-fast) ease-out; }
+.nav-item:hover { transform: translateX(2px); }
+.nav-item .nav-icon { transition: transform var(--motion-base) cubic-bezier(0.34, 1.4, 0.5, 1); }
+.nav-item:hover .nav-icon { transform: scale(1.12); }
+
+/* 활성 메뉴의 왼쪽 바가 위에서 내려오며 자리를 잡는다 */
+@keyframes barIn { from { transform: scaleY(0); opacity: 0; } to { transform: scaleY(1); opacity: 1; } }
+.nav-bar-in { animation: barIn 240ms cubic-bezier(0.22, 0.9, 0.3, 1) both; transform-origin: center; }
+
+/* 버튼 — 누르는 순간보다 "올라오는" 쪽을 만든다 */
+.lift { transition: transform var(--motion-fast) ease-out, box-shadow var(--motion-fast) ease-out, filter var(--motion-fast) ease-out; }
+.lift:hover { transform: translateY(-1px); box-shadow: var(--neutral-shadow-lg); }
+.lift:active { transform: translateY(0); box-shadow: none; }
+
+/* 진행바 — 화면에 처음 그려질 때만 빛이 두 번 지나간다.
+   계속 반짝이면 배경 소음이 되므로 iteration을 끊는다. */
+@keyframes barSheen { 0% { transform: translateX(-110%); } 55%, 100% { transform: translateX(330%); } }
+.progress > span { position: relative; overflow: hidden; }
+.progress > span::after {
+  content: ""; position: absolute; inset: 0; width: 34%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  animation: barSheen 2.4s cubic-bezier(0.4, 0, 0.2, 1) 2 both;
+}
+
+/* 숫자·배지가 갱신될 때 한 번 튕긴다 */
+@keyframes tick { 0% { transform: translateY(-3px); opacity: 0.4; } 60% { transform: translateY(1px); } 100% { transform: translateY(0); opacity: 1; } }
+.anim-tick { animation: tick 260ms cubic-bezier(0.34, 1.4, 0.5, 1) both; }
+
+/* 알림 배지 — 새 알림이 있을 때만 아주 옅게 맥박 */
+@keyframes pulseRing {
+  0%, 70%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--sem-error) 0%, transparent); }
+  85% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--sem-error) 22%, transparent); }
+}
+.anim-pulse { animation: pulseRing 2.8s ease-in-out infinite; }
+
+/* 아이콘 타일 — 카드에 마우스를 올리면 아이콘만 살짝 커진다 */
+.card-hover .hover-pop { transition: transform var(--motion-base) cubic-bezier(0.34, 1.4, 0.5, 1); }
+.card-hover:hover .hover-pop { transform: scale(1.08) rotate(-2deg); }
+
+/* 화살표 — CTA에 마우스를 올리면 진행 방향으로 밀린다 */
+.arrow-slide { transition: transform var(--motion-fast) cubic-bezier(0.22, 0.9, 0.3, 1); }
+a:hover > .arrow-slide, button:hover > .arrow-slide, .group:hover .arrow-slide { transform: translateX(3px); }
+
+/* 모션 끄기 — 위 전부를 무력화한다 */
+html[data-motion="reduce"] .anim-page,
+html[data-motion="reduce"] .anim-tick,
+html[data-motion="reduce"] .anim-pulse,
+html[data-motion="reduce"] .nav-bar-in,
+html[data-motion="reduce"] .progress > span::after { animation: none; }
+html[data-motion="reduce"] .nav-item:hover,
+html[data-motion="reduce"] .lift:hover,
+html[data-motion="reduce"] .card-hover:hover .hover-pop { transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .anim-page, .anim-tick, .anim-pulse, .nav-bar-in, .progress > span::after { animation: none; }
+  .nav-item:hover, .lift:hover, .card-hover:hover .hover-pop { transform: none; }
+}
 
 /* AX 코치 강조 — 3초 주기로 아주 옅게 빛난다.
    시선을 뺏는 게 아니라 "여기가 시작점"이라는 표시라서 진폭을 작게 잡는다. */

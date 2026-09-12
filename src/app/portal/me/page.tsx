@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { HelpCircle, LogOut, Mail, Phone, ShieldCheck, UserRound } from "lucide-react";
+import { FontScalePicker } from "@/components/shell/FontScale";
 import { useStore, usePortalCompanyId, useCurrentUser } from "@/lib/store";
 import { useUi } from "@/lib/ui-store";
 import { fmtDate } from "@/lib/format";
@@ -46,7 +47,7 @@ export default function PortalMePage() {
           <Card className="p-5">
             <div className="mb-3 font-bold">화면 설정</div>
             <div className="grid gap-4 md:grid-cols-2">
-              <div><div className="mb-1.5 text-[0.85rem] font-semibold text-ink-2">글자 크기</div><SegmentedControl value={settings.fontScale} onChange={(k) => setSettings({ fontScale: k })} options={[{ key: "small", label: "작게" }, { key: "base", label: "기본" }, { key: "large", label: "크게" }]} /></div>
+              <div><div className="mb-1.5 text-[0.85rem] font-semibold text-ink-2">글자 크기</div><FontScalePicker /></div>
               <div><div className="mb-1.5 text-[0.85rem] font-semibold text-ink-2">모션 줄이기</div><SegmentedControl value={settings.reduceMotion ? "on" : "off"} onChange={(k) => setSettings({ reduceMotion: k === "on" })} options={[{ key: "off", label: "Off" }, { key: "on", label: "On" }]} /></div>
             </div>
             <div className="mt-4 flex flex-wrap gap-2">

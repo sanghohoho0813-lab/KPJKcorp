@@ -115,7 +115,7 @@ export function CoachCard() {
       <Card className="coach-box coach-glow anim-rise p-5">
         <div className="flex flex-col gap-4 md:flex-row md:items-center">
           <div className="flex min-w-0 flex-1 items-start gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-ink"><Compass size={20} /></span>
+            <span className="hover-pop flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-ink"><Compass size={20} /></span>
             <div className="min-w-0">
               <h2 className="text-[1.1rem] font-bold">AX 실증 14일을 시작할까요?</h2>
               <p className="mt-1 text-[0.88rem] leading-relaxed text-ink-2">
@@ -157,21 +157,21 @@ export function CoachCard() {
           <div className="stagger grid gap-2 md:grid-cols-3">
             {/* 모바일은 "한 화면 = 한 가지 판단" — 첫 미션만 크게, 나머지는 코치 화면에서 */}
             {s.today.map((m, i) => (
-              <Link key={m.key} href={m.href} className={cx("card card-hover flex flex-col gap-2 p-4", i > 0 && "hidden md:flex")}>
+              <Link key={m.key} href={m.href} className={cx("card card-hover group flex flex-col gap-2 p-4", i > 0 && "hidden md:flex")}>
                 <div className="flex items-center gap-2">
                   <span className="rounded-md bg-surface-2 px-1.5 py-0.5 text-[0.7rem] font-bold text-ink-3">Day {m.day}</span>
                   <span className="text-[0.72rem] font-semibold text-ink-3">{m.progress}</span>
                 </div>
                 <div className="text-[0.95rem] font-bold leading-snug">{m.title}</div>
                 <div className="text-[0.8rem] leading-relaxed text-ink-2">{m.why}</div>
-                <span className="mt-auto flex items-center gap-1 pt-1 text-[0.82rem] font-semibold text-accent">{m.cta} <ArrowRight size={13} /></span>
+                <span className="mt-auto flex items-center gap-1 pt-1 text-[0.82rem] font-semibold text-accent">{m.cta} <ArrowRight size={13} className="arrow-slide" /></span>
               </Link>
             ))}
           </div>
         )}
         {s.today.length > 1 && (
           <Link href="/ax/coach" className="pressable mt-2 flex items-center justify-center gap-1 rounded-xl border border-line bg-surface px-4 py-2.5 text-[0.85rem] font-semibold text-ink-2 hover:bg-surface-2 md:hidden">
-            오늘의 미션 {s.today.length - 1}개 더 보기 <ArrowRight size={14} />
+            오늘의 미션 {s.today.length - 1}개 더 보기 <ArrowRight size={14} className="arrow-slide" />
           </Link>
         )}
         <WhyToggle open={why} onToggle={() => setWhy((v) => !v)} />

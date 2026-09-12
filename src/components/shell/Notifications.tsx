@@ -29,7 +29,8 @@ export function NotificationBell({ audience, companyId, className, onNavigate }:
     <div ref={ref} className="relative">
       <button onClick={() => setOpen((v) => !v)} className={cx("pressable relative rounded-lg p-2 text-ink-2 hover:bg-surface-2", className)} aria-label="알림">
         <Bell size={20} />
-        {unread > 0 && <span className="tnum absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-error px-1 text-[0.65rem] font-bold text-white">{unread}</span>}
+        {/* 안 읽은 알림이 있을 때만 맥박. 읽으면 즉시 멈춘다 — 상태를 말하는 모션이어야 한다. */}
+        {unread > 0 && <span key={unread} className="anim-pulse anim-tick tnum absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-error px-1 text-[0.65rem] font-bold text-white">{unread}</span>}
       </button>
       {open && (
         <div className="anim-pop absolute right-0 top-full z-40 mt-2 w-[360px] max-w-[calc(100vw-24px)] overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl">

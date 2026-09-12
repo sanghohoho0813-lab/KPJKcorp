@@ -10,6 +10,7 @@ import { useIsMobile, useIsPreviewFrame } from "@/lib/hooks";
 import { NotificationBell } from "./Notifications";
 import { DevicePreviewButton, DevicePreviewOverlay } from "./DevicePreview";
 import { Tutorial } from "./Tutorial";
+import { FontScaleStepper } from "./FontScale";
 import { Presentation } from "./Presentation";
 import { Toaster } from "@/components/ui/Toaster";
 import { Modal } from "@/components/ui/overlay";
@@ -106,30 +107,34 @@ export function PortalShell({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-canvas">
       {isInternal && company && <PreviewBar companyName={company.name} />}
       <header className="sticky top-0 z-30 border-b border-line bg-surface/90 backdrop-blur">
-        <div className="mx-auto flex h-[var(--header-h)] max-w-[1280px] items-center gap-3 px-4 md:px-6">
-          <Link href="/portal" className="flex shrink-0 items-center gap-2.5 whitespace-nowrap">
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-shell text-[0.65rem] font-black text-white">KPJK</span>
-            <span className="text-[1rem] font-bold"><span className="hidden xl:inline">KPJK Consulting </span>Portal</span>
+        {/* 글자 크기를 키우면 이 줄의 모든 요소가 같이 넓어진다. 줄일 수 있는 것(로고 문구·메뉴)은
+            줄어들게 하고, 줄이면 안 되는 것(알림·계정)에만 shrink-0을 준다. */}
+        <div className="mx-auto flex h-[var(--header-h)] max-w-[1280px] items-center gap-2 px-4 md:gap-3 md:px-6">
+          <Link href="/portal" className="flex min-w-0 items-center gap-2.5">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-shell text-[0.65rem] font-black text-white">KPJK</span>
+            <span className="truncate text-[1rem] font-bold"><span className="hidden xl:inline">KPJK Consulting </span>Portal</span>
           </Link>
-          <nav className="ml-4 hidden items-center gap-0.5 lg:flex">
+          <nav className="ml-2 hidden min-w-0 items-center gap-0.5 overflow-hidden lg:flex">
             {NAV.slice(0, 7).map((n) => (
-              <Link key={n.href} href={n.href} className={cx("pressable whitespace-nowrap rounded-lg px-2.5 py-2 text-[0.85rem] font-semibold transition-colors", isActive(pathname, n.href) ? "bg-surface-2 text-ink" : "text-ink-2 hover:bg-surface-2 hover:text-ink")}>
+              <Link key={n.href} href={n.href} className={cx("pressable lift whitespace-nowrap rounded-lg px-2.5 py-2 text-[0.85rem] font-semibold transition-colors", isActive(pathname, n.href) ? "bg-surface-2 text-ink" : "text-ink-2 hover:bg-surface-2 hover:text-ink")}>
                 {n.label}
               </Link>
             ))}
           </nav>
           <div className="flex-1" />
-          <div className="hidden items-center gap-1 lg:flex">
-            <DevicePreviewButton className={btn} labelClass="hidden 2xl:inline" />
+          {/* 고객 화면에서도 글자 크기는 바로 바꿀 수 있어야 한다 — 대표님들 연령대가 넓다. */}
+          <FontScaleStepper className="mr-1 shrink-0" />
+          <div className="hidden shrink-0 items-center gap-1 lg:flex">
+            <DevicePreviewButton className={cx(btn, "hdr-optional")} labelClass="hidden 2xl:inline" />
             {!inFrame && (
               <button onClick={() => openTutorial("portal")} className={btn} title="이용 안내" aria-label="이용 안내">
                 <HelpCircle size={18} />
               </button>
             )}
           </div>
-          <NotificationBell audience="client" companyId={companyId} />
-          <Link href="/portal/me" className="flex items-center gap-2 pl-1">
-            <div className="hidden max-w-[180px] whitespace-nowrap text-right leading-tight sm:block">
+          <span className="shrink-0"><NotificationBell audience="client" companyId={companyId} /></span>
+          <Link href="/portal/me" className="flex shrink-0 items-center gap-2 pl-1">
+            <div className="hdr-optional hidden max-w-[180px] whitespace-nowrap text-right leading-tight sm:block">
               <div className="truncate text-[0.82rem] font-bold">{company?.name}</div>
               <div className="truncate text-[0.7rem] text-ink-3">{isInternal ? company?.contactName : user?.name} {isInternal ? company?.contactTitle : user?.title}</div>
             </div>
@@ -142,7 +147,9 @@ export function PortalShell({ children }: { children: ReactNode }) {
           )}
         </div>
       </header>
-      <main className={cx("mx-auto w-full max-w-[1280px] px-4 py-5 md:px-6 md:py-8", isMobile && "pb-24")}>{ready ? children : <PageSkeleton />}</main>
+      <main className={cx("mx-auto w-full max-w-[1280px] px-4 py-5 md:px-6 md:py-8", isMobile && "pb-24")}>
+        {ready ? <div key={pathname} className="anim-page">{children}</div> : <PageSkeleton />}
+      </main>
 
       {/* Mobile bottom nav: 홈 / 진행현황 / 자료제출 / 문의 / MY */}
       <nav className="pb-safe fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-surface lg:hidden">

@@ -33,6 +33,7 @@ import { LiveClock } from "./LiveClock";
 import { NotificationBell } from "./Notifications";
 import { DevicePreviewButton, DevicePreviewOverlay } from "./DevicePreview";
 import { Tutorial } from "./Tutorial";
+import { FontScalePicker, FontScaleStepper } from "./FontScale";
 import { Presentation, PresentationButton } from "./Presentation";
 import { NextSheet } from "./NextSheet";
 import { AiReadyModal, DraftModal } from "@/components/ai/AiModals";
@@ -132,7 +133,7 @@ function NavLink({ item, color, onClick, mobile, utility }: { item: NavItem; col
       onClick={onClick}
       aria-current={active ? "page" : undefined}
       className={cx(
-        "pressable relative flex items-center gap-2.5 rounded-lg px-3 transition-colors",
+        "pressable nav-item relative flex items-center gap-2.5 rounded-lg px-3",
         utility ? "py-[0.3rem] text-[0.82rem] font-medium" : "py-[0.35rem] text-[0.9rem] font-semibold",
         mobile
           ? active
@@ -143,13 +144,13 @@ function NavLink({ item, color, onClick, mobile, utility }: { item: NavItem; col
             : "text-shell-text-2 hover:bg-white/[0.05] hover:text-white",
       )}
     >
-      {active && !mobile && <span aria-hidden className="absolute left-0 top-1/2 h-[18px] w-[3px] -translate-y-1/2 rounded-r-full bg-accent" />}
-      <span className="flex h-5 w-5 shrink-0 items-center justify-center transition-opacity" style={{ color, opacity: active ? 1 : utility ? 0.6 : 0.75 }}>
+      {active && !mobile && <span aria-hidden className="nav-bar-in absolute left-0 top-1/2 h-[18px] w-[3px] -translate-y-1/2 rounded-r-full bg-accent" />}
+      <span className="nav-icon flex h-5 w-5 shrink-0 items-center justify-center transition-opacity" style={{ color, opacity: active ? 1 : utility ? 0.6 : 0.75 }}>
         {item.icon}
       </span>
       <span className="flex-1 truncate">{item.label}</span>
       {badgeCount > 0 && (
-        <span className={cx("tnum shrink-0 rounded-full px-1.5 text-[0.72rem] font-bold", item.badge === "approvals" ? "bg-accent text-accent-ink" : mobile ? "bg-surface-2 text-ink-2" : "bg-white/15 text-white")}>{badgeCount}</span>
+        <span key={badgeCount} className={cx("anim-tick tnum shrink-0 rounded-full px-1.5 text-[0.72rem] font-bold", item.badge === "approvals" ? "bg-accent text-accent-ink" : mobile ? "bg-surface-2 text-ink-2" : "bg-white/15 text-white")}>{badgeCount}</span>
       )}
     </Link>
   );
@@ -203,14 +204,15 @@ function NextGroup({ mobile }: { mobile?: boolean }) {
 function Sidebar() {
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-[var(--sidebar-w)] flex-col bg-shell text-shell-text lg:flex">
-      <div className="flex h-[var(--header-h)] items-center gap-3 px-5">
-        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-[0.7rem] font-black tracking-wider text-shell">KPJK</span>
-        <div className="leading-tight">
-          <div className="text-[1rem] font-bold text-white">KPJK</div>
-          <div className="text-[0.8rem] font-bold tracking-wide text-highlight">Business AX</div>
+      <div className="flex items-center gap-3 px-5 pb-5 pt-6">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-[0.7rem] font-black tracking-wider text-shell">KPJK</span>
+        <div className="min-w-0 leading-tight">
+          <div className="truncate text-[0.72rem] font-bold tracking-[0.1em] text-shell-text-2">KPJK CORPORATION</div>
+          <div className="truncate text-[1.18rem] font-extrabold tracking-tight text-highlight">Business AX</div>
         </div>
       </div>
-      <nav className="thin-scroll flex-1 overflow-y-auto px-3 pb-4">
+      {/* 메뉴는 로고에서 한 칸 더 내려온다 — 로고와 첫 메뉴가 붙어 있으면 둘이 한 덩어리로 읽힌다. */}
+      <nav className="thin-scroll flex-1 overflow-y-auto px-3 pb-4 pt-2">
         {NAV_GROUPS.map((g, i) => (
           <div key={g.key} className={cx(i > 0 && "mt-3 border-t border-white/[0.07] pt-2.5")}>
             <div className="px-3 pb-1 pt-0.5 text-[0.66rem] font-bold tracking-[0.16em] text-shell-text-3">{g.label}</div>
@@ -278,11 +280,11 @@ function Header() {
   const lbl = "hidden 2xl:inline";
   return (
     <header className="sticky top-0 z-30 flex h-[var(--header-h)] items-center gap-2 border-b border-line bg-surface/90 px-4 backdrop-blur md:px-6">
-      <div className="flex items-center gap-2 lg:hidden">
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-shell text-[0.65rem] font-black text-white">KPJK</span>
-        <span className="text-[0.95rem] font-bold">Business AX</span>
+      <div className="flex min-w-0 items-center gap-2 lg:hidden">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-shell text-[0.65rem] font-black text-white">KPJK</span>
+        <span className="truncate text-[0.95rem] font-bold">Business AX</span>
       </div>
-      <div className="hidden items-center gap-3 lg:flex">
+      <div className="hdr-optional hidden items-center gap-3 lg:flex">
         <span className="hidden xl:flex"><LiveClock /></span>
         <span className="flex xl:hidden"><LiveClock compact /></span>
         <DemoBadge className="hidden xl:inline-flex" />
@@ -300,24 +302,26 @@ function Header() {
             ]}
           />
         )}
-        <button id="tut-surface" onClick={() => setPick(true)} className={btn} title="고객 화면 보기">
+        <button id="tut-surface" onClick={() => setPick(true)} className={cx(btn, "hdr-optional")} title="고객 화면 보기">
           <Eye size={18} /> <span className={lbl}>고객 화면 보기</span>
         </button>
+        <FontScaleStepper className="mx-1" />
         <DevicePreviewButton className={btn} labelClass={lbl} />
-        <PresentationButton className={btn} labelClass={lbl} />
+        <PresentationButton className={cx(btn, "hdr-optional")} labelClass={lbl} />
         {!inFrame && (
           <button onClick={() => openTutorial("ax")} className={btn} title="튜토리얼">
             <HelpCircle size={18} />
           </button>
         )}
       </div>
-      <div className="lg:hidden">
-        <LiveClock compact />
+      <div className="flex shrink-0 items-center gap-2 lg:hidden">
+        <FontScaleStepper />
+        <span className="hdr-optional"><LiveClock compact /></span>
       </div>
-      <NotificationBell audience="internal" />
+      <span className="shrink-0"><NotificationBell audience="internal" /></span>
       <div className="hidden items-center gap-2 pl-2 lg:flex">
         <Avatar name={user?.name ?? "K"} size={34} />
-        <div className="hidden whitespace-nowrap leading-tight xl:block">
+        <div className="hdr-optional hidden whitespace-nowrap leading-tight xl:block">
           <div className="text-[0.82rem] font-bold">{user?.name}</div>
           <div className="text-[0.7rem] text-ink-3">{user?.title}</div>
         </div>
@@ -383,6 +387,10 @@ function MoreSheet() {
             <div className="text-[0.75rem] text-ink-3">{session?.role === "admin" ? "대표 화면" : "직원 화면"}</div>
           </div>
           <SegmentedControl size="sm" value={session?.role === "admin" ? "admin" : "consultant"} onChange={(k) => login(k === "admin" ? "u_admin" : "u_park")} options={[{ key: "admin", label: "대표" }, { key: "consultant", label: "직원" }]} />
+        </div>
+        <div className="mb-4 rounded-xl border border-line p-3">
+          <div className="mb-2 text-[0.82rem] font-semibold text-ink-2">글자 크기</div>
+          <FontScalePicker />
         </div>
         <div className="mb-4 grid grid-cols-2 gap-2">
           <button onClick={() => { close(); setPick(true); }} className={btn}><Eye size={18} /> 고객 화면 보기</button>
@@ -457,7 +465,9 @@ export function AxShell({ children }: { children: ReactNode }) {
       <Sidebar />
       <div className="lg:pl-[var(--sidebar-w)]">
         <Header />
-        <main className={cx("mx-auto w-full max-w-[1720px] px-4 py-5 md:px-6 md:py-7", isMobile && "pb-24")}>{ready ? children : <PageSkeleton />}</main>
+        <main className={cx("mx-auto w-full max-w-[1720px] px-4 py-5 md:px-6 md:py-7", isMobile && "pb-24")}>
+          {ready ? <div key={pathname} className="anim-page">{children}</div> : <PageSkeleton />}
+        </main>
       </div>
       <MobileNav />
       <MoreSheet />
