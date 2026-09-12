@@ -25,7 +25,7 @@ export default function DashboardPage() {
   const brief = useMemo(() => buildBrief({ now, companies: st.companies, projects: st.projects, docRequests: st.docRequests, schedules: st.schedules, tasks: st.tasks, inquiries: st.inquiries, activities: st.activities, users: st.users, quotes: st.quotes, assigneeId }), [now, st.companies, st.projects, st.docRequests, st.schedules, st.tasks, st.inquiries, st.activities, st.users, st.quotes, assigneeId]);
   const counts = briefSummaryCounts(brief);
 
-  const active = st.projects.filter((p) => !["done", "aftercare"].includes(p.stage) && (!assigneeId || p.consultantId === assigneeId));
+  const active = st.projects.filter((p) => !p.archived && !["done", "aftercare"].includes(p.stage) && (!assigneeId || p.consultantId === assigneeId));
   const docWaiting = st.docRequests.filter((r) => (r.status === "submitted" || r.status === "reviewing") && (!assigneeId || r.assigneeId === assigneeId)).length;
   const weekSchedules = st.schedules.filter((s) => { const d = daysBetween(now.toISOString(), s.start); return d >= 0 && d <= 7 && (!assigneeId || s.assigneeId === assigneeId); }).sort((a, b) => a.start.localeCompare(b.start));
   const todaySchedules = weekSchedules.filter((s) => isSameDay(s.start, now));

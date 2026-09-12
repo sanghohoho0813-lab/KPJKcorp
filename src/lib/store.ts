@@ -4,6 +4,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { buildSeed, type SeedData } from "./demo/seed";
 import type {
+  User,
   Company,
   Project,
   Activity,
@@ -68,6 +69,24 @@ export interface StoreState extends SeedData {
   updateCompany: (id: string, patch: Partial<Omit<Company, "id" | "code">>, byUserId: string) => void;
   createProject: (data: Omit<Project, "id" | "stageChangedAt">, byUserId: string) => string | null;
   updateProject: (id: string, patch: Partial<Omit<Project, "id" | "companyId">>, byUserId: string) => void;
+
+  // ---- 사용자 계정 ----
+  createUser: (data: { name: string; email: string; role: Role; title: string; phone?: string; companyId?: string; passwordHash: string }, byUserId: string) => string | null;
+  updateUser: (id: string, patch: Partial<Pick<User, "name" | "email" | "title" | "phone" | "companyId">>, byUserId: string) => void;
+  setUserActive: (id: string, active: boolean, byUserId: string) => void;
+  resetUserPassword: (id: string, passwordHash: string, byUserId: string) => void;
+
+  // ---- 자료요청 수정 / 취소 (제출 전) ----
+  updateDocRequest: (id: string, patch: { name?: string; description?: string; dueDate?: string }, byUserId: string) => void;
+  cancelDocRequest: (id: string, byUserId: string) => void;
+
+  // ---- 상담기록 수정 / 삭제 ----
+  updateConsultation: (id: string, patch: Partial<Omit<Consultation, "id" | "companyId">>, byUserId: string) => void;
+  deleteConsultation: (id: string, byUserId: string) => void;
+
+  // ---- 보관 (하드 삭제 대신) ----
+  archiveCompany: (id: string, archived: boolean, byUserId: string) => void;
+  archiveProject: (id: string, archived: boolean, byUserId: string) => void;
 
   // ---- 일정 / 업무 수정·삭제 ----
   updateSchedule: (id: string, patch: Partial<Omit<Schedule, "id">>, byUserId: string) => void;
@@ -421,6 +440,162 @@ export const useStore = create<StoreState>()(
         set({
           projects: after.projects.map((p) => (p.id === id ? { ...p, ...rest } : p)),
           activities: [makeActivity({ type: "project_updated", companyId: before.companyId, projectId: id, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `프로젝트 수정: ${before.name} — ${changed.map((k) => LABEL[k] ?? k).join(", ")}`, meta: { fields: changed.join(",") } }), ...after.activities],
+        });
+      },
+
+      // ---------- 사용자 계정 ----------
+      createUser: (data, byUserId) => {
+        const st = get();
+        if (deny(st, "user.manage", `계정 생성 (${data.email})`, set)) return null;
+        const email = data.email.trim().toLowerCase();
+        // 아이디 = 이메일이므로 중복이 있으면 로그인 자체가 모호해진다.
+        if (st.users.some((u) => u.email.toLowerCase() === email)) return null;
+        const id = uid(data.role === "client" ? "c" : "u");
+        const user: User = {
+          id, name: data.name.trim(), email, role: data.role, title: data.title.trim(),
+          phone: data.phone?.trim() || undefined,
+          companyId: data.role === "client" ? data.companyId : undefined,
+          passwordHash: data.passwordHash, active: true,
+        };
+        set({
+          users: [...st.users, user],
+          activities: [makeActivity({ type: "user_created", companyId: user.companyId, actorId: byUserId, actorRole: st.session?.role ?? "admin", text: `계정 생성: ${user.name} (${user.email}) · ${user.role === "admin" ? "대표" : user.role === "consultant" ? "컨설턴트" : "기업고객"}` }), ...st.activities],
+        });
+        return id;
+      },
+
+      updateUser: (id, patch, byUserId) => {
+        const st = get();
+        const before = st.users.find((u) => u.id === id);
+        if (!before) return;
+        if (deny(st, "user.manage", `계정 수정 (${before.email})`, set)) return;
+        const next = { ...patch };
+        if (next.email) {
+          const email = next.email.trim().toLowerCase();
+          if (st.users.some((u) => u.id !== id && u.email.toLowerCase() === email)) return;
+          next.email = email;
+        }
+        const changed = (Object.keys(next) as (keyof typeof next)[]).filter((k) => next[k] !== undefined && next[k] !== before[k]);
+        if (changed.length === 0) return;
+        const LABEL: Record<string, string> = { name: "이름", email: "아이디", title: "직책", phone: "연락처", companyId: "소속 기업" };
+        set({
+          users: st.users.map((u) => (u.id === id ? { ...u, ...next } : u)),
+          activities: [makeActivity({ type: "user_updated", companyId: before.companyId, actorId: byUserId, actorRole: st.session?.role ?? "admin", text: `계정 수정: ${before.name} — ${changed.map((k) => LABEL[k] ?? k).join(", ")}`, meta: { fields: changed.join(",") } }), ...st.activities],
+        });
+      },
+
+      setUserActive: (id, active, byUserId) => {
+        const st = get();
+        const u = st.users.find((x) => x.id === id);
+        if (!u) return;
+        if (deny(st, "user.manage", `계정 ${active ? "사용 재개" : "사용 중지"} (${u.email})`, set)) return;
+        // 자기 자신을 잠그면 아무도 계정을 되살릴 수 없게 된다.
+        if (!active && u.id === st.session?.userId) return;
+        // 마지막 남은 대표 계정을 잠그는 것도 같은 이유로 막는다.
+        if (!active && u.role === "admin" && st.users.filter((x) => x.role === "admin" && x.active !== false).length <= 1) return;
+        set({
+          users: st.users.map((x) => (x.id === id ? { ...x, active } : x)),
+          activities: [makeActivity({ type: "user_deactivated", companyId: u.companyId, actorId: byUserId, actorRole: st.session?.role ?? "admin", text: `계정 ${active ? "사용 재개" : "사용 중지"}: ${u.name} (${u.email})` }), ...st.activities],
+        });
+      },
+
+      resetUserPassword: (id, passwordHash, byUserId) => {
+        const st = get();
+        const u = st.users.find((x) => x.id === id);
+        if (!u) return;
+        if (deny(st, "user.manage", `비밀번호 재설정 (${u.email})`, set)) return;
+        set({
+          users: st.users.map((x) => (x.id === id ? { ...x, passwordHash } : x)),
+          // 비밀번호 값 자체는 기록하지 않는다. 누가 언제 재설정했는지만 남긴다.
+          activities: [makeActivity({ type: "password_reset", companyId: u.companyId, actorId: byUserId, actorRole: st.session?.role ?? "admin", text: `비밀번호 재설정: ${u.name} (${u.email})` }), ...st.activities],
+        });
+      },
+
+      // ---------- 자료요청 수정 · 취소 ----------
+      updateDocRequest: (id, patch, byUserId) => {
+        const st = get();
+        const before = st.docRequests.find((r) => r.id === id);
+        if (!before) return;
+        if (deny(st, "doc.update", `자료요청 수정 (${before.name})`, set)) return;
+        // 제출 이후에는 고칠 수 없다 — 고객이 낸 것과 요청 내용이 어긋나면 기록이 의미를 잃는다.
+        if (!["planned", "requested", "revision"].includes(before.status)) return;
+        const changed = (Object.keys(patch) as (keyof typeof patch)[]).filter((k) => patch[k] !== undefined && patch[k] !== before[k]);
+        if (changed.length === 0) return;
+        const LABEL: Record<string, string> = { name: "자료명", description: "설명", dueDate: "제출기한" };
+        const dueMoved = patch.dueDate !== undefined && patch.dueDate !== before.dueDate;
+        set({
+          docRequests: st.docRequests.map((r) => (r.id === id ? { ...r, ...patch } : r)),
+          activities: [makeActivity({ type: "doc_request_updated", companyId: before.companyId, projectId: before.projectId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `자료요청 수정: ${patch.name ?? before.name} — ${changed.map((k) => LABEL[k] ?? k).join(", ")}`, meta: { fields: changed.join(",") } }), ...st.activities],
+          notifications: [makeNotification({ audience: "client", companyId: before.companyId, title: dueMoved ? "자료 제출기한이 변경되었습니다" : "요청자료 내용이 변경되었습니다", body: `${patch.name ?? before.name} — 요청자료에서 확인해 주세요.`, href: "/portal/documents" }), ...st.notifications],
+        });
+      },
+
+      cancelDocRequest: (id, byUserId) => {
+        const st = get();
+        const req = st.docRequests.find((r) => r.id === id);
+        if (!req) return;
+        if (deny(st, "doc.update", `자료요청 취소 (${req.name})`, set)) return;
+        if (!["planned", "requested", "revision"].includes(req.status)) return;
+        set({
+          docRequests: st.docRequests.filter((r) => r.id !== id),
+          // 요청에 딸려 자동 생성된 검토 업무도 같이 정리한다.
+          tasks: st.tasks.filter((t) => !(t.source === "auto" && t.projectId === req.projectId && t.title.includes(req.name))),
+          activities: [makeActivity({ type: "doc_request_canceled", companyId: req.companyId, projectId: req.projectId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `자료요청 취소: ${req.name}` }), ...st.activities],
+          notifications: [makeNotification({ audience: "client", companyId: req.companyId, title: "자료 요청이 취소되었습니다", body: `${req.name} 요청이 취소되었습니다. 제출하지 않으셔도 됩니다.`, href: "/portal/documents" }), ...st.notifications],
+        });
+      },
+
+      // ---------- 상담기록 수정 · 삭제 ----------
+      updateConsultation: (id, patch, byUserId) => {
+        const st = get();
+        const before = st.consultations.find((c) => c.id === id);
+        if (!before) return;
+        if (deny(st, "consultation.update", "상담기록 수정", set)) return;
+        const company = st.companies.find((c) => c.id === before.companyId);
+        set({
+          consultations: st.consultations.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+          activities: [makeActivity({ type: "consultation_updated", companyId: before.companyId, projectId: before.projectId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `상담기록 수정: ${before.type}${company ? ` — ${company.name}` : ""}`, meta: { consultationId: id } }), ...st.activities],
+        });
+      },
+
+      deleteConsultation: (id, byUserId) => {
+        const st = get();
+        const target = st.consultations.find((c) => c.id === id);
+        if (!target) return;
+        if (deny(st, "consultation.update", "상담기록 삭제", set)) return;
+        const company = st.companies.find((c) => c.id === target.companyId);
+        set({
+          consultations: st.consultations.filter((c) => c.id !== id),
+          activities: [makeActivity({ type: "consultation_deleted", companyId: target.companyId, projectId: target.projectId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `상담기록 삭제: ${target.type}${company ? ` — ${company.name}` : ""}` }), ...st.activities],
+        });
+      },
+
+      // ---------- 보관 ----------
+      // 기업·프로젝트는 지우지 않고 보관한다. 지우면 그 아래 자료·상담·계약·활동로그가
+      // 전부 고아가 되고, 실증 데이터의 근거도 함께 사라진다.
+      archiveCompany: (id, archived, byUserId) => {
+        const st = get();
+        const c = st.companies.find((x) => x.id === id);
+        if (!c) return;
+        if (deny(st, "company.archive", `기업 ${archived ? "보관" : "보관 해제"} (${c.name})`, set)) return;
+        const now = nowIso();
+        set({
+          companies: st.companies.map((x) => (x.id === id ? { ...x, archived, archivedAt: archived ? now : undefined } : x)),
+          // 기업을 보관하면 그 기업의 진행 중 프로젝트도 함께 보관한다.
+          projects: archived ? st.projects.map((p) => (p.companyId === id ? { ...p, archived: true, archivedAt: now } : p)) : st.projects,
+          activities: [makeActivity({ type: "company_archived", companyId: id, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `기업 ${archived ? "보관" : "보관 해제"}: ${c.name}` }), ...st.activities],
+        });
+      },
+
+      archiveProject: (id, archived, byUserId) => {
+        const st = get();
+        const p = st.projects.find((x) => x.id === id);
+        if (!p) return;
+        if (deny(st, "project.archive", `프로젝트 ${archived ? "보관" : "보관 해제"} (${p.name})`, set)) return;
+        const now = nowIso();
+        set({
+          projects: st.projects.map((x) => (x.id === id ? { ...x, archived, archivedAt: archived ? now : undefined } : x)),
+          activities: [makeActivity({ type: "project_archived", companyId: p.companyId, projectId: id, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `프로젝트 ${archived ? "보관" : "보관 해제"}: ${p.name}` }), ...st.activities],
         });
       },
 
@@ -959,6 +1134,9 @@ export const useStore = create<StoreState>()(
 );
 
 /* ---------- selectors / helpers ---------- */
+
+/** 보관된 항목은 업무 화면·브리핑·고객 Portal 어디에도 나오지 않는다. */
+export const notArchived = <T extends { archived?: boolean }>(x: T) => !x.archived;
 
 export function useHydrated() {
   return useStore((s) => s.hydrated);

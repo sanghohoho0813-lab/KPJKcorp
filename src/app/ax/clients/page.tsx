@@ -16,7 +16,7 @@ export default function ClientsPage() {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [view, setView] = useState<"card" | "table">("card");
-  const [filter, setFilter] = useState<"all" | "mine" | "issue">("all");
+  const [filter, setFilter] = useState<"all" | "mine" | "issue" | "archived">("all");
   const [newOpen, setNewOpen] = useState(false);
   const may = useMay();
   const now = new Date().toISOString();
@@ -35,13 +35,15 @@ export default function ClientsPage() {
         const consultant = st.users.find((u) => u.id === c.consultantId);
         return { c, projects, active, missing, overdue, openIq, next, last, consultant, hasIssue: overdue > 0 || openIq > 0 };
       })
+      // 보관된 기업은 "보관" 필터에서만 보인다.
+      .filter((r) => (filter === "archived" ? !!r.c.archived : !r.c.archived))
       .filter((r) => (filter === "mine" ? r.c.consultantId === me : filter === "issue" ? r.hasIssue : true))
       .filter((r) => !q || r.c.name.includes(q) || r.c.ceo.includes(q) || r.c.industry.includes(q) || r.c.contactName.includes(q));
   }, [st, q, filter, me, now]);
 
   return (
     <div>
-      <PageHeader title="기업고객" desc="기업고객 단위로 상담·계약·프로젝트·자료·일정·문의를 연결합니다." badge={<Badge>{st.companies.length}개 기업</Badge>} actions={
+      <PageHeader title="기업고객" desc="기업고객 단위로 상담·계약·프로젝트·자료·일정·문의를 연결합니다." badge={<Badge>{st.companies.filter((c) => !c.archived).length}개 기업</Badge>} actions={
         <div className="flex flex-wrap items-center gap-2">
           <SegmentedControl value={view} onChange={setView} options={[{ key: "card", label: <span className="flex items-center gap-1"><LayoutGrid size={14} /> 카드</span> }, { key: "table", label: <span className="flex items-center gap-1"><List size={14} /> 목록</span> }]} />
           {may("company.create") && <Button variant="accent" icon={<Plus size={16} />} onClick={() => setNewOpen(true)}>기업고객 등록</Button>}
@@ -49,7 +51,7 @@ export default function ClientsPage() {
       } />
       <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center">
         <div className="md:w-80"><SearchBox value={q} onChange={setQ} placeholder="기업명, 대표, 업종, 담당자 검색" /></div>
-        <SegmentedControl size="sm" value={filter} onChange={setFilter} options={[{ key: "all", label: "전체" }, { key: "mine", label: "내 담당" }, { key: "issue", label: "확인 필요" }]} />
+        <SegmentedControl size="sm" value={filter} onChange={setFilter} options={[{ key: "all", label: "전체" }, { key: "mine", label: "내 담당" }, { key: "issue", label: "확인 필요" }, { key: "archived", label: "보관" }]} />
       </div>
 
       {rows.length === 0 ? (

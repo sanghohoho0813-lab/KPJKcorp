@@ -23,7 +23,7 @@ export default function PortalHome() {
   const displayName = isClient ? `${user?.name} ${user?.title}` : `${c.contactName} ${c.contactTitle}`;
   const now = new Date().toISOString();
 
-  const projects = st.projects.filter((p) => p.companyId === c.id && p.clientVisible).sort((a, b) => b.startDate.localeCompare(a.startDate));
+  const projects = st.projects.filter((p) => p.companyId === c.id && p.clientVisible && !p.archived).sort((a, b) => b.startDate.localeCompare(a.startDate));
   const active = projects.filter((p) => !["done", "aftercare"].includes(p.stage));
   const main = active[0] ?? projects[0];
   const docs = st.docRequests.filter((d) => d.companyId === c.id && d.status !== "planned");

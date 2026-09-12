@@ -8,6 +8,7 @@ import { useStore, useCurrentUser } from "@/lib/store";
 import { useUi, NEXT_FEATURES } from "@/lib/ui-store";
 import { THEMES } from "@/lib/themes";
 import { can, PERMISSION_ROWS, rowVerdict } from "@/lib/permissions";
+import { UserAdmin } from "@/components/domain/UserModals";
 import { fmtDateTime } from "@/lib/format";
 import { Badge, Button, Card, DemoBadge, NextBadge, PageHeader, SectionTitle, SegmentedControl, cx, AiReadyBadge } from "@/components/ui/ui";
 import { Confirm } from "@/components/ui/overlay";
@@ -65,6 +66,15 @@ export default function SettingsPage() {
           {can(session?.role, "portal.preview") && (
             <div className="mb-3"><Button size="sm" variant="outline" onClick={() => router.push("/portal")}>고객 화면 보기 (읽기 전용)</Button></div>
           )}
+          {can(session?.role, "user.manage") ? (
+            <div className="mb-5">
+              <div className="mb-2 text-[0.85rem] font-semibold text-ink-2">계정 관리</div>
+              <UserAdmin />
+            </div>
+          ) : (
+            <div className="mb-5 rounded-xl bg-surface-2 px-4 py-3 text-[0.85rem] text-ink-2">계정 관리는 대표 계정에서만 가능합니다.</div>
+          )}
+
           <div className="mb-2 text-[0.85rem] font-semibold text-ink-2">Permission Matrix</div>
           <p className="mb-2 text-[0.78rem] leading-relaxed text-ink-3">
             이 표는 설명이 아니라 <b className="text-ink-2">실제 규칙</b>입니다. <code className="rounded bg-surface-2 px-1">src/lib/permissions.ts</code>의 정책에서 직접 그려지며,

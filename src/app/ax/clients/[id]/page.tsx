@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Building2, CalendarDays, ChevronRight, Eye, FileCheck2, FileText, FolderOpen, Mail, MapPin, MessageSquare, MessageSquareText, Phone, Plus, Sparkles, UserRound, Pencil } from "lucide-react";
+import { ArrowLeft, Building2, CalendarDays, ChevronRight, Eye, FileCheck2, FileText, FolderOpen, Mail, MapPin, MessageSquare, MessageSquareText, Phone, Plus, Sparkles, UserRound, Pencil, Archive, ArchiveRestore, UserPlus } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useUi } from "@/lib/ui-store";
 import { daysBetween, fmtDate, fmtDateTime, fmtSize, relativeDay, fmtRelative, fmtTime } from "@/lib/format";
@@ -15,6 +15,8 @@ import { ActivityFeed, DocStatusBadge, InquiryStatusBadge, ScheduleItem, StageBa
 import { ReviewDocModal } from "@/components/domain/DocActions";
 import { NewDocRequestModal, NewScheduleModal } from "@/components/domain/CreateModals";
 import { CompanyModal, ProjectModal, useMay } from "@/components/domain/EntityModals";
+import { UserModal } from "@/components/domain/UserModals";
+import { Confirm } from "@/components/ui/overlay";
 import { NewConsultationModal } from "@/components/domain/ConsultationModal";
 
 type TabKey = "overview" | "consult" | "contract" | "project" | "docs" | "schedule" | "inquiry" | "results" | "history";
@@ -31,6 +33,11 @@ export default function ClientCardPage() {
   const [newDoc, setNewDoc] = useState<string | null>(null);
   const [editCompany, setEditCompany] = useState(false);
   const [newProject, setNewProject] = useState(false);
+  const [confirmArchive, setConfirmArchive] = useState(false);
+  const [newAccount, setNewAccount] = useState(false);
+  const archive = useStore((x) => x.archiveCompany);
+  const toast = useStore((x) => x.toast);
+  const me = useStore((x) => x.session?.userId) ?? "u_admin";
   const may = useMay();
   const [newConsult, setNewConsult] = useState(false);
   const [newSchedule, setNewSchedule] = useState(false);
@@ -98,6 +105,7 @@ export default function ClientCardPage() {
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-[1.6rem] font-bold md:text-[1.85rem]">{c.name}</h1>
+                {c.archived && <Badge tone="neutral">보관됨</Badge>}
                 {active[0] && <StageBadge stage={active[0].stage} />}
               </div>
               <div className="mt-1 text-[0.9rem] text-ink-2">{c.industry} · 임직원 {c.employees}명 · 매출 {c.revenue} · 사업자번호 {c.bizNo}</div>
@@ -115,12 +123,34 @@ export default function ClientCardPage() {
             <div className="flex items-center gap-2 rounded-xl bg-surface-2 px-3 py-2 text-[0.85rem]"><span className="text-ink-3">담당 컨설턴트</span><b>{consultant?.name} {consultant?.title}</b></div>
             <div className="flex flex-wrap gap-2">
               {may("company.update") && <Button size="sm" variant="outline" icon={<Pencil size={15} />} onClick={() => setEditCompany(true)}>기업정보 수정</Button>}
+              {may("company.archive") && (
+                c.archived
+                  ? <Button size="sm" variant="outline" icon={<ArchiveRestore size={15} />} onClick={() => { archive(c.id, false, me); toast("보관을 해제했습니다."); }}>보관 해제</Button>
+                  : <Button size="sm" variant="ghost" icon={<Archive size={15} />} onClick={() => setConfirmArchive(true)}>보관</Button>
+              )}
               {may("project.create") && <Button size="sm" variant="outline" icon={<Plus size={15} />} onClick={() => setNewProject(true)}>프로젝트 등록</Button>}
               <Button size="sm" variant="outline" icon={<Eye size={15} />} onClick={() => { setPreview(c.id); router.push("/portal"); }}>고객 화면 보기</Button>
               <Button size="sm" variant="outline" icon={<MessageSquareText size={15} />} onClick={() => openDraft({ kind: "progress_update", ctx: { companyName: c.name, contactName: c.contactName, consultantName: consultant?.name, stage: active[0] ? stageLabel(active[0].stage) : "-", note: upcoming[0]?.title } })}>진행 안내 초안</Button>
             </div>
           </div>
         </div>
+        {(() => {
+          const acct = st.users.find((u) => u.role === "client" && u.companyId === c.id);
+          if (acct && acct.active !== false) return null;
+          return (
+            <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-warning/30 bg-warning-bg px-4 py-3 text-[0.85rem] text-warning">
+              <UserPlus size={16} className="shrink-0" />
+              <span className="min-w-0 flex-1">
+                {acct ? <><b>담당자 Portal 계정이 사용 중지 상태입니다.</b> 고객이 로그인할 수 없습니다.</> : <><b>담당자 Portal 계정이 없습니다.</b> 계정을 만들어야 고객이 진행상황을 보고 자료를 제출할 수 있습니다.</>}
+              </span>
+              {may("user.manage")
+                ? (acct
+                    ? <Link href="/ax/settings" className="pressable shrink-0 rounded-lg bg-warning px-3 py-1.5 text-[0.82rem] font-semibold text-white">설정에서 처리</Link>
+                    : <button onClick={() => setNewAccount(true)} className="pressable shrink-0 rounded-lg bg-warning px-3 py-1.5 text-[0.82rem] font-semibold text-white">계정 만들기</button>)
+                : <span className="shrink-0 text-[0.8rem]">대표 계정에서 처리</span>}
+            </div>
+          );
+        })()}
         {c.memo && <div className="mt-4 rounded-xl bg-soft/50 px-4 py-3 text-[0.88rem] text-ink-2"><b className="text-ink">메모</b> · {c.memo}</div>}
       </Card>
 
@@ -370,6 +400,15 @@ export default function ClientCardPage() {
       )}
 
       <ReviewDocModal req={reviewReq} open={!!reviewReq} onClose={() => setReviewReq(null)} />
+      <UserModal open={newAccount} presetCompanyId={c.id} onClose={() => setNewAccount(false)} />
+      <Confirm
+        open={confirmArchive}
+        onClose={() => setConfirmArchive(false)}
+        onConfirm={() => { archive(c.id, true, me); toast(`${c.name}을(를) 보관했습니다. 목록에서 빠지지만 기록은 그대로 남습니다.`); setConfirmArchive(false); }}
+        title={`${c.name}을(를) 보관할까요?`}
+        desc="삭제가 아니라 보관입니다. 기업고객 목록에서 빠지고 진행 중 프로젝트도 함께 보관되지만, 상담·자료·계약·활동 기록은 전부 남고 언제든 되돌릴 수 있습니다."
+        confirmText="보관"
+      />
       <CompanyModal open={editCompany} companyId={c.id} onClose={() => setEditCompany(false)} />
       <ProjectModal open={newProject} companyId={c.id} onClose={() => setNewProject(false)} onCreated={(id) => router.push(`/ax/projects/${id}`)} />
       <NewDocRequestModal projectId={newDoc} open={!!newDoc} onClose={() => setNewDoc(null)} />

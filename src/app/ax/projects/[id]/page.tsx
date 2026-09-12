@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Briefcase, CheckCircle2, ChevronDown, FileText, Plus, Share2, Sparkles, Upload, Pencil } from "lucide-react";
+import { ArrowLeft, ArrowRight, Briefcase, CheckCircle2, ChevronDown, FileText, Plus, Share2, Sparkles, Upload, Pencil, Archive, ArchiveRestore } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useUi } from "@/lib/ui-store";
 import { CUSTOMER_STEPS, INTERNAL_STAGES, stageLabel, stageProgress, stageToCustomerStep } from "@/lib/stages";
@@ -11,11 +11,11 @@ import { projectSummary } from "@/lib/brief";
 import { daysBetween, fmtDate, fmtDateTime, fmtSize, relativeDay } from "@/lib/format";
 import type { DocumentRequest, InternalStage } from "@/lib/types";
 import { AiReadyBadge, Badge, Button, Card, EmptyState, Field, Input, Select, Stat, Textarea, SectionTitle, cx } from "@/components/ui/ui";
-import { Modal } from "@/components/ui/overlay";
+import { Confirm, Modal } from "@/components/ui/overlay";
 import { ActivityFeed, DocStatusBadge, DueText, ScheduleItem, StageBadge } from "@/components/domain/domain";
 import { ReviewDocModal } from "@/components/domain/DocActions";
 import { NewDocRequestModal, NewScheduleModal, NewTaskModal } from "@/components/domain/CreateModals";
-import { ProjectModal, useMay } from "@/components/domain/EntityModals";
+import { DOC_EDITABLE, EditDocRequestModal, ProjectModal, useMay } from "@/components/domain/EntityModals";
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -28,6 +28,10 @@ export default function ProjectDetailPage() {
   const [reviewReq, setReviewReq] = useState<DocumentRequest | null>(null);
   const [newDoc, setNewDoc] = useState(false);
   const [editProject, setEditProject] = useState(false);
+  const [editDoc, setEditDoc] = useState<string | null>(null);
+  const [confirmArchive, setConfirmArchive] = useState(false);
+  const archiveProject = useStore((x) => x.archiveProject);
+  const me = useStore((x) => x.session?.userId) ?? "u_admin";
   const may = useMay();
   const [newSchedule, setNewSchedule] = useState(false);
   const [newTask, setNewTask] = useState(false);
@@ -74,11 +78,16 @@ export default function ProjectDetailPage() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <Link href={`/ax/clients/${c.id}`} className="text-[0.9rem] font-semibold text-ink-2 hover:text-accent">{c.name} →</Link>
-            <div className="mt-1 flex flex-wrap items-center gap-2"><h1 className="text-[1.6rem] font-bold md:text-[1.85rem]">{p.name}</h1><StageBadge stage={p.stage} /><Badge>{p.type}</Badge></div>
+            <div className="mt-1 flex flex-wrap items-center gap-2"><h1 className="text-[1.6rem] font-bold md:text-[1.85rem]">{p.name}</h1>{p.archived && <Badge>보관됨</Badge>}<StageBadge stage={p.stage} /><Badge>{p.type}</Badge></div>
             <p className="mt-1 text-[0.9rem] text-ink-2">{p.description}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             {may("project.update") && <Button variant="outline" size="sm" icon={<Pencil size={15} />} onClick={() => setEditProject(true)}>프로젝트 수정</Button>}
+            {may("project.archive") && (
+              p.archived
+                ? <Button variant="outline" size="sm" icon={<ArchiveRestore size={15} />} onClick={() => { archiveProject(p.id, false, me); toast("보관을 해제했습니다."); }}>보관 해제</Button>
+                : <Button variant="ghost" size="sm" icon={<Archive size={15} />} onClick={() => setConfirmArchive(true)}>보관</Button>
+            )}
             <Button variant="outline" size="sm" icon={<Plus size={15} />} onClick={() => setNewDoc(true)}>자료 요청</Button>
             <Button variant="outline" size="sm" icon={<Plus size={15} />} onClick={() => setNewSchedule(true)}>일정</Button>
             <Button variant="outline" size="sm" icon={<Plus size={15} />} onClick={() => setNewTask(true)}>업무</Button>
@@ -127,12 +136,17 @@ export default function ProjectDetailPage() {
             {docs.length === 0 ? <EmptyState title="요청한 자료가 없습니다" action={<Button size="sm" variant="outline" onClick={() => setNewDoc(true)}>자료 요청</Button>} /> : (
               <div className="divide-y divide-line">
                 {docs.map((d) => (
-                  <button key={d.id} onClick={() => setReviewReq(d)} className="flex w-full items-center gap-3 px-5 py-3 text-left hover:bg-surface-2/60">
+                  <div key={d.id} className="flex w-full items-center gap-3 px-5 py-3 hover:bg-surface-2/60">
+                  <button onClick={() => setReviewReq(d)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
                     <span className={cx("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", d.status === "done" ? "bg-success-bg text-success" : d.status === "requested" || d.status === "revision" ? "bg-error-bg text-error" : "bg-warning-bg text-warning")}>{d.status === "done" ? <CheckCircle2 size={16} /> : d.status === "requested" || d.status === "revision" ? <Upload size={16} /> : <FileText size={16} />}</span>
                     <div className="min-w-0 flex-1"><div className="line-clamp-2 font-semibold md:line-clamp-1">{d.name}</div><div className="text-[0.78rem] text-ink-3">{d.files.length ? `${d.files[d.files.length - 1].fileName} · ${fmtSize(d.files[d.files.length - 1].size)}` : d.description || "-"}</div></div>
                     <DocStatusBadge status={d.status} />
                     <span className="hidden w-24 text-right sm:block"><DueText iso={d.dueDate} pending={d.status === "requested" || d.status === "revision"} /></span>
                   </button>
+                  {may("doc.update") && DOC_EDITABLE.includes(d.status) && (
+                    <button onClick={() => setEditDoc(d.id)} aria-label={`${d.name} 요청 수정`} className="pressable shrink-0 rounded-lg p-2 text-ink-3 hover:bg-surface-2 hover:text-ink"><Pencil size={15} /></button>
+                  )}
+                  </div>
                 ))}
               </div>
             )}
@@ -187,6 +201,15 @@ export default function ProjectDetailPage() {
       </Modal>
 
       <ReviewDocModal req={reviewReq} open={!!reviewReq} onClose={() => setReviewReq(null)} />
+      <Confirm
+        open={confirmArchive}
+        onClose={() => setConfirmArchive(false)}
+        onConfirm={() => { archiveProject(p.id, true, me); toast("프로젝트를 보관했습니다. 목록에서 빠지지만 기록은 남습니다."); setConfirmArchive(false); }}
+        title={`${p.name}을(를) 보관할까요?`}
+        desc="삭제가 아니라 보관입니다. 프로젝트 목록과 Board에서 빠지고 고객 Portal에도 표시되지 않지만, 자료·일정·활동 기록은 전부 남고 언제든 되돌릴 수 있습니다."
+        confirmText="보관"
+      />
+      <EditDocRequestModal open={!!editDoc} requestId={editDoc} onClose={() => setEditDoc(null)} />
       <ProjectModal open={editProject} projectId={p.id} onClose={() => setEditProject(false)} />
       <NewDocRequestModal projectId={newDoc ? p.id : null} open={newDoc} onClose={() => setNewDoc(false)} />
       <NewScheduleModal open={newSchedule} onClose={() => setNewSchedule(false)} companyId={c.id} projectId={p.id} />

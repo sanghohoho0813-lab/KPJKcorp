@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, X } from "lucide-react";
+import { Plus, Trash2, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 import type { Consultation } from "@/lib/types";
 import { addDays, iso } from "@/lib/format";
 import { Button, Field, Input, Select, Textarea, cx } from "@/components/ui/ui";
-import { Modal } from "@/components/ui/overlay";
+import { Confirm, Modal } from "@/components/ui/overlay";
 
 function localDateTimeInput(d: Date) {
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -57,23 +57,33 @@ function ListInput({ label, hint, items, onChange, placeholder }: { label: strin
   );
 }
 
-export function NewConsultationModal({ open, onClose, companyId, projectId }: { open: boolean; onClose: () => void; companyId?: string; projectId?: string }) {
+/** 작성과 수정이 같은 폼을 쓴다 — 항목이 갈라지면 둘 중 하나가 반드시 뒤처진다. */
+export function NewConsultationModal(props: { open: boolean; onClose: () => void; companyId?: string; projectId?: string; consultationId?: string | null }) {
+  if (!props.open) return null;
+  return <ConsultationModalInner key={props.consultationId ?? "new"} {...props} />;
+}
+
+function ConsultationModalInner({ open, onClose, companyId, projectId, consultationId }: { open: boolean; onClose: () => void; companyId?: string; projectId?: string; consultationId?: string | null }) {
   const st = useStore();
   const create = useStore((s) => s.createConsultation);
+  const update = useStore((s) => s.updateConsultation);
+  const remove = useStore((s) => s.deleteConsultation);
   const toast = useStore((s) => s.toast);
   const me = st.session?.userId ?? "u_admin";
+  const editing = st.consultations.find((x) => x.id === consultationId);
 
-  const [company, setCompany] = useState(companyId ?? st.companies[0]?.id ?? "");
-  const [project, setProject] = useState(projectId ?? "");
-  const [date, setDate] = useState(() => localDateTimeInput(new Date()));
-  const [type, setType] = useState<Consultation["type"]>("후속상담");
-  const [channel, setChannel] = useState<Consultation["channel"]>("방문");
-  const [notes, setNotes] = useState("");
-  const [core, setCore] = useState<string[]>([]);
-  const [requirements, setRequirements] = useState<string[]>([]);
-  const [promises, setPromises] = useState<string[]>([]);
-  const [documents, setDocuments] = useState<string[]>([]);
-  const [nextAction, setNextAction] = useState("");
+  const [company, setCompany] = useState(editing?.companyId ?? companyId ?? st.companies[0]?.id ?? "");
+  const [project, setProject] = useState(editing?.projectId ?? projectId ?? "");
+  const [date, setDate] = useState(() => localDateTimeInput(editing ? new Date(editing.date) : new Date()));
+  const [type, setType] = useState<Consultation["type"]>(editing?.type ?? "후속상담");
+  const [channel, setChannel] = useState<Consultation["channel"]>(editing?.channel ?? "방문");
+  const [notes, setNotes] = useState(editing?.notes ?? "");
+  const [core, setCore] = useState<string[]>(editing?.summary.core ?? []);
+  const [requirements, setRequirements] = useState<string[]>(editing?.summary.requirements ?? []);
+  const [promises, setPromises] = useState<string[]>(editing?.summary.promises ?? []);
+  const [documents, setDocuments] = useState<string[]>(editing?.summary.documents ?? []);
+  const [nextAction, setNextAction] = useState(editing?.summary.nextAction ?? "");
+  const [confirmDel, setConfirmDel] = useState(false);
   const [makeTask, setMakeTask] = useState(true);
   const [taskDue, setTaskDue] = useState(() => localDateInput(addDays(new Date(), 3)));
 
@@ -89,6 +99,19 @@ export function NewConsultationModal({ open, onClose, companyId, projectId }: { 
   const submit = () => {
     if (!cid) { toast("기업을 선택해 주세요.", "error"); return; }
     if (!notes.trim() && core.length === 0) { toast("상담 내용 또는 핵심 내용을 입력해 주세요.", "error"); return; }
+    if (editing) {
+      update(editing.id, {
+        projectId: project || undefined,
+        date: new Date(date).toISOString(),
+        type,
+        channel,
+        notes: notes.trim(),
+        summary: { core, requirements, promises, documents, nextAction: nextAction.trim() },
+      }, me);
+      toast("상담 기록을 수정했습니다.");
+      onClose();
+      return;
+    }
     create(
       {
         companyId: cid,
@@ -109,13 +132,16 @@ export function NewConsultationModal({ open, onClose, companyId, projectId }: { 
   };
 
   return (
+    <>
     <Modal
       open={open}
       onClose={onClose}
-      title="상담 기록 작성"
+      title={editing ? "상담 기록 수정" : "상담 기록 작성"}
       size="lg"
       footer={
         <>
+          {editing && <Button variant="danger" icon={<Trash2 size={15} />} onClick={() => setConfirmDel(true)}>삭제</Button>}
+          <span className="flex-1" />
           <Button variant="ghost" onClick={onClose}>취소</Button>
           <Button variant="accent" onClick={submit}>저장</Button>
         </>
@@ -165,7 +191,8 @@ export function NewConsultationModal({ open, onClose, companyId, projectId }: { 
         </Field>
       </div>
 
-      <div className={cx("mt-3 rounded-xl border px-4 py-3", nextAction.trim() ? "border-accent/50 bg-soft/50" : "border-line bg-surface-2")}>
+      {/* 후속 업무 자동 등록은 최초 작성에서만. 수정할 때마다 업무가 또 생기면 중복이 쌓인다. */}
+      <div className={cx("mt-3 rounded-xl border px-4 py-3", editing && "hidden", nextAction.trim() ? "border-accent/50 bg-soft/50" : "border-line bg-surface-2")}>
         <label className="flex items-center gap-2 text-[0.88rem] font-semibold">
           <input type="checkbox" checked={makeTask} onChange={(e) => setMakeTask(e.target.checked)} className="h-4 w-4 accent-[var(--theme-accent)]" />
           다음 Action을 후속 업무로 등록
@@ -180,5 +207,21 @@ export function NewConsultationModal({ open, onClose, companyId, projectId }: { 
         )}
       </div>
     </Modal>
+      <Confirm
+        open={confirmDel}
+        onClose={() => setConfirmDel(false)}
+        onConfirm={() => {
+          if (!editing) return;
+          remove(editing.id, me);
+          toast("상담 기록을 삭제했습니다.");
+          setConfirmDel(false);
+          onClose();
+        }}
+        title="이 상담 기록을 삭제할까요?"
+        desc="삭제하면 이 상담을 근거로 한 판단의 출처가 사라집니다. 삭제 사실은 활동 로그에 남습니다."
+        confirmText="삭제"
+        danger
+      />
+    </>
   );
 }

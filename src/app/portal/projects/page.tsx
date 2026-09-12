@@ -14,7 +14,7 @@ function Inner() {
   const companyId = usePortalCompanyId();
   const params = useSearchParams();
   const c = st.companies.find((x) => x.id === companyId);
-  const projects = st.projects.filter((p) => p.companyId === companyId && p.clientVisible).sort((a, b) => b.startDate.localeCompare(a.startDate));
+  const projects = st.projects.filter((p) => p.companyId === companyId && p.clientVisible && !p.archived).sort((a, b) => b.startDate.localeCompare(a.startDate));
   const [sel, setSel] = useState<string>(params.get("p") ?? projects.find((p) => !["done", "aftercare"].includes(p.stage))?.id ?? projects[0]?.id ?? "");
   const p = projects.find((x) => x.id === sel) ?? projects[0];
   if (!c) return null;

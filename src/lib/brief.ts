@@ -74,7 +74,10 @@ export interface BriefInput {
 }
 
 export function buildBrief(input: BriefInput): BriefItem[] {
-  const { now, companies, projects, docRequests, schedules, tasks, inquiries, activities, users, quotes, assigneeId } = input;
+  const { now, docRequests, schedules, tasks, inquiries, activities, users, quotes, assigneeId } = input;
+  // 보관된 기업·프로젝트는 브리핑에 올라오지 않는다. 보관은 "이 건은 이제 안 본다"는 뜻이다.
+  const companies = input.companies.filter((c) => !c.archived);
+  const projects = input.projects.filter((p) => !p.archived && companies.some((c) => c.id === p.companyId));
   const items: BriefItem[] = [];
   const cname = (id?: string) => companies.find((c) => c.id === id)?.name ?? "";
   const uname = (id?: string) => users.find((u) => u.id === id)?.name ?? "담당자";

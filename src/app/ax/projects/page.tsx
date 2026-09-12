@@ -18,14 +18,14 @@ function ProjectsInner() {
   const router = useRouter();
   const [view, setView] = useState<"board" | "list">("board");
   const [q, setQ] = useState("");
-  const [filter, setFilter] = useState<"all" | "mine" | "delayed" | "done">(params.get("filter") === "delayed" ? "delayed" : "all");
+  const [filter, setFilter] = useState<"all" | "mine" | "delayed" | "done" | "archived">(params.get("filter") === "delayed" ? "delayed" : "all");
   const [stage, setStage] = useState<InternalStage | "all">("all");
   const [newOpen, setNewOpen] = useState(false);
   const may = useMay();
   const now = new Date().toISOString();
   const me = st.session?.userId;
 
-  const rows = useMemo(() => st.projects.map((p) => {
+  const rows = useMemo(() => st.projects.filter((p) => (filter === "archived" ? !!p.archived : !p.archived)).map((p) => {
     const c = st.companies.find((x) => x.id === p.companyId);
     const docs = st.docRequests.filter((d) => d.projectId === p.id);
     const missing = docs.filter((d) => d.status === "requested" || d.status === "revision");
@@ -46,7 +46,7 @@ function ProjectsInner() {
 
   return (
     <div>
-      <PageHeader title="프로젝트 운영 Board" desc="상담부터 완료까지 컨설팅 단계별 병목을 확인합니다." badge={<Badge>총 {st.projects.length}개</Badge>} actions={
+      <PageHeader title="프로젝트 운영 Board" desc="상담부터 완료까지 컨설팅 단계별 병목을 확인합니다." badge={<Badge>총 {st.projects.filter((p) => !p.archived).length}개</Badge>} actions={
         <div className="flex flex-wrap items-center gap-2">
           <SegmentedControl value={view} onChange={setView} options={[{ key: "board", label: <span className="flex items-center gap-1"><Columns3 size={14} /> Board</span> }, { key: "list", label: <span className="flex items-center gap-1"><List size={14} /> 목록</span> }]} />
           {may("project.create") && <Button variant="accent" icon={<Plus size={16} />} onClick={() => setNewOpen(true)}>프로젝트 등록</Button>}
@@ -54,7 +54,7 @@ function ProjectsInner() {
       } />
       <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center">
         <div className="md:w-80"><SearchBox value={q} onChange={setQ} placeholder="프로젝트명, 기업명 검색" /></div>
-        <SegmentedControl size="sm" value={filter} onChange={setFilter} options={[{ key: "all", label: "진행 전체" }, { key: "mine", label: "내 담당" }, { key: "delayed", label: "지연" }, { key: "done", label: "완료" }]} />
+        <SegmentedControl size="sm" value={filter} onChange={setFilter} options={[{ key: "all", label: "진행 전체" }, { key: "mine", label: "내 담당" }, { key: "delayed", label: "지연" }, { key: "done", label: "완료" }, { key: "archived", label: "보관" }]} />
       </div>
 
       {view === "board" ? (

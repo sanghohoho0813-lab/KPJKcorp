@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { type ReactNode, useState } from "react";
-import { AlertTriangle, ArrowRight, Building2, Pencil, ShieldAlert, Trash2, CalendarDays, CheckCircle2, ChevronDown, FileUp, MessageSquare, Clock, FileText, RefreshCw, Sparkles, Upload, UserCheck, Search, Briefcase, Bell, LogIn, Download, RotateCcw, TrendingUp, ShieldCheck, ClipboardList, UserMinus, Repeat, Receipt } from "lucide-react";
+import { AlertTriangle, Archive, ArrowRight, Building2, KeyRound, Pencil, ShieldAlert, Trash2, UserPlus, CalendarDays, CheckCircle2, ChevronDown, FileUp, MessageSquare, Clock, FileText, RefreshCw, Sparkles, Upload, UserCheck, Search, Briefcase, Bell, LogIn, Download, RotateCcw, TrendingUp, ShieldCheck, ClipboardList, UserMinus, Repeat, Receipt } from "lucide-react";
 import type { Activity, DocStatus, InternalStage, Schedule, TaskStatus, Priority, InquiryStatus } from "@/lib/types";
 import { DOC_STATUS, INQUIRY_STATUS, PRIORITY, SCHEDULE_TYPE, TASK_STATUS, stageLabel, stageProgress } from "@/lib/stages";
 import type { BriefItem } from "@/lib/brief";
@@ -161,6 +161,16 @@ export function BriefList({ items, limit, compact }: { items: BriefItem[]; limit
 
 /* ---------- Activity feed (Evidence) ---------- */
 const ACT_ICON: Record<Activity["type"], ReactNode> = {
+  user_created: <UserPlus size={14} />,
+  user_updated: <Pencil size={14} />,
+  user_deactivated: <UserMinus size={14} />,
+  password_reset: <KeyRound size={14} />,
+  doc_request_updated: <Pencil size={14} />,
+  doc_request_canceled: <Trash2 size={14} />,
+  consultation_updated: <Pencil size={14} />,
+  consultation_deleted: <Trash2 size={14} />,
+  company_archived: <Archive size={14} />,
+  project_archived: <Archive size={14} />,
   company_created: <Building2 size={14} />,
   company_updated: <Pencil size={14} />,
   project_updated: <Pencil size={14} />,

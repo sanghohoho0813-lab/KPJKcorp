@@ -23,7 +23,7 @@ export default function PortalInquiriesPage() {
   const [body, setBody] = useState("");
   const [follow, setFollow] = useState("");
   const c = st.companies.find((x) => x.id === companyId);
-  const projects = st.projects.filter((p) => p.companyId === companyId && p.clientVisible);
+  const projects = st.projects.filter((p) => p.companyId === companyId && p.clientVisible && !p.archived);
   const list = st.inquiries.filter((i) => i.companyId === companyId).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const cur = list.find((i) => i.id === sel);
   const isClient = st.session?.role === "client";

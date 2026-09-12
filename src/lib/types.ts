@@ -59,6 +59,9 @@ export interface Company {
   firstConsultDate: string;
   consultantId: string;
   memo: string;
+  /** 보관됨 — 목록에서 빠지되 기록·연결은 그대로 남는다. 하드 삭제는 하지 않는다. */
+  archived?: boolean;
+  archivedAt?: string;
 }
 
 export interface Consultation {
@@ -103,6 +106,8 @@ export interface Project {
   description: string;
   stageChangedAt: string;
   clientVisible: boolean;
+  archived?: boolean;
+  archivedAt?: string;
 }
 
 export interface DocumentFile {
@@ -371,6 +376,16 @@ export type ActivityType =
   | "sign_in_failed"
   | "sign_out"
   | "permission_denied"
+  | "user_created"
+  | "user_updated"
+  | "user_deactivated"
+  | "password_reset"
+  | "doc_request_updated"
+  | "doc_request_canceled"
+  | "consultation_updated"
+  | "consultation_deleted"
+  | "company_archived"
+  | "project_archived"
   | "demo_reset";
 
 export interface Activity {

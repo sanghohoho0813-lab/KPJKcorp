@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Building2, Briefcase, CalendarDays, CheckSquare, Trash2 } from "lucide-react";
+import { Building2, Briefcase, CalendarDays, CheckSquare, FileUp, Trash2 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { can } from "@/lib/permissions";
 import { INTERNAL_STAGES, SCHEDULE_TYPE } from "@/lib/stages";
@@ -431,6 +431,78 @@ function EditTaskInner({ open, taskId, onClose }: { open: boolean; taskId: strin
         title="이 업무를 삭제할까요?"
         desc="삭제 기록은 활동 로그에 남습니다. 완료 처리와 달리 실적 집계에서도 빠집니다."
         confirmText="삭제"
+        danger
+      />
+    </>
+  );
+}
+
+/* ---------------- 자료요청 수정 · 취소 (제출 전) ---------------- */
+
+/** 제출·검토가 시작된 뒤에는 손대지 않는다 — 요청 내용과 받은 자료가 어긋나면 기록이 의미를 잃는다. */
+export const DOC_EDITABLE = ["planned", "requested", "revision"];
+
+export function EditDocRequestModal(props: { open: boolean; requestId: string | null; onClose: () => void }) {
+  if (!props.open || !props.requestId) return null;
+  return <EditDocRequestInner key={props.requestId} {...props} />;
+}
+
+function EditDocRequestInner({ open, requestId, onClose }: { open: boolean; requestId: string | null; onClose: () => void }) {
+  const st = useStore();
+  const update = useStore((s) => s.updateDocRequest);
+  const cancel = useStore((s) => s.cancelDocRequest);
+  const toast = useStore((s) => s.toast);
+  const me = st.session?.userId ?? "u_admin";
+  const req = st.docRequests.find((r) => r.id === requestId);
+  const [name, setName] = useState(req?.name ?? "");
+  const [desc, setDesc] = useState(req?.description ?? "");
+  const [due, setDue] = useState(() => dateInput(req?.dueDate));
+  const [confirmDel, setConfirmDel] = useState(false);
+  if (!req) return null;
+
+  const company = st.companies.find((c) => c.id === req.companyId);
+  const submit = () => {
+    if (!name.trim()) { toast("자료명을 입력해 주세요.", "error"); return; }
+    update(req.id, { name: name.trim(), description: desc.trim(), dueDate: new Date(`${due}T18:00:00`).toISOString() }, me);
+    toast("자료요청을 수정했습니다. 고객에게 변경 안내가 전송되었습니다.");
+    onClose();
+  };
+
+  return (
+    <>
+      <Modal
+        open={open}
+        onClose={onClose}
+        size="sm"
+        title={<span className="flex items-center gap-2"><FileUp size={18} /> 자료요청 수정</span>}
+        footer={
+          <>
+            <Button variant="danger" icon={<Trash2 size={15} />} onClick={() => setConfirmDel(true)}>요청 취소</Button>
+            <span className="flex-1" />
+            <Button variant="ghost" onClick={onClose}>닫기</Button>
+            <Button variant="accent" onClick={submit}>저장</Button>
+          </>
+        }
+      >
+        <div className="mb-3 rounded-xl bg-surface-2 px-4 py-2.5 text-[0.85rem]"><b>{company?.name}</b> · {st.projects.find((p) => p.id === req.projectId)?.name}</div>
+        <div className="space-y-3">
+          <Field label="자료명"><Input value={name} onChange={(e) => setName(e.target.value)} autoFocus /></Field>
+          <Field label="설명 (고객에게 표시)"><Textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={3} /></Field>
+          <Field label="제출기한" hint="기한을 바꾸면 고객에게 변경 알림이 전송됩니다."><Input type="date" value={due} onChange={(e) => setDue(e.target.value)} /></Field>
+        </div>
+      </Modal>
+      <Confirm
+        open={confirmDel}
+        onClose={() => setConfirmDel(false)}
+        onConfirm={() => {
+          cancel(req.id, me);
+          toast("자료요청을 취소하고 고객에게 안내했습니다.");
+          setConfirmDel(false);
+          onClose();
+        }}
+        title="이 자료요청을 취소할까요?"
+        desc="고객 화면에서 사라지고 취소 안내가 전송됩니다. 이 요청으로 자동 생성된 검토 업무도 함께 정리됩니다."
+        confirmText="요청 취소"
         danger
       />
     </>

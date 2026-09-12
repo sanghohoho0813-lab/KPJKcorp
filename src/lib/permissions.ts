@@ -40,7 +40,12 @@ export type Permission =
   | "settings.write"
   | "baseline.write"
   | "sprint.manage"
-  | "portal.preview";
+  | "portal.preview"
+  | "user.manage"
+  | "company.archive"
+  | "project.archive"
+  | "doc.update"
+  | "consultation.update";
 
 const POLICY: Record<Permission, Role[]> = {
   "company.create": ["admin", "consultant"],
@@ -72,6 +77,12 @@ const POLICY: Record<Permission, Role[]> = {
   "baseline.write": ["admin"],
   "sprint.manage": ["admin"],
   "portal.preview": ["admin", "consultant"],
+  // 계정 생성·비활성화·비밀번호 재설정은 대표만. 직원이 계정을 만들 수 있으면 권한 체계가 무의미해진다.
+  "user.manage": ["admin"],
+  "company.archive": ["admin", "consultant"],
+  "project.archive": ["admin", "consultant"],
+  "doc.update": ["admin", "consultant"],
+  "consultation.update": ["admin", "consultant"],
 };
 
 export function can(role: Role | undefined | null, p: Permission): boolean {
@@ -99,6 +110,10 @@ export const PERMISSION_ROWS: { label: string; perms: Permission[] }[] = [
   { label: "문의 답변", perms: ["inquiry.answer"] },
   { label: "실증 기준선 · 스프린트", perms: ["baseline.write", "sprint.manage"] },
   { label: "고객 화면 미리보기", perms: ["portal.preview"] },
+  { label: "기업 · 프로젝트 보관", perms: ["company.archive", "project.archive"] },
+  { label: "자료요청 수정 · 취소", perms: ["doc.update"] },
+  { label: "상담기록 수정 · 삭제", perms: ["consultation.update"] },
+  { label: "사용자 계정 관리", perms: ["user.manage"] },
 ];
 
 export function rowVerdict(role: Role, perms: Permission[]): "all" | "some" | "none" {

@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ClipboardList, FileSignature, Plus, Receipt, ShieldCheck, Sparkles } from "lucide-react";
+import { ClipboardList, FileSignature, Plus, Receipt, ShieldCheck, Sparkles, Pencil } from "lucide-react";
 import { useStore, quoteNet } from "@/lib/store";
 import { useUi } from "@/lib/ui-store";
 import { fmtDate, fmtDateTime, fmtWon } from "@/lib/format";
 import { AiReadyBadge, Badge, Button, Card, PageHeader, Tabs, EmptyState } from "@/components/ui/ui";
 import { NewConsultationModal } from "@/components/domain/ConsultationModal";
+import { useMay } from "@/components/domain/EntityModals";
 import { NewQuoteModal, QuoteDetailModal, QUOTE_STATUS } from "@/components/domain/QuoteModals";
 import type { Quote } from "@/lib/types";
 
@@ -20,6 +21,8 @@ function ConsultationsInner() {
   const consultations = [...st.consultations].sort((a, b) => b.date.localeCompare(a.date));
   const contracts = [...st.contracts].sort((a, b) => (b.sentAt ?? "").localeCompare(a.sentAt ?? ""));
   const [newConsult, setNewConsult] = useState(false);
+  const [editCs, setEditCs] = useState<string | null>(null);
+  const may = useMay();
   const [newQuote, setNewQuote] = useState(false);
   const [openQuote, setOpenQuote] = useState<Quote | null>(null);
   const quotes = [...st.quotes].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -46,7 +49,12 @@ function ConsultationsInner() {
                       <Badge tone="info">{cs.type}</Badge><Badge>{cs.channel}</Badge>
                       <span className="text-[0.85rem] text-ink-2">{fmtDateTime(cs.date)} · {st.users.find((u) => u.id === cs.consultantId)?.name}</span>
                     </div>
-                    <AiReadyBadge label="AI 요약" onClick={() => openAi({ title: "상담 요약 — AI 적용 설명", key: "consult" })} />
+                    <div className="flex items-center gap-1">
+                      <AiReadyBadge label="AI 요약" onClick={() => openAi({ title: "상담 요약 — AI 적용 설명", key: "consult" })} />
+                      {may("consultation.update") && (
+                        <button onClick={() => setEditCs(cs.id)} aria-label="상담기록 수정" className="pressable rounded-lg p-2 text-ink-3 hover:bg-surface-2 hover:text-ink"><Pencil size={15} /></button>
+                      )}
+                    </div>
                   </div>
                   <p className="mt-3 text-[0.9rem] leading-relaxed text-ink-2">{cs.notes}</p>
                   <div className="mt-3 grid gap-3 rounded-xl bg-surface-2 p-4 text-[0.85rem] md:grid-cols-4">
@@ -134,6 +142,7 @@ function ConsultationsInner() {
         )}
       </div>
       <NewConsultationModal open={newConsult} onClose={() => setNewConsult(false)} />
+      <NewConsultationModal open={!!editCs} consultationId={editCs} onClose={() => setEditCs(null)} />
       <NewQuoteModal open={newQuote} onClose={() => setNewQuote(false)} />
       <QuoteDetailModal quote={openQuote} onClose={() => setOpenQuote(null)} />
     </div>
