@@ -31,9 +31,15 @@ export interface User {
   name: string;
   role: Role;
   title: string;
+  /** 로그인 아이디를 겸한다 */
   email: string;
   phone?: string;
   companyId?: string; // client only
+  /** SHA-256(salt::email::password). 서버가 없으므로 보안 경계가 아니다 — src/lib/auth.ts 주석 참고 */
+  passwordHash?: string;
+  /** 비활성 계정은 로그인할 수 없다 */
+  active?: boolean;
+  lastLoginAt?: string;
 }
 
 export interface Company {
@@ -354,6 +360,17 @@ export type ActivityType =
   | "survey_submitted"
   | "ai_action_taken"
   | "evidence_exported"
+  | "company_created"
+  | "company_updated"
+  | "project_updated"
+  | "schedule_updated"
+  | "schedule_deleted"
+  | "task_updated"
+  | "task_deleted"
+  | "sign_in"
+  | "sign_in_failed"
+  | "sign_out"
+  | "permission_denied"
   | "demo_reset";
 
 export interface Activity {
@@ -385,6 +402,8 @@ export interface Session {
   companyId?: string;
   /** internal user previewing the portal for a company */
   portalPreviewCompanyId?: string;
+  /** 로그인 시각 — 세션 만료 판단에 쓴다 */
+  signedInAt?: string;
 }
 
 export type ThemeKey =

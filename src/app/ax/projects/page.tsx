@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useMemo, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Columns3, List } from "lucide-react";
+import { Columns3, List, Plus } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { INTERNAL_STAGES, KANBAN_STAGES, stageLabel } from "@/lib/stages";
 import { daysBetween, fmtDate, relativeDay } from "@/lib/format";
 import type { InternalStage } from "@/lib/types";
-import { Badge, Card, PageHeader, SegmentedControl, cx } from "@/components/ui/ui";
+import { Badge, Button, Card, PageHeader, SegmentedControl, cx } from "@/components/ui/ui";
+import { ProjectModal, useMay } from "@/components/domain/EntityModals";
 import { SearchBox, StageBadge, StageProgressBar } from "@/components/domain/domain";
 
 function ProjectsInner() {
@@ -19,6 +20,8 @@ function ProjectsInner() {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"all" | "mine" | "delayed" | "done">(params.get("filter") === "delayed" ? "delayed" : "all");
   const [stage, setStage] = useState<InternalStage | "all">("all");
+  const [newOpen, setNewOpen] = useState(false);
+  const may = useMay();
   const now = new Date().toISOString();
   const me = st.session?.userId;
 
@@ -43,7 +46,12 @@ function ProjectsInner() {
 
   return (
     <div>
-      <PageHeader title="프로젝트 운영 Board" desc="상담부터 완료까지 컨설팅 단계별 병목을 확인합니다." badge={<Badge>총 {st.projects.length}개</Badge>} actions={<SegmentedControl value={view} onChange={setView} options={[{ key: "board", label: <span className="flex items-center gap-1"><Columns3 size={14} /> Board</span> }, { key: "list", label: <span className="flex items-center gap-1"><List size={14} /> 목록</span> }]} />} />
+      <PageHeader title="프로젝트 운영 Board" desc="상담부터 완료까지 컨설팅 단계별 병목을 확인합니다." badge={<Badge>총 {st.projects.length}개</Badge>} actions={
+        <div className="flex flex-wrap items-center gap-2">
+          <SegmentedControl value={view} onChange={setView} options={[{ key: "board", label: <span className="flex items-center gap-1"><Columns3 size={14} /> Board</span> }, { key: "list", label: <span className="flex items-center gap-1"><List size={14} /> 목록</span> }]} />
+          {may("project.create") && <Button variant="accent" icon={<Plus size={16} />} onClick={() => setNewOpen(true)}>프로젝트 등록</Button>}
+        </div>
+      } />
       <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center">
         <div className="md:w-80"><SearchBox value={q} onChange={setQ} placeholder="프로젝트명, 기업명 검색" /></div>
         <SegmentedControl size="sm" value={filter} onChange={setFilter} options={[{ key: "all", label: "진행 전체" }, { key: "mine", label: "내 담당" }, { key: "delayed", label: "지연" }, { key: "done", label: "완료" }]} />
@@ -156,6 +164,7 @@ function ProjectsInner() {
         </>
       )}
       <div className="mt-4 text-[0.78rem] text-ink-3">내부 단계 {INTERNAL_STAGES.length}개 중 문의·자료접수·사후관리는 인접 컬럼에 합쳐 표시됩니다.</div>
+      <ProjectModal open={newOpen} onClose={() => setNewOpen(false)} onCreated={(id) => router.push(`/ax/projects/${id}`)} />
     </div>
   );
 }

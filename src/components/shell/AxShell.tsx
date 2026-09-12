@@ -39,7 +39,7 @@ import { NextSheet } from "./NextSheet";
 import { AiReadyModal, DraftModal } from "@/components/ai/AiModals";
 import { Toaster } from "@/components/ui/Toaster";
 import { Modal, Sheet, Confirm } from "@/components/ui/overlay";
-import { Avatar, Button, DemoBadge, NextBadge, PageSkeleton, SegmentedControl, cx } from "@/components/ui/ui";
+import { Avatar, Badge, Button, DemoBadge, NextBadge, PageSkeleton, cx } from "@/components/ui/ui";
 
 interface NavItem {
   href: string;
@@ -269,8 +269,6 @@ function CompanyPickerModal({ open, onClose }: { open: boolean; onClose: () => v
 
 function Header() {
   const user = useCurrentUser();
-  const session = useStore((s) => s.session);
-  const login = useStore((s) => s.login);
   const logout = useStore((s) => s.logout);
   const openTutorial = useUi((s) => s.openTutorial);
   const router = useRouter();
@@ -291,17 +289,8 @@ function Header() {
       </div>
       <div className="flex-1" />
       <div className="hidden items-center gap-1 lg:flex">
-        {!inFrame && (
-          <SegmentedControl
-            size="sm"
-            value={session?.role === "admin" ? "admin" : "consultant"}
-            onChange={(k) => login(k === "admin" ? "u_admin" : "u_park")}
-            options={[
-              { key: "admin", label: "대표" },
-              { key: "consultant", label: "직원" },
-            ]}
-          />
-        )}
+        {/* 대표/직원 전환 버튼을 제거했다 — 버튼 하나로 권한이 바뀌면 권한 체계가 성립하지 않는다.
+            역할은 로그인한 계정으로만 정해진다. */}
         <button id="tut-surface" onClick={() => setPick(true)} className={cx(btn, "hdr-optional")} title="고객 화면 보기">
           <Eye size={18} /> <span className={lbl}>고객 화면 보기</span>
         </button>
@@ -368,7 +357,6 @@ function MoreSheet() {
   const openTutorial = useUi((s) => s.openTutorial);
   const user = useCurrentUser();
   const session = useStore((s) => s.session);
-  const login = useStore((s) => s.login);
   const logout = useStore((s) => s.logout);
   const resetDemo = useStore((s) => s.resetDemo);
   const toast = useStore((s) => s.toast);
@@ -386,7 +374,7 @@ function MoreSheet() {
             <div className="font-bold">{user?.name} {user?.title}</div>
             <div className="text-[0.75rem] text-ink-3">{session?.role === "admin" ? "대표 화면" : "직원 화면"}</div>
           </div>
-          <SegmentedControl size="sm" value={session?.role === "admin" ? "admin" : "consultant"} onChange={(k) => login(k === "admin" ? "u_admin" : "u_park")} options={[{ key: "admin", label: "대표" }, { key: "consultant", label: "직원" }]} />
+          <Badge tone={session?.role === "admin" ? "accent" : "neutral"}>{session?.role === "admin" ? "대표" : "컨설턴트"}</Badge>
         </div>
         <div className="mb-4 rounded-xl border border-line p-3">
           <div className="mb-2 text-[0.82rem] font-semibold text-ink-2">글자 크기</div>

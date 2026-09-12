@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Building2, ChevronRight, LayoutGrid, List } from "lucide-react";
+import { Building2, ChevronRight, LayoutGrid, List, Plus } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { daysBetween, fmtDate, fmtRelative } from "@/lib/format";
 import { stageLabel } from "@/lib/stages";
-import { PageHeader, Badge, SegmentedControl, EmptyState, Card } from "@/components/ui/ui";
+import { PageHeader, Badge, Button, SegmentedControl, EmptyState, Card } from "@/components/ui/ui";
+import { CompanyModal, useMay } from "@/components/domain/EntityModals";
 import { SearchBox, StageBadge, StageProgressBar } from "@/components/domain/domain";
 
 export default function ClientsPage() {
@@ -16,6 +17,8 @@ export default function ClientsPage() {
   const [q, setQ] = useState("");
   const [view, setView] = useState<"card" | "table">("card");
   const [filter, setFilter] = useState<"all" | "mine" | "issue">("all");
+  const [newOpen, setNewOpen] = useState(false);
+  const may = useMay();
   const now = new Date().toISOString();
   const me = st.session?.userId;
 
@@ -38,7 +41,12 @@ export default function ClientsPage() {
 
   return (
     <div>
-      <PageHeader title="기업고객" desc="기업고객 단위로 상담·계약·프로젝트·자료·일정·문의를 연결합니다." badge={<Badge>{st.companies.length}개 기업</Badge>} actions={<SegmentedControl value={view} onChange={setView} options={[{ key: "card", label: <span className="flex items-center gap-1"><LayoutGrid size={14} /> 카드</span> }, { key: "table", label: <span className="flex items-center gap-1"><List size={14} /> 목록</span> }]} />} />
+      <PageHeader title="기업고객" desc="기업고객 단위로 상담·계약·프로젝트·자료·일정·문의를 연결합니다." badge={<Badge>{st.companies.length}개 기업</Badge>} actions={
+        <div className="flex flex-wrap items-center gap-2">
+          <SegmentedControl value={view} onChange={setView} options={[{ key: "card", label: <span className="flex items-center gap-1"><LayoutGrid size={14} /> 카드</span> }, { key: "table", label: <span className="flex items-center gap-1"><List size={14} /> 목록</span> }]} />
+          {may("company.create") && <Button variant="accent" icon={<Plus size={16} />} onClick={() => setNewOpen(true)}>기업고객 등록</Button>}
+        </div>
+      } />
       <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center">
         <div className="md:w-80"><SearchBox value={q} onChange={setQ} placeholder="기업명, 대표, 업종, 담당자 검색" /></div>
         <SegmentedControl size="sm" value={filter} onChange={setFilter} options={[{ key: "all", label: "전체" }, { key: "mine", label: "내 담당" }, { key: "issue", label: "확인 필요" }]} />
@@ -121,6 +129,7 @@ export default function ClientsPage() {
         </Card>
         </>
       )}
+      <CompanyModal open={newOpen} onClose={() => setNewOpen(false)} onCreated={(id) => router.push(`/ax/clients/${id}`)} />
     </div>
   );
 }

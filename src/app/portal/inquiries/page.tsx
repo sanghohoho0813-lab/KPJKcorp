@@ -26,17 +26,20 @@ export default function PortalInquiriesPage() {
   const projects = st.projects.filter((p) => p.companyId === companyId && p.clientVisible);
   const list = st.inquiries.filter((i) => i.companyId === companyId).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const cur = list.find((i) => i.id === sel);
-  const byUser = st.session?.role === "client" ? st.session.userId : st.users.find((u) => u.companyId === companyId)?.id ?? "c_a";
+  const isClient = st.session?.role === "client";
+  const byUser = isClient ? st.session!.userId : "";
   const consultant = st.users.find((u) => u.id === c?.consultantId);
 
   const submit = () => {
     if (!title.trim() || !body.trim()) { toast("제목과 내용을 입력해 주세요.", "error"); return; }
+    if (!isClient) { st.toast("읽기 전용 미리보기입니다. 문의 작성은 고객 계정으로만 가능합니다.", "error"); return; }
     create({ companyId: companyId!, projectId: projectId || projects[0]?.id, title: title.trim(), category, body: body.trim() }, byUser);
     toast("문의가 접수되었습니다. 담당 컨설턴트가 확인 후 답변드립니다.");
     setTitle(""); setBody(""); setOpen(false);
   };
   const sendFollow = () => {
     if (!cur || !follow.trim()) return;
+    if (!isClient) { st.toast("읽기 전용 미리보기입니다. 추가 문의는 고객 계정으로만 가능합니다.", "error"); return; }
     reply(cur.id, follow.trim(), byUser, "client");
     toast("추가 문의가 전달되었습니다.");
     setFollow("");

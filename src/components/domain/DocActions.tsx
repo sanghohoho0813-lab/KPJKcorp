@@ -103,8 +103,15 @@ export function UploadModal({ req, open, onClose }: { req: DocumentRequest | nul
       toast("제출할 파일을 선택해 주세요.", "error");
       return;
     }
-    const byUser = session?.role === "client" ? session.userId : "c_a";
-    upload(req.id, { fileName: file.name, size: file.size }, byUser);
+    // 막는 주체는 화면이 아니라 store다. 여기서는 결과를 보고 안내만 한다 —
+    // 미리보기 중인 내부 계정이 대신 올리면 "고객이 직접 제출했다"는 기록이 거짓이 된다.
+    const before = useStore.getState().docRequests.find((r) => r.id === req.id)?.files.length ?? 0;
+    upload(req.id, { fileName: file.name, size: file.size }, session?.userId ?? "");
+    const after = useStore.getState().docRequests.find((r) => r.id === req.id)?.files.length ?? 0;
+    if (after === before) {
+      toast("읽기 전용 미리보기입니다. 자료 제출은 고객 계정으로만 가능합니다.", "error");
+      return;
+    }
     toast("자료가 제출되었습니다. 담당 컨설턴트에게 바로 전달되었습니다.");
     setFile(null);
     onClose();

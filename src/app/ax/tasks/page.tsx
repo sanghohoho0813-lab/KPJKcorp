@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { CheckSquare, Plus } from "lucide-react";
+import { CheckSquare, Pencil, Plus } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { daysBetween, fmtDate, isSameDay } from "@/lib/format";
 import type { Task, TaskStatus } from "@/lib/types";
 import { Badge, Button, Card, EmptyState, KpiCard, PageHeader, SegmentedControl, Tabs, cx } from "@/components/ui/ui";
 import { DueText, PriorityBadge, TaskStatusBadge } from "@/components/domain/domain";
 import { NewTaskModal } from "@/components/domain/CreateModals";
+import { EditTaskModal, useMay } from "@/components/domain/EntityModals";
 import { InquiryConsole } from "@/components/domain/InquiryConsole";
 
 type Filter = "today" | "open" | "overdue" | "done" | "all";
@@ -22,6 +23,8 @@ function TasksInner() {
   const [tab, setTab] = useState<"task" | "inquiry">(params.get("tab") === "inquiry" ? "inquiry" : "task");
   const [filter, setFilter] = useState<Filter>("today");
   const [open, setOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const may = useMay();
   const now = new Date();
   const nowIso = now.toISOString();
   const me = st.session?.role === "consultant" ? st.session.userId : undefined;
@@ -96,6 +99,11 @@ function TasksInner() {
                     <TaskStatusBadge status={t.status} />
                     {!isDone && t.status !== "doing" && <Button size="sm" variant="ghost" onClick={() => setStatus(t, "doing")}>시작</Button>}
                     {!isDone && t.status !== "hold" && <Button size="sm" variant="ghost" onClick={() => setStatus(t, "hold")}>보류</Button>}
+                    {may("task.update") && (
+                      <button onClick={() => setEditId(t.id)} aria-label={`${t.title} 수정`} className="pressable rounded-lg p-2 text-ink-3 hover:bg-surface-2 hover:text-ink">
+                        <Pencil size={15} />
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -104,6 +112,7 @@ function TasksInner() {
         )}
       </Card>
       </>}
+      <EditTaskModal open={!!editId} taskId={editId} onClose={() => setEditId(null)} />
       <NewTaskModal open={open} onClose={() => setOpen(false)} />
     </div>
   );

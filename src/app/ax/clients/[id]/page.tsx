@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Building2, CalendarDays, ChevronRight, Eye, FileCheck2, FileText, FolderOpen, Mail, MapPin, MessageSquare, MessageSquareText, Phone, Plus, Sparkles, UserRound } from "lucide-react";
+import { ArrowLeft, Building2, CalendarDays, ChevronRight, Eye, FileCheck2, FileText, FolderOpen, Mail, MapPin, MessageSquare, MessageSquareText, Phone, Plus, Sparkles, UserRound, Pencil } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useUi } from "@/lib/ui-store";
 import { daysBetween, fmtDate, fmtDateTime, fmtSize, relativeDay, fmtRelative, fmtTime } from "@/lib/format";
@@ -14,6 +14,7 @@ import { Badge, Button, Card, EmptyState, IconTile, KpiCard, SectionTitle, Stat,
 import { ActivityFeed, DocStatusBadge, InquiryStatusBadge, ScheduleItem, StageBadge, StageProgressBar, DueText } from "@/components/domain/domain";
 import { ReviewDocModal } from "@/components/domain/DocActions";
 import { NewDocRequestModal, NewScheduleModal } from "@/components/domain/CreateModals";
+import { CompanyModal, ProjectModal, useMay } from "@/components/domain/EntityModals";
 import { NewConsultationModal } from "@/components/domain/ConsultationModal";
 
 type TabKey = "overview" | "consult" | "contract" | "project" | "docs" | "schedule" | "inquiry" | "results" | "history";
@@ -28,6 +29,9 @@ export default function ClientCardPage() {
   const [tab, setTab] = useState<TabKey>("overview");
   const [reviewReq, setReviewReq] = useState<DocumentRequest | null>(null);
   const [newDoc, setNewDoc] = useState<string | null>(null);
+  const [editCompany, setEditCompany] = useState(false);
+  const [newProject, setNewProject] = useState(false);
+  const may = useMay();
   const [newConsult, setNewConsult] = useState(false);
   const [newSchedule, setNewSchedule] = useState(false);
 
@@ -110,6 +114,8 @@ export default function ClientCardPage() {
           <div className="flex flex-wrap gap-2 lg:flex-col lg:items-end">
             <div className="flex items-center gap-2 rounded-xl bg-surface-2 px-3 py-2 text-[0.85rem]"><span className="text-ink-3">담당 컨설턴트</span><b>{consultant?.name} {consultant?.title}</b></div>
             <div className="flex flex-wrap gap-2">
+              {may("company.update") && <Button size="sm" variant="outline" icon={<Pencil size={15} />} onClick={() => setEditCompany(true)}>기업정보 수정</Button>}
+              {may("project.create") && <Button size="sm" variant="outline" icon={<Plus size={15} />} onClick={() => setNewProject(true)}>프로젝트 등록</Button>}
               <Button size="sm" variant="outline" icon={<Eye size={15} />} onClick={() => { setPreview(c.id); router.push("/portal"); }}>고객 화면 보기</Button>
               <Button size="sm" variant="outline" icon={<MessageSquareText size={15} />} onClick={() => openDraft({ kind: "progress_update", ctx: { companyName: c.name, contactName: c.contactName, consultantName: consultant?.name, stage: active[0] ? stageLabel(active[0].stage) : "-", note: upcoming[0]?.title } })}>진행 안내 초안</Button>
             </div>
@@ -364,6 +370,8 @@ export default function ClientCardPage() {
       )}
 
       <ReviewDocModal req={reviewReq} open={!!reviewReq} onClose={() => setReviewReq(null)} />
+      <CompanyModal open={editCompany} companyId={c.id} onClose={() => setEditCompany(false)} />
+      <ProjectModal open={newProject} companyId={c.id} onClose={() => setNewProject(false)} onCreated={(id) => router.push(`/ax/projects/${id}`)} />
       <NewDocRequestModal projectId={newDoc} open={!!newDoc} onClose={() => setNewDoc(null)} />
       <NewConsultationModal open={newConsult} onClose={() => setNewConsult(false)} companyId={c.id} />
       <NewScheduleModal open={newSchedule} onClose={() => setNewSchedule(false)} companyId={c.id} projectId={active[0]?.id} />

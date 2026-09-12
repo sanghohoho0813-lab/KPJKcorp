@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { type ReactNode, useState } from "react";
-import { AlertTriangle, ArrowRight, CalendarDays, CheckCircle2, ChevronDown, FileUp, MessageSquare, Clock, FileText, RefreshCw, Sparkles, Upload, UserCheck, Search, Briefcase, Bell, LogIn, Download, RotateCcw, TrendingUp, ShieldCheck, ClipboardList, UserMinus, Repeat, Receipt } from "lucide-react";
+import { AlertTriangle, ArrowRight, Building2, Pencil, ShieldAlert, Trash2, CalendarDays, CheckCircle2, ChevronDown, FileUp, MessageSquare, Clock, FileText, RefreshCw, Sparkles, Upload, UserCheck, Search, Briefcase, Bell, LogIn, Download, RotateCcw, TrendingUp, ShieldCheck, ClipboardList, UserMinus, Repeat, Receipt } from "lucide-react";
 import type { Activity, DocStatus, InternalStage, Schedule, TaskStatus, Priority, InquiryStatus } from "@/lib/types";
 import { DOC_STATUS, INQUIRY_STATUS, PRIORITY, SCHEDULE_TYPE, TASK_STATUS, stageLabel, stageProgress } from "@/lib/stages";
 import type { BriefItem } from "@/lib/brief";
@@ -161,6 +161,17 @@ export function BriefList({ items, limit, compact }: { items: BriefItem[]; limit
 
 /* ---------- Activity feed (Evidence) ---------- */
 const ACT_ICON: Record<Activity["type"], ReactNode> = {
+  company_created: <Building2 size={14} />,
+  company_updated: <Pencil size={14} />,
+  project_updated: <Pencil size={14} />,
+  schedule_updated: <Pencil size={14} />,
+  schedule_deleted: <Trash2 size={14} />,
+  task_updated: <Pencil size={14} />,
+  task_deleted: <Trash2 size={14} />,
+  sign_in: <LogIn size={14} />,
+  sign_in_failed: <ShieldAlert size={14} />,
+  sign_out: <LogIn size={14} />,
+  permission_denied: <ShieldAlert size={14} />,
   consultation_logged: <MessageSquare size={14} />,
   contract_sent: <FileText size={14} />,
   contract_signed: <UserCheck size={14} />,
@@ -219,11 +230,11 @@ export function ActivityFeed({ items, limit, showCompany }: { items: Activity[];
 }
 
 /* ---------- Schedule item ---------- */
-export function ScheduleItem({ s, showCompany, client }: { s: Schedule; showCompany?: boolean; client?: boolean }) {
+export function ScheduleItem({ s, showCompany, client, onEdit }: { s: Schedule; showCompany?: boolean; client?: boolean; onEdit?: (id: string) => void }) {
   const companies = useStore((s) => s.companies);
   const t = SCHEDULE_TYPE[s.type];
   return (
-    <div className="flex items-start gap-3 py-2.5">
+    <div className="group flex items-start gap-3 py-2.5">
       <div className="tnum w-14 shrink-0 text-center">
         <div className="text-[0.7rem] font-semibold text-ink-3">{relativeDay(s.start)}</div>
         <div className="text-[0.95rem] font-bold">{fmtTime(s.start)}</div>
@@ -240,6 +251,11 @@ export function ScheduleItem({ s, showCompany, client }: { s: Schedule; showComp
         </div>
       </div>
       <span className="hidden text-[0.78rem] text-ink-3 sm:block">{fmtDateTime(s.start)}</span>
+      {onEdit && (
+        <button onClick={() => onEdit(s.id)} aria-label={`${s.title} 수정`} className="pressable shrink-0 rounded-lg p-2 text-ink-3 hover:bg-surface-2 hover:text-ink">
+          <Pencil size={15} />
+        </button>
+      )}
     </div>
   );
 }

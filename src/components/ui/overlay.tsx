@@ -14,12 +14,14 @@ import { cx } from "./ui";
 function useFocusReturn(open: boolean) {
   const prev = useRef<HTMLElement | null>(null);
   useEffect(() => {
-    if (open) {
-      prev.current = document.activeElement as HTMLElement | null;
-    } else if (prev.current) {
-      prev.current.focus?.();
+    if (!open) return;
+    prev.current = document.activeElement as HTMLElement | null;
+    // cleanup에서 돌려준다 — open이 false로 바뀔 때뿐 아니라 오버레이가 통째로
+    // 언마운트될 때도 포커스가 원래 자리로 간다.
+    return () => {
+      prev.current?.focus?.();
       prev.current = null;
-    }
+    };
   }, [open]);
 }
 

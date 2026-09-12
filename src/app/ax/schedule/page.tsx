@@ -8,6 +8,7 @@ import { isSameDay, fmtTime } from "@/lib/format";
 import { Badge, Button, Card, PageHeader, SegmentedControl, cx, EmptyState } from "@/components/ui/ui";
 import { ScheduleItem } from "@/components/domain/domain";
 import { NewScheduleModal } from "@/components/domain/CreateModals";
+import { EditScheduleModal, useMay } from "@/components/domain/EntityModals";
 
 export default function SchedulePage() {
   const st = useStore();
@@ -15,6 +16,8 @@ export default function SchedulePage() {
   const [cursor, setCursor] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
   const [selected, setSelected] = useState<Date>(new Date());
   const [open, setOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const may = useMay();
   const me = st.session?.role === "consultant" ? st.session.userId : undefined;
   const now = new Date();
   const all = st.schedules.filter((s) => !me || s.assigneeId === me).sort((a, b) => a.start.localeCompare(b.start));
@@ -58,7 +61,7 @@ export default function SchedulePage() {
             return (
               <Card key={day} className="p-5">
                 <div className="mb-1 flex items-center gap-2"><span className={cx("text-[1rem] font-bold", today && "text-accent")}>{d.getMonth() + 1}월 {d.getDate()}일 ({["일", "월", "화", "수", "목", "금", "토"][d.getDay()]})</span>{today && <Badge tone="accent">오늘</Badge>}<span className="text-[0.8rem] text-ink-3">{items.length}건</span></div>
-                <div className="divide-y divide-line">{items.map((s) => <ScheduleItem key={s.id} s={s} showCompany />)}</div>
+                <div className="divide-y divide-line">{items.map((s) => <ScheduleItem key={s.id} s={s} showCompany onEdit={may("schedule.update") ? setEditId : undefined} />)}</div>
               </Card>
             );
           })}
@@ -90,10 +93,11 @@ export default function SchedulePage() {
           </Card>
           <Card className="p-5">
             <div className="mb-2 text-[1rem] font-bold">{selected.getMonth() + 1}월 {selected.getDate()}일 일정</div>
-            {daySchedules.length === 0 ? <div className="py-6 text-center text-[0.9rem] text-ink-3">일정이 없습니다.</div> : <div className="divide-y divide-line">{daySchedules.map((s) => <ScheduleItem key={s.id} s={s} showCompany />)}</div>}
+            {daySchedules.length === 0 ? <div className="py-6 text-center text-[0.9rem] text-ink-3">일정이 없습니다.</div> : <div className="divide-y divide-line">{daySchedules.map((s) => <ScheduleItem key={s.id} s={s} showCompany onEdit={may("schedule.update") ? setEditId : undefined} />)}</div>}
           </Card>
         </div>
       )}
+      <EditScheduleModal open={!!editId} scheduleId={editId} onClose={() => setEditId(null)} />
       <NewScheduleModal open={open} onClose={() => setOpen(false)} />
     </div>
   );

@@ -43,10 +43,12 @@ export default function PortalServicesPage() {
   const consultant = st.users.find((u) => u.id === c.consultantId);
   // 관리자 미리보기에서도 "고객이 한 행동"으로 기록되어야 Loop가 실제와 같아진다.
   const contactUser = st.users.find((u) => u.role === "client" && u.companyId === c.id);
-  const actorId = st.session?.role === "client" ? (user?.id ?? contactUser?.id ?? "") : (contactUser?.id ?? "");
+  const isClient = st.session?.role === "client";
+  const actorId = isClient ? (user?.id ?? contactUser?.id ?? "") : "";
 
   const submit = () => {
     if (!ask) return;
+    if (!isClient) { toast("읽기 전용 미리보기입니다. 관심 표시는 고객 계정으로만 가능합니다.", "error"); return; }
     raise(
       { companyId: c.id, serviceKey: ask.svc.key, note: note.trim() || undefined, reason: ask.reason, source: ask.kind === "request" ? "portal_request" : "portal_interest" },
       actorId,
@@ -190,6 +192,7 @@ export default function PortalServicesPage() {
               variant={reply?.decision === "accepted" ? "accent" : "primary"}
               onClick={() => {
                 if (!reply) return;
+                if (!isClient) { toast("읽기 전용 미리보기입니다. 제안 회신은 고객 계정으로만 가능합니다.", "error"); return; }
                 respond(reply.q.id, reply.decision, actorId, replyNote.trim() || undefined);
                 toast(reply.decision === "accepted" ? "회신이 전달되었습니다. 담당 컨설턴트가 계약 절차를 안내드립니다." : "회신이 전달되었습니다. 담당 컨설턴트가 연락드립니다.");
                 setReply(null);

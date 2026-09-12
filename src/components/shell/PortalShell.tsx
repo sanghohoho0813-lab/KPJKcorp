@@ -3,7 +3,7 @@
 import { type ReactNode, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, Briefcase, CalendarDays, FileCheck2, FolderUp, HelpCircle, Home, LayoutDashboard, LogOut, MessageSquare, Sparkles, UserRound, ChevronRight } from "lucide-react";
+import { Bell, Briefcase, CalendarDays, Eye, FileCheck2, FolderUp, HelpCircle, Home, LayoutDashboard, LogOut, MessageSquare, Sparkles, UserRound, ChevronRight } from "lucide-react";
 import { useStore, useCurrentUser, usePortalCompanyId } from "@/lib/store";
 import { useUi } from "@/lib/ui-store";
 import { useIsMobile, useIsPreviewFrame } from "@/lib/hooks";
@@ -106,6 +106,12 @@ export function PortalShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-canvas">
       {isInternal && company && <PreviewBar companyName={company.name} />}
+      {isInternal && (
+        <div className="flex items-center gap-2 border-b border-warning/30 bg-warning-bg px-4 py-2 text-[0.8rem] font-semibold text-warning md:px-6">
+          <Eye size={14} className="shrink-0" />
+          <span>읽기 전용 미리보기입니다. 자료 제출·문의·회신은 고객 계정으로만 할 수 있습니다.</span>
+        </div>
+      )}
       <header className="sticky top-0 z-30 border-b border-line bg-surface/90 backdrop-blur">
         {/* 글자 크기를 키우면 이 줄의 모든 요소가 같이 넓어진다. 줄일 수 있는 것(로고 문구·메뉴)은
             줄어들게 하고, 줄이면 안 되는 것(알림·계정)에만 shrink-0을 준다. */}

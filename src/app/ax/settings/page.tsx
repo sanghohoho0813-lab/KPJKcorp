@@ -4,33 +4,19 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Database, HelpCircle, Palette, RotateCcw, ShieldCheck, Sparkles, Award, Play } from "lucide-react";
 import { FontScalePicker } from "@/components/shell/FontScale";
-import { useStore } from "@/lib/store";
+import { useStore, useCurrentUser } from "@/lib/store";
 import { useUi, NEXT_FEATURES } from "@/lib/ui-store";
 import { THEMES } from "@/lib/themes";
+import { can, PERMISSION_ROWS, rowVerdict } from "@/lib/permissions";
 import { fmtDateTime } from "@/lib/format";
 import { Badge, Button, Card, DemoBadge, NextBadge, PageHeader, SectionTitle, SegmentedControl, cx, AiReadyBadge } from "@/components/ui/ui";
 import { Confirm } from "@/components/ui/overlay";
 
-const PERMS: { feature: string; admin: string; consultant: string; client: string }[] = [
-  { feature: "전체 기업고객 · 프로젝트", admin: "✓", consultant: "△ 담당 중심", client: "×" },
-  { feature: "상담 · 계약 기록", admin: "✓", consultant: "✓", client: "× (계약 상태만)" },
-  { feature: "자료 요청 · 검토", admin: "✓", consultant: "✓", client: "△ 본인 회사 제출/확인" },
-  { feature: "일정", admin: "✓", consultant: "✓", client: "△ 고객 공개 일정만" },
-  { feature: "업무 · 후속관리", admin: "✓", consultant: "△ 담당 업무", client: "×" },
-  { feature: "문의 답변", admin: "✓", consultant: "✓", client: "△ 본인 문의 작성/확인" },
-  { feature: "결과자료 공유", admin: "✓", consultant: "✓", client: "△ 본인 회사 열람" },
-  { feature: "매출기회 등록 · 단계 이동", admin: "✓", consultant: "✓ 담당 고객", client: "△ 관심 표시 · 상담 요청" },
-  { feature: "대표 승인 (할인 · 제안 · 약속)", admin: "✓ 승인 / 반려", consultant: "△ 요청만 가능", client: "×" },
-  { feature: "AI 브리핑 · 리포트", admin: "✓ 전체", consultant: "△ 담당 기준", client: "×" },
-  { feature: "설정 · 테마", admin: "✓", consultant: "✓", client: "× (내 정보만)" },
-  { feature: "타 기업 데이터", admin: "✓", consultant: "✓", client: "× 절대 불가" },
-];
-
 export default function SettingsPage() {
   const settings = useStore((s) => s.settings);
+  const me = useCurrentUser();
   const setSettings = useStore((s) => s.setSettings);
   const session = useStore((s) => s.session);
-  const login = useStore((s) => s.login);
   const resetDemo = useStore((s) => s.resetDemo);
   const toast = useStore((s) => s.toast);
   const seededAt = useStore((s) => s.seededAt);
@@ -70,20 +56,36 @@ export default function SettingsPage() {
 
         <Card className="p-5">
           <SectionTitle><span className="flex items-center gap-2"><ShieldCheck size={18} className="text-ink-3" /> 사용자 / 권한</span></SectionTitle>
-          <div className="mb-3 flex flex-wrap items-center gap-3">
-            <span className="text-[0.85rem] font-semibold text-ink-2">Role 미리보기</span>
-            <SegmentedControl value={session?.role === "consultant" ? "consultant" : "admin"} onChange={(k) => { login(k === "admin" ? "u_admin" : "u_park"); toast(k === "admin" ? "대표 화면으로 전환" : "직원(박성훈 이사) 화면으로 전환"); }} options={[{ key: "admin", label: "대표" }, { key: "consultant", label: "직원" }]} />
-            <Button size="sm" variant="outline" onClick={() => router.push("/portal")}>고객 화면 보기</Button>
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl bg-surface-2 px-4 py-3 text-[0.85rem]">
+            <span className="text-ink-2">현재 로그인</span>
+            <b>{me?.name} {me?.title}</b>
+            <Badge tone={session?.role === "admin" ? "accent" : "neutral"}>{session?.role === "admin" ? "대표 · 관리자" : "컨설턴트"}</Badge>
+            <span className="ml-auto text-[0.78rem] text-ink-3">역할은 계정으로만 정해집니다</span>
           </div>
+          {can(session?.role, "portal.preview") && (
+            <div className="mb-3"><Button size="sm" variant="outline" onClick={() => router.push("/portal")}>고객 화면 보기 (읽기 전용)</Button></div>
+          )}
           <div className="mb-2 text-[0.85rem] font-semibold text-ink-2">Permission Matrix</div>
+          <p className="mb-2 text-[0.78rem] leading-relaxed text-ink-3">
+            이 표는 설명이 아니라 <b className="text-ink-2">실제 규칙</b>입니다. <code className="rounded bg-surface-2 px-1">src/lib/permissions.ts</code>의 정책에서 직접 그려지며,
+            같은 정책을 저장 로직이 검사합니다. 화면에서 버튼이 숨겨질 뿐 아니라, 권한 없는 계정이 해당 동작을 호출하면 거절되고 그 사실이 기록으로 남습니다.
+          </p>
           <div className="mb-2 md:hidden"><SegmentedControl size="sm" value={permTab} onChange={setPermTab} options={[{ key: "admin", label: "대표" }, { key: "consultant", label: "직원" }, { key: "client", label: "고객" }]} /></div>
           <div className="overflow-x-auto rounded-xl border border-line">
             <table className="tbl tbl-compact">
               <thead><tr><th className="w-[34%]">기능</th><th className={cx("md:table-cell", permTab !== "admin" && "hidden")}>대표/관리자</th><th className={cx("md:table-cell", permTab !== "consultant" && "hidden")}>컨설턴트</th><th className={cx("md:table-cell", permTab !== "client" && "hidden")}>기업고객</th></tr></thead>
-              <tbody>{PERMS.map((p) => <tr key={p.feature}><td className="font-semibold">{p.feature}</td><td className={cx("md:table-cell", permTab !== "admin" && "hidden")}>{p.admin}</td><td className={cx("md:table-cell", permTab !== "consultant" && "hidden")}>{p.consultant}</td><td className={cx("md:table-cell", permTab !== "client" && "hidden", p.client.startsWith("×") && "text-error")}>{p.client}</td></tr>)}</tbody>
+              <tbody>
+                {PERMISSION_ROWS.map((row) => {
+                  const cell = (r: "admin" | "consultant" | "client") => {
+                    const v = rowVerdict(r, row.perms);
+                    return <td className={cx("md:table-cell", permTab !== r && "hidden", v === "none" && "text-ink-3")}>{v === "all" ? "✓" : v === "some" ? "△ 일부" : "×"}</td>;
+                  };
+                  return <tr key={row.label}><td className="font-semibold">{row.label}</td>{cell("admin")}{cell("consultant")}{cell("client")}</tr>;
+                })}
+              </tbody>
             </table>
           </div>
-          <div className="mt-3 text-[0.78rem] text-ink-3">실제 운영 시 Supabase Auth + RLS(사용자별로 볼 수 있는 데이터를 나누는 보안기능)로 전환합니다. 고객은 타 기업 데이터에 절대 접근할 수 없습니다.</div>
+          <div className="mt-3 text-[0.78rem] text-ink-3">한계 — 이 검사는 브라우저 안에서 이루어집니다. 개발자도구로 우회하는 것은 막지 못하므로 현재는 업무 규칙이지 보안 경계가 아닙니다. 서버 DB·세션(Supabase Auth + RLS)을 연결할 때 같은 정책을 서버에서 한 번 더 검사하도록 옮깁니다.</div>
         </Card>
 
         <Card className="p-5">

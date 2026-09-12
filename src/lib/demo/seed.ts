@@ -45,17 +45,19 @@ export interface SeedData {
 export function buildSeed(now = new Date()): SeedData {
   const d = (days: number, hour?: number, minute = 0) => iso(addDays(now, days, hour, minute));
 
+  // 데모 비밀번호 — 내부 kpjk2026! / 고객 client2026! (해시는 auth.ts의 salt 기준)
+  // 운영 전환 시 이 시드는 통째로 제거되고 실제 계정으로 대체된다.
   const users: User[] = [
-    { id: "u_admin", name: "김영돈", role: "admin", title: "대표이사", email: "ceo@kpjk.co.kr", phone: "010-0000-0001" },
-    { id: "u_park", name: "박성훈", role: "consultant", title: "이사", email: "park@kpjk.co.kr", phone: "010-0000-0002" },
-    { id: "u_lee", name: "이주연", role: "consultant", title: "수석 컨설턴트", email: "lee@kpjk.co.kr", phone: "010-0000-0003" },
-    { id: "u_jung", name: "정민재", role: "consultant", title: "컨설턴트", email: "jung@kpjk.co.kr", phone: "010-0000-0004" },
-    { id: "c_a", name: "김민석", role: "client", title: "대표이사", email: "ceo@a-precision.demo", companyId: "co_a" },
-    { id: "c_b", name: "최수진", role: "client", title: "경영지원팀장", email: "choi@bntech.demo", companyId: "co_b" },
-    { id: "c_c", name: "한도윤", role: "client", title: "대표이사", email: "han@cmfood.demo", companyId: "co_c" },
-    { id: "c_d", name: "오세훈", role: "client", title: "관리이사", email: "oh@d1const.demo", companyId: "co_d" },
-    { id: "c_e", name: "서지혜", role: "client", title: "대표이사", email: "seo@eplusbio.demo", companyId: "co_e" },
-    { id: "c_f", name: "윤태호", role: "client", title: "대표이사", email: "yoon@flogis.demo", companyId: "co_f" },
+    { id: "u_admin", name: "김영돈", role: "admin", title: "대표이사", email: "ceo@kpjk.co.kr", phone: "010-0000-0001" , passwordHash: "5c43dd980fab03054d3d1ff85be0c5ab7764e1edb89d9e6899bd7a5fdbd68f95", active: true },
+    { id: "u_park", name: "박성훈", role: "consultant", title: "이사", email: "park@kpjk.co.kr", phone: "010-0000-0002" , passwordHash: "83a1abfc84a8496f17ab5573591903563b4dd6bf01012dbf0b10f7a3cd767a75", active: true },
+    { id: "u_lee", name: "이주연", role: "consultant", title: "수석 컨설턴트", email: "lee@kpjk.co.kr", phone: "010-0000-0003" , passwordHash: "780b602c8eff17d0fd1dfabc3a6c1ef72be20600fac61bd4fdda311301274b59", active: true },
+    { id: "u_jung", name: "정민재", role: "consultant", title: "컨설턴트", email: "jung@kpjk.co.kr", phone: "010-0000-0004" , passwordHash: "f6600e07506173e38415a202293da29148d0670c096b18586e0a302229b30b6d", active: true },
+    { id: "c_a", name: "김민석", role: "client", title: "대표이사", email: "ceo@a-precision.demo", companyId: "co_a" , passwordHash: "1a5e3d3ab33a7695598ba364c68301e2f305cc4583c2043cc4c434d489c2bb72", active: true },
+    { id: "c_b", name: "최수진", role: "client", title: "경영지원팀장", email: "choi@bntech.demo", companyId: "co_b" , passwordHash: "8db443b0b697bc3ef929656a1404791a6af7fac66b091dde5abba5302a05adda", active: true },
+    { id: "c_c", name: "한도윤", role: "client", title: "대표이사", email: "han@cmfood.demo", companyId: "co_c" , passwordHash: "d78444076ba691b08525ec3eb3c15e6863df6567af1f51d326a6bf3a7f891b52", active: true },
+    { id: "c_d", name: "오세훈", role: "client", title: "관리이사", email: "oh@d1const.demo", companyId: "co_d" , passwordHash: "f6d6adfbdcbd2af1221b6bf4ad3a57ccd948a28c4f89f165c4d76f105bb8800c", active: true },
+    { id: "c_e", name: "서지혜", role: "client", title: "대표이사", email: "seo@eplusbio.demo", companyId: "co_e" , passwordHash: "123a1bc30697964171d8745f27186e25438db1315624a1feda0edce7fd4fae34", active: true },
+    { id: "c_f", name: "윤태호", role: "client", title: "대표이사", email: "yoon@flogis.demo", companyId: "co_f" , passwordHash: "9a6f27ad00a70bad34346492be53f35a07398b4684fe379284f5d2ce7c06827f", active: true },
   ];
 
   const companies: Company[] = [

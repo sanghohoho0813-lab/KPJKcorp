@@ -4,6 +4,8 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { buildSeed, type SeedData } from "./demo/seed";
 import type {
+  Company,
+  Project,
   Activity,
   ActivityType,
   Approval,
@@ -33,6 +35,7 @@ import type {
 import { nowIso, uid, addDays, iso } from "./format";
 import { stageLabel } from "./stages";
 import { OPP_STATUS, SERVICE_BY_KEY } from "./services";
+import { can, type Permission } from "./permissions";
 
 export interface StoreState extends SeedData {
   hydrated: boolean;
@@ -42,8 +45,11 @@ export interface StoreState extends SeedData {
   toasts: { id: string; text: string; tone?: "success" | "error" | "info" }[];
 
   // session
-  login: (userId: string) => void;
+  /** 자격증명 확인 후 로그인. 실패 사유를 그대로 돌려준다. */
+  signIn: (loginId: string, passwordHash: string) => { ok: true } | { ok: false; reason: "no_user" | "bad_password" | "inactive" };
   logout: () => void;
+  /** 현재 세션이 이 행동을 할 수 있는가. 화면과 액션이 같은 답을 쓴다. */
+  may: (p: Permission) => boolean;
   setPortalPreview: (companyId?: string) => void;
   setSettings: (patch: Partial<Settings>) => void;
   toast: (text: string, tone?: "success" | "error" | "info") => void;
@@ -56,6 +62,18 @@ export interface StoreState extends SeedData {
   reviewDocument: (requestId: string, outcome: "done" | "revision" | "reviewing", note: string | undefined, byUserId: string) => void;
   changeProjectStage: (projectId: string, stage: InternalStage, byUserId: string) => void;
   createDocRequest: (projectId: string, data: { name: string; description: string; dueDate: string }, byUserId: string) => void;
+
+  // ---- 기업고객 / 프로젝트 등록·수정 ----
+  createCompany: (data: Omit<Company, "id" | "code">, byUserId: string) => string | null;
+  updateCompany: (id: string, patch: Partial<Omit<Company, "id" | "code">>, byUserId: string) => void;
+  createProject: (data: Omit<Project, "id" | "stageChangedAt">, byUserId: string) => string | null;
+  updateProject: (id: string, patch: Partial<Omit<Project, "id" | "companyId">>, byUserId: string) => void;
+
+  // ---- 일정 / 업무 수정·삭제 ----
+  updateSchedule: (id: string, patch: Partial<Omit<Schedule, "id">>, byUserId: string) => void;
+  deleteSchedule: (id: string, byUserId: string) => void;
+  updateTask: (id: string, patch: Partial<Omit<Task, "id" | "createdAt">>, byUserId: string) => void;
+  deleteTask: (id: string, byUserId: string) => void;
   createConsultation: (data: Omit<Consultation, "id">, byUserId: string, followUp?: { create: boolean; dueDate: string }) => void;
   createInquiry: (data: { companyId: string; projectId?: string; title: string; category: Inquiry["category"]; body: string }, byUserId: string) => void;
   replyInquiry: (inquiryId: string, body: string, byUserId: string, role: Role) => void;
@@ -116,6 +134,33 @@ function makeActivity(a: Omit<Activity, "id" | "at">): Activity {
   return { ...a, id: uid("ac"), at: nowIso() };
 }
 
+/**
+ * 권한 거절 — 막았다는 사실도 기록으로 남긴다.
+ * 화면이 버튼을 숨겨도 액션은 따로 검사한다. 둘 중 하나만으로는
+ * "권한이 실제로 적용된다"고 말할 수 없다.
+ */
+function deny(
+  st: { session: Session | null; activities: Activity[] },
+  p: Permission,
+  what: string,
+  set: (patch: { activities: Activity[]; toasts?: never }) => void,
+): boolean {
+  if (can(st.session?.role, p)) return false;
+  set({
+    activities: [
+      makeActivity({
+        type: "permission_denied",
+        actorId: st.session?.userId ?? "unknown",
+        actorRole: st.session?.role ?? "system",
+        text: `권한 없음으로 거절: ${what}`,
+        meta: { permission: p, role: st.session?.role ?? "none" },
+      }),
+      ...st.activities,
+    ],
+  });
+  return true;
+}
+
 function makeNotification(n: Omit<Notification, "id" | "at" | "read">): Notification {
   return { ...n, id: uid("nt"), at: nowIso(), read: false };
 }
@@ -137,17 +182,47 @@ export const useStore = create<StoreState>()(
         if (age > 20 * 3600 * 1000) set({ ...buildSeed(), seededAt: nowIso(), session: get().session, settings: get().settings });
       },
 
-      login: (userId) => {
-        const u = get().users.find((x) => x.id === userId);
-        if (!u) return;
-        const session: Session = { userId: u.id, role: u.role, companyId: u.companyId };
-        const patch: Partial<StoreState> = { session };
-        if (u.role === "client") {
-          patch.activities = [makeActivity({ type: "portal_login", companyId: u.companyId, actorId: u.id, actorRole: "client", text: "고객 Portal 접속" }), ...get().activities];
-        }
-        set(patch);
+      /**
+       * 자격증명 확인 후 로그인.
+       * 이전에는 userId만 넘기면 그 사람이 됐다. 이제 아이디와 비밀번호 해시가 모두 맞아야 하고,
+       * 성공·실패가 전부 Activity로 남는다. (서버가 없다는 한계는 src/lib/auth.ts 주석 참고)
+       */
+      signIn: (loginId, passwordHash) => {
+        const st = get();
+        const key = loginId.trim().toLowerCase();
+        const u = st.users.find((x) => x.email.toLowerCase() === key);
+        const fail = (reason: "no_user" | "bad_password" | "inactive") => {
+          set({
+            activities: [makeActivity({ type: "sign_in_failed", actorId: u?.id ?? "unknown", actorRole: "system", text: `로그인 실패 (${loginId}) — ${reason}`, meta: { reason } }), ...st.activities],
+          });
+          return { ok: false as const, reason };
+        };
+        if (!u) return fail("no_user");
+        if (u.active === false) return fail("inactive");
+        if (!u.passwordHash || u.passwordHash !== passwordHash) return fail("bad_password");
+
+        const now = nowIso();
+        const session: Session = { userId: u.id, role: u.role, companyId: u.companyId, signedInAt: now };
+        set({
+          session,
+          users: st.users.map((x) => (x.id === u.id ? { ...x, lastLoginAt: now } : x)),
+          activities: [
+            makeActivity({ type: "sign_in", companyId: u.companyId, actorId: u.id, actorRole: u.role, text: `로그인: ${u.name} ${u.title}` }),
+            ...(u.role === "client" ? [makeActivity({ type: "portal_login", companyId: u.companyId, actorId: u.id, actorRole: "client", text: "고객 Portal 접속" })] : []),
+            ...st.activities,
+          ],
+        });
+        return { ok: true as const };
       },
-      logout: () => set({ session: null }),
+      logout: () => {
+        const st = get();
+        const u = st.users.find((x) => x.id === st.session?.userId);
+        set({
+          session: null,
+          activities: u ? [makeActivity({ type: "sign_out", actorId: u.id, actorRole: u.role, text: `로그아웃: ${u.name}` }), ...st.activities] : st.activities,
+        });
+      },
+      may: (p) => can(get().session?.role, p),
       setPortalPreview: (companyId) => {
         const s = get().session;
         if (!s) return;
@@ -168,6 +243,8 @@ export const useStore = create<StoreState>()(
         const st = get();
         const req = st.docRequests.find((r) => r.id === requestId);
         if (!req) return;
+        // 자료 제출은 고객의 행동이다 — 내부 계정이 대신 올리면 "고객이 직접 제출했다"는 실증이 거짓이 된다.
+        if (deny(st, "doc.submit", `자료 제출 (${req.name})`, set)) return;
         const project = st.projects.find((p) => p.id === req.projectId);
         const company = st.companies.find((c) => c.id === req.companyId);
         const version = req.files.length + 1;
@@ -229,6 +306,7 @@ export const useStore = create<StoreState>()(
         const st = get();
         const req = st.docRequests.find((r) => r.id === requestId);
         if (!req) return;
+        if (deny(st, "doc.review", `자료 검토 (${req.name})`, set)) return;
         const company = st.companies.find((c) => c.id === req.companyId);
         const now = nowIso();
         const updated: DocumentRequest = { ...req, status: outcome, reviewedAt: outcome === "reviewing" ? req.reviewedAt : now, reviewNote: outcome === "revision" ? note : req.reviewNote };
@@ -256,6 +334,7 @@ export const useStore = create<StoreState>()(
         const st = get();
         const p = st.projects.find((x) => x.id === projectId);
         if (!p || p.stage === stage) return;
+        if (deny(st, "project.update", `단계 변경 (${p.name})`, set)) return;
         const now = nowIso();
         set({
           projects: st.projects.map((x) => (x.id === projectId ? { ...x, stage, stageChangedAt: now } : x)),
@@ -268,6 +347,7 @@ export const useStore = create<StoreState>()(
         const st = get();
         const p = st.projects.find((x) => x.id === projectId);
         if (!p) return;
+        if (deny(st, "doc.request", `자료 요청 (${data.name})`, set)) return;
         const req: DocumentRequest = { id: uid("dr"), projectId, companyId: p.companyId, name: data.name, description: data.description, requestedAt: nowIso(), dueDate: data.dueDate, status: "requested", assigneeId: p.consultantId, files: [] };
         set({
           docRequests: [req, ...st.docRequests],
@@ -276,9 +356,140 @@ export const useStore = create<StoreState>()(
         });
       },
 
+      // ---------- 기업고객 / 프로젝트 등록 · 수정 ----------
+      // 모든 쓰기 액션은 deny()를 먼저 통과한다. 화면에서 버튼을 숨기는 것만으로는
+      // "권한이 적용된다"고 말할 수 없다 — 액션 자체가 거절해야 한다.
+      createCompany: (data, byUserId) => {
+        const st = get();
+        if (deny(st, "company.create", `기업고객 등록 (${data.name})`, set)) return null;
+        const id = uid("co");
+        // 코드(A, B, C…)는 기존 최대값 다음 글자. 26개를 넘기면 A2, B2 … 로 이어진다.
+        const used = st.companies.map((c) => c.code);
+        const n = st.companies.length;
+        const code = n < 26 ? String.fromCharCode(65 + n) : `${String.fromCharCode(65 + (n % 26))}${Math.floor(n / 26) + 1}`;
+        const company: Company = { ...data, id, code: used.includes(code) ? `${code}${n}` : code };
+        set({
+          companies: [...st.companies, company],
+          activities: [makeActivity({ type: "company_created", companyId: id, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `기업고객 등록: ${company.name}` }), ...st.activities],
+        });
+        return id;
+      },
+
+      updateCompany: (id, patch, byUserId) => {
+        const st = get();
+        const before = st.companies.find((c) => c.id === id);
+        if (!before) return;
+        if (deny(st, "company.update", `기업고객 수정 (${before.name})`, set)) return;
+        const changed = (Object.keys(patch) as (keyof typeof patch)[]).filter((k) => patch[k] !== undefined && patch[k] !== before[k]);
+        if (changed.length === 0) return;
+        const LABEL: Record<string, string> = { name: "기업명", ceo: "대표자", industry: "업종", bizNo: "사업자번호", contactName: "담당자", contactTitle: "직책", contactPhone: "연락처", contactEmail: "이메일", address: "주소", employees: "임직원", revenue: "매출", consultantId: "담당 컨설턴트", memo: "메모", firstConsultDate: "최초 상담일" };
+        set({
+          companies: st.companies.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+          activities: [makeActivity({ type: "company_updated", companyId: id, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `기업정보 수정: ${before.name} — ${changed.map((k) => LABEL[k] ?? k).join(", ")}`, meta: { fields: changed.join(",") } }), ...st.activities],
+        });
+      },
+
+      createProject: (data, byUserId) => {
+        const st = get();
+        const company = st.companies.find((c) => c.id === data.companyId);
+        if (!company) return null;
+        if (deny(st, "project.create", `프로젝트 등록 (${data.name})`, set)) return null;
+        const now = nowIso();
+        const project: Project = { ...data, id: uid("pj"), stageChangedAt: now };
+        set({
+          projects: [...st.projects, project],
+          activities: [makeActivity({ type: "project_created", companyId: data.companyId, projectId: project.id, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `프로젝트 등록: ${company.name} — ${project.name}` }), ...st.activities],
+          notifications: data.clientVisible
+            ? [makeNotification({ audience: "client", companyId: data.companyId, title: "새 프로젝트가 시작되었습니다", body: `${project.name} 진행 상황을 Portal에서 확인하실 수 있습니다.`, href: "/portal/projects" }), ...st.notifications]
+            : st.notifications,
+        });
+        return project.id;
+      },
+
+      updateProject: (id, patch, byUserId) => {
+        const st = get();
+        const before = st.projects.find((p) => p.id === id);
+        if (!before) return;
+        if (deny(st, "project.update", `프로젝트 수정 (${before.name})`, set)) return;
+        // 단계 변경은 고객 Portal 진행률·알림까지 움직이므로 전용 액션이 처리한다.
+        const { stage, ...rest } = patch;
+        const changed = (Object.keys(rest) as (keyof typeof rest)[]).filter((k) => rest[k] !== undefined && rest[k] !== before[k]);
+        if (stage && stage !== before.stage) get().changeProjectStage(id, stage, byUserId);
+        if (changed.length === 0) return;
+        const LABEL: Record<string, string> = { name: "프로젝트명", type: "유형", consultantId: "담당 컨설턴트", startDate: "시작일", dueDate: "마감일", description: "설명", clientVisible: "고객 공개" };
+        const after = get();
+        set({
+          projects: after.projects.map((p) => (p.id === id ? { ...p, ...rest } : p)),
+          activities: [makeActivity({ type: "project_updated", companyId: before.companyId, projectId: id, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `프로젝트 수정: ${before.name} — ${changed.map((k) => LABEL[k] ?? k).join(", ")}`, meta: { fields: changed.join(",") } }), ...after.activities],
+        });
+      },
+
+      // ---------- 일정 · 업무 수정 · 삭제 ----------
+      updateSchedule: (id, patch, byUserId) => {
+        const st = get();
+        const before = st.schedules.find((x) => x.id === id);
+        if (!before) return;
+        if (deny(st, "schedule.update", `일정 수정 (${before.title})`, set)) return;
+        const changed = (Object.keys(patch) as (keyof typeof patch)[]).filter((k) => patch[k] !== undefined && patch[k] !== before[k]);
+        if (changed.length === 0) return;
+        const after: Schedule = { ...before, ...patch };
+        // 고객에게 공개된 일정의 시간이 바뀌면 고객도 알아야 한다.
+        const timeMoved = patch.start !== undefined && patch.start !== before.start;
+        set({
+          schedules: st.schedules.map((x) => (x.id === id ? after : x)),
+          activities: [makeActivity({ type: "schedule_updated", companyId: before.companyId, projectId: before.projectId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `일정 수정: ${after.title}${timeMoved ? " (시간 변경)" : ""}`, meta: { fields: changed.join(",") } }), ...st.activities],
+          notifications: timeMoved && after.visibleToClient && after.companyId
+            ? [makeNotification({ audience: "client", companyId: after.companyId, title: "일정이 변경되었습니다", body: `${after.title} 일정이 조정되었습니다. 일정 화면에서 확인해 주세요.`, href: "/portal/schedule" }), ...st.notifications]
+            : st.notifications,
+        });
+      },
+
+      deleteSchedule: (id, byUserId) => {
+        const st = get();
+        const target = st.schedules.find((x) => x.id === id);
+        if (!target) return;
+        if (deny(st, "schedule.delete", `일정 삭제 (${target.title})`, set)) return;
+        set({
+          schedules: st.schedules.filter((x) => x.id !== id),
+          activities: [makeActivity({ type: "schedule_deleted", companyId: target.companyId, projectId: target.projectId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `일정 삭제: ${target.title}` }), ...st.activities],
+          notifications: target.visibleToClient && target.companyId
+            ? [makeNotification({ audience: "client", companyId: target.companyId, title: "일정이 취소되었습니다", body: `${target.title} 일정이 취소되었습니다.`, href: "/portal/schedule" }), ...st.notifications]
+            : st.notifications,
+        });
+      },
+
+      updateTask: (id, patch, byUserId) => {
+        const st = get();
+        const before = st.tasks.find((t) => t.id === id);
+        if (!before) return;
+        if (deny(st, "task.update", `업무 수정 (${before.title})`, set)) return;
+        const { status, ...rest } = patch;
+        const changed = (Object.keys(rest) as (keyof typeof rest)[]).filter((k) => rest[k] !== undefined && rest[k] !== before[k]);
+        if (status && status !== before.status) get().updateTaskStatus(id, status, byUserId);
+        if (changed.length === 0) return;
+        const LABEL: Record<string, string> = { title: "제목", type: "유형", dueDate: "기한", assigneeId: "담당자", priority: "우선순위", memo: "메모" };
+        const after = get();
+        set({
+          tasks: after.tasks.map((t) => (t.id === id ? { ...t, ...rest } : t)),
+          activities: [makeActivity({ type: "task_updated", companyId: before.companyId, projectId: before.projectId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `업무 수정: ${before.title} — ${changed.map((k) => LABEL[k] ?? k).join(", ")}`, meta: { fields: changed.join(",") } }), ...after.activities],
+        });
+      },
+
+      deleteTask: (id, byUserId) => {
+        const st = get();
+        const target = st.tasks.find((t) => t.id === id);
+        if (!target) return;
+        if (deny(st, "task.delete", `업무 삭제 (${target.title})`, set)) return;
+        set({
+          tasks: st.tasks.filter((t) => t.id !== id),
+          activities: [makeActivity({ type: "task_deleted", companyId: target.companyId, projectId: target.projectId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `업무 삭제: ${target.title}${target.source === "auto" ? " (자동 생성 업무)" : ""}` }), ...st.activities],
+        });
+      },
+
       // ---------- 상담 기록 ----------
       createConsultation: (data, byUserId, followUp) => {
         const st = get();
+        if (deny(st, "consultation.create", "상담 기록", set)) return;
         const company = st.companies.find((c) => c.id === data.companyId);
         const cs: Consultation = { ...data, id: uid("cs") };
         // 상담에서 정한 "다음 Action"이 업무로 넘어가지 않으면 결국 기억에 의존하게 된다.
@@ -364,17 +575,20 @@ export const useStore = create<StoreState>()(
       },
       createTask: (data, byUserId) => {
         const st = get();
+        if (deny(st, "task.create", `업무 등록 (${data.title})`, set)) return;
         const t: Task = { ...data, id: uid("tk"), createdAt: nowIso(), status: data.status ?? "todo", source: "manual" };
         set({ tasks: [t, ...st.tasks], activities: [makeActivity({ type: "task_created", companyId: t.companyId, projectId: t.projectId, actorId: byUserId, actorRole: "consultant", text: `업무 등록: ${t.title}` }), ...st.activities] });
       },
       createSchedule: (data, byUserId) => {
         const st = get();
+        if (deny(st, "schedule.create", `일정 등록 (${data.title})`, set)) return;
         const s: Schedule = { ...data, id: uid("sc") };
         const notifs = data.visibleToClient && data.companyId ? [makeNotification({ audience: "client", companyId: data.companyId, title: "새 일정이 등록되었습니다", body: data.title, href: "/portal/schedule" })] : [];
         set({ schedules: [...st.schedules, s], activities: [makeActivity({ type: "schedule_created", companyId: data.companyId, projectId: data.projectId, actorId: byUserId, actorRole: "consultant", text: `일정 등록: ${data.title}` }), ...st.activities], notifications: [...notifs, ...st.notifications] });
       },
       shareResult: (data, byUserId) => {
         const st = get();
+        if (deny(st, "result.share", `결과자료 공유 (${data.name})`, set)) return;
         const r: ResultFile = { ...data, id: uid("rs"), sharedAt: nowIso() };
         set({
           results: [r, ...st.results],
@@ -395,6 +609,7 @@ export const useStore = create<StoreState>()(
         const company = st.companies.find((c) => c.id === data.companyId);
         const svc = SERVICE_BY_KEY[data.serviceKey];
         if (!company || !svc) return;
+        if (deny(st, "opportunity.create", `매출기회 등록 (${svc.name})`, set)) return;
         const now = nowIso();
         const fromClient = data.source === "portal_interest" || data.source === "portal_request";
         const assigneeId = company.consultantId;
@@ -447,6 +662,7 @@ export const useStore = create<StoreState>()(
         const st = get();
         const o = st.opportunities.find((x) => x.id === id);
         if (!o || o.status === status) return;
+        if (deny(st, "opportunity.advance", `매출기회 단계 이동 (${o.serviceName})`, set)) return;
         const now = nowIso();
         const company = st.companies.find((c) => c.id === o.companyId);
         const updated: Opportunity = { ...o, status, updatedAt: now, history: [...o.history, { at: now, status, by: byUserId, note }] };
@@ -465,6 +681,7 @@ export const useStore = create<StoreState>()(
       // ---------- 대표 승인 ----------
       requestApproval: (data, byUserId) => {
         const st = get();
+        if (deny(st, "approval.request", `승인 요청 (${data.title})`, set)) return;
         const now = nowIso();
         const ap: Approval = { ...data, id: uid("ap"), requestedBy: byUserId, requestedAt: now, status: "pending" };
         const company = st.companies.find((c) => c.id === data.companyId);
@@ -483,6 +700,8 @@ export const useStore = create<StoreState>()(
         const st = get();
         const ap = st.approvals.find((x) => x.id === id);
         if (!ap || ap.status !== "pending") return;
+        // 대표 승인은 여기서 실제로 막힌다. 이전에는 버튼만 숨겼다.
+        if (deny(st, "approval.decide", `대표 승인 처리 (${ap.title})`, set)) return;
         const now = nowIso();
         const company = st.companies.find((c) => c.id === ap.companyId);
         const updated: Approval = { ...ap, status: decision, decidedBy: byUserId, decidedAt: now, decisionNote: note };
@@ -524,6 +743,7 @@ export const useStore = create<StoreState>()(
       // ---------- 견적 ----------
       createQuote: (data, byUserId) => {
         const st = get();
+        if (deny(st, "quote.create", `견적 작성 (${data.title})`, set)) return;
         const company = st.companies.find((c) => c.id === data.companyId);
         const q: Quote = {
           ...data,
@@ -571,6 +791,7 @@ export const useStore = create<StoreState>()(
         const st = get();
         const q = st.quotes.find((x) => x.id === quoteId);
         if (!q) return;
+        if (deny(st, "quote.send", `견적 발송 (${q.title})`, set)) return;
         const company = st.companies.find((c) => c.id === q.companyId);
         const now = nowIso();
         // 응답이 없으면 그냥 묻힌다 — 발송 시점에 후속 확인 업무를 같이 만든다.
@@ -603,6 +824,7 @@ export const useStore = create<StoreState>()(
         const st = get();
         const q = st.quotes.find((x) => x.id === quoteId);
         if (!q || q.status !== "sent") return;
+        if (deny(st, "quote.respond", `견적 회신 (${q.title})`, set)) return;
         const company = st.companies.find((c) => c.id === q.companyId);
         const now = nowIso();
         const accepted = decision === "accepted";
@@ -665,6 +887,7 @@ export const useStore = create<StoreState>()(
       startSprint: () => {
         const st = get();
         if (st.settings.sprintStartedAt) return;
+        if (deny(st, "sprint.manage", "AX 실증 시작", set)) return;
         const now = nowIso();
         set({
           settings: { ...st.settings, sprintStartedAt: now },
@@ -673,6 +896,7 @@ export const useStore = create<StoreState>()(
       },
       saveBaseline: (data, byUserId) => {
         const st = get();
+        if (deny(st, "baseline.write", "도입 전 기준선 입력", set)) return;
         const now = nowIso();
         set({
           settings: { ...st.settings, baseline: { ...data, recordedAt: now, recordedBy: byUserId } },

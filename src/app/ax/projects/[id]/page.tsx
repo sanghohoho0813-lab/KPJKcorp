@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Briefcase, CheckCircle2, ChevronDown, FileText, Plus, Share2, Sparkles, Upload } from "lucide-react";
+import { ArrowLeft, ArrowRight, Briefcase, CheckCircle2, ChevronDown, FileText, Plus, Share2, Sparkles, Upload, Pencil } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useUi } from "@/lib/ui-store";
 import { CUSTOMER_STEPS, INTERNAL_STAGES, stageLabel, stageProgress, stageToCustomerStep } from "@/lib/stages";
@@ -15,6 +15,7 @@ import { Modal } from "@/components/ui/overlay";
 import { ActivityFeed, DocStatusBadge, DueText, ScheduleItem, StageBadge } from "@/components/domain/domain";
 import { ReviewDocModal } from "@/components/domain/DocActions";
 import { NewDocRequestModal, NewScheduleModal, NewTaskModal } from "@/components/domain/CreateModals";
+import { ProjectModal, useMay } from "@/components/domain/EntityModals";
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -26,6 +27,8 @@ export default function ProjectDetailPage() {
   const toast = useStore((s) => s.toast);
   const [reviewReq, setReviewReq] = useState<DocumentRequest | null>(null);
   const [newDoc, setNewDoc] = useState(false);
+  const [editProject, setEditProject] = useState(false);
+  const may = useMay();
   const [newSchedule, setNewSchedule] = useState(false);
   const [newTask, setNewTask] = useState(false);
   const [stageOpen, setStageOpen] = useState(false);
@@ -75,6 +78,7 @@ export default function ProjectDetailPage() {
             <p className="mt-1 text-[0.9rem] text-ink-2">{p.description}</p>
           </div>
           <div className="flex flex-wrap gap-2">
+            {may("project.update") && <Button variant="outline" size="sm" icon={<Pencil size={15} />} onClick={() => setEditProject(true)}>프로젝트 수정</Button>}
             <Button variant="outline" size="sm" icon={<Plus size={15} />} onClick={() => setNewDoc(true)}>자료 요청</Button>
             <Button variant="outline" size="sm" icon={<Plus size={15} />} onClick={() => setNewSchedule(true)}>일정</Button>
             <Button variant="outline" size="sm" icon={<Plus size={15} />} onClick={() => setNewTask(true)}>업무</Button>
@@ -183,6 +187,7 @@ export default function ProjectDetailPage() {
       </Modal>
 
       <ReviewDocModal req={reviewReq} open={!!reviewReq} onClose={() => setReviewReq(null)} />
+      <ProjectModal open={editProject} projectId={p.id} onClose={() => setEditProject(false)} />
       <NewDocRequestModal projectId={newDoc ? p.id : null} open={newDoc} onClose={() => setNewDoc(false)} />
       <NewScheduleModal open={newSchedule} onClose={() => setNewSchedule(false)} companyId={c.id} projectId={p.id} />
       <NewTaskModal open={newTask} onClose={() => setNewTask(false)} companyId={c.id} projectId={p.id} />
