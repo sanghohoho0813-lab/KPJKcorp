@@ -45,7 +45,11 @@ export type Permission =
   | "company.archive"
   | "project.archive"
   | "doc.update"
-  | "consultation.update";
+  | "consultation.update"
+  | "quote.update"
+  | "contract.manage"
+  | "result.withdraw"
+  | "rules.manage";
 
 const POLICY: Record<Permission, Role[]> = {
   "company.create": ["admin", "consultant"],
@@ -83,6 +87,10 @@ const POLICY: Record<Permission, Role[]> = {
   "project.archive": ["admin", "consultant"],
   "doc.update": ["admin", "consultant"],
   "consultation.update": ["admin", "consultant"],
+  "quote.update": ["admin", "consultant"],
+  "contract.manage": ["admin", "consultant"],
+  "result.withdraw": ["admin", "consultant"],
+  "rules.manage": ["admin"],
 };
 
 export function can(role: Role | undefined | null, p: Permission): boolean {
@@ -113,6 +121,10 @@ export const PERMISSION_ROWS: { label: string; perms: Permission[] }[] = [
   { label: "기업 · 프로젝트 보관", perms: ["company.archive", "project.archive"] },
   { label: "자료요청 수정 · 취소", perms: ["doc.update"] },
   { label: "상담기록 수정 · 삭제", perms: ["consultation.update"] },
+  { label: "견적 수정 (발송 전)", perms: ["quote.update"] },
+  { label: "계약 직접 등록 · 수정", perms: ["contract.manage"] },
+  { label: "결과자료 회수", perms: ["result.withdraw"] },
+  { label: "자동 업무 규칙 설정", perms: ["rules.manage"] },
   { label: "사용자 계정 관리", perms: ["user.manage"] },
 ];
 

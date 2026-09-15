@@ -3,13 +3,14 @@
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { BellRing, FolderOpen, MessageSquareText } from "lucide-react";
+import { BellRing, FolderOpen, MessageSquareText, Pencil } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useUi } from "@/lib/ui-store";
 import { daysBetween, fmtDate, fmtSize, relativeDay } from "@/lib/format";
 import type { DocStatus, DocumentRequest } from "@/lib/types";
 import { Badge, Button, Card, EmptyState, KpiCard, PageHeader, SegmentedControl, NextBadge, Tabs, cx } from "@/components/ui/ui";
 import { ResultsGrid } from "@/components/domain/ResultsGrid";
+import { DOC_EDITABLE, EditDocRequestModal, useMay } from "@/components/domain/EntityModals";
 import { Modal } from "@/components/ui/overlay";
 import { DocStatusBadge, DueText, SearchBox } from "@/components/domain/domain";
 import { ReviewDocModal } from "@/components/domain/DocActions";
@@ -22,6 +23,8 @@ function DocumentsInner() {
   const openDraft = useUi((s) => s.openDraft);
   const [top, setTop] = useState<"requests" | "results">(params.get("tab") === "results" ? "results" : "requests");
   const [filter, setFilter] = useState<Filter>("all");
+  const [editDoc, setEditDoc] = useState<string | null>(null);
+  const may = useMay();
   const [q, setQ] = useState("");
   const [remind, setRemind] = useState(false);
   const [review, setReview] = useState<DocumentRequest | null>(() => {
@@ -111,6 +114,7 @@ function DocumentsInner() {
                           )}
                           {(d.status === "submitted" || d.status === "reviewing") && <Button size="sm" variant="accent" onClick={() => setReview(d)}>검토</Button>}
                           {(d.status === "done" || d.status === "planned") && <Button size="sm" variant="outline" onClick={() => setReview(d)}>보기</Button>}
+                          {may("doc.update") && DOC_EDITABLE.includes(d.status) && <Button size="sm" variant="ghost" icon={<Pencil size={14} />} onClick={() => setEditDoc(d.id)}>수정</Button>}
                         </div>
                       </td>
                     </tr>
@@ -143,6 +147,7 @@ function DocumentsInner() {
         )}
         <div className="mt-3 flex items-center gap-2 text-[0.78rem] text-ink-3"><NextBadge /> 카카오톡/이메일 자동 발송은 향후 확장 기능입니다. 현재는 담당자가 초안을 확인 후 직접 발송합니다.</div>
       </Modal>
+      <EditDocRequestModal open={!!editDoc} requestId={editDoc} onClose={() => setEditDoc(null)} />
     </div>
   );
 }

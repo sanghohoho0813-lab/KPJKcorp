@@ -90,8 +90,15 @@ export interface Contract {
   status: "draft" | "sent" | "signed";
   sentAt?: string;
   signedAt?: string;
+  /** 사람이 읽는 기간 표기 (예: 2026.03 ~ 2026.12) */
   period: string;
   scope: string;
+  /** 계약 종료일 — 있으면 만료 전 갱신 협의 업무가 자동으로 잡힌다 */
+  endDate?: string;
+  /** 계약 금액 (원). 견적 전환 시 견적 합계가 들어온다 */
+  amount?: number;
+  /** 어디서 왔는가 — 견적 전환 / 직접 등록 */
+  source?: "quote" | "manual";
 }
 
 export interface Project {
@@ -164,6 +171,8 @@ export interface Task {
   createdAt: string;
   completedAt?: string;
   source?: "manual" | "auto";
+  /** 시간 규칙이 만든 업무 — 같은 규칙·대상으로 두 번 만들지 않기 위한 열쇠 */
+  ruleKey?: string;
 }
 
 export interface Message {
@@ -386,6 +395,11 @@ export type ActivityType =
   | "consultation_deleted"
   | "company_archived"
   | "project_archived"
+  | "quote_updated"
+  | "contract_created"
+  | "contract_updated"
+  | "result_withdrawn"
+  | "rule_task_created"
   | "demo_reset";
 
 export interface Activity {
@@ -445,4 +459,6 @@ export interface Settings {
   baseline?: Baseline;
   tutorialDonePortal: boolean;
   timezone: string;
+  /** 시간 규칙 켜기/끄기. 키가 없으면 켜진 것으로 본다 */
+  autoRules?: Record<string, boolean>;
 }

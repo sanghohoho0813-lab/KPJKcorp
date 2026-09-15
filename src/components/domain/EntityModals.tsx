@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Building2, Briefcase, CalendarDays, CheckSquare, FileUp, Trash2 } from "lucide-react";
+import { Building2, Briefcase, CalendarDays, CheckSquare, FileText, FileUp, Trash2 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { can } from "@/lib/permissions";
 import { INTERNAL_STAGES, SCHEDULE_TYPE } from "@/lib/stages";
 import { addDays } from "@/lib/format";
-import type { Company, InternalStage, Project, ScheduleType, Task } from "@/lib/types";
+import type { Company, Contract, InternalStage, Project, ScheduleType, Task } from "@/lib/types";
 import { Confirm, Modal } from "@/components/ui/overlay";
 import { Button, Field, Input, Select, Textarea } from "@/components/ui/ui";
 
@@ -463,7 +463,7 @@ function EditDocRequestInner({ open, requestId, onClose }: { open: boolean; requ
   const company = st.companies.find((c) => c.id === req.companyId);
   const submit = () => {
     if (!name.trim()) { toast("자료명을 입력해 주세요.", "error"); return; }
-    update(req.id, { name: name.trim(), description: desc.trim(), dueDate: new Date(`${due}T18:00:00`).toISOString() }, me);
+    update(req.id, { name: name.trim(), description: desc.trim(), dueDate: due === dateInput(req.dueDate) ? undefined : new Date(`${due}T18:00:00`).toISOString() }, me);
     toast("자료요청을 수정했습니다. 고객에게 변경 안내가 전송되었습니다.");
     onClose();
   };
@@ -506,5 +506,121 @@ function EditDocRequestInner({ open, requestId, onClose }: { open: boolean; requ
         danger
       />
     </>
+  );
+}
+
+/* ---------------- 계약 직접 등록 · 수정 ---------------- */
+
+/** 견적 없이 맺은 기존 계약을 시스템에 올릴 때 쓴다. 견적에서 전환된 계약도 여기서 종료일·금액·상태를 고친다. */
+export function ContractModal(props: { open: boolean; contractId?: string | null; companyId?: string; onClose: () => void }) {
+  if (!props.open) return null;
+  return <ContractModalInner key={props.contractId ?? `new:${props.companyId ?? ""}`} {...props} />;
+}
+
+function ContractModalInner({ open, contractId, companyId, onClose }: { open: boolean; contractId?: string | null; companyId?: string; onClose: () => void }) {
+  const st = useStore();
+  const create = useStore((s) => s.createContract);
+  const update = useStore((s) => s.updateContract);
+  const toast = useStore((s) => s.toast);
+  const me = st.session?.userId ?? "u_admin";
+  const editing = st.contracts.find((c) => c.id === contractId);
+  const liveCompanies = st.companies.filter((c) => !c.archived);
+
+  const [cid, setCid] = useState(editing?.companyId ?? companyId ?? liveCompanies[0]?.id ?? "");
+  const [pid, setPid] = useState(editing?.projectId ?? "");
+  const [title, setTitle] = useState(editing?.title ?? "");
+  const [scope, setScope] = useState(editing?.scope ?? "");
+  const [period, setPeriod] = useState(editing?.period ?? "");
+  const [status, setStatus] = useState<Contract["status"]>(editing?.status ?? "draft");
+  const [endDate, setEndDate] = useState(editing?.endDate ? dateInput(editing.endDate) : "");
+  const [amount, setAmount] = useState(editing?.amount ? String(Math.round(editing.amount / 10000)) : "");
+  const [signedAt, setSignedAt] = useState(editing?.signedAt ? dateInput(editing.signedAt) : "");
+  const [err, setErr] = useState<Record<string, string | undefined>>({});
+
+  const projects = st.projects.filter((p) => p.companyId === cid && !p.archived);
+
+  const submit = () => {
+    const e: Record<string, string | undefined> = {};
+    if (!cid) e.cid = "기업을 선택해 주세요.";
+    if (!pid) e.pid = "프로젝트를 선택해 주세요. 계약은 항상 프로젝트에 붙습니다.";
+    if (!title.trim()) e.title = "계약명은 필수입니다.";
+    if (!period.trim()) e.period = "기간 표기는 필수입니다. 예: 2026.03 ~ 2026.12";
+    if (status === "signed" && !signedAt) e.signedAt = "서명 완료 계약은 서명일이 필요합니다.";
+    setErr(e);
+    if (Object.keys(e).length) { toast("입력값을 확인해 주세요.", "error"); return; }
+    const data = {
+      companyId: cid, projectId: pid, title: title.trim(), scope: scope.trim(), period: period.trim(), status,
+      endDate: endDate ? new Date(`${endDate}T23:59:00`).toISOString() : undefined,
+      amount: amount ? Number(amount) * 10000 : undefined,
+      signedAt: signedAt ? new Date(`${signedAt}T09:00:00`).toISOString() : undefined,
+      sentAt: editing?.sentAt ?? (status !== "draft" ? new Date().toISOString() : undefined),
+    };
+    if (editing) {
+      update(editing.id, data, me);
+      toast("계약을 수정했습니다.");
+    } else {
+      const id = create(data, me);
+      if (!id) { toast("계약을 등록할 권한이 없습니다.", "error"); return; }
+      toast(`계약을 등록했습니다.${data.endDate ? " 종료 30일 전에 갱신 협의 업무가 자동으로 잡힙니다." : ""}`);
+    }
+    onClose();
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      size="md"
+      title={<span className="flex items-center gap-2"><FileText size={18} /> {editing ? "계약 수정" : "계약 등록"}</span>}
+      footer={<><Button variant="ghost" onClick={onClose}>취소</Button><Button variant="accent" onClick={submit}>{editing ? "저장" : "등록"}</Button></>}
+    >
+      {!editing && (
+        <p className="mb-3 rounded-xl bg-surface-2 px-4 py-2.5 text-[0.82rem] leading-relaxed text-ink-2">
+          견적 없이 맺은 기존 계약을 올릴 때 씁니다. 새 계약은 가능하면 <b className="text-ink">견적 → 고객 수락 → 계약 전환</b> 흐름을 타야 매출 기록이 이어집니다.
+        </p>
+      )}
+      {editing?.source === "quote" && (
+        <p className="mb-3 rounded-xl bg-info-bg px-4 py-2.5 text-[0.82rem] text-info">견적에서 전환된 계약입니다. 금액은 견적 합계에서 왔습니다.</p>
+      )}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="기업 *" hint={err.cid}>
+          {editing ? (
+            <div className="flex h-11 items-center rounded-[10px] bg-surface-2 px-3.5 text-[0.95rem] font-semibold">{st.companies.find((c) => c.id === cid)?.name}</div>
+          ) : (
+            <Select value={cid} onChange={(e) => { setCid(e.target.value); setPid(""); }}>
+              {liveCompanies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </Select>
+          )}
+        </Field>
+        <Field label="프로젝트 *" hint={err.pid}>
+          <Select value={pid} onChange={(e) => setPid(e.target.value)}>
+            <option value="">선택</option>
+            {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </Select>
+        </Field>
+        <div className="sm:col-span-2">
+          <Field label="계약명 *" hint={err.title}><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="예: 경영진단 컨설팅 계약" autoFocus /></Field>
+        </div>
+        <Field label="기간 표기 *" hint={err.period}><Input value={period} onChange={(e) => setPeriod(e.target.value)} placeholder="예: 2026.03 ~ 2026.12" /></Field>
+        <Field label="종료일" hint="입력하면 30일 전에 갱신 협의 업무가 자동으로 잡힙니다"><Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></Field>
+        <Field label="계약 금액">
+          <div className="flex items-center gap-2">
+            <Input inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0" />
+            <span className="shrink-0 text-[0.85rem] text-ink-3">만원</span>
+          </div>
+        </Field>
+        <Field label="상태">
+          <Select value={status} onChange={(e) => setStatus(e.target.value as Contract["status"])}>
+            <option value="draft">초안</option><option value="sent">서명 대기</option><option value="signed">서명 완료</option>
+          </Select>
+        </Field>
+        {status === "signed" && (
+          <Field label="서명일 *" hint={err.signedAt}><Input type="date" value={signedAt} onChange={(e) => setSignedAt(e.target.value)} /></Field>
+        )}
+      </div>
+      <div className="mt-3">
+        <Field label="범위" hint="고객 Portal 계약 상태에도 표시됩니다."><Textarea rows={2} value={scope} onChange={(e) => setScope(e.target.value)} /></Field>
+      </div>
+    </Modal>
   );
 }

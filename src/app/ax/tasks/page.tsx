@@ -11,6 +11,7 @@ import { Badge, Button, Card, EmptyState, KpiCard, PageHeader, SegmentedControl,
 import { DueText, PriorityBadge, TaskStatusBadge } from "@/components/domain/domain";
 import { NewTaskModal } from "@/components/domain/CreateModals";
 import { EditTaskModal, useMay } from "@/components/domain/EntityModals";
+import { ruleOfTask } from "@/lib/rules";
 import { InquiryConsole } from "@/components/domain/InquiryConsole";
 
 type Filter = "today" | "open" | "overdue" | "done" | "all";
@@ -84,7 +85,7 @@ function TasksInner() {
                     <div className="flex flex-wrap items-center gap-2">
                       <PriorityBadge priority={t.priority} />
                       <span className={cx("font-semibold", isDone && "line-through")}>{t.title}</span>
-                      {t.source === "auto" && <Badge tone="info">자동</Badge>}
+                      {t.ruleKey ? <Badge tone="info" >규칙 · {ruleOfTask(t.ruleKey)?.label.split(" ")[0] ?? "자동"}</Badge> : t.source === "auto" && <Badge tone="info">자동</Badge>}
                     </div>
                     <div className="mt-0.5 flex flex-wrap gap-x-2 text-[0.8rem] text-ink-3">
                       <span>{t.type}</span>

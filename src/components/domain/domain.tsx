@@ -161,6 +161,11 @@ export function BriefList({ items, limit, compact }: { items: BriefItem[]; limit
 
 /* ---------- Activity feed (Evidence) ---------- */
 const ACT_ICON: Record<Activity["type"], ReactNode> = {
+  quote_updated: <Pencil size={14} />,
+  contract_created: <FileText size={14} />,
+  contract_updated: <Pencil size={14} />,
+  result_withdrawn: <RotateCcw size={14} />,
+  rule_task_created: <Repeat size={14} />,
   user_created: <UserPlus size={14} />,
   user_updated: <Pencil size={14} />,
   user_deactivated: <UserMinus size={14} />,

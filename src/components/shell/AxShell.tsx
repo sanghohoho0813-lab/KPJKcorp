@@ -34,6 +34,7 @@ import { NotificationBell } from "./Notifications";
 import { DevicePreviewButton, DevicePreviewOverlay } from "./DevicePreview";
 import { Tutorial } from "./Tutorial";
 import { FontScalePicker, FontScaleStepper } from "./FontScale";
+import { GlobalSearch, SearchTrigger } from "./GlobalSearch";
 import { Presentation, PresentationButton } from "./Presentation";
 import { NextSheet } from "./NextSheet";
 import { AiReadyModal, DraftModal } from "@/components/ai/AiModals";
@@ -282,10 +283,10 @@ function Header() {
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-shell text-[0.65rem] font-black text-white">KPJK</span>
         <span className="truncate text-[0.95rem] font-bold">Business AX</span>
       </div>
-      <div className="hdr-optional hidden items-center gap-3 lg:flex">
-        <span className="hidden xl:flex"><LiveClock /></span>
-        <span className="flex xl:hidden"><LiveClock compact /></span>
-        <DemoBadge className="hidden xl:inline-flex" />
+      <div className="hidden items-center gap-3 lg:flex">
+        <SearchTrigger />
+        <span className="hdr-optional hidden xl:flex"><LiveClock compact /></span>
+        <DemoBadge className="hdr-optional hidden 2xl:inline-flex" />
       </div>
       <div className="flex-1" />
       <div className="hidden items-center gap-1 lg:flex">
@@ -303,7 +304,8 @@ function Header() {
           </button>
         )}
       </div>
-      <div className="flex shrink-0 items-center gap-2 lg:hidden">
+      <div className="flex shrink-0 items-center gap-1 lg:hidden">
+        <SearchTrigger compact />
         <FontScaleStepper />
         <span className="hdr-optional"><LiveClock compact /></span>
       </div>
@@ -459,6 +461,7 @@ export function AxShell({ children }: { children: ReactNode }) {
       </div>
       <MobileNav />
       <MoreSheet />
+      <GlobalSearch />
       <NextSheet />
       <AiReadyModal />
       <DraftModal />

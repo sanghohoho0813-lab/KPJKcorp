@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Database, HelpCircle, Palette, RotateCcw, ShieldCheck, Sparkles, Award, Play } from "lucide-react";
+import { Check, Database, HelpCircle, Palette, RotateCcw, ShieldCheck, Sparkles, Award, Play, Repeat } from "lucide-react";
 import { FontScalePicker } from "@/components/shell/FontScale";
 import { useStore, useCurrentUser } from "@/lib/store";
 import { useUi, NEXT_FEATURES } from "@/lib/ui-store";
 import { THEMES } from "@/lib/themes";
 import { can, PERMISSION_ROWS, rowVerdict } from "@/lib/permissions";
 import { UserAdmin } from "@/components/domain/UserModals";
+import { AutoRulesPanel } from "@/components/domain/AutoRulesPanel";
 import { fmtDateTime } from "@/lib/format";
 import { Badge, Button, Card, DemoBadge, NextBadge, PageHeader, SectionTitle, SegmentedControl, cx, AiReadyBadge } from "@/components/ui/ui";
 import { Confirm } from "@/components/ui/overlay";
@@ -96,6 +97,11 @@ export default function SettingsPage() {
             </table>
           </div>
           <div className="mt-3 text-[0.78rem] text-ink-3">한계 — 이 검사는 브라우저 안에서 이루어집니다. 개발자도구로 우회하는 것은 막지 못하므로 현재는 업무 규칙이지 보안 경계가 아닙니다. 서버 DB·세션(Supabase Auth + RLS)을 연결할 때 같은 정책을 서버에서 한 번 더 검사하도록 옮깁니다.</div>
+        </Card>
+
+        <Card className="p-5">
+          <SectionTitle><span className="flex items-center gap-2"><Repeat size={18} className="text-ink-3" /> 자동 업무 규칙</span></SectionTitle>
+          <AutoRulesPanel />
         </Card>
 
         <Card className="p-5">

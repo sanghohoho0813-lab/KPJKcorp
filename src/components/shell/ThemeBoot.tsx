@@ -29,6 +29,20 @@ export function ThemeBoot() {
     if (theme !== settings.theme || fontScale !== settings.fontScale) setSettings({ theme, fontScale });
   }, [hydrated, settings.theme, settings.fontScale, setSettings]);
 
+  // 시간 규칙 — 앱을 열 때 한 번, 그 뒤 10분마다. 만든 것이 있으면 조용히 알린다.
+  const syncRules = useStore((s) => s.syncRuleTasks);
+  const session = useStore((s) => s.session);
+  useEffect(() => {
+    if (!hydrated || !session || session.role === "client") return;
+    const run = () => {
+      const n = syncRules();
+      if (n > 0) useStore.getState().toast(`규칙에 따라 후속 업무 ${n}건이 자동 등록되었습니다.`, "info");
+    };
+    const t0 = setTimeout(run, 1500);
+    const t = setInterval(run, 10 * 60 * 1000);
+    return () => { clearTimeout(t0); clearInterval(t); };
+  }, [hydrated, session, syncRules]);
+
   useEffect(() => {
     const el = document.documentElement;
     el.setAttribute("data-theme", normalizeTheme(settings.theme));

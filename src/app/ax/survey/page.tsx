@@ -6,7 +6,8 @@ import { ArrowRight, Check, ClipboardList, Send } from "lucide-react";
 import { useStore, useCurrentUser } from "@/lib/store";
 import { REQUIRED_IDS, SURVEY, SURVEY_QUESTIONS, SURVEY_STAGE, SURVEY_VERSION, type Question } from "@/lib/survey";
 import { fmtDateTime } from "@/lib/format";
-import { Badge, Button, Card, PageHeader, Progress, Textarea, cx } from "@/components/ui/ui";
+import { Badge, Button, Card, PageHeader, Progress, SegmentedControl, Textarea, cx } from "@/components/ui/ui";
+import { SurveyResults } from "@/components/domain/SurveyResults";
 
 type Answer = string | string[] | number;
 
@@ -95,6 +96,8 @@ export default function SurveyPage() {
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [free, setFree] = useState("");
   const [done, setDone] = useState(false);
+  const [view, setView] = useState<"form" | "results">("form");
+  const canSeeResults = st.session?.role === "admin" || st.session?.role === "consultant";
   const startedAt = useRef(0);
   // Date.now()는 렌더 중에 부를 수 없다 (React Compiler purity). 마운트 시점에 기록한다.
   useEffect(() => { startedAt.current = Date.now(); }, []);
@@ -158,7 +161,11 @@ export default function SurveyPage() {
         title="시스템 개선 의견"
         desc="지금 만든 기본 시스템을 실제 업무에 맞는 도구로 만들기 위한 설문입니다. 만족도 조사가 아니라, 다음에 무엇을 만들지 정하는 자료로 씁니다."
         badge={<Badge tone="accent">2단계 → 3단계 · 약 2분</Badge>}
+        actions={canSeeResults ? <SegmentedControl value={view} onChange={setView} options={[{ key: "form", label: "설문 작성" }, { key: "results", label: `응답 보기 (${st.surveys.length})` }]} /> : undefined}
       />
+
+      {view === "results" && canSeeResults ? <SurveyResults /> : (
+      <>
 
       {mine.length > 0 && (
         <div className="mb-4 rounded-xl bg-surface-2 px-4 py-3 text-[0.85rem] text-ink-2">
@@ -208,6 +215,8 @@ export default function SurveyPage() {
           <Button variant="accent" icon={<Send size={16} />} onClick={send}>제출</Button>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

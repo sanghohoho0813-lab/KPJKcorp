@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, X } from "lucide-react";
+import { Pencil, Plus, X } from "lucide-react";
 import { useStore, quoteGross, quoteNet } from "@/lib/store";
 import type { Quote, QuoteItem, QuoteStatus } from "@/lib/types";
 import { addDays, daysBetween, fmtWon } from "@/lib/format";
@@ -25,21 +25,29 @@ function dateInput(d: Date) {
 
 /* ---------------- 견적 작성 ---------------- */
 
-export function NewQuoteModal({ open, onClose, companyId }: { open: boolean; onClose: () => void; companyId?: string }) {
+/** 작성과 수정(발송 전)이 같은 폼을 쓴다. 발송된 견적은 고객이 이미 본 금액이라 여기로 들어올 수 없다. */
+export function NewQuoteModal(props: { open: boolean; onClose: () => void; companyId?: string; quoteId?: string | null }) {
+  if (!props.open) return null;
+  return <QuoteFormInner key={props.quoteId ?? "new"} {...props} />;
+}
+
+function QuoteFormInner({ open, onClose, companyId, quoteId }: { open: boolean; onClose: () => void; companyId?: string; quoteId?: string | null }) {
   const st = useStore();
   const create = useStore((s) => s.createQuote);
+  const update = useStore((s) => s.updateQuote);
   const toast = useStore((s) => s.toast);
   const me = st.session?.userId ?? "u_admin";
+  const editing = st.quotes.find((q) => q.id === quoteId);
 
-  const [company, setCompany] = useState(companyId ?? st.companies[0]?.id ?? "");
-  const [project, setProject] = useState("");
-  const [opp, setOpp] = useState("");
-  const [title, setTitle] = useState("");
-  const [scope, setScope] = useState("");
-  const [period, setPeriod] = useState("3개월");
-  const [items, setItems] = useState<QuoteItem[]>([{ name: "", amount: 0 }]);
-  const [discount, setDiscount] = useState("0");
-  const [valid, setValid] = useState(() => dateInput(addDays(new Date(), 14)));
+  const [company, setCompany] = useState(editing?.companyId ?? companyId ?? st.companies[0]?.id ?? "");
+  const [project, setProject] = useState(editing?.projectId ?? "");
+  const [opp, setOpp] = useState(editing?.opportunityId ?? "");
+  const [title, setTitle] = useState(editing?.title ?? "");
+  const [scope, setScope] = useState(editing?.scope ?? "");
+  const [period, setPeriod] = useState(editing?.period ?? "3개월");
+  const [items, setItems] = useState<QuoteItem[]>(editing?.items.length ? editing.items.map((i) => ({ ...i })) : [{ name: "", amount: 0 }]);
+  const [discount, setDiscount] = useState(String(editing?.discountPct ?? 0));
+  const [valid, setValid] = useState(() => dateInput(editing ? new Date(editing.validUntil) : addDays(new Date(), 14)));
 
   const cid = companyId ?? company;
   const projects = st.projects.filter((p) => p.companyId === cid);
@@ -53,6 +61,18 @@ export function NewQuoteModal({ open, onClose, companyId }: { open: boolean; onC
 
   const submit = () => {
     if (!ok) { toast("견적명과 항목을 한 개 이상 입력해 주세요.", "error"); return; }
+    if (editing) {
+      const discountChanged = pct !== editing.discountPct;
+      update(editing.id, {
+        projectId: project || undefined, title: title.trim(), scope: scope.trim(), period,
+        items: items.filter((i) => i.name.trim() && i.amount > 0), discountPct: pct,
+        // 날짜가 그대로면 보내지 않는다 — 시각만 재구성돼 "유효기간 변경"으로 잘못 기록되는 것을 막는다
+        validUntil: valid === dateInput(new Date(editing.validUntil)) ? undefined : new Date(`${valid}T23:59:00`).toISOString(),
+      }, me);
+      toast(discountChanged && editing.approvalId ? "견적을 수정했습니다. 할인율이 바뀌어 대표 승인을 다시 받아야 합니다." : "견적을 수정했습니다.");
+      onClose();
+      return;
+    }
     create(
       {
         companyId: cid,
@@ -76,7 +96,7 @@ export function NewQuoteModal({ open, onClose, companyId }: { open: boolean; onC
     <Modal
       open={open}
       onClose={onClose}
-      title="견적 작성"
+      title={editing ? "견적 수정" : "견적 작성"}
       size="lg"
       footer={
         <>
@@ -86,7 +106,7 @@ export function NewQuoteModal({ open, onClose, companyId }: { open: boolean; onC
       }
     >
       <div className="grid gap-3 sm:grid-cols-2">
-        {!companyId && (
+        {!companyId && !editing && (
           <Field label="기업">
             <Select value={company} onChange={(e) => { setCompany(e.target.value); setProject(""); setOpp(""); }}>
               {st.companies.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
@@ -99,7 +119,7 @@ export function NewQuoteModal({ open, onClose, companyId }: { open: boolean; onC
             {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </Select>
         </Field>
-        {opps.length > 0 && (
+        {opps.length > 0 && !editing && (
           <Field label="매출기회 연결" hint="연결하면 계약 전환 시 기회도 같이 닫힙니다.">
             <Select value={opp} onChange={(e) => setOpp(e.target.value)}>
               <option value="">연결 안 함</option>
@@ -198,7 +218,7 @@ export function QuoteApprovalModal({ quote, onClose }: { quote: Quote | null; on
 
 /* ---------------- 견적 상세 · 실행 ---------------- */
 
-export function QuoteDetailModal({ quote, onClose }: { quote: Quote | null; onClose: () => void }) {
+export function QuoteDetailModal({ quote, onClose, onEdit }: { quote: Quote | null; onClose: () => void; onEdit?: (id: string) => void }) {
   const st = useStore();
   const send = useStore((s) => s.sendQuote);
   const convert = useStore((s) => s.convertQuote);
@@ -232,6 +252,9 @@ export function QuoteDetailModal({ quote, onClose }: { quote: Quote | null; onCl
             )}
             {q.status === "accepted" && (
               <Button variant="accent" onClick={() => { convert(q.id, me); toast("계약으로 전환했습니다. 계약 탭에서 확인하세요."); onClose(); }}>계약으로 전환</Button>
+            )}
+            {(q.status === "draft" || q.status === "approval_pending") && onEdit && (
+              <Button variant="outline" icon={<Pencil size={15} />} onClick={() => { onClose(); onEdit(q.id); }}>수정</Button>
             )}
           </>
         }

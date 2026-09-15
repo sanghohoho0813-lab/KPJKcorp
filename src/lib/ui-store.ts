@@ -9,6 +9,7 @@ interface UiState {
   presentationStep: number;
   devicePreview: "mobile" | "desktop" | null;
   moreSheet: boolean;
+  searchOpen: boolean;
   nextSheet: string | null; // NEXT feature key
   aiModal: { title: string; key: string } | null;
   draftModal: { kind: string; ctx: Record<string, string | undefined> } | null;
@@ -21,6 +22,8 @@ interface UiState {
   openPreview: (mode: "mobile" | "desktop") => void;
   closePreview: () => void;
   setMoreSheet: (v: boolean) => void;
+  openSearch: () => void;
+  closeSearch: () => void;
   openNext: (key: string | null) => void;
   openAi: (v: { title: string; key: string } | null) => void;
   openDraft: (v: { kind: string; ctx: Record<string, string | undefined> } | null) => void;
@@ -32,6 +35,7 @@ export const useUi = create<UiState>()((set) => ({
   presentationStep: 0,
   devicePreview: null,
   moreSheet: false,
+  searchOpen: false,
   nextSheet: null,
   aiModal: null,
   draftModal: null,
@@ -43,6 +47,8 @@ export const useUi = create<UiState>()((set) => ({
   openPreview: (mode) => set({ devicePreview: mode, moreSheet: false }),
   closePreview: () => set({ devicePreview: null }),
   setMoreSheet: (v) => set({ moreSheet: v }),
+  openSearch: () => set({ searchOpen: true, moreSheet: false }),
+  closeSearch: () => set({ searchOpen: false }),
   openNext: (key) => set({ nextSheet: key, moreSheet: false }),
   openAi: (v) => set({ aiModal: v }),
   openDraft: (v) => set({ draftModal: v }),

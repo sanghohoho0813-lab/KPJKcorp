@@ -33,7 +33,7 @@ import type {
   Task,
   TaskStatus,
 } from "./types";
-import { nowIso, uid, addDays, iso } from "./format";
+import { nowIso, uid, addDays, iso, daysBetween } from "./format";
 import { stageLabel } from "./stages";
 import { OPP_STATUS, SERVICE_BY_KEY } from "./services";
 import { can, type Permission } from "./permissions";
@@ -83,6 +83,17 @@ export interface StoreState extends SeedData {
   // ---- 상담기록 수정 / 삭제 ----
   updateConsultation: (id: string, patch: Partial<Omit<Consultation, "id" | "companyId">>, byUserId: string) => void;
   deleteConsultation: (id: string, byUserId: string) => void;
+
+  // ---- 견적 수정 (발송 전) / 계약 직접 등록·수정 / 결과자료 회수 ----
+  updateQuote: (id: string, patch: Partial<Pick<Quote, "title" | "scope" | "period" | "items" | "discountPct" | "validUntil" | "projectId">>, byUserId: string) => void;
+  createContract: (data: Omit<Contract, "id" | "source">, byUserId: string) => string | null;
+  updateContract: (id: string, patch: Partial<Omit<Contract, "id" | "companyId" | "source">>, byUserId: string) => void;
+  withdrawResult: (id: string, reason: string | undefined, byUserId: string) => void;
+
+  // ---- 시간 규칙 (계약 만료·사후관리·미열람·유효기간) ----
+  /** 규칙을 훑어 아직 없는 업무를 만든다. 멱등 — ruleKey 가 같으면 다시 만들지 않는다. 만든 개수를 돌려준다 */
+  syncRuleTasks: () => number;
+  setAutoRule: (key: string, enabled: boolean) => void;
 
   // ---- 보관 (하드 삭제 대신) ----
   archiveCompany: (id: string, archived: boolean, byUserId: string) => void;
@@ -570,6 +581,168 @@ export const useStore = create<StoreState>()(
         });
       },
 
+      // ---------- 견적 수정 (발송 전) ----------
+      updateQuote: (id, patch, byUserId) => {
+        const st = get();
+        const before = st.quotes.find((q) => q.id === id);
+        if (!before) return;
+        if (deny(st, "quote.update", `견적 수정 (${before.title})`, set)) return;
+        // 발송된 견적은 고객이 이미 본 금액이다 — 고치려면 새 견적으로 재발송한다.
+        if (before.status !== "draft" && before.status !== "approval_pending") return;
+        const next: Quote = { ...before, ...patch };
+        // 할인율이 바뀌면 이전 승인은 무효다. 승인은 특정 할인율에 대한 것이다.
+        const discountChanged = patch.discountPct !== undefined && patch.discountPct !== before.discountPct;
+        if (discountChanged) { next.approvalId = undefined; if (next.status === "approval_pending") next.status = "draft"; }
+        const LABEL: Record<string, string> = { title: "견적명", scope: "범위", period: "기간", items: "항목", discountPct: "할인율", validUntil: "유효기간", projectId: "프로젝트" };
+        const changed = (Object.keys(patch) as (keyof typeof patch)[]).filter((k) => patch[k] !== undefined && JSON.stringify(patch[k]) !== JSON.stringify(before[k]));
+        if (changed.length === 0) return;
+        set({
+          quotes: st.quotes.map((q) => (q.id === id ? next : q)),
+          // 승인 대기 중이던 건의 할인율이 바뀌면 그 승인 요청은 더 이상 유효하지 않다.
+          approvals: discountChanged && before.approvalId ? st.approvals.map((a) => (a.id === before.approvalId && a.status === "pending" ? { ...a, status: "rejected" as const, decidedAt: nowIso(), decisionNote: "견적 할인율 변경으로 자동 철회" } : a)) : st.approvals,
+          activities: [makeActivity({ type: "quote_updated", companyId: before.companyId, projectId: before.projectId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `견적 수정: ${next.title} — ${changed.map((k) => LABEL[k] ?? k).join(", ")}${discountChanged && before.approvalId ? " (기존 승인 무효)" : ""}`, meta: { fields: changed.join(","), amount: quoteNet(next) } }), ...st.activities],
+        });
+      },
+
+      // ---------- 계약 직접 등록 · 수정 ----------
+      createContract: (data, byUserId) => {
+        const st = get();
+        const company = st.companies.find((c) => c.id === data.companyId);
+        if (!company) return null;
+        if (deny(st, "contract.manage", `계약 등록 (${data.title})`, set)) return null;
+        const ct: Contract = { ...data, id: uid("ct"), source: "manual" };
+        set({
+          contracts: [ct, ...st.contracts],
+          activities: [makeActivity({ type: "contract_created", companyId: ct.companyId, projectId: ct.projectId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `계약 등록: ${ct.title} (${company.name})`, meta: { amount: ct.amount ?? 0, status: ct.status } }), ...st.activities],
+        });
+        return ct.id;
+      },
+
+      updateContract: (id, patch, byUserId) => {
+        const st = get();
+        const before = st.contracts.find((c) => c.id === id);
+        if (!before) return;
+        if (deny(st, "contract.manage", `계약 수정 (${before.title})`, set)) return;
+        const changed = (Object.keys(patch) as (keyof typeof patch)[]).filter((k) => patch[k] !== undefined && patch[k] !== before[k]);
+        if (changed.length === 0) return;
+        const LABEL: Record<string, string> = { title: "계약명", status: "상태", period: "기간", scope: "범위", endDate: "종료일", amount: "금액", projectId: "프로젝트", sentAt: "송부일", signedAt: "서명일" };
+        const next = { ...before, ...patch };
+        const signedNow = patch.status === "signed" && before.status !== "signed";
+        if (signedNow && !next.signedAt) next.signedAt = nowIso();
+        set({
+          contracts: st.contracts.map((c) => (c.id === id ? next : c)),
+          activities: [
+            ...(signedNow ? [makeActivity({ type: "contract_signed", companyId: before.companyId, projectId: before.projectId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `계약 서명: ${next.title}` })] : []),
+            makeActivity({ type: "contract_updated", companyId: before.companyId, projectId: before.projectId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `계약 수정: ${next.title} — ${changed.map((k) => LABEL[k] ?? k).join(", ")}`, meta: { fields: changed.join(",") } }),
+            ...st.activities,
+          ],
+        });
+      },
+
+      // ---------- 결과자료 회수 ----------
+      withdrawResult: (id, reason, byUserId) => {
+        const st = get();
+        const r = st.results.find((x) => x.id === id);
+        if (!r) return;
+        if (deny(st, "result.withdraw", `결과자료 회수 (${r.name})`, set)) return;
+        set({
+          results: st.results.filter((x) => x.id !== id),
+          activities: [makeActivity({ type: "result_withdrawn", companyId: r.companyId, projectId: r.projectId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `결과자료 회수: ${r.name}${reason ? ` — ${reason}` : ""}` }), ...st.activities],
+          notifications: [makeNotification({ audience: "client", companyId: r.companyId, title: "결과자료가 회수되었습니다", body: `${r.name}이(가) 내려졌습니다.${reason ? ` 사유: ${reason}` : ""} 수정본이 준비되면 다시 안내드립니다.`, href: "/portal/results" }), ...st.notifications],
+        });
+      },
+
+      // ---------- 시간 규칙 ----------
+      // 사건이 아니라 "시간이 흘러서" 생기는 일들은 누가 눌러주지 않으면 아무도 모른다.
+      // 앱을 열 때와 10분마다 훑어서 아직 없는 업무를 만든다. ruleKey 로 멱등을 보장한다.
+      syncRuleTasks: () => {
+        const st = get();
+        const on = (k: string) => st.settings.autoRules?.[k] !== false;
+        const has = (key: string) => st.tasks.some((t) => t.ruleKey === key);
+        const now = new Date();
+        const nowIsoStr = now.toISOString();
+        const made: Task[] = [];
+        const acts: Activity[] = [];
+        const liveCompany = (id?: string) => { const c = st.companies.find((x) => x.id === id); return c && !c.archived ? c : undefined; };
+        const liveProject = (id?: string) => { const p = st.projects.find((x) => x.id === id); return p && !p.archived ? p : undefined; };
+        const push = (t: Omit<Task, "id" | "createdAt" | "status" | "source">, ruleLabel: string) => {
+          const task: Task = { ...t, id: uid("tk"), createdAt: nowIsoStr, status: "todo", source: "auto" };
+          made.push(task);
+          acts.push(makeActivity({ type: "rule_task_created", companyId: t.companyId, projectId: t.projectId, actorId: "system", actorRole: "system", text: `규칙 생성 (${ruleLabel}): ${t.title}`, meta: { ruleKey: t.ruleKey ?? "" } }));
+        };
+
+        // 1) 계약 만료 30일 전 → 갱신 협의
+        if (on("contract_renewal")) {
+          for (const ct of st.contracts) {
+            if (ct.status !== "signed" || !ct.endDate) continue;
+            const c = liveCompany(ct.companyId); if (!c) continue;
+            const d = daysBetween(nowIsoStr, ct.endDate);
+            if (d < 0 || d > 30) continue;
+            const key = `contract_renewal:${ct.id}`;
+            if (has(key)) continue;
+            push({ companyId: ct.companyId, projectId: ct.projectId, title: `${c.name} 계약 만료 D-${d} — 갱신 협의`, type: "후속연락", dueDate: iso(addDays(now, Math.max(1, Math.min(7, d - 7)), 18)), assigneeId: c.consultantId, priority: d <= 14 ? "urgent" : "normal", ruleKey: key, memo: `계약 종료일 ${ct.endDate.slice(0, 10)}. 갱신 여부와 조건을 미리 확인합니다.` }, "계약 만료 30일 전");
+          }
+        }
+        // 2) 사후관리 90일 경과 → 종료 점검
+        if (on("aftercare_review")) {
+          for (const p of st.projects) {
+            if (p.stage !== "aftercare" || p.archived) continue;
+            const c = liveCompany(p.companyId); if (!c) continue;
+            const d = daysBetween(p.stageChangedAt, nowIsoStr);
+            if (d < 90) continue;
+            const key = `aftercare_review:${p.id}`;
+            if (has(key)) continue;
+            push({ companyId: p.companyId, projectId: p.id, title: `${c.name} ${p.name} 사후관리 ${d}일 — 종료 점검`, type: "후속연락", dueDate: iso(addDays(now, 5, 18)), assigneeId: p.consultantId, priority: "normal", ruleKey: key, memo: "사후관리를 마무리할지, 추가 컨설팅으로 이을지 대표와 정리합니다." }, "사후관리 90일 경과");
+          }
+        }
+        // 3) 결과자료 공유 후 7일 미열람 → 확인 안내
+        if (on("result_unread")) {
+          for (const r of st.results) {
+            const c = liveCompany(r.companyId); if (!c) continue;
+            if (daysBetween(r.sharedAt, nowIsoStr) < 7) continue;
+            const viewed = st.activities.some((a) => a.type === "result_downloaded" && a.companyId === r.companyId && a.text.includes(r.name) && a.at >= r.sharedAt);
+            if (viewed) continue;
+            const key = `result_unread:${r.id}`;
+            if (has(key)) continue;
+            push({ companyId: r.companyId, projectId: r.projectId, title: `${c.name} 결과자료 미열람 7일 — 확인 안내`, type: "후속연락", dueDate: iso(addDays(now, 2, 18)), assigneeId: c.consultantId, priority: "normal", ruleKey: key, memo: `${r.name}을(를) 고객이 아직 열지 않았습니다. 전달됐는지 확인합니다.` }, "결과자료 7일 미열람");
+          }
+        }
+        // 4) 발송 견적 유효기간 D-3 무회신 → 연장 협의
+        if (on("quote_expiring")) {
+          for (const q of st.quotes) {
+            if (q.status !== "sent") continue;
+            const c = liveCompany(q.companyId); if (!c) continue;
+            const d = daysBetween(nowIsoStr, q.validUntil);
+            if (d < 0 || d > 3) continue;
+            const key = `quote_expiring:${q.id}`;
+            if (has(key)) continue;
+            push({ companyId: q.companyId, projectId: q.projectId, title: `${c.name} 견적 유효기간 D-${d} — 회신·연장 확인`, type: "후속연락", dueDate: iso(addDays(now, 1, 18)), assigneeId: c.consultantId, priority: "urgent", ruleKey: key, memo: `${q.title} 유효기간 ${q.validUntil.slice(0, 10)}. 회신을 받거나 기간을 연장합니다.` }, "견적 유효기간 D-3");
+          }
+        }
+        // 5) 자료 미제출 기한 초과 3일 → 독촉 (브리핑엔 있지만 업무함엔 없던 것)
+        if (on("doc_overdue_followup")) {
+          for (const d of st.docRequests) {
+            if (d.status !== "requested" && d.status !== "revision") continue;
+            const c = liveCompany(d.companyId); if (!c || !liveProject(d.projectId)) continue;
+            const over = daysBetween(d.dueDate, nowIsoStr);
+            if (over < 3) continue;
+            const key = `doc_overdue_followup:${d.id}`;
+            if (has(key)) continue;
+            push({ companyId: d.companyId, projectId: d.projectId, title: `${c.name} ${d.name} 기한 ${over}일 초과 — 독촉`, type: "후속연락", dueDate: iso(addDays(now, 1, 18)), assigneeId: d.assigneeId, priority: "urgent", ruleKey: key, memo: "미제출 사유를 확인하고 필요하면 기한을 조정합니다." }, "자료 기한 3일 초과");
+          }
+        }
+
+        if (made.length === 0) return 0;
+        set({ tasks: [...made, ...st.tasks], activities: [...acts, ...st.activities] });
+        return made.length;
+      },
+
+      setAutoRule: (key, enabled) => {
+        const st = get();
+        if (deny(st, "rules.manage", `자동 업무 규칙 ${enabled ? "켜기" : "끄기"} (${key})`, set)) return;
+        set({ settings: { ...st.settings, autoRules: { ...(st.settings.autoRules ?? {}), [key]: enabled } } });
+      },
+
       // ---------- 보관 ----------
       // 기업·프로젝트는 지우지 않고 보관한다. 지우면 그 아래 자료·상담·계약·활동로그가
       // 전부 고아가 되고, 실증 데이터의 근거도 함께 사라진다.
@@ -1044,6 +1217,8 @@ export const useStore = create<StoreState>()(
           sentAt: now,
           period: q.period,
           scope: q.scope,
+          amount: quoteNet(q),
+          source: "quote",
         };
         // 견적이 계약이 되면 연결된 매출기회도 함께 닫힌다 — 두 곳을 따로 정리하게 두지 않는다.
         const opportunities = q.opportunityId
