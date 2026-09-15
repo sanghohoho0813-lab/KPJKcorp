@@ -18,6 +18,9 @@ import { CompanyModal, ProjectModal, useMay } from "@/components/domain/EntityMo
 import { UserModal } from "@/components/domain/UserModals";
 import { Confirm } from "@/components/ui/overlay";
 import { NewConsultationModal } from "@/components/domain/ConsultationModal";
+import { CONSULT_AREA_LABEL, ENTITY_TYPES, companySummary, yearsSince } from "@/lib/company-options";
+import { DOC_SOURCE_LABEL } from "@/lib/docparse";
+import { EXTRACT_METHOD_LABEL } from "@/lib/docextract";
 
 type TabKey = "overview" | "consult" | "contract" | "project" | "docs" | "schedule" | "inquiry" | "results" | "history";
 
@@ -105,17 +108,41 @@ export default function ClientCardPage() {
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-[1.6rem] font-bold md:text-[1.85rem]">{c.name}</h1>
+                {c.sample && <Badge tone="info">샘플</Badge>}
                 {c.archived && <Badge tone="neutral">보관됨</Badge>}
                 {active[0] && <StageBadge stage={active[0].stage} />}
               </div>
-              <div className="mt-1 text-[0.9rem] text-ink-2">{c.industry} · 임직원 {c.employees}명 · 매출 {c.revenue} · 사업자번호 {c.bizNo}</div>
+              <div className="mt-1 text-[0.9rem] text-ink-2">
+                {[
+                  ENTITY_TYPES.find((t) => t.key === c.entityType)?.label,
+                  companySummary(c),
+                  c.bizNo && `사업자번호 ${c.bizNo}`,
+                  c.corpNo && `법인번호 ${c.corpNo}`,
+                  c.establishedAt && `설립 ${c.establishedAt.slice(0, 4)}년 (업력 ${yearsSince(c.establishedAt)}년)`,
+                ].filter(Boolean).join(" · ") || "기본 정보가 아직 없습니다 — 기업정보 수정에서 서류를 올리면 채워집니다."}
+              </div>
+              {(c.bizCategory || c.bizItem) && <div className="mt-0.5 text-[0.82rem] text-ink-3">업태 {c.bizCategory ?? "-"} · 종목 {c.bizItem ?? "-"}{c.capital ? ` · 자본금 ${c.capital.toLocaleString("ko-KR")}원` : ""}</div>}
+              {(c.interests?.length || c.leadSource) ? (
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  {(c.interests ?? []).map((k) => <Badge key={k} tone="accent">{CONSULT_AREA_LABEL[k] ?? k}</Badge>)}
+                  {c.leadSource && <Badge tone="neutral">유입 · {c.leadSource}</Badge>}
+                </div>
+              ) : null}
               <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1.5 text-[0.85rem] md:grid-cols-3">
-                <span className="flex items-center gap-1.5 text-ink-2"><UserRound size={14} className="text-ink-3" /> 대표 <b className="text-ink">{c.ceo}</b></span>
-                <span className="flex items-center gap-1.5 text-ink-2"><UserRound size={14} className="text-ink-3" /> 담당자 <b className="text-ink">{c.contactName} {c.contactTitle}</b></span>
-                <span className="flex items-center gap-1.5 text-ink-2"><Phone size={14} className="text-ink-3" /> {c.contactPhone}</span>
-                <span className="flex items-center gap-1.5 text-ink-2"><Mail size={14} className="text-ink-3" /> {c.contactEmail}</span>
-                <span className="flex items-center gap-1.5 text-ink-2"><MapPin size={14} className="text-ink-3" /> {c.address}</span>
+                <span className="flex items-center gap-1.5 text-ink-2"><UserRound size={14} className="shrink-0 text-ink-3" /> <span className="shrink-0">대표</span> <b className="text-ink">{c.ceo}</b></span>
+                <span className="flex items-center gap-1.5 text-ink-2"><UserRound size={14} className="shrink-0 text-ink-3" /> <span className="shrink-0">담당자</span> <b className="text-ink">{c.contactName} {c.contactTitle}</b></span>
+                <span className="flex items-center gap-1.5 text-ink-2"><Phone size={14} className="text-ink-3" /> {c.contactPhone || <span className="text-ink-3">연락처 없음</span>}{c.companyPhone ? <span className="text-ink-3"> · 대표 {c.companyPhone}</span> : null}</span>
+                <span className="flex items-center gap-1.5 text-ink-2"><Mail size={14} className="text-ink-3" /> {c.contactEmail || <span className="text-ink-3">이메일 없음</span>}</span>
+                <span className="flex items-center gap-1.5 text-ink-2"><MapPin size={14} className="text-ink-3" /> {c.address || c.region || <span className="text-ink-3">주소 없음</span>}</span>
                 <span className="flex items-center gap-1.5 text-ink-2"><CalendarDays size={14} className="text-ink-3" /> 최초 상담 {fmtDate(c.firstConsultDate, { year: true })}</span>
+                {c.website && <span className="flex items-center gap-1.5 text-ink-2"><ChevronRight size={14} className="text-ink-3" /> {c.website}</span>}
+                {c.docs && (Object.keys(c.docs) as (keyof typeof c.docs)[]).some((k) => c.docs?.[k]) && (
+                  <span className="col-span-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-ink-2 md:col-span-3">
+                    {(Object.keys(c.docs) as (keyof typeof c.docs)[]).map((k) => { const d = c.docs?.[k]; if (!d) return null; return (
+                      <span key={k} className="flex items-center gap-1.5"><FileCheck2 size={14} className="shrink-0 text-success" /> {DOC_SOURCE_LABEL[k]} 확인 <span className="text-ink-3">· {fmtDate(d.readAt, { year: true })} · {EXTRACT_METHOD_LABEL[d.method]}</span></span>
+                    ); })}
+                  </span>
+                )}
               </div>
             </div>
           </div>

@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Building2, Briefcase, CalendarDays, CheckSquare, FileText, FileUp, Trash2 } from "lucide-react";
+import { Briefcase, CalendarDays, CheckSquare, FileText, FileUp, Trash2 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { can } from "@/lib/permissions";
 import { INTERNAL_STAGES, SCHEDULE_TYPE } from "@/lib/stages";
 import { addDays } from "@/lib/format";
-import type { Company, Contract, InternalStage, Project, ScheduleType, Task } from "@/lib/types";
+import type { Contract, InternalStage, Project, ScheduleType, Task } from "@/lib/types";
 import { Confirm, Modal } from "@/components/ui/overlay";
 import { Button, Field, Input, Select, Textarea } from "@/components/ui/ui";
 
@@ -23,108 +23,8 @@ function dateInput(iso?: string) {
 export const PROJECT_TYPES = ["경영진단", "정책자금", "연구소", "기업인증", "법인자문", "운영개선", "기타"];
 
 /* ---------------- 기업고객 등록 · 수정 ---------------- */
-
-type CompanyForm = Omit<Company, "id" | "code">;
-
-const EMPTY_COMPANY = (consultantId: string): CompanyForm => ({
-  name: "", ceo: "", industry: "", bizNo: "", contactName: "", contactTitle: "", contactPhone: "",
-  contactEmail: "", address: "", employees: 0, revenue: "", firstConsultDate: new Date().toISOString(),
-  consultantId, memo: "",
-});
-
-export function CompanyModal(props: { open: boolean; companyId?: string | null; onClose: () => void; onCreated?: (id: string) => void }) {
-  // 열릴 때마다 새로 마운트해서 폼을 초기화한다. effect로 setState 하지 않는다.
-  if (!props.open) return null;
-  return <CompanyModalInner key={props.companyId ?? "new"} {...props} />;
-}
-
-function CompanyModalInner({ open, companyId, onClose, onCreated }: { open: boolean; companyId?: string | null; onClose: () => void; onCreated?: (id: string) => void }) {
-  const st = useStore();
-  const create = useStore((s) => s.createCompany);
-  const update = useStore((s) => s.updateCompany);
-  const toast = useStore((s) => s.toast);
-  const me = st.session?.userId ?? "u_admin";
-  const editing = st.companies.find((c) => c.id === companyId);
-  const consultants = st.users.filter((u) => u.role !== "client");
-  const [f, setF] = useState<CompanyForm>(() => (editing ? { ...editing } : EMPTY_COMPANY(me)));
-  const [err, setErr] = useState<Partial<Record<keyof CompanyForm, string>>>({});
-
-  const set = <K extends keyof CompanyForm>(k: K, v: CompanyForm[K]) => {
-    setF((x) => ({ ...x, [k]: v }));
-    setErr((e) => ({ ...e, [k]: undefined }));
-  };
-
-  const validate = () => {
-    const e: Partial<Record<keyof CompanyForm, string>> = {};
-    if (!f.name.trim()) e.name = "기업명은 필수입니다.";
-    else if (st.companies.some((c) => c.id !== companyId && c.name.trim() === f.name.trim())) e.name = "같은 이름의 기업이 이미 있습니다.";
-    if (!f.ceo.trim()) e.ceo = "대표자명은 필수입니다.";
-    if (!f.contactName.trim()) e.contactName = "담당자명은 필수입니다.";
-    if (f.bizNo && !/^[0-9-]{10,14}$/.test(f.bizNo.trim())) e.bizNo = "숫자와 하이픈만, 10자리 이상 입력해 주세요.";
-    if (f.contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.contactEmail.trim())) e.contactEmail = "이메일 형식이 아닙니다.";
-    if (f.employees < 0) e.employees = "0 이상이어야 합니다.";
-    setErr(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const submit = () => {
-    if (!validate()) { toast("입력값을 확인해 주세요.", "error"); return; }
-    const data: CompanyForm = {
-      ...f,
-      name: f.name.trim(), ceo: f.ceo.trim(), industry: f.industry.trim(), bizNo: f.bizNo.trim(),
-      contactName: f.contactName.trim(), contactTitle: f.contactTitle.trim(), contactPhone: f.contactPhone.trim(),
-      contactEmail: f.contactEmail.trim(), address: f.address.trim(), revenue: f.revenue.trim(), memo: f.memo.trim(),
-    };
-    if (editing) {
-      update(editing.id, data, me);
-      toast("기업정보를 수정했습니다. 변경 항목이 활동 기록에 남았습니다.");
-      onClose();
-    } else {
-      const id = create(data, me);
-      if (!id) { toast("기업고객을 등록할 권한이 없습니다.", "error"); return; }
-      toast(`${data.name}을(를) 등록했습니다.`);
-      onClose();
-      onCreated?.(id);
-    }
-  };
-
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      size="md"
-      title={<span className="flex items-center gap-2"><Building2 size={18} /> {editing ? "기업정보 수정" : "기업고객 등록"}</span>}
-      footer={<><Button variant="ghost" onClick={onClose}>취소</Button><Button variant="accent" onClick={submit}>{editing ? "저장" : "등록"}</Button></>}
-    >
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="기업명 *" hint={err.name}><Input value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="예: 에이정밀(주)" autoFocus /></Field>
-        <Field label="대표자 *" hint={err.ceo}><Input value={f.ceo} onChange={(e) => set("ceo", e.target.value)} /></Field>
-        <Field label="업종"><Input value={f.industry} onChange={(e) => set("industry", e.target.value)} placeholder="예: 정밀부품 제조" /></Field>
-        <Field label="사업자번호" hint={err.bizNo}><Input value={f.bizNo} onChange={(e) => set("bizNo", e.target.value)} placeholder="000-00-00000" inputMode="numeric" /></Field>
-        <Field label="담당자 *" hint={err.contactName}><Input value={f.contactName} onChange={(e) => set("contactName", e.target.value)} /></Field>
-        <Field label="담당자 직책"><Input value={f.contactTitle} onChange={(e) => set("contactTitle", e.target.value)} placeholder="예: 경영지원팀장" /></Field>
-        <Field label="연락처"><Input value={f.contactPhone} onChange={(e) => set("contactPhone", e.target.value)} placeholder="010-0000-0000" inputMode="tel" /></Field>
-        <Field label="이메일" hint={err.contactEmail}><Input value={f.contactEmail} onChange={(e) => set("contactEmail", e.target.value)} inputMode="email" /></Field>
-        <Field label="주소"><Input value={f.address} onChange={(e) => set("address", e.target.value)} placeholder="예: 경기 화성시" /></Field>
-        <Field label="임직원 수" hint={err.employees}><Input value={String(f.employees || "")} onChange={(e) => set("employees", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} inputMode="numeric" /></Field>
-        <Field label="매출 규모"><Input value={f.revenue} onChange={(e) => set("revenue", e.target.value)} placeholder="예: 120억" /></Field>
-        <Field label="담당 컨설턴트">
-          <Select value={f.consultantId} onChange={(e) => set("consultantId", e.target.value)}>
-            {consultants.map((u) => <option key={u.id} value={u.id}>{u.name} {u.title}</option>)}
-          </Select>
-        </Field>
-        <Field label="최초 상담일">
-          <Input type="date" value={dateInput(f.firstConsultDate)} onChange={(e) => set("firstConsultDate", new Date(`${e.target.value}T09:00:00`).toISOString())} />
-        </Field>
-      </div>
-      <div className="mt-3">
-        <Field label="메모" hint="상담에서 파악한 관심사·의사결정 방식 등을 적어두면 브리핑과 추천에 쓰입니다.">
-          <Textarea value={f.memo} onChange={(e) => set("memo", e.target.value)} rows={3} />
-        </Field>
-      </div>
-    </Modal>
-  );
-}
+// 클릭 위주 폼 + 서류 자동 채우기로 커져서 CompanyForm.tsx로 옮겼다. 기존 import 경로는 그대로 쓴다.
+export { CompanyModal } from "./CompanyForm";
 
 /* ---------------- 프로젝트 등록 · 수정 ---------------- */
 

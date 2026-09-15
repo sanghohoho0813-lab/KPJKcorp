@@ -9,6 +9,7 @@ import { fmtDateTime } from "@/lib/format";
 import type { OrgInfo } from "@/lib/types";
 import { Badge, Button, Field, Input, cx } from "@/components/ui/ui";
 import { Confirm, Modal } from "@/components/ui/overlay";
+import { SamplePanel } from "./SampleData";
 
 /**
  * 실사용 안전장치 — 서버가 붙기 전까지 실제 데이터를 넣기 시작했을 때 지켜주는 세 가지.
@@ -115,6 +116,8 @@ export function DataPanel() {
         </div>
         {!manage && <p className="mt-2 text-[0.78rem] text-ink-3">백업과 복원은 대표 계정에서만 가능합니다.</p>}
       </div>
+
+      <SamplePanel />
 
       {/* 회사 정보 (인쇄용) */}
       <div className="rounded-xl border border-line p-4">

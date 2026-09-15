@@ -62,6 +62,48 @@ export interface Company {
   /** 보관됨 — 목록에서 빠지되 기록·연결은 그대로 남는다. 하드 삭제는 하지 않는다. */
   archived?: boolean;
   archivedAt?: string;
+
+  /* ---- 확장 정보 (전부 선택) — 서류에서 읽거나 클릭으로 고른다 ---- */
+  /** 사업자 형태 */
+  entityType?: EntityType;
+  /** 법인등록번호 000000-0000000 */
+  corpNo?: string;
+  /** 설립일(법인) 또는 개업일(개인) — YYYY-MM-DD */
+  establishedAt?: string;
+  /** 업태 / 종목 — 사업자등록증 그대로 */
+  bizCategory?: string;
+  bizItem?: string;
+  /** 대표자 생년월일 YYYY-MM-DD — 가업승계·보험 설계에 쓰인다. 주민번호 뒷자리는 절대 저장하지 않는다 */
+  ceoBirth?: string;
+  /** 자본금(원) — 등기부에서 읽는다 */
+  capital?: number;
+  /** 지역 (시·도) */
+  region?: string;
+  /** 임직원 규모 구간 — 정확한 수(employees)가 없을 때의 클릭 입력 */
+  employeeBand?: string;
+  /** 매출 규모 구간 — 정확한 값(revenue)이 없을 때의 클릭 입력 */
+  revenueBand?: string;
+  companyPhone?: string;
+  website?: string;
+  /** 관심 컨설팅 분야 (kpjkcorporation.com 자문 분야 기준) */
+  interests?: string[];
+  /** 유입 경로 */
+  leadSource?: string;
+  /** 확인한 서류 — 파일은 저장하지 않고 "무엇을 언제 어떤 방법으로 읽었는지"만 남긴다 */
+  docs?: Partial<Record<CompanyDocKind, CompanyDocMeta>>;
+  /** 데모 샘플 기업 — "샘플 지우기 / 다시 보기"의 대상. 사용자가 직접 넣은 기업에는 붙지 않는다 */
+  sample?: boolean;
+}
+
+export type EntityType = "corporation" | "sole" | "other";
+export type CompanyDocKind = "bizReg" | "corpReg";
+export interface CompanyDocMeta {
+  fileName: string;
+  size: number;
+  readAt: string;
+  method: "pdf_text" | "ocr" | "paste";
+  /** 이 서류에서 읽어 반영한 항목 키 */
+  fields: string[];
 }
 
 export interface Consultation {
@@ -406,7 +448,10 @@ export type ActivityType =
   | "backup_exported"
   | "backup_imported"
   | "org_updated"
-  | "demo_reset";
+  | "demo_reset"
+  | "samples_removed"
+  | "samples_restored"
+  | "company_doc_read";
 
 export interface Activity {
   id: string;

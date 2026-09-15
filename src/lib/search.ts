@@ -76,7 +76,7 @@ export function search(input: SearchInput, rawQuery: string): SearchHit[] {
   const hits: SearchHit[] = [];
 
   for (const c of liveCompanies) {
-    const s = scoreOf(q, c.name, [c.ceo, c.contactName, c.industry, c.bizNo, c.contactPhone]);
+    const s = scoreOf(q, c.name, [c.ceo, c.contactName, c.industry, c.bizNo, c.contactPhone, c.corpNo, c.region, c.address]);
     if (s) hits.push({ kind: "company", id: c.id, title: c.name, sub: `${c.industry} · 대표 ${c.ceo} · 담당 ${c.contactName}`, href: `/ax/clients/${c.id}`, score: s });
   }
   for (const p of liveProjects) {

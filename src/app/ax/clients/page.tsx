@@ -10,6 +10,8 @@ import { stageLabel } from "@/lib/stages";
 import { PageHeader, Badge, Button, SegmentedControl, EmptyState, Card } from "@/components/ui/ui";
 import { CompanyModal, useMay } from "@/components/domain/EntityModals";
 import { SearchBox, StageBadge, StageProgressBar } from "@/components/domain/domain";
+import { RestoreSamplesButton, SampleBanner } from "@/components/domain/SampleData";
+import { CONSULT_AREA_LABEL, companySummary } from "@/lib/company-options";
 
 export default function ClientsPage() {
   const st = useStore();
@@ -38,7 +40,7 @@ export default function ClientsPage() {
       // 보관된 기업은 "보관" 필터에서만 보인다.
       .filter((r) => (filter === "archived" ? !!r.c.archived : !r.c.archived))
       .filter((r) => (filter === "mine" ? r.c.consultantId === me : filter === "issue" ? r.hasIssue : true))
-      .filter((r) => !q || r.c.name.includes(q) || r.c.ceo.includes(q) || r.c.industry.includes(q) || r.c.contactName.includes(q));
+      .filter((r) => !q || r.c.name.includes(q) || r.c.ceo.includes(q) || r.c.industry.includes(q) || r.c.contactName.includes(q) || r.c.bizNo.includes(q) || (r.c.region ?? "").includes(q) || (r.c.interests ?? []).some((k) => (CONSULT_AREA_LABEL[k] ?? "").includes(q)));
   }, [st, q, filter, me, now]);
 
   return (
@@ -46,11 +48,13 @@ export default function ClientsPage() {
       <PageHeader title="기업고객" desc="기업고객 단위로 상담·계약·프로젝트·자료·일정·문의를 연결합니다." badge={<Badge>{st.companies.filter((c) => !c.archived).length}개 기업</Badge>} actions={
         <div className="flex flex-wrap items-center gap-2">
           <SegmentedControl value={view} onChange={setView} options={[{ key: "card", label: <span className="flex items-center gap-1"><LayoutGrid size={14} /> 카드</span> }, { key: "table", label: <span className="flex items-center gap-1"><List size={14} /> 목록</span> }]} />
+          <RestoreSamplesButton />
           {may("company.create") && <Button variant="accent" icon={<Plus size={16} />} onClick={() => setNewOpen(true)}>기업고객 등록</Button>}
         </div>
       } />
+      <SampleBanner className="mb-4" />
       <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center">
-        <div className="md:w-80"><SearchBox value={q} onChange={setQ} placeholder="기업명, 대표, 업종, 담당자 검색" /></div>
+        <div className="md:w-80"><SearchBox value={q} onChange={setQ} placeholder="기업명, 대표, 업종, 지역, 관심 분야 검색" /></div>
         <SegmentedControl size="sm" value={filter} onChange={setFilter} options={[{ key: "all", label: "전체" }, { key: "mine", label: "내 담당" }, { key: "issue", label: "확인 필요" }, { key: "archived", label: "보관" }]} />
       </div>
 
@@ -62,8 +66,8 @@ export default function ClientsPage() {
             <Link key={c.id} href={`/ax/clients/${c.id}`} className="card card-hover flex flex-col p-5">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2"><span className="tnum flex h-7 w-7 items-center justify-center rounded-lg bg-shell text-[0.75rem] font-bold text-white">{c.code}</span><span className="truncate text-[1.05rem] font-bold">{c.name}</span></div>
-                  <div className="mt-1 text-[0.82rem] text-ink-3">{c.industry} · {c.employees}명 · 매출 {c.revenue}</div>
+                  <div className="flex items-center gap-2"><span className="tnum flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-shell text-[0.75rem] font-bold text-white">{c.code}</span><span className="truncate text-[1.05rem] font-bold">{c.name}</span>{c.sample && <Badge tone="info" className="shrink-0">샘플</Badge>}</div>
+                  <div className="mt-1 text-[0.82rem] text-ink-3">{companySummary(c) || "기본 정보 미입력"}{c.region ? ` · ${c.region}` : ""}</div>
                 </div>
                 <ChevronRight size={18} className="shrink-0 text-ink-3" />
               </div>
@@ -72,6 +76,8 @@ export default function ClientsPage() {
                 {missing.length > 0 && overdue === 0 && <Badge tone="warning">미제출 {missing.length}</Badge>}
                 {openIq > 0 && <Badge tone="error">미답변 문의 {openIq}</Badge>}
                 {missing.length === 0 && openIq === 0 && <Badge tone="success">이슈 없음</Badge>}
+                {(c.interests ?? []).slice(0, 3).map((k) => <Badge key={k} tone="accent">{CONSULT_AREA_LABEL[k] ?? k}</Badge>)}
+                {(c.interests?.length ?? 0) > 3 && <Badge tone="neutral">+{(c.interests?.length ?? 0) - 3}</Badge>}
               </div>
               <div className="mt-4 space-y-2">
                 {active.length ? active.slice(0, 2).map((p) => (
@@ -98,6 +104,7 @@ export default function ClientsPage() {
               <div className="flex items-center gap-2">
                 <span className="tnum flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-shell text-[0.7rem] font-bold text-white">{c.code}</span>
                 <span className="truncate font-bold">{c.name}</span>
+                {c.sample && <Badge tone="info" className="shrink-0">샘플</Badge>}
                 {active[0] && <StageBadge stage={active[0].stage} />}
               </div>
               <div className="mt-1 truncate text-[0.82rem] text-ink-2">{active[0]?.name ?? "진행 중 프로젝트 없음"}{active.length > 1 ? ` 외 ${active.length - 1}` : ""}</div>
@@ -115,8 +122,8 @@ export default function ClientsPage() {
             <tbody>
               {rows.map(({ c, active, missing, overdue, openIq, next, consultant }) => (
                 <tr key={c.id} className="row-clickable" onClick={() => router.push(`/ax/clients/${c.id}`)}>
-                  <td className="font-semibold">{c.name}</td>
-                  <td className="text-ink-2">{c.industry}</td>
+                  <td className="font-semibold">{c.name}{c.sample && <Badge tone="info" className="ml-1.5">샘플</Badge>}</td>
+                  <td className="text-ink-2">{c.industry || <span className="text-ink-3">-</span>}</td>
                   <td className="nowrap">{consultant?.name}</td>
                   <td>{active[0]?.name ?? <span className="text-ink-3">-</span>}{active.length > 1 && <span className="text-ink-3"> 외 {active.length - 1}</span>}</td>
                   <td>{active[0] ? <StageBadge stage={active[0].stage} /> : "-"}</td>

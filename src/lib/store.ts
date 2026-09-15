@@ -150,6 +150,10 @@ export interface StoreState extends SeedData {
   markAllRead: (audience: "internal" | "client", companyId?: string) => void;
   logActivity: (a: Omit<Activity, "id" | "at">) => void;
   resetDemo: () => void;
+  /** 샘플 기업 6개와 그에 딸린 모든 데이터를 지운다. 사용자가 직접 넣은 것은 건드리지 않는다. 운영 모드가 함께 켜진다 */
+  removeSamples: (byUserId: string) => { ok: true; counts: { companies: number; projects: number; records: number } } | { ok: false; reason: string };
+  /** 지운 샘플을 다시 넣는다. 이미 있는 것과 사용자가 넣은 것은 그대로 둔다 */
+  restoreSamples: (byUserId: string) => { ok: true; counts: { companies: number; projects: number } } | { ok: false; reason: string };
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -168,6 +172,18 @@ export function quoteGross(q: Pick<Quote, "items">) {
 /** 견적 합계 (할인 적용) */
 export function quoteNet(q: Pick<Quote, "items" | "discountPct">) {
   return Math.round(quoteGross(q) * (1 - (q.discountPct || 0) / 100));
+}
+
+/** 비어 있는 첫 코드 — A..Z, 다 차면 A2..Z2, A3… */
+export function nextCompanyCode(used: string[]) {
+  const taken = new Set(used);
+  for (let round = 1; round < 50; round += 1) {
+    for (let i = 0; i < 26; i += 1) {
+      const code = round === 1 ? String.fromCharCode(65 + i) : `${String.fromCharCode(65 + i)}${round}`;
+      if (!taken.has(code)) return code;
+    }
+  }
+  return `X${used.length}`;
 }
 
 function makeActivity(a: Omit<Activity, "id" | "at">): Activity {
@@ -405,11 +421,8 @@ export const useStore = create<StoreState>()(
         const st = get();
         if (deny(st, "company.create", `기업고객 등록 (${data.name})`, set)) return null;
         const id = uid("co");
-        // 코드(A, B, C…)는 기존 최대값 다음 글자. 26개를 넘기면 A2, B2 … 로 이어진다.
-        const used = st.companies.map((c) => c.code);
-        const n = st.companies.length;
-        const code = n < 26 ? String.fromCharCode(65 + n) : `${String.fromCharCode(65 + (n % 26))}${Math.floor(n / 26) + 1}`;
-        const company: Company = { ...data, id, code: used.includes(code) ? `${code}${n}` : code };
+        // 코드(A, B, C…)는 비어 있는 첫 글자. 샘플을 지웠다 되살려도 겹치지 않도록 "몇 번째"가 아니라 "안 쓰인 글자"를 고른다.
+        const company: Company = { ...data, id, code: nextCompanyCode(st.companies.map((c) => c.code)), sample: undefined };
         set({
           companies: [...st.companies, company],
           activities: [makeActivity({ type: "company_created", companyId: id, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `기업고객 등록: ${company.name}` }), ...st.activities],
@@ -422,9 +435,9 @@ export const useStore = create<StoreState>()(
         const before = st.companies.find((c) => c.id === id);
         if (!before) return;
         if (deny(st, "company.update", `기업고객 수정 (${before.name})`, set)) return;
-        const changed = (Object.keys(patch) as (keyof typeof patch)[]).filter((k) => patch[k] !== undefined && patch[k] !== before[k]);
+        const changed = (Object.keys(patch) as (keyof typeof patch)[]).filter((k) => patch[k] !== undefined && JSON.stringify(patch[k]) !== JSON.stringify(before[k]));
         if (changed.length === 0) return;
-        const LABEL: Record<string, string> = { name: "기업명", ceo: "대표자", industry: "업종", bizNo: "사업자번호", contactName: "담당자", contactTitle: "직책", contactPhone: "연락처", contactEmail: "이메일", address: "주소", employees: "임직원", revenue: "매출", consultantId: "담당 컨설턴트", memo: "메모", firstConsultDate: "최초 상담일" };
+        const LABEL: Record<string, string> = { name: "기업명", ceo: "대표자", industry: "업종", bizNo: "사업자번호", contactName: "담당자", contactTitle: "직책", contactPhone: "연락처", contactEmail: "이메일", address: "주소", employees: "임직원", revenue: "매출", consultantId: "담당 컨설턴트", memo: "메모", firstConsultDate: "최초 상담일", entityType: "사업자 형태", corpNo: "법인등록번호", establishedAt: "설립일", bizCategory: "업태", bizItem: "종목", ceoBirth: "대표자 생년월일", capital: "자본금", region: "지역", employeeBand: "임직원 규모", revenueBand: "매출 규모", companyPhone: "대표번호", website: "홈페이지", interests: "관심 분야", leadSource: "유입 경로", docs: "서류 확인" };
         set({
           companies: st.companies.map((c) => (c.id === id ? { ...c, ...patch } : c)),
           activities: [makeActivity({ type: "company_updated", companyId: id, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `기업정보 수정: ${before.name} — ${changed.map((k) => LABEL[k] ?? k).join(", ")}`, meta: { fields: changed.join(",") } }), ...st.activities],
@@ -1385,6 +1398,93 @@ export const useStore = create<StoreState>()(
         if (st.settings.liveMode) return;
         if (deny(st, "data.manage", "데모 초기화", set)) return;
         set({ ...buildSeed(), seededAt: nowIso(), session: st.session, settings: { ...st.settings }, toasts: [] });
+      },
+
+      // ---------- 샘플 지우기 · 다시 보기 ----------
+      // "보관"과 다르다. 샘플은 실제 기록이 아니므로 흔적 없이 지운다.
+      // 대신 사용자가 넣은 기업·프로젝트·기록은 한 건도 건드리지 않는다 — sample 표식이 있는 기업과 그 하위만 고른다.
+      removeSamples: (byUserId) => {
+        const st = get();
+        if (deny(st, "data.manage", "샘플 데이터 지우기", set)) return { ok: false, reason: "샘플 삭제는 대표 계정에서만 가능합니다." };
+        const ids = new Set(st.companies.filter((c) => c.sample).map((c) => c.id));
+        if (ids.size === 0) return { ok: false, reason: "지울 샘플이 없습니다." };
+        const pids = new Set(st.projects.filter((p) => ids.has(p.companyId)).map((p) => p.id));
+        const keepC = <T extends { companyId?: string }>(x: T) => !x.companyId || !ids.has(x.companyId);
+        const keepP = <T extends { projectId?: string }>(x: T) => !x.projectId || !pids.has(x.projectId);
+        const before = st.projects.length + st.consultations.length + st.contracts.length + st.docRequests.length + st.schedules.length + st.tasks.length + st.inquiries.length + st.results.length + st.opportunities.length + st.quotes.length + st.approvals.length + st.activities.length + st.notifications.length;
+        const next = {
+          companies: st.companies.filter((c) => !ids.has(c.id)),
+          users: st.users.filter((u) => u.role !== "client" || !u.companyId || !ids.has(u.companyId)),
+          projects: st.projects.filter((p) => !ids.has(p.companyId)),
+          consultations: st.consultations.filter(keepC),
+          contracts: st.contracts.filter(keepC),
+          docRequests: st.docRequests.filter((d) => keepC(d) && keepP(d)),
+          schedules: st.schedules.filter((x) => keepC(x) && keepP(x)),
+          tasks: st.tasks.filter((x) => keepC(x) && keepP(x)),
+          inquiries: st.inquiries.filter(keepC),
+          results: st.results.filter((x) => keepC(x) && keepP(x)),
+          opportunities: st.opportunities.filter(keepC),
+          quotes: st.quotes.filter((x) => keepC(x) && keepP(x)),
+          approvals: st.approvals.filter(keepC),
+          activities: st.activities.filter((a) => keepC(a) && keepP(a)),
+          notifications: st.notifications.filter(keepC),
+        };
+        const after = next.projects.length + next.consultations.length + next.contracts.length + next.docRequests.length + next.schedules.length + next.tasks.length + next.inquiries.length + next.results.length + next.opportunities.length + next.quotes.length + next.approvals.length + next.activities.length + next.notifications.length;
+        const counts = { companies: ids.size, projects: pids.size, records: before - after };
+        // 샘플을 지웠다는 건 실제 데이터를 넣기 시작한다는 뜻이다. 20시간 뒤 자동 초기화가 그 데이터를 지우지 않도록 운영 모드를 함께 켠다.
+        const settings = st.settings.liveMode ? st.settings : { ...st.settings, liveMode: true };
+        set({
+          ...next,
+          settings,
+          // 샘플 클라이언트로 미리보기 중이었다면 풀어준다
+          session: st.session && st.session.portalPreviewCompanyId && ids.has(st.session.portalPreviewCompanyId) ? { ...st.session, portalPreviewCompanyId: undefined } : st.session,
+          activities: [
+            ...(st.settings.liveMode ? [] : [makeActivity({ type: "live_mode_changed", actorId: byUserId, actorRole: "admin", text: "운영 모드 켜짐 — 샘플 삭제와 함께 자동으로 켜짐" })]),
+            makeActivity({ type: "samples_removed", actorId: byUserId, actorRole: "admin", text: `샘플 데이터 삭제 — 기업 ${counts.companies} · 프로젝트 ${counts.projects} · 관련 기록 ${counts.records}건`, meta: counts }),
+            ...next.activities,
+          ],
+        });
+        return { ok: true, counts };
+      },
+
+      restoreSamples: (byUserId) => {
+        const st = get();
+        if (deny(st, "data.manage", "샘플 데이터 다시 보기", set)) return { ok: false, reason: "샘플 복원은 대표 계정에서만 가능합니다." };
+        const seed = buildSeed();
+        const have = new Set(st.companies.map((c) => c.id));
+        const add = seed.companies.filter((c) => c.sample && !have.has(c.id));
+        if (add.length === 0) return { ok: false, reason: "샘플 기업이 이미 모두 들어 있습니다." };
+        const ids = new Set(add.map((c) => c.id));
+        // 코드가 사용자 기업과 겹치면 비어 있는 글자로 바꾼다
+        const used = st.companies.map((c) => c.code);
+        const companies = add.map((c) => { const code = used.includes(c.code) ? nextCompanyCode(used) : c.code; used.push(code); return { ...c, code }; });
+        const inC = <T extends { companyId?: string }>(x: T) => !!x.companyId && ids.has(x.companyId);
+        const projects = seed.projects.filter((p) => ids.has(p.companyId));
+        const pids = new Set(projects.map((p) => p.id));
+        const inP = <T extends { projectId?: string }>(x: T) => !!x.projectId && pids.has(x.projectId);
+        const haveUser = new Set(st.users.map((u) => u.id));
+        set({
+          companies: [...st.companies, ...companies],
+          users: [...st.users, ...seed.users.filter((u) => u.role === "client" && inC(u) && !haveUser.has(u.id))],
+          projects: [...st.projects, ...projects],
+          consultations: [...st.consultations, ...seed.consultations.filter(inC)],
+          contracts: [...st.contracts, ...seed.contracts.filter(inC)],
+          docRequests: [...st.docRequests, ...seed.docRequests.filter((d) => inC(d) || inP(d))],
+          schedules: [...st.schedules, ...seed.schedules.filter((x) => inC(x) || inP(x))],
+          tasks: [...st.tasks, ...seed.tasks.filter((x) => inC(x) || inP(x))],
+          inquiries: [...st.inquiries, ...seed.inquiries.filter(inC)],
+          results: [...st.results, ...seed.results.filter((x) => inC(x) || inP(x))],
+          opportunities: [...st.opportunities, ...seed.opportunities.filter(inC)],
+          quotes: [...st.quotes, ...seed.quotes.filter((x) => inC(x) || inP(x))],
+          approvals: [...st.approvals, ...seed.approvals.filter(inC)],
+          notifications: [...st.notifications, ...seed.notifications.filter(inC)],
+          activities: [
+            makeActivity({ type: "samples_restored", actorId: byUserId, actorRole: "admin", text: `샘플 데이터 다시 보기 — 기업 ${companies.length} · 프로젝트 ${projects.length}` }),
+            ...st.activities,
+            ...seed.activities.filter((a) => inC(a) || inP(a)),
+          ],
+        });
+        return { ok: true, counts: { companies: companies.length, projects: projects.length } };
       },
     }),
     {
