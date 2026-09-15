@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, Plus, X } from "lucide-react";
+import { Pencil, Plus, Printer, X } from "lucide-react";
+import Link from "next/link";
 import { useStore, quoteGross, quoteNet } from "@/lib/store";
 import type { Quote, QuoteItem, QuoteStatus } from "@/lib/types";
 import { addDays, daysBetween, fmtWon } from "@/lib/format";
@@ -256,6 +257,9 @@ export function QuoteDetailModal({ quote, onClose, onEdit }: { quote: Quote | nu
             {(q.status === "draft" || q.status === "approval_pending") && onEdit && (
               <Button variant="outline" icon={<Pencil size={15} />} onClick={() => { onClose(); onEdit(q.id); }}>수정</Button>
             )}
+            <Link href={`/print/quote/${q.id}`} className="pressable inline-flex h-11 items-center gap-2 rounded-[var(--radius-btn)] border border-line-2 bg-surface px-4 text-[0.9rem] font-semibold text-ink hover:bg-surface-2">
+              <Printer size={15} /> 견적서 인쇄
+            </Link>
           </>
         }
       >

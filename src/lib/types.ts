@@ -115,6 +115,8 @@ export interface Project {
   clientVisible: boolean;
   archived?: boolean;
   archivedAt?: string;
+  /** 담당자가 직접 입력한 다음 예정 — 표준 소요일이 쌓이기 전까지는 이것만 고객에게 보여준다 */
+  nextMilestone?: { label: string; date: string };
 }
 
 export interface DocumentFile {
@@ -400,6 +402,10 @@ export type ActivityType =
   | "contract_updated"
   | "result_withdrawn"
   | "rule_task_created"
+  | "live_mode_changed"
+  | "backup_exported"
+  | "backup_imported"
+  | "org_updated"
   | "demo_reset";
 
 export interface Activity {
@@ -461,4 +467,21 @@ export interface Settings {
   timezone: string;
   /** 시간 규칙 켜기/끄기. 키가 없으면 켜진 것으로 본다 */
   autoRules?: Record<string, boolean>;
+  /**
+   * 운영 모드 — 켜면 20시간 자동 초기화가 멈추고, 데모 계정 안내가 사라지며, 데모 초기화가 잠긴다.
+   * 서버가 붙기 전까지 실제 데이터를 넣기 시작할 때의 유일한 보호막이다.
+   */
+  liveMode?: boolean;
+  lastBackupAt?: string;
+  /** 인쇄물 상단에 들어가는 우리 회사 정보. 비워두면 인쇄물에 빈칸으로 나간다 — 값을 지어내지 않는다 */
+  org?: OrgInfo;
+}
+
+export interface OrgInfo {
+  name: string;
+  ceo?: string;
+  bizNo?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
 }

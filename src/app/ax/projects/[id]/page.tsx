@@ -99,6 +99,7 @@ export default function ProjectDetailPage() {
           <Stat label="담당" value={`${consultant?.name} ${consultant?.title}`} />
           <Stat label="시작일" value={fmtDate(p.startDate)} />
           <Stat label="마감일" value={<>{fmtDate(p.dueDate)} <span className="text-ink-3">({relativeDay(p.dueDate)})</span></>} />
+          <Stat label="다음 예정 (고객 표시)" value={p.nextMilestone ? <>{fmtDate(p.nextMilestone.date)} <span className="text-ink-3">· {p.nextMilestone.label}</span></> : <span className="text-ink-3">미입력 — 프로젝트 수정에서 적으면 고객에게 보입니다</span>} />
           <Stat label="계약" value={contract ? (contract.status === "signed" ? `서명 완료 (${fmtDate(contract.signedAt)})` : contract.status === "sent" ? "서명 대기" : "초안") : "-"} />
           <Stat label="현재 단계 진입" value={`${fmtDate(p.stageChangedAt)} (${daysBetween(p.stageChangedAt, now.toISOString())}일 전)`} />
         </div>

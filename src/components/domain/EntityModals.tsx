@@ -173,7 +173,8 @@ function ProjectModalInner({ open, projectId, companyId, onClose, onCreated }: {
 
   const submit = () => {
     if (!validate()) { toast("입력값을 확인해 주세요.", "error"); return; }
-    const data = { ...f, name: f.name.trim(), description: f.description.trim() };
+    const nm = f.nextMilestone && f.nextMilestone.label.trim() && f.nextMilestone.date ? { label: f.nextMilestone.label.trim(), date: f.nextMilestone.date } : undefined;
+    const data = { ...f, name: f.name.trim(), description: f.description.trim(), nextMilestone: nm };
     if (editing) {
       update(editing.id, data, me);
       toast("프로젝트를 수정했습니다.");
@@ -233,6 +234,14 @@ function ProjectModalInner({ open, projectId, companyId, onClose, onCreated }: {
       </div>
       <div className="mt-3 space-y-3">
         <Field label="설명" hint="고객 Portal에도 표시됩니다."><Textarea value={f.description} onChange={(e) => set("description", e.target.value)} rows={3} /></Field>
+        <div className="rounded-xl border border-line p-4">
+          <div className="text-[0.85rem] font-semibold">다음 예정 <span className="font-normal text-ink-3">— 고객 Portal에 "예상 완료"로 표시됩니다</span></div>
+          <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_180px]">
+            <Input value={f.nextMilestone?.label ?? ""} onChange={(e) => set("nextMilestone", e.target.value || f.nextMilestone?.date ? { label: e.target.value, date: f.nextMilestone?.date ?? "" } : undefined)} placeholder="예: 중간 보고 미팅 / 결과보고서 전달" />
+            <Input type="date" value={f.nextMilestone?.date ? dateInput(f.nextMilestone.date) : ""} onChange={(e) => set("nextMilestone", e.target.value || f.nextMilestone?.label ? { label: f.nextMilestone?.label ?? "", date: e.target.value ? new Date(`${e.target.value}T18:00:00`).toISOString() : "" } : undefined)} />
+          </div>
+          <p className="mt-1.5 text-[0.75rem] leading-relaxed text-ink-3">표준 소요일이 쌓이기 전까지는 시스템이 예상일을 계산하지 않습니다. 담당자가 적은 날짜만 고객에게 보입니다.</p>
+        </div>
         <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-line px-4 py-3 text-[0.88rem]">
           <input type="checkbox" checked={f.clientVisible} onChange={(e) => set("clientVisible", e.target.checked)} className="h-4 w-4" />
           <span className="font-semibold">고객 Portal에 공개</span>

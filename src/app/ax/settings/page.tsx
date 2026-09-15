@@ -10,6 +10,7 @@ import { THEMES } from "@/lib/themes";
 import { can, PERMISSION_ROWS, rowVerdict } from "@/lib/permissions";
 import { UserAdmin } from "@/components/domain/UserModals";
 import { AutoRulesPanel } from "@/components/domain/AutoRulesPanel";
+import { DataPanel } from "@/components/domain/DataPanel";
 import { fmtDateTime } from "@/lib/format";
 import { Badge, Button, Card, DemoBadge, NextBadge, PageHeader, SectionTitle, SegmentedControl, cx, AiReadyBadge } from "@/components/ui/ui";
 import { Confirm } from "@/components/ui/overlay";
@@ -22,7 +23,6 @@ export default function SettingsPage() {
   const resetDemo = useStore((s) => s.resetDemo);
   const toast = useStore((s) => s.toast);
   const seededAt = useStore((s) => s.seededAt);
-  const activities = useStore((s) => s.activities);
   const openTutorial = useUi((s) => s.openTutorial);
   const openPresentation = useUi((s) => s.openPresentation);
   const openAi = useUi((s) => s.openAi);
@@ -106,27 +106,18 @@ export default function SettingsPage() {
 
         <Card className="p-5">
           <SectionTitle><span className="flex items-center gap-2"><HelpCircle size={18} className="text-ink-3" /> 데모</span></SectionTitle>
-          <div className="mb-3 flex flex-wrap items-center gap-2"><DemoBadge /><span className="text-[0.85rem] text-ink-2">현재 상태: <b>DEMO</b> · Live 전환은 실데이터/Auth 연결 후</span></div>
+          <div className="mb-3 flex flex-wrap items-center gap-2"><DemoBadge /><span className="text-[0.85rem] text-ink-2">{settings.liveMode ? <>현재 상태: <b>운영</b> · 데모 초기화는 잠겨 있습니다 (데이터 섹션에서 데모 모드로 돌리면 풀립니다)</> : <>현재 상태: <b>DEMO</b> · 실제 데이터를 넣기 전에 데이터 섹션에서 운영 모드를 켜세요</>}</span></div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" icon={<HelpCircle size={16} />} onClick={() => openTutorial("ax")}>튜토리얼 다시 보기</Button>
             <Button variant="outline" icon={<Play size={16} />} onClick={openPresentation}>시연 모드</Button>
-            <Button variant="danger" icon={<RotateCcw size={16} />} onClick={() => setConfirm(true)}>데모 초기화</Button>
+            <Button variant="danger" icon={<RotateCcw size={16} />} disabled={!!settings.liveMode} title={settings.liveMode ? "운영 모드에서는 잠깁니다" : undefined} onClick={() => setConfirm(true)}>데모 초기화</Button>
           </div>
-          <div className="mt-3 text-[0.78rem] text-ink-3">데모 초기화는 Action 상태·고객 제출·문의·알림을 초기값으로 되돌립니다. 마지막 Seed: {fmtDateTime(seededAt)} · 20시간이 지나면 날짜가 오늘 기준으로 자동 갱신됩니다.</div>
+          <div className="mt-3 text-[0.78rem] text-ink-3">데모 초기화는 Action 상태·고객 제출·문의·알림을 초기값으로 되돌립니다. 마지막 Seed: {fmtDateTime(seededAt)}{settings.liveMode ? " · 운영 모드라 자동 초기화되지 않습니다." : " · 20시간이 지나면 날짜가 오늘 기준으로 자동 갱신됩니다."}</div>
         </Card>
 
         <Card className="p-5">
           <SectionTitle><span className="flex items-center gap-2"><Database size={18} className="text-ink-3" /> 데이터</span></SectionTitle>
-          <div className="grid gap-2 text-[0.88rem] md:grid-cols-2">
-            <div className="rounded-xl bg-surface-2 p-3"><div className="text-[0.75rem] font-bold text-ink-3">Data Source</div><div className="font-semibold">Demo Repository (브라우저 로컬 저장)</div></div>
-            <div className="rounded-xl bg-surface-2 p-3"><div className="text-[0.75rem] font-bold text-ink-3">마지막 업데이트</div><div className="font-semibold tnum">{activities[0] ? fmtDateTime(activities[0].at) : "-"}</div></div>
-            <div className="rounded-xl bg-surface-2 p-3"><div className="text-[0.75rem] font-bold text-ink-3">SSOT Entity</div><div className="font-semibold">Company · Project · DocumentRequest · Schedule · Task · Inquiry · Activity</div></div>
-            <div className="rounded-xl bg-surface-2 p-3"><div className="text-[0.75rem] font-bold text-ink-3">교체 지점</div><div className="font-semibold">src/lib/store.ts Action → Supabase</div></div>
-          </div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Button size="sm" variant="outline" onClick={() => toast("CSV 가져오기는 실데이터 연결 단계에서 활성화됩니다.", "info")}>CSV 가져오기</Button>
-            <Button size="sm" variant="ghost" onClick={() => toast("필드 구조: PROJECT_SPEC.md §4 Data Model 참고", "info")}>필드 구조 보기</Button>
-          </div>
+          <DataPanel />
         </Card>
 
         <Card className="p-5">

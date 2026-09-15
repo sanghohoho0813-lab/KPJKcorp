@@ -21,6 +21,7 @@ export default function LoginPage() {
   const session = useStore((s) => s.session);
   const signIn = useStore((s) => s.signIn);
   const setPreview = useStore((s) => s.setPortalPreview);
+  const live = useStore((s) => s.settings.liveMode);
   const router = useRouter();
 
   const [loginId, setLoginId] = useState("");
@@ -173,6 +174,7 @@ export default function LoginPage() {
             </Button>
           </div>
 
+          {!live && (
           <div className="mt-6 rounded-xl border border-line bg-surface-2/60 p-4">
             <div className="text-[0.82rem] font-bold">데모 계정</div>
             <p className="mt-0.5 text-[0.78rem] leading-relaxed text-ink-3">
@@ -193,9 +195,10 @@ export default function LoginPage() {
               ))}
             </div>
           </div>
+          )}
 
           <p className="mt-4 text-[0.75rem] leading-relaxed text-ink-3">
-            이 데모는 브라우저 안에서만 동작합니다. 비밀번호 확인도 브라우저에서 이루어지므로 보안 경계가 아니며,
+            이 시스템은 브라우저 안에서만 동작합니다. 비밀번호 확인도 브라우저에서 이루어지므로 보안 경계가 아니며,
             서버·DB 연결 시 실제 인증으로 대체됩니다. 샘플 데이터는 실제 고객이 아닌 Demo 기업입니다.
           </p>
         </div>

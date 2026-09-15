@@ -28,13 +28,14 @@ import {
 } from "lucide-react";
 import { useStore, useCurrentUser } from "@/lib/store";
 import { NEXT_FEATURES, useUi } from "@/lib/ui-store";
-import { useIsMobile, useIsPreviewFrame } from "@/lib/hooks";
+import { useIsMobile, useIsPreviewFrame, useNow } from "@/lib/hooks";
 import { LiveClock } from "./LiveClock";
 import { NotificationBell } from "./Notifications";
 import { DevicePreviewButton, DevicePreviewOverlay } from "./DevicePreview";
 import { Tutorial } from "./Tutorial";
 import { FontScalePicker, FontScaleStepper } from "./FontScale";
 import { GlobalSearch, SearchTrigger } from "./GlobalSearch";
+import { QuickApproveBar } from "@/components/domain/QuickApprove";
 import { Presentation, PresentationButton } from "./Presentation";
 import { NextSheet } from "./NextSheet";
 import { AiReadyModal, DraftModal } from "@/components/ai/AiModals";
@@ -202,6 +203,18 @@ function NextGroup({ mobile }: { mobile?: boolean }) {
   );
 }
 
+function SidebarFoot() {
+  const live = useStore((s) => s.settings.liveMode);
+  const last = useStore((s) => s.settings.lastBackupAt);
+  const tick = useNow(60000);
+  const stale = !last || (tick ? tick.getTime() - new Date(last).getTime() > 7 * 86400000 : false);
+  return (
+    <div className="px-3 pb-1 pt-2 text-[0.7rem] text-shell-text-3">
+      {live ? <>운영 · v1.3{stale && <Link href="/ax/settings" className="ml-1 text-warning">· 백업 필요</Link>}</> : "DEMO DATA · v1.3"}
+    </div>
+  );
+}
+
 function Sidebar() {
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-[var(--sidebar-w)] flex-col bg-shell text-shell-text lg:flex">
@@ -240,7 +253,7 @@ function Sidebar() {
           </span>
           <ChevronRight size={13} className="shrink-0 text-shell-text-3" />
         </Link>
-        <div className="px-3 pb-1 pt-2 text-[0.7rem] text-shell-text-3">DEMO DATA · v1.2</div>
+        <SidebarFoot />
       </div>
     </aside>
   );
@@ -459,6 +472,7 @@ export function AxShell({ children }: { children: ReactNode }) {
           {ready ? <div key={pathname} className="anim-page">{children}</div> : <PageSkeleton />}
         </main>
       </div>
+      <QuickApproveBar />
       <MobileNav />
       <MoreSheet />
       <GlobalSearch />

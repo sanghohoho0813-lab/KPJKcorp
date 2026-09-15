@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { BarChart3, Download } from "lucide-react";
+import { BarChart3, Download, Printer } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { daysBetween, fmtDateTime } from "@/lib/format";
 import { INTERNAL_STAGES } from "@/lib/stages";
@@ -155,7 +155,7 @@ export default function ReportsPage() {
 
   return (
     <div>
-      <PageHeader title="리포트 · 실증" desc="KPI 측정지점과 Evidence Log입니다. 실제 Baseline이 없는 숫자는 개선율로 표시하지 않습니다." badge={<DemoBadge />} actions={<Button variant="outline" icon={<Download size={16} />} onClick={exportCsv}>Evidence CSV</Button>} />
+      <PageHeader title="리포트 · 실증" desc="KPI 측정지점과 Evidence Log입니다. 실제 Baseline이 없는 숫자는 개선율로 표시하지 않습니다." badge={<DemoBadge />} actions={<><Button variant="outline" icon={<Download size={16} />} onClick={exportCsv}>Evidence CSV</Button><Link href="/print/evidence" className="pressable lift inline-flex h-11 items-center gap-2 rounded-[var(--radius-btn)] bg-accent px-4 text-[0.9rem] font-semibold text-accent-ink"><Printer size={16} /> 실증 리포트 인쇄 · PDF</Link></>} />
       <Tabs tabs={[{ key: "kpi", label: "KPI 측정지점" }, { key: "ops", label: "운영 현황" }, { key: "evidence", label: "Evidence Log", count: st.activities.length }]} value={tab} onChange={setTab} />
       <div className="mt-5">
         {tab === "sprint" && (

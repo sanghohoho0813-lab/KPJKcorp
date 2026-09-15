@@ -4,6 +4,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { buildSeed, type SeedData } from "./demo/seed";
 import type {
+  OrgInfo,
   User,
   Company,
   Project,
@@ -94,6 +95,15 @@ export interface StoreState extends SeedData {
   /** 규칙을 훑어 아직 없는 업무를 만든다. 멱등 — ruleKey 가 같으면 다시 만들지 않는다. 만든 개수를 돌려준다 */
   syncRuleTasks: () => number;
   setAutoRule: (key: string, enabled: boolean) => void;
+
+  // ---- 실사용 안전장치 ----
+  /** 운영 모드 — 자동 초기화 중지, 데모 안내 숨김, 데모 초기화 잠금 */
+  setLiveMode: (on: boolean, byUserId: string) => void;
+  /** 전체 데이터를 JSON 문자열로. 다른 PC로 옮기거나 실수 복구용 */
+  exportBackup: (byUserId: string) => string | null;
+  /** 백업 JSON을 읽어 전체를 교체. 모양이 다르면 아무것도 바꾸지 않고 사유를 돌려준다 */
+  importBackup: (json: string, byUserId: string) => { ok: true; counts: Record<string, number> } | { ok: false; reason: string };
+  setOrg: (org: OrgInfo, byUserId: string) => void;
 
   // ---- 보관 (하드 삭제 대신) ----
   archiveCompany: (id: string, archived: boolean, byUserId: string) => void;
@@ -208,6 +218,8 @@ export const useStore = create<StoreState>()(
       setHydrated: () => set({ hydrated: true }),
       // Demo freshness: reseed if the persisted seed is older than 20 hours so relative dates stay "today".
       reseedIfStale: () => {
+        // 운영 모드에서는 절대 초기화하지 않는다. 실제 데이터가 들어오기 시작하면 이 한 줄이 전부를 지킨다.
+        if (get().settings.liveMode) return;
         const age = Date.now() - new Date(get().seededAt).getTime();
         if (age > 20 * 3600 * 1000) set({ ...buildSeed(), seededAt: nowIso(), session: get().session, settings: get().settings });
       },
@@ -443,14 +455,22 @@ export const useStore = create<StoreState>()(
         if (deny(st, "project.update", `프로젝트 수정 (${before.name})`, set)) return;
         // 단계 변경은 고객 Portal 진행률·알림까지 움직이므로 전용 액션이 처리한다.
         const { stage, ...rest } = patch;
-        const changed = (Object.keys(rest) as (keyof typeof rest)[]).filter((k) => rest[k] !== undefined && rest[k] !== before[k]);
+        const changed = (Object.keys(rest) as (keyof typeof rest)[]).filter((k) => {
+          if (k === "nextMilestone") return JSON.stringify(rest[k] ?? null) !== JSON.stringify(before[k] ?? null);
+          return rest[k] !== undefined && rest[k] !== before[k];
+        });
         if (stage && stage !== before.stage) get().changeProjectStage(id, stage, byUserId);
         if (changed.length === 0) return;
-        const LABEL: Record<string, string> = { name: "프로젝트명", type: "유형", consultantId: "담당 컨설턴트", startDate: "시작일", dueDate: "마감일", description: "설명", clientVisible: "고객 공개" };
+        const LABEL: Record<string, string> = { name: "프로젝트명", type: "유형", consultantId: "담당 컨설턴트", startDate: "시작일", dueDate: "마감일", description: "설명", clientVisible: "고객 공개", nextMilestone: "다음 예정" };
+        const milestoneChanged = changed.includes("nextMilestone") && rest.nextMilestone;
         const after = get();
         set({
           projects: after.projects.map((p) => (p.id === id ? { ...p, ...rest } : p)),
           activities: [makeActivity({ type: "project_updated", companyId: before.companyId, projectId: id, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `프로젝트 수정: ${before.name} — ${changed.map((k) => LABEL[k] ?? k).join(", ")}`, meta: { fields: changed.join(",") } }), ...after.activities],
+          // 고객에게 보이는 예정일이 바뀌면 고객도 알아야 한다.
+          notifications: milestoneChanged && before.clientVisible
+            ? [makeNotification({ audience: "client", companyId: before.companyId, title: "다음 예정이 안내되었습니다", body: `${before.name}: ${rest.nextMilestone!.label} — ${rest.nextMilestone!.date.slice(0, 10)}`, href: "/portal/projects" }), ...after.notifications]
+            : after.notifications,
         });
       },
 
@@ -741,6 +761,83 @@ export const useStore = create<StoreState>()(
         const st = get();
         if (deny(st, "rules.manage", `자동 업무 규칙 ${enabled ? "켜기" : "끄기"} (${key})`, set)) return;
         set({ settings: { ...st.settings, autoRules: { ...(st.settings.autoRules ?? {}), [key]: enabled } } });
+      },
+
+      // ---------- 실사용 안전장치 ----------
+      setLiveMode: (on, byUserId) => {
+        const st = get();
+        if (deny(st, "data.manage", `운영 모드 ${on ? "켜기" : "끄기"}`, set)) return;
+        if (!!st.settings.liveMode === on) return;
+        set({
+          settings: { ...st.settings, liveMode: on },
+          activities: [makeActivity({ type: "live_mode_changed", actorId: byUserId, actorRole: st.session?.role ?? "admin", text: on ? "운영 모드 켬 — 자동 초기화 중지, 데모 초기화 잠금" : "운영 모드 끔 — 데모 동작으로 복귀", meta: { on: String(on) } }), ...st.activities],
+        });
+      },
+
+      exportBackup: (byUserId) => {
+        const st = get();
+        if (deny(st, "data.manage", "백업 내보내기", set)) return null;
+        const now = nowIso();
+        const keys: (keyof SeedData)[] = ["users", "companies", "consultations", "contracts", "projects", "docRequests", "schedules", "tasks", "inquiries", "results", "opportunities", "quotes", "approvals", "surveys", "activities", "notifications"];
+        const data: Record<string, unknown> = {};
+        for (const k of keys) data[k] = st[k];
+        const payload = {
+          format: "kpjk-ax-backup",
+          version: 1,
+          exportedAt: now,
+          exportedBy: byUserId,
+          liveMode: !!st.settings.liveMode,
+          settings: { ...st.settings, lastBackupAt: now },
+          seededAt: st.seededAt,
+          data,
+        };
+        set({
+          settings: { ...st.settings, lastBackupAt: now },
+          activities: [makeActivity({ type: "backup_exported", actorId: byUserId, actorRole: st.session?.role ?? "admin", text: `백업 내보내기 (기업 ${st.companies.length} · 프로젝트 ${st.projects.length} · 기록 ${st.activities.length}건)` }), ...st.activities],
+        });
+        return JSON.stringify(payload, null, 0);
+      },
+
+      importBackup: (json, byUserId) => {
+        const st = get();
+        if (deny(st, "data.manage", "백업 가져오기", set)) return { ok: false, reason: "권한이 없습니다." };
+        let parsed: { format?: string; version?: number; data?: Record<string, unknown>; settings?: Partial<Settings>; seededAt?: string; exportedAt?: string };
+        try { parsed = JSON.parse(json); } catch { return { ok: false, reason: "JSON 파일이 아닙니다." }; }
+        if (parsed?.format !== "kpjk-ax-backup" || !parsed.data) return { ok: false, reason: "이 시스템의 백업 파일이 아닙니다." };
+        const keys: (keyof SeedData)[] = ["users", "companies", "consultations", "contracts", "projects", "docRequests", "schedules", "tasks", "inquiries", "results", "opportunities", "quotes", "approvals", "surveys", "activities", "notifications"];
+        const next: Partial<SeedData> = {};
+        const counts: Record<string, number> = {};
+        for (const k of keys) {
+          const v = parsed.data[k];
+          if (!Array.isArray(v)) return { ok: false, reason: `백업에 ${k} 목록이 없습니다.` };
+          (next as Record<string, unknown>)[k] = v;
+          counts[k] = v.length;
+        }
+        const users = next.users as User[];
+        if (!users.some((u) => u.role === "admin" && u.active !== false)) return { ok: false, reason: "사용 가능한 대표 계정이 없는 백업은 가져올 수 없습니다. 아무도 로그인할 수 없게 됩니다." };
+        // 지금 로그인한 계정이 백업 안에도 있으면 세션을 유지하고, 없으면 다시 로그인하게 한다.
+        const keepSession = st.session && users.some((u) => u.id === st.session!.userId && u.active !== false);
+        const importedSettings: Settings = { ...st.settings, ...(parsed.settings ?? {}), liveMode: true, lastBackupAt: st.settings.lastBackupAt };
+        set({
+          ...(next as SeedData),
+          seededAt: parsed.seededAt ?? st.seededAt,
+          session: keepSession ? st.session : null,
+          settings: importedSettings,
+          activities: [
+            makeActivity({ type: "backup_imported", actorId: byUserId, actorRole: st.session?.role ?? "admin", text: `백업 가져오기 (${parsed.exportedAt ? parsed.exportedAt.slice(0, 16).replace("T", " ") : "시각 미상"} 내보낸 파일 · 기업 ${counts.companies} · 프로젝트 ${counts.projects} · 기록 ${counts.activities}건)` }),
+            ...(next.activities as Activity[]),
+          ],
+        });
+        return { ok: true, counts };
+      },
+
+      setOrg: (org, byUserId) => {
+        const st = get();
+        if (deny(st, "data.manage", "회사 정보 수정", set)) return;
+        set({
+          settings: { ...st.settings, org: { ...org, name: org.name.trim() } },
+          activities: [makeActivity({ type: "org_updated", actorId: byUserId, actorRole: st.session?.role ?? "admin", text: `인쇄용 회사 정보 수정: ${org.name.trim()}` }), ...st.activities],
+        });
       },
 
       // ---------- 보관 ----------
@@ -1284,6 +1381,9 @@ export const useStore = create<StoreState>()(
 
       resetDemo: () => {
         const st = get();
+        // 운영 모드에서는 잠긴다. 초기화하려면 먼저 운영 모드를 꺼야 하고, 그 전환도 기록에 남는다.
+        if (st.settings.liveMode) return;
+        if (deny(st, "data.manage", "데모 초기화", set)) return;
         set({ ...buildSeed(), seededAt: nowIso(), session: st.session, settings: { ...st.settings }, toasts: [] });
       },
     }),

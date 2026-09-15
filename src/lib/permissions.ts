@@ -49,7 +49,8 @@ export type Permission =
   | "quote.update"
   | "contract.manage"
   | "result.withdraw"
-  | "rules.manage";
+  | "rules.manage"
+  | "data.manage";
 
 const POLICY: Record<Permission, Role[]> = {
   "company.create": ["admin", "consultant"],
@@ -91,6 +92,8 @@ const POLICY: Record<Permission, Role[]> = {
   "contract.manage": ["admin", "consultant"],
   "result.withdraw": ["admin", "consultant"],
   "rules.manage": ["admin"],
+  // 운영 모드 전환·백업·복원·데모 초기화. 데이터 전체를 바꾸는 일이라 대표만
+  "data.manage": ["admin"],
 };
 
 export function can(role: Role | undefined | null, p: Permission): boolean {
@@ -125,6 +128,7 @@ export const PERMISSION_ROWS: { label: string; perms: Permission[] }[] = [
   { label: "계약 직접 등록 · 수정", perms: ["contract.manage"] },
   { label: "결과자료 회수", perms: ["result.withdraw"] },
   { label: "자동 업무 규칙 설정", perms: ["rules.manage"] },
+  { label: "운영 모드 · 백업 · 복원", perms: ["data.manage"] },
   { label: "사용자 계정 관리", perms: ["user.manage"] },
 ];
 

@@ -349,3 +349,18 @@ html[data-motion="reduce"] .coach-glow { animation: none; }
 /* Print-friendly hidden */
 .hide-scrollbar { scrollbar-width: none; }
 .hide-scrollbar::-webkit-scrollbar { display: none; }
+
+/* ------------------------------------------------------------------
+   Print — 견적서·실증 리포트. 화면 도구줄은 숨기고, 종이 한 장 단위로 끊는다.
+   ------------------------------------------------------------------ */
+@media print {
+  @page { size: A4; margin: 0; }
+  html { font-size: 11pt !important; }
+  body { background: #fff !important; }
+  .print-hide { display: none !important; }
+  .print-sheet { break-after: page; page-break-after: always; box-shadow: none !important; border: 0 !important; border-radius: 0 !important; }
+  .print-sheet:last-child { break-after: auto; page-break-after: auto; }
+  .print-page { max-width: none !important; padding: 0 !important; }
+  a[href]::after { content: none !important; }
+}
+.print-sheet { min-height: 297mm; border-radius: 4px; }
