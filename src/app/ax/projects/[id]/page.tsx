@@ -8,7 +8,8 @@ import { useStore } from "@/lib/store";
 import { useUi } from "@/lib/ui-store";
 import { CUSTOMER_STEPS, INTERNAL_STAGES, stageLabel, stageProgress, stageToCustomerStep } from "@/lib/stages";
 import { projectSummary } from "@/lib/brief";
-import { daysBetween, fmtDate, fmtDateTime, fmtSize, relativeDay } from "@/lib/format";
+import { daysBetween, fmtDate, fmtDateTime, fmtSize, relativeDay, uid } from "@/lib/format";
+import { uploadResult as uploadResultFile } from "@/lib/server/storage";
 import type { DocumentRequest, InternalStage } from "@/lib/types";
 import { AiReadyBadge, Badge, Button, Card, EmptyState, Field, Input, Select, Stat, Textarea, SectionTitle, cx } from "@/components/ui/ui";
 import { Confirm, Modal } from "@/components/ui/overlay";
@@ -40,6 +41,8 @@ export default function ProjectDetailPage() {
   const [resName, setResName] = useState("");
   const [resKind, setResKind] = useState<"보고서" | "제안서" | "분석자료" | "체크리스트" | "기타">("보고서");
   const [resDesc, setResDesc] = useState("");
+  const [resFile, setResFile] = useState<File | null>(null);
+  const [resBusy, setResBusy] = useState(false);
   const now = new Date();
 
   const p = st.projects.find((x) => x.id === id);
@@ -63,11 +66,27 @@ export default function ProjectDetailPage() {
   const nextStage = INTERNAL_STAGES[stageIdx + 1]?.key;
   const customerStep = stageToCustomerStep(p.stage);
 
-  const doShare = () => {
+  const doShare = async () => {
+    if (resBusy) return;
     if (!resName.trim()) { toast("결과자료명을 입력해 주세요.", "error"); return; }
-    shareResult({ projectId: p.id, companyId: p.companyId, name: resName.trim(), kind: resKind, description: resDesc.trim(), size: 1_200_000 + Math.floor(Math.random() * 3_000_000), sharedBy: st.session?.userId ?? "u_admin" }, st.session?.userId ?? "u_admin");
+    const me = st.session?.userId ?? "u_admin";
+
+    // 서버가 붙어 있으면 실제 파일을 올린다. 파일 없이 이름만 공유하면
+    // 고객 화면에 "받을 수 없는 자료"가 생긴다.
+    if (st.serverMode) {
+      if (!resFile) { toast("공유할 파일을 선택해 주세요.", "error"); return; }
+      setResBusy(true);
+      const id = uid("rs");
+      const up = await uploadResultFile(p.companyId, id, resFile);
+      if (!up.ok) { toast(up.reason ?? "파일을 올리지 못했습니다.", "error"); setResBusy(false); return; }
+      shareResult({ projectId: p.id, companyId: p.companyId, name: resName.trim(), kind: resKind, description: resDesc.trim(), size: resFile.size, sharedBy: me, storagePath: up.path }, me);
+      setResBusy(false);
+    } else {
+      // 데모 모드에는 올릴 파일이 없다. 크기를 지어내지 않고 0으로 둔다.
+      shareResult({ projectId: p.id, companyId: p.companyId, name: resName.trim(), kind: resKind, description: resDesc.trim(), size: resFile?.size ?? 0, sharedBy: me }, me);
+    }
     toast("결과자료를 공유했습니다. 고객 Portal 완료자료에 표시됩니다.");
-    setShare(false); setResName(""); setResDesc("");
+    setShare(false); setResName(""); setResDesc(""); setResFile(null);
   };
 
   return (
@@ -192,11 +211,15 @@ export default function ProjectDetailPage() {
       </Modal>
 
       {/* Share result */}
-      <Modal open={share} onClose={() => setShare(false)} title="결과자료 공유" size="sm" footer={<><Button variant="ghost" onClick={() => setShare(false)}>취소</Button><Button variant="accent" onClick={doShare} icon={<Share2 size={15} />}>공유</Button></>}>
+      <Modal open={share} onClose={() => setShare(false)} title="결과자료 공유" size="sm" footer={<><Button variant="ghost" onClick={() => setShare(false)}>취소</Button><Button variant="accent" onClick={doShare} disabled={resBusy} icon={<Share2 size={15} />}>{resBusy ? "올리는 중…" : "공유"}</Button></>}>
         <div className="space-y-3">
           <Field label="자료명"><Input value={resName} onChange={(e) => setResName(e.target.value)} placeholder="예: 경영진단 최종 보고서" autoFocus /></Field>
           <Field label="종류"><Select value={resKind} onChange={(e) => setResKind(e.target.value as typeof resKind)}>{["보고서", "제안서", "분석자료", "체크리스트", "기타"].map((k) => <option key={k}>{k}</option>)}</Select></Field>
           <Field label="설명"><Textarea value={resDesc} onChange={(e) => setResDesc(e.target.value)} className="min-h-20" placeholder="고객에게 보이는 설명" /></Field>
+          <Field label={st.serverMode ? "파일 *" : "파일"} hint={st.serverMode ? "고객이 Portal에서 바로 내려받습니다. 한 번에 50MB 까지." : "데모 모드에서는 파일이 저장되지 않습니다."}>
+            <Input type="file" onChange={(e) => setResFile(e.target.files?.[0] ?? null)} />
+          </Field>
+          {resFile && <div className="text-[0.8rem] text-ink-3">{resFile.name} · {fmtSize(resFile.size)}</div>}
           <p className="text-[0.78rem] text-ink-3">이 데모에서는 파일 메타만 기록됩니다.</p>
         </div>
       </Modal>

@@ -6,7 +6,9 @@ import { useRouter } from "next/navigation";
 import { AlertCircle, ArrowRight, Eye, EyeOff, KeyRound, Mail } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { hashPassword, LOCK_SECONDS, MAX_ATTEMPTS } from "@/lib/auth";
-import { Button, DemoBadge, Field, Input, cx } from "@/components/ui/ui";
+import { serverConfigured } from "@/lib/server/client";
+import { sendPasswordReset } from "@/lib/server/auth";
+import { Badge, Button, DemoBadge, Field, Input, cx } from "@/components/ui/ui";
 import { Toaster } from "@/components/ui/Toaster";
 
 /** 데모 계정 안내 — 운영 전환 시 이 블록과 seed의 passwordHash를 함께 제거한다. */
@@ -20,9 +22,13 @@ export default function LoginPage() {
   const hydrated = useStore((s) => s.hydrated);
   const session = useStore((s) => s.session);
   const signIn = useStore((s) => s.signIn);
+  const signInServer = useStore((s) => s.serverSignIn);
   const setPreview = useStore((s) => s.setPortalPreview);
   const live = useStore((s) => s.settings.liveMode);
   const router = useRouter();
+  // 서버가 붙어 있으면 로그인은 Supabase 가 처리한다. 없으면 지금까지처럼 브라우저 안에서 확인한다.
+  const onServer = serverConfigured();
+  const [resetSent, setResetSent] = useState(false);
 
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
@@ -59,6 +65,29 @@ export default function LoginPage() {
     setBusy(true);
     setError(null);
     try {
+      if (onServer) {
+        const r = await signInServer(loginId, password);
+        if (!r.ok) {
+          const next = attempts + 1;
+          setAttempts(next);
+          if (next >= MAX_ATTEMPTS) {
+            setLockUntil(Date.now() + LOCK_SECONDS * 1000);
+            setNow(Date.now());
+            setAttempts(0);
+            setError(`로그인 시도가 ${MAX_ATTEMPTS}회 실패했습니다. ${LOCK_SECONDS}초 후 다시 시도해 주세요.`);
+          } else {
+            setError(`${r.reason ?? "로그인하지 못했습니다."} (${next}/${MAX_ATTEMPTS})`);
+          }
+          setPassword("");
+          setBusy(false);
+          return;
+        }
+        setPreview(undefined);
+        const role = useStore.getState().session?.role;
+        setTimeout(() => router.push(role === "client" ? "/portal" : "/ax/dashboard"), 200);
+        return;
+      }
+
       const hash = await hashPassword(loginId, password);
       const res = signIn(loginId, hash);
       if (!res.ok) {
@@ -119,8 +148,15 @@ export default function LoginPage() {
             <DemoBadge className="ml-auto" />
           </div>
 
-          <h1 className="text-[1.6rem] font-bold">로그인</h1>
-          <p className="mt-1 text-[0.9rem] text-ink-2">계정 아이디와 비밀번호를 입력해 주세요. 역할은 계정에 따라 결정됩니다.</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-[1.6rem] font-bold">로그인</h1>
+            {onServer && <Badge tone="success" dot>서버 연결</Badge>}
+          </div>
+          <p className="mt-1 text-[0.9rem] text-ink-2">
+            {onServer
+              ? "계정 아이디와 비밀번호를 입력해 주세요. 데이터는 서버에 저장되며 어느 기기에서 열어도 같습니다."
+              : "계정 아이디와 비밀번호를 입력해 주세요. 역할은 계정에 따라 결정됩니다."}
+          </p>
 
           <div className="mt-6 space-y-3">
             <Field label="아이디 (이메일)">
@@ -172,9 +208,30 @@ export default function LoginPage() {
             <Button variant="accent" size="lg" full onClick={submit} disabled={!hydrated || busy || locked} icon={<ArrowRight size={18} />}>
               {locked ? `${lockLeft}초 후 다시 시도` : busy ? "확인 중…" : "로그인"}
             </Button>
+
+            {onServer && (
+              resetSent ? (
+                <p className="text-center text-[0.82rem] text-success">
+                  재설정 메일을 보냈습니다. 받은 편지함을 확인해 주세요.
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  className="w-full text-center text-[0.82rem] font-semibold text-ink-3 underline-offset-2 hover:text-ink hover:underline"
+                  onClick={async () => {
+                    if (!loginId.trim()) { setError("먼저 아이디(이메일)를 입력해 주세요."); return; }
+                    const r = await sendPasswordReset(loginId);
+                    // 그 이메일이 등록돼 있는지 알려주지 않는다 — 계정 존재 여부를 떠보는 것을 막는다.
+                    if (r.ok) setResetSent(true); else setError(r.reason ?? "메일을 보내지 못했습니다.");
+                  }}
+                >
+                  비밀번호를 잊으셨나요?
+                </button>
+              )
+            )}
           </div>
 
-          {!live && (
+          {!live && !onServer && (
           <div className="mt-6 rounded-xl border border-line bg-surface-2/60 p-4">
             <div className="text-[0.82rem] font-bold">데모 계정</div>
             <p className="mt-0.5 text-[0.78rem] leading-relaxed text-ink-3">

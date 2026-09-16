@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Download, ShieldCheck, Upload, Building2 } from "lucide-react";
+import { Cloud, CloudOff, Download, ShieldCheck, Upload, Building2, Users } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useNow } from "@/lib/hooks";
 import { can } from "@/lib/permissions";
@@ -9,6 +9,7 @@ import { fmtDateTime } from "@/lib/format";
 import type { OrgInfo } from "@/lib/types";
 import { Badge, Button, Field, Input, cx } from "@/components/ui/ui";
 import { Confirm, Modal } from "@/components/ui/overlay";
+import { serverConfigured } from "@/lib/server/client";
 import { SamplePanel } from "./SampleData";
 
 /**
@@ -72,6 +73,8 @@ export function DataPanel() {
 
   return (
     <div className="space-y-4">
+      <ServerPanel />
+
       {/* 운영 모드 */}
       <div className={cx("rounded-xl border p-4", live ? "border-success/40 bg-success-bg/40" : "border-warning/40 bg-warning-bg/50")}>
         <div className="flex flex-wrap items-start gap-3">
@@ -82,12 +85,14 @@ export function DataPanel() {
               <Badge tone={live ? "success" : "warning"}>{live ? "자동 초기화 중지" : "20시간 후 자동 초기화"}</Badge>
             </div>
             <p className="mt-1 text-[0.85rem] leading-relaxed text-ink-2">
-              {live
-                ? "실제 데이터가 보호됩니다. 자동 초기화가 멈추고, 데모 초기화 버튼이 잠기며, 로그인 화면의 데모 계정 안내가 사라집니다."
-                : "지금은 데모입니다. 20시간이 지나면 입력한 내용이 전부 초기값으로 돌아갑니다. 실제 업무 데이터를 넣기 시작하려면 먼저 운영 모드를 켜세요."}
+              {st.serverMode
+                ? "서버에 연결되어 있어 자동으로 켜져 있습니다. 데이터는 서버에 저장되며 이 브라우저를 지워도 사라지지 않습니다."
+                : live
+                  ? "실제 데이터가 보호됩니다. 자동 초기화가 멈추고, 데모 초기화 버튼이 잠기며, 로그인 화면의 데모 계정 안내가 사라집니다."
+                  : "지금은 데모입니다. 20시간이 지나면 입력한 내용이 전부 초기값으로 돌아갑니다. 실제 업무 데이터를 넣기 시작하려면 먼저 운영 모드를 켜세요."}
             </p>
           </div>
-          {manage && (
+          {manage && !st.serverMode && (
             <Button size="sm" variant={live ? "outline" : "accent"} onClick={() => setConfirmLive(!live)}>
               {live ? "데모 모드로" : "운영 모드 켜기"}
             </Button>
@@ -185,5 +190,84 @@ function OrgModalInner({ onClose, onSave, initial }: { onClose: () => void; onSa
         </div>
       </div>
     </Modal>
+  );
+}
+
+/**
+ * 서버 연결 상태 + 컨설턴트 열람 범위.
+ *
+ * 열람 범위는 화면이 거르는 것이 아니라 데이터베이스가 거른다.
+ * 여기서 바꾸면 서버 정책이 즉시 따라 바뀌고, 코드 배포가 필요 없다.
+ */
+function ServerPanel() {
+  const st = useStore();
+  const toast = useStore((s) => s.toast);
+  const setScope = useStore((s) => s.setConsultantScope);
+  const me = st.session?.userId ?? "u_admin";
+  const manage = can(st.session?.role, "data.manage");
+  const configured = serverConfigured();
+  const on = st.serverMode;
+  const scope = st.settings.consultantScope ?? "all";
+  const [busy, setBusy] = useState(false);
+
+  const consultants = st.users.filter((u) => u.role === "consultant" && u.active !== false).length;
+
+  return (
+    <div className={cx("rounded-xl border p-4", on ? "border-success/40 bg-success-bg/30" : "border-line")}>
+      <div className="flex flex-wrap items-start gap-3">
+        {on ? <Cloud size={20} className="mt-0.5 shrink-0 text-success" /> : <CloudOff size={20} className="mt-0.5 shrink-0 text-ink-3" />}
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-bold">{on ? "서버 연결됨" : configured ? "서버 설정됨 · 연결 안 됨" : "서버 미연결"}</span>
+            <Badge tone={on ? "success" : configured ? "warning" : "neutral"}>
+              {on ? "여러 기기에서 같은 데이터" : configured ? "로그인 필요" : "이 브라우저에만 저장"}
+            </Badge>
+          </div>
+          <p className="mt-1 text-[0.85rem] leading-relaxed text-ink-2">
+            {on
+              ? "입력하는 모든 내용이 서버에 저장됩니다. 대표님·컨설턴트·고객이 각자의 기기에서 같은 데이터를 봅니다. 접근 권한은 서버가 직접 막습니다."
+              : configured
+                ? "연결 정보는 들어와 있지만 아직 서버 계정으로 로그인하지 않았습니다. 로그아웃 후 서버 계정으로 다시 로그인해 주세요."
+                : "지금은 이 브라우저 안에만 저장됩니다. 다른 PC에서는 아무것도 보이지 않고, 브라우저 데이터를 지우면 함께 사라집니다. 연결 방법은 supabase/README.md 에 있습니다."}
+          </p>
+          {st.syncError && (
+            <p className="mt-2 rounded-lg bg-error-bg px-3 py-2 text-[0.82rem] font-semibold text-error">
+              마지막 저장 실패: {st.syncError}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {on && (
+        <div className="mt-4 border-t border-line pt-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="flex items-center gap-2 text-[0.88rem] font-bold"><Users size={15} className="text-ink-3" /> 컨설턴트 열람 범위</span>
+            <Badge tone={scope === "all" ? "info" : "accent"}>{scope === "all" ? "전체 기업" : "내 담당만"}</Badge>
+          </div>
+          <p className="mt-1 text-[0.85rem] leading-relaxed text-ink-2">
+            {scope === "all"
+              ? `컨설턴트 ${consultants}명이 모든 기업고객을 봅니다. 담당자가 자리를 비워도 다른 사람이 이어받기 쉽습니다.`
+              : `컨설턴트는 자기가 담당인 기업만 봅니다. 대표님은 전부 보십니다. 외부 파트너 컨설턴트를 붙일 때 이 설정이 필요합니다.`}
+            {" "}고객 계정은 어느 쪽이든 자기 회사만 봅니다.
+          </p>
+          {manage && (
+            <Button
+              size="sm" variant="outline" className="mt-3" disabled={busy}
+              onClick={async () => {
+                const next = scope === "all" ? "own" : "all";
+                setBusy(true);
+                const r = await setScope(next, me);
+                setBusy(false);
+                toast(r.ok
+                  ? `컨설턴트 열람 범위를 ${next === "all" ? "전체 기업" : "내 담당만"}으로 바꿨습니다. 지금 접속 중인 사람에게도 즉시 적용됩니다.`
+                  : (r.reason ?? "바꾸지 못했습니다."), r.ok ? "success" : "error");
+              }}
+            >
+              {busy ? "바꾸는 중…" : scope === "all" ? "내 담당만 보이게" : "전체 기업 보이게"}
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

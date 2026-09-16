@@ -38,6 +38,9 @@ import { nowIso, uid, addDays, iso, daysBetween } from "./format";
 import { stageLabel } from "./stages";
 import { OPP_STATUS, SERVICE_BY_KEY } from "./services";
 import { can, type Permission } from "./permissions";
+import { serverConfigured } from "./server/client";
+import { currentServerUser, serverSignIn as authSignIn, serverSignOut } from "./server/auth";
+import { loadAll, pushChanges, pushSettings, type ServerSettings } from "./server/sync";
 
 export interface StoreState extends SeedData {
   hydrated: boolean;
@@ -59,8 +62,20 @@ export interface StoreState extends SeedData {
   setHydrated: () => void;
   reseedIfStale: () => void;
 
+  /** 서버에 연결돼 로그인된 상태. 꺼져 있으면 지금까지처럼 브라우저 저장소로 돈다. */
+  serverMode: boolean;
+  /** 서버 저장이 실패했을 때 사용자에게 보일 마지막 사유 */
+  syncError?: string;
+  /** 서버 로그인 → 볼 수 있는 데이터 전부 읽기 → 세션 설정까지 한 번에 */
+  serverSignIn: (email: string, password: string) => Promise<{ ok: boolean; reason?: string }>;
+  /** 새로고침 후에도 로그인이 살아 있으면 다시 연결한다 */
+  resumeServerSession: () => Promise<boolean>;
+  serverLogout: () => Promise<void>;
+  /** 컨설턴트 열람 범위 전환 (대표만). 서버 정책이 즉시 따라 바뀐다. */
+  setConsultantScope: (scope: "all" | "own", byUserId: string) => Promise<{ ok: boolean; reason?: string }>;
+
   // closed loop actions
-  uploadDocument: (requestId: string, file: { fileName: string; size: number }, byUserId: string) => void;
+  uploadDocument: (requestId: string, file: { fileName: string; size: number; storagePath?: string }, byUserId: string) => void;
   reviewDocument: (requestId: string, outcome: "done" | "revision" | "reviewing", note: string | undefined, byUserId: string) => void;
   changeProjectStage: (projectId: string, stage: InternalStage, byUserId: string) => void;
   createDocRequest: (projectId: string, data: { name: string; description: string; dueDate: string }, byUserId: string) => void;
@@ -221,11 +236,74 @@ function makeNotification(n: Omit<Notification, "id" | "at" | "read">): Notifica
   return { ...n, id: uid("nt"), at: nowIso(), read: false };
 }
 
+/** 서버 모드로 들어가거나 로그아웃할 때의 빈 상태. 남의 데이터가 화면에 남아 있으면 안 된다. */
+const EMPTY_DATA: SeedData = {
+  users: [], companies: [], consultations: [], contracts: [], projects: [], docRequests: [],
+  schedules: [], tasks: [], inquiries: [], results: [], opportunities: [], quotes: [],
+  approvals: [], surveys: [], activities: [], notifications: [],
+};
+
+/**
+ * 서버에서 막 읽어온 데이터를 set() 하면 그대로 다시 서버로 밀려 올라간다.
+ * 그 구간을 표시해 되돌려 보내지 않는다.
+ */
+let loadingFromServer = false;
+
+/** 서버에서 읽은 것을 화면 상태로 앉힌다. 기기 취향(테마·글자크기)은 건드리지 않는다. */
+function applyServer(
+  set: (patch: Partial<StoreState>) => void,
+  get: () => StoreState,
+  user: User,
+  data: Partial<StoreState>,
+  server: ServerSettings | undefined,
+) {
+  const cur = get().settings;
+  loadingFromServer = true;
+  set({
+    ...EMPTY_DATA,
+    ...data,
+    serverMode: true,
+    syncError: undefined,
+    session: {
+      userId: user.id,
+      role: user.role,
+      companyId: user.companyId,
+      signedInAt: nowIso(),
+    },
+    settings: {
+      ...cur,
+      // 조직 공용 설정만 서버 값으로 덮는다
+      org: server?.org ?? cur.org,
+      baseline: server?.baseline ?? cur.baseline,
+      sprintStartedAt: server?.sprintStartedAt ?? cur.sprintStartedAt,
+      autoRules: server?.autoRules ?? cur.autoRules,
+      consultantScope: server?.consultantScope ?? "all",
+      // 서버에 붙은 순간부터는 데모 자동 초기화가 의미 없다
+      liveMode: true,
+    },
+  });
+  loadingFromServer = false;
+}
+
 export const useStore = create<StoreState>()(
   persist(
-    (set, get) => ({
+    (rawSet, get) => {
+      /**
+       * 모든 상태 변경이 이 한 곳을 지난다.
+       * 쓰기 액션 45개에 서버 호출을 끼워 넣는 대신, 바뀐 배열을 비교해 달라진 행만 보낸다.
+       * 덕분에 화면·액션 코드는 서버가 붙었다는 사실 자체를 모르고, 새 기능을 만들 때
+       * "서버 저장을 빠뜨렸는지" 신경 쓸 필요가 없다.
+       */
+      const set = ((partial: unknown, replace?: boolean) => {
+        const before = get();
+        (rawSet as (p: unknown, r?: boolean) => void)(partial, replace);
+        if (!loadingFromServer && before?.serverMode) pushChanges(before, get());
+      }) as typeof rawSet;
+
+      return {
       ...buildSeed(),
       hydrated: false,
+      serverMode: false,
       seededAt: nowIso(),
       session: null,
       settings: DEFAULT_SETTINGS,
@@ -235,7 +313,7 @@ export const useStore = create<StoreState>()(
       // Demo freshness: reseed if the persisted seed is older than 20 hours so relative dates stay "today".
       reseedIfStale: () => {
         // 운영 모드에서는 절대 초기화하지 않는다. 실제 데이터가 들어오기 시작하면 이 한 줄이 전부를 지킨다.
-        if (get().settings.liveMode) return;
+        if (get().serverMode || get().settings.liveMode) return;
         const age = Date.now() - new Date(get().seededAt).getTime();
         if (age > 20 * 3600 * 1000) set({ ...buildSeed(), seededAt: nowIso(), session: get().session, settings: get().settings });
       },
@@ -275,10 +353,16 @@ export const useStore = create<StoreState>()(
       logout: () => {
         const st = get();
         const u = st.users.find((x) => x.id === st.session?.userId);
-        set({
-          session: null,
-          activities: u ? [makeActivity({ type: "sign_out", actorId: u.id, actorRole: u.role, text: `로그아웃: ${u.name}` }), ...st.activities] : st.activities,
-        });
+        // 로그아웃 기록은 세션이 살아 있는 동안 남겨야 서버가 받아준다(정책상 actor = 본인).
+        if (u) {
+          set({ activities: [makeActivity({ type: "sign_out", actorId: u.id, actorRole: u.role, text: `로그아웃: ${u.name}` }), ...st.activities] });
+        }
+        if (st.serverMode) {
+          // 화면에 남아 있는 목록까지 비운다. 공용 PC 에서 다음 사람에게 보이면 안 된다.
+          void get().serverLogout();
+          return;
+        }
+        set({ session: null });
       },
       may: (p) => can(get().session?.role, p),
       setPortalPreview: (companyId) => {
@@ -312,7 +396,7 @@ export const useStore = create<StoreState>()(
           status: "submitted",
           submittedAt: now,
           reviewNote: undefined,
-          files: [...req.files, { id: uid("f"), fileName: file.fileName, size: file.size, uploadedAt: now, uploadedBy: byUserId, version }],
+          files: [...req.files, { id: uid("f"), fileName: file.fileName, size: file.size, uploadedAt: now, uploadedBy: byUserId, version, storagePath: file.storagePath }],
         };
         const docRequests = st.docRequests.map((r) => (r.id === requestId ? updated : r));
 
@@ -814,6 +898,11 @@ export const useStore = create<StoreState>()(
       importBackup: (json, byUserId) => {
         const st = get();
         if (deny(st, "data.manage", "백업 가져오기", set)) return { ok: false, reason: "권한이 없습니다." };
+        // 서버에 붙어 있을 때 통째로 덮으면, 백업 안의 담당자 ID 가 서버 계정과 맞지 않아
+        // 기업·프로젝트가 줄줄이 거절된다. 반쯤 복원된 상태가 가장 나쁘다.
+        if (st.serverMode) {
+          return { ok: false, reason: "서버에 연결된 상태에서는 백업을 덮어쓸 수 없습니다. 복원이 필요하면 Supabase 대시보드에서 처리해 주세요. (내보내기는 그대로 됩니다)" };
+        }
         let parsed: { format?: string; version?: number; data?: Record<string, unknown>; settings?: Partial<Settings>; seededAt?: string; exportedAt?: string };
         try { parsed = JSON.parse(json); } catch { return { ok: false, reason: "JSON 파일이 아닙니다." }; }
         if (parsed?.format !== "kpjk-ax-backup" || !parsed.data) return { ok: false, reason: "이 시스템의 백업 파일이 아닙니다." };
@@ -1392,8 +1481,58 @@ export const useStore = create<StoreState>()(
       markNotificationRead: (id) => set({ notifications: get().notifications.map((n) => (n.id === id ? { ...n, read: true } : n)) }),
       markAllRead: (audience, companyId) => set({ notifications: get().notifications.map((n) => (n.audience === audience && (!companyId || n.companyId === companyId) ? { ...n, read: true } : n)) }),
 
+      // ---------- 서버 연결 ----------
+      serverSignIn: async (email, password) => {
+        const r = await authSignIn(email, password);
+        if (!r.ok || !r.user) return { ok: false, reason: r.reason };
+        const loaded = await loadAll();
+        if (!loaded.ok || !loaded.data) return { ok: false, reason: loaded.reason };
+        applyServer(set, get, r.user, loaded.data, loaded.settings);
+        return { ok: true };
+      },
+
+      resumeServerSession: async () => {
+        if (!serverConfigured()) return false;
+        const user = await currentServerUser();
+        if (!user) return false;
+        const loaded = await loadAll();
+        if (!loaded.ok || !loaded.data) return false;
+        applyServer(set, get, user, loaded.data, loaded.settings);
+        return true;
+      },
+
+      serverLogout: async () => {
+        await serverSignOut();
+        loadingFromServer = true;
+        // 공용 PC 에서 다음 사람에게 앞사람 데이터가 보이면 안 된다 — 목록을 비운다.
+        set({ ...EMPTY_DATA, session: null, serverMode: false, syncError: undefined });
+        loadingFromServer = false;
+      },
+
+      setConsultantScope: async (scope, byUserId) => {
+        const st = get();
+        if (deny(st, "data.manage", `컨설턴트 열람 범위 변경 (${scope})`, set)) {
+          return { ok: false, reason: "대표 계정에서만 바꿀 수 있습니다." };
+        }
+        if (st.serverMode) {
+          const r = await pushSettings({ consultantScope: scope });
+          if (!r.ok) return r;
+        }
+        set({
+          settings: { ...st.settings, consultantScope: scope },
+          activities: [makeActivity({
+            type: "org_updated", actorId: byUserId, actorRole: "admin",
+            text: `컨설턴트 열람 범위: ${scope === "all" ? "전체 기업" : "내 담당 기업만"}`,
+            meta: { scope },
+          }), ...st.activities],
+        });
+        return { ok: true };
+      },
+
       resetDemo: () => {
         const st = get();
+        // 서버에 붙어 있으면 이건 데모용 도구가 아니다 — 실제 데이터를 지우게 된다.
+        if (st.serverMode) return;
         // 운영 모드에서는 잠긴다. 초기화하려면 먼저 운영 모드를 꺼야 하고, 그 전환도 기록에 남는다.
         if (st.settings.liveMode) return;
         if (deny(st, "data.manage", "데모 초기화", set)) return;
@@ -1449,6 +1588,7 @@ export const useStore = create<StoreState>()(
 
       restoreSamples: (byUserId) => {
         const st = get();
+        if (st.serverMode) return { ok: false, reason: "서버에 연결된 상태에서는 샘플을 넣지 않습니다. 실제 고객 데이터와 섞입니다." };
         if (deny(st, "data.manage", "샘플 데이터 다시 보기", set)) return { ok: false, reason: "샘플 복원은 대표 계정에서만 가능합니다." };
         const seed = buildSeed();
         const have = new Set(st.companies.map((c) => c.id));
@@ -1486,7 +1626,8 @@ export const useStore = create<StoreState>()(
         });
         return { ok: true, counts: { companies: companies.length, projects: projects.length } };
       },
-    }),
+      };
+    },
     {
       name: "kpjk-ax-demo-v1",
       storage: createJSONStorage(() => localStorage),

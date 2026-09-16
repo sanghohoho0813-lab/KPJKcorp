@@ -4,9 +4,10 @@ import { useState } from "react";
 import { KeyRound, UserPlus } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { hashPassword } from "@/lib/auth";
+import { createServerUser, sendPasswordReset, setServerUserActive, updateServerUser } from "@/lib/server/auth";
 import type { Role, User } from "@/lib/types";
 import { Confirm, Modal } from "@/components/ui/overlay";
-import { Button, Field, Input, Select } from "@/components/ui/ui";
+import { Badge, Button, Field, Input, Select } from "@/components/ui/ui";
 
 const ROLE_LABEL: Record<Role, string> = { admin: "대표 · 관리자", consultant: "컨설턴트", client: "기업고객" };
 
@@ -30,6 +31,8 @@ function UserModalInner({ open, userId, presetCompanyId, onClose, onCreated }: {
   const toast = useStore((s) => s.toast);
   const me = st.session?.userId ?? "u_admin";
   const editing = st.users.find((u) => u.id === userId);
+  // 서버 모드에서는 비밀번호를 Supabase Auth 가 갖는다. 앱은 해시조차 만들지 않는다.
+  const onServer = st.serverMode;
 
   const [name, setName] = useState(editing?.name ?? "");
   const [email, setEmail] = useState(editing?.email ?? "");
@@ -61,18 +64,46 @@ function UserModalInner({ open, userId, presetCompanyId, onClose, onCreated }: {
 
     setBusy(true);
     try {
+      const patch = {
+        name: name.trim(), email: email.trim(), title: title.trim(),
+        phone: phone.trim() || undefined,
+        companyId: role === "client" ? companyId : undefined,
+      };
+
       if (editing) {
-        update(editing.id, { name: name.trim(), email: email.trim(), title: title.trim(), phone: phone.trim() || undefined, companyId: role === "client" ? companyId : undefined }, me);
+        if (onServer) {
+          const r = await updateServerUser(editing.id, patch);
+          if (!r.ok) { toast(r.reason ?? "저장하지 못했습니다.", "error"); setBusy(false); return; }
+        }
+        update(editing.id, patch, me);
         toast("계정 정보를 수정했습니다.");
         onClose();
-      } else {
-        const hash = await hashPassword(email.trim(), pw);
-        const id = create({ name: name.trim(), email: email.trim(), role, title: title.trim(), phone: phone.trim() || undefined, companyId: role === "client" ? companyId : undefined, passwordHash: hash }, me);
-        if (!id) { toast("계정을 만들 권한이 없거나 아이디가 중복됩니다.", "error"); setBusy(false); return; }
-        toast(`${name.trim()} 계정을 만들었습니다. 첫 로그인 후 비밀번호를 바꾸도록 안내해 주세요.`);
-        onClose();
-        onCreated?.(id);
+        return;
       }
+
+      if (onServer) {
+        // 세션을 저장하지 않는 별도 연결로 가입시킨다 — 대표가 로그아웃되지 않는다.
+        const r = await createServerUser({ ...patch, role, password: pw });
+        if (!r.ok) { toast(r.reason, "error"); setBusy(false); return; }
+        // 서버가 이미 프로필을 넣었다. 화면 목록에만 반영한다.
+        useStore.setState({ users: [...st.users, r.user] });
+        useStore.getState().logActivity({
+          type: "user_created", companyId: r.user.companyId, actorId: me,
+          actorRole: st.session?.role ?? "admin",
+          text: `계정 생성: ${r.user.name} (${r.user.email}) · ${ROLE_LABEL[r.user.role]}`,
+        });
+        toast(`${r.user.name} 계정을 만들었습니다. 정한 비밀번호를 본인에게 전달해 주세요.`);
+        onClose();
+        onCreated?.(r.user.id);
+        return;
+      }
+
+      const hash = await hashPassword(email.trim(), pw);
+      const id = create({ ...patch, role, passwordHash: hash }, me);
+      if (!id) { toast("계정을 만들 권한이 없거나 아이디가 중복됩니다.", "error"); setBusy(false); return; }
+      toast(`${name.trim()} 계정을 만들었습니다. 첫 로그인 후 비밀번호를 바꾸도록 안내해 주세요.`);
+      onClose();
+      onCreated?.(id);
     } catch {
       toast("처리 중 문제가 발생했습니다.", "error");
       setBusy(false);
@@ -131,8 +162,13 @@ function UserModalInner({ open, userId, presetCompanyId, onClose, onCreated }: {
 
 export function ResetPasswordModal({ open, user, onClose }: { open: boolean; user: User | null; onClose: () => void }) {
   const reset = useStore((s) => s.resetUserPassword);
+  const log = useStore((s) => s.logActivity);
+  const role = useStore((s) => s.session?.role);
   const toast = useStore((s) => s.toast);
   const me = useStore((s) => s.session?.userId) ?? "u_admin";
+  // 서버 모드에서는 대표도 남의 비밀번호를 볼 수도, 정할 수도 없다.
+  // 본인에게 재설정 링크를 보내는 것이 우리가 할 수 있는 전부이고, 그게 맞다.
+  const onServer = useStore((s) => s.serverMode);
   const [pw, setPw] = useState("");
   const [pw2, setPw2] = useState("");
   const [err, setErr] = useState<string | null>(null);
@@ -140,6 +176,19 @@ export function ResetPasswordModal({ open, user, onClose }: { open: boolean; use
   if (!user) return null;
 
   const submit = async () => {
+    if (onServer) {
+      setBusy(true);
+      const r = await sendPasswordReset(user.email);
+      if (!r.ok) { setErr(r.reason ?? "메일을 보내지 못했습니다."); setBusy(false); return; }
+      log({
+        type: "password_reset", companyId: user.companyId, actorId: me,
+        actorRole: role ?? "admin", text: `비밀번호 재설정 메일 발송: ${user.name} (${user.email})`,
+      });
+      toast(`${user.email} 으로 재설정 메일을 보냈습니다.`);
+      setBusy(false);
+      onClose();
+      return;
+    }
     const issue = pwIssue(pw);
     if (issue) { setErr(issue); return; }
     if (pw !== pw2) { setErr("비밀번호가 서로 다릅니다."); return; }
@@ -161,19 +210,31 @@ export function ResetPasswordModal({ open, user, onClose }: { open: boolean; use
       onClose={onClose}
       size="sm"
       title={<span className="flex items-center gap-2"><KeyRound size={18} /> 비밀번호 재설정</span>}
-      footer={<><Button variant="ghost" onClick={onClose}>취소</Button><Button variant="accent" onClick={submit} disabled={busy}>재설정</Button></>}
+      footer={<><Button variant="ghost" onClick={onClose}>취소</Button><Button variant="accent" onClick={submit} disabled={busy}>{busy ? "처리 중…" : onServer ? "재설정 메일 보내기" : "재설정"}</Button></>}
     >
       <div className="mb-3 rounded-xl bg-surface-2 px-4 py-2.5 text-[0.88rem]">
         <b>{user.name}</b> {user.title} · {user.email}
       </div>
-      <p className="mb-3 text-[0.82rem] leading-relaxed text-ink-3">
-        새 비밀번호를 직접 정해 본인에게 전달합니다. 이 화면에는 기존 비밀번호가 표시되지 않으며,
-        재설정 사실만 기록에 남습니다(비밀번호 값은 기록하지 않습니다).
-      </p>
-      <div className="space-y-3">
-        <Field label="새 비밀번호" hint={err ?? "영문+숫자 8자 이상"}><Input type="password" value={pw} onChange={(e) => { setPw(e.target.value); setErr(null); }} autoComplete="new-password" autoFocus /></Field>
-        <Field label="새 비밀번호 확인"><Input type="password" value={pw2} onChange={(e) => { setPw2(e.target.value); setErr(null); }} autoComplete="new-password" /></Field>
-      </div>
+      {onServer ? (
+        <>
+          <p className="mb-3 text-[0.82rem] leading-relaxed text-ink-2">
+            본인 이메일로 재설정 링크를 보냅니다. 대표 계정도 남의 비밀번호를 보거나 직접 정할 수 없습니다 —
+            비밀번호는 서버가 보관하고, 본인만 바꿉니다. 보낸 사실은 기록에 남습니다.
+          </p>
+          {err && <p role="alert" className="rounded-lg bg-error-bg px-3 py-2 text-[0.82rem] font-semibold text-error">{err}</p>}
+        </>
+      ) : (
+        <>
+          <p className="mb-3 text-[0.82rem] leading-relaxed text-ink-3">
+            새 비밀번호를 직접 정해 본인에게 전달합니다. 이 화면에는 기존 비밀번호가 표시되지 않으며,
+            재설정 사실만 기록에 남습니다(비밀번호 값은 기록하지 않습니다).
+          </p>
+          <div className="space-y-3">
+            <Field label="새 비밀번호" hint={err ?? "영문+숫자 8자 이상"}><Input type="password" value={pw} onChange={(e) => { setPw(e.target.value); setErr(null); }} autoComplete="new-password" autoFocus /></Field>
+            <Field label="새 비밀번호 확인"><Input type="password" value={pw2} onChange={(e) => { setPw2(e.target.value); setErr(null); }} autoComplete="new-password" /></Field>
+          </div>
+        </>
+      )}
     </Modal>
   );
 }
@@ -182,8 +243,17 @@ export function ResetPasswordModal({ open, user, onClose }: { open: boolean; use
 
 export function UserAdmin() {
   const st = useStore();
-  const setActive = useStore((s) => s.setUserActive);
+  const setActiveLocal = useStore((s) => s.setUserActive);
   const toast = useStore((s) => s.toast);
+  const onServer = st.serverMode;
+  // 계정 목록(profiles)은 자동 동기화 대상이 아니다 — 로그인 주체라 서버가 직접 관리한다.
+  const setActive = async (id: string, active: boolean, by: string) => {
+    if (onServer) {
+      const r = await setServerUserActive(id, active);
+      if (!r.ok) { toast(r.reason ?? "변경하지 못했습니다.", "error"); return; }
+    }
+    setActiveLocal(id, active, by);
+  };
   const me = st.session?.userId ?? "u_admin";
   const [modalFor, setModalFor] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -197,7 +267,10 @@ export function UserAdmin() {
   return (
     <>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <span className="text-[0.85rem] font-semibold text-ink-2">계정 {st.users.length}개 · 사용 중 {st.users.filter((u) => u.active !== false).length}개</span>
+        <span className="flex flex-wrap items-center gap-2 text-[0.85rem] font-semibold text-ink-2">
+          계정 {st.users.length}개 · 사용 중 {st.users.filter((u) => u.active !== false).length}개
+          {onServer && <Badge tone="success" dot>서버가 관리</Badge>}
+        </span>
         <Button size="sm" variant="accent" icon={<UserPlus size={15} />} onClick={() => setCreating(true)}>계정 만들기</Button>
       </div>
       <div className="overflow-x-auto rounded-xl border border-line">
@@ -222,7 +295,7 @@ export function UserAdmin() {
                       <Button size="sm" variant="ghost" onClick={() => setModalFor(u.id)}>수정</Button>
                       <Button size="sm" variant="ghost" onClick={() => setPwFor(u)}>비밀번호</Button>
                       {off ? (
-                        <Button size="sm" variant="outline" onClick={() => { setActive(u.id, true, me); toast(`${u.name} 계정을 다시 사용합니다.`); }}>재개</Button>
+                        <Button size="sm" variant="outline" onClick={() => { void setActive(u.id, true, me).then(() => toast(`${u.name} 계정을 다시 사용합니다.`)); }}>재개</Button>
                       ) : (
                         <Button
                           size="sm"
@@ -255,7 +328,7 @@ export function UserAdmin() {
         onClose={() => setConfirmOff(null)}
         onConfirm={() => {
           if (!confirmOff) return;
-          setActive(confirmOff.id, false, me);
+          void setActive(confirmOff.id, false, me);
           toast(`${confirmOff.name} 계정을 사용 중지했습니다.`);
           setConfirmOff(null);
         }}

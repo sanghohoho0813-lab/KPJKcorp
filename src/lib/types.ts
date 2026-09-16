@@ -168,6 +168,8 @@ export interface DocumentFile {
   uploadedAt: string;
   uploadedBy: string;
   version: number;
+  /** 서버 보관함(documents 버킷) 안의 경로. 서버 연결 전에는 없다 — 그때는 메타만 남는다. */
+  storagePath?: string;
 }
 
 export interface DocumentRequest {
@@ -250,6 +252,8 @@ export interface ResultFile {
   sharedBy: string;
   size: number;
   description: string;
+  /** 서버 보관함(results 버킷) 안의 경로. 없으면 파일 없이 이름만 공유된 상태다. */
+  storagePath?: string;
 }
 
 /* ---------- Opportunity (추가서비스 관심 → 매출) ---------- */
@@ -518,6 +522,12 @@ export interface Settings {
    */
   liveMode?: boolean;
   lastBackupAt?: string;
+  /**
+   * 컨설턴트가 볼 수 있는 범위 — 'all' 전 기업 / 'own' 내 담당만.
+   * 서버 연결 시 이 값은 데이터베이스(app_settings)가 갖고, 화면은 그것을 비출 뿐이다.
+   * 실제 차단도 서버가 한다. 여기 값을 고쳐도 남의 데이터가 열리지 않는다.
+   */
+  consultantScope?: "all" | "own";
   /** 인쇄물 상단에 들어가는 우리 회사 정보. 비워두면 인쇄물에 빈칸으로 나간다 — 값을 지어내지 않는다 */
   org?: OrgInfo;
 }

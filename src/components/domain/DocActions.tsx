@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, FileText, MessageSquareText, RefreshCw, Search, Upload } from "lucide-react";
+import { CheckCircle2, Download, FileText, MessageSquareText, RefreshCw, Search, Upload } from "lucide-react";
 import type { DocumentRequest } from "@/lib/types";
 import { useStore } from "@/lib/store";
 import { useUi } from "@/lib/ui-store";
-import { fmtDate, fmtDateTime, fmtSize, relativeDay } from "@/lib/format";
+import { fmtDate, fmtDateTime, fmtSize, relativeDay, uid } from "@/lib/format";
+import { MAX_UPLOAD_BYTES, uploadDocument as uploadDocumentFile, DOC_BUCKET, saveToDisk } from "@/lib/server/storage";
 import { Modal } from "@/components/ui/overlay";
 import { Button, Field, Textarea, Input, Stat, Badge } from "@/components/ui/ui";
 import { DocStatusBadge } from "./domain";
@@ -19,6 +20,12 @@ export function ReviewDocModal({ req, open, onClose }: { req: DocumentRequest | 
   const users = useStore((s) => s.users);
   const openDraft = useUi((s) => s.openDraft);
   const [note, setNote] = useState("");
+  // 제출된 파일 열기. 60초짜리 임시 주소를 그때그때 받아 쓴다 — 링크가 새어 나가도 오래 못 쓴다.
+  const openFile = async (f: { storagePath?: string; fileName: string }) => {
+    if (!f.storagePath) return;
+    const r = await saveToDisk(DOC_BUCKET, f.storagePath, f.fileName);
+    if (!r.ok) useStore.getState().toast(r.reason ?? "파일을 열지 못했습니다.", "error");
+  };
   const company = companies.find((c) => c.id === req?.companyId);
   const consultant = users.find((u) => u.id === req?.assigneeId);
   if (!req) return null;
@@ -54,9 +61,16 @@ export function ReviewDocModal({ req, open, onClose }: { req: DocumentRequest | 
         ) : (
           <ul className="space-y-1.5">
             {req.files.map((f) => (
-              <li key={f.id} className="flex items-center justify-between rounded-xl border border-line px-3 py-2.5 text-[0.88rem]">
-                <span className="flex items-center gap-2 font-semibold"><FileText size={16} className="text-ink-3" /> {f.fileName} <Badge>v{f.version}</Badge></span>
-                <span className="text-ink-3">{fmtSize(f.size)} · {fmtDateTime(f.uploadedAt)}</span>
+              <li key={f.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line px-3 py-2.5 text-[0.88rem]">
+                <span className="flex min-w-0 items-center gap-2 font-semibold"><FileText size={16} className="shrink-0 text-ink-3" /> <span className="truncate">{f.fileName}</span> <Badge>v{f.version}</Badge></span>
+                <span className="flex shrink-0 items-center gap-2 text-ink-3">
+                  {fmtSize(f.size)} · {fmtDateTime(f.uploadedAt)}
+                  {f.storagePath && (
+                    <Button size="sm" variant="outline" icon={<Download size={14} />} onClick={() => void openFile(f)}>
+                      열기
+                    </Button>
+                  )}
+                </span>
               </li>
             ))}
           </ul>
@@ -85,42 +99,64 @@ export function ReviewDocModal({ req, open, onClose }: { req: DocumentRequest | 
   );
 }
 
-/** Portal upload modal — starts the PRIMARY closed loop from the customer side. File metadata only (no storage in this phase). */
+/**
+ * 고객이 자료를 제출하는 화면 — 이 시스템의 가장 중요한 고리다.
+ * 서버가 붙어 있으면 실제 파일이 올라가고, 없으면 예전처럼 파일명·크기만 기록한다.
+ */
 export function UploadModal({ req, open, onClose }: { req: DocumentRequest | null; open: boolean; onClose: () => void }) {
   const session = useStore((s) => s.session);
   const upload = useStore((s) => s.uploadDocument);
   const toast = useStore((s) => s.toast);
-  const [file, setFile] = useState<{ name: string; size: number } | null>(null);
+  const onServer = useStore((s) => s.serverMode);
+  const [file, setFile] = useState<{ name: string; size: number; blob?: File } | null>(null);
   const [drag, setDrag] = useState(false);
+  const [busy, setBusy] = useState(false);
   if (!req) return null;
   const pick = (f: File | undefined) => {
     if (!f) return;
-    setFile({ name: f.name, size: f.size });
+    if (f.size > MAX_UPLOAD_BYTES) { toast("50MB 를 넘는 파일은 올릴 수 없습니다.", "error"); return; }
+    setFile({ name: f.name, size: f.size, blob: f });
   };
   const useSample = () => setFile({ name: `${req.name.replace(/\s+/g, "_")}.xlsx`, size: 240_000 + Math.floor(Math.random() * 400_000) });
-  const submit = () => {
+  const submit = async () => {
+    if (busy) return;
     if (!file) {
       toast("제출할 파일을 선택해 주세요.", "error");
       return;
     }
+    setBusy(true);
+
+    // 서버가 있으면 실제 파일을 먼저 올린다. 올라가지 않으면 제출로 치지 않는다 —
+    // "제출됨"인데 파일이 없으면 담당자가 헛걸음한다.
+    let storagePath: string | undefined;
+    if (onServer) {
+      if (!file.blob) { toast("샘플 파일은 서버에 올릴 수 없습니다. 실제 파일을 선택해 주세요.", "error"); setBusy(false); return; }
+      const fileId = uid("f");
+      const r = await uploadDocumentFile(req.companyId, req.id, fileId, file.blob);
+      if (!r.ok) { toast(r.reason ?? "파일을 올리지 못했습니다.", "error"); setBusy(false); return; }
+      storagePath = r.path;
+    }
+
     // 막는 주체는 화면이 아니라 store다. 여기서는 결과를 보고 안내만 한다 —
     // 미리보기 중인 내부 계정이 대신 올리면 "고객이 직접 제출했다"는 기록이 거짓이 된다.
     const before = useStore.getState().docRequests.find((r) => r.id === req.id)?.files.length ?? 0;
-    upload(req.id, { fileName: file.name, size: file.size }, session?.userId ?? "");
+    upload(req.id, { fileName: file.name, size: file.size, storagePath }, session?.userId ?? "");
     const after = useStore.getState().docRequests.find((r) => r.id === req.id)?.files.length ?? 0;
     if (after === before) {
       toast("읽기 전용 미리보기입니다. 자료 제출은 고객 계정으로만 가능합니다.", "error");
+      setBusy(false);
       return;
     }
     toast("자료가 제출되었습니다. 담당 컨설턴트에게 바로 전달되었습니다.");
     setFile(null);
+    setBusy(false);
     onClose();
   };
   return (
     <Modal open={open} onClose={onClose} title={<span className="flex items-center gap-2"><Upload size={18} /> 자료 제출</span>} size="sm" footer={
       <>
         <Button variant="ghost" onClick={onClose}>취소</Button>
-        <Button variant="accent" onClick={submit} icon={<Upload size={16} />}>제출하기</Button>
+        <Button variant="accent" onClick={submit} disabled={busy} icon={<Upload size={16} />}>{busy ? "올리는 중…" : "제출하기"}</Button>
       </>
     }>
       <div className="mb-3">
@@ -148,8 +184,12 @@ export function UploadModal({ req, open, onClose }: { req: DocumentRequest | nul
         )}
         <Input type="file" className="hidden" onChange={(e) => pick(e.target.files?.[0])} />
       </label>
-      <button onClick={useSample} className="mt-2 text-[0.8rem] font-semibold text-ink-3 underline-offset-2 hover:text-ink hover:underline">데모용 샘플 파일 사용</button>
-      <p className="mt-3 text-[0.75rem] text-ink-3">이 데모에서는 파일 내용이 저장되지 않고 파일명·크기만 기록됩니다. 실제 운영 시 안전한 저장소에 보관됩니다.</p>
+      {!onServer && <button onClick={useSample} className="mt-2 text-[0.8rem] font-semibold text-ink-3 underline-offset-2 hover:text-ink hover:underline">데모용 샘플 파일 사용</button>}
+      <p className="mt-3 text-[0.75rem] leading-relaxed text-ink-3">
+        {onServer
+          ? "파일은 우리 회사 보관함에 안전하게 저장되고, 담당 컨설턴트와 대표만 열 수 있습니다. 다른 기업에는 보이지 않습니다. 한 번에 50MB 까지."
+          : "지금은 데모라 파일 내용이 저장되지 않고 파일명·크기만 기록됩니다. 서버 연결 후에는 실제 파일이 보관됩니다."}
+      </p>
     </Modal>
   );
 }
