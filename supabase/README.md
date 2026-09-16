@@ -31,7 +31,12 @@ Dashboard → **Authentication** → Users → **Add user** → *Create new user
 - **Auto Confirm User: 켜기** ← 이걸 켜야 확인 메일 없이 바로 로그인됩니다
 
 **(2) SQL 실행**
-Dashboard → **SQL Editor** → New query → [`setup.sql`](./setup.sql) 전체를 붙여넣고 **Run**.
+Dashboard → **SQL Editor** → New query →
+편집기 안을 클릭하고 **`Ctrl+A`(전체 선택) → `Ctrl+V`(붙여넣기) → Run**.
+
+> **`Ctrl+A` 를 꼭 먼저 누르세요.** 그냥 붙여넣으면 편집기에 있던 글자가 맨 아래에 남아
+> `syntax error at or near ...` 오류가 납니다. 그때는 **맨 아랫줄의 남은 글자만 지우고
+> 다시 Run** 하면 됩니다. 오류가 나면 아무것도 만들어지지 않으므로 몇 번을 다시 해도 안전합니다.
 
 바로 복사할 수 있는 주소:
 ```
@@ -51,6 +56,15 @@ https://raw.githubusercontent.com/sanghohoho0813-lab/KPJKcorp/claude/read-and-an
 - **로그인 계정이 여러 개**여서 대표를 못 고른 경우에는 "다음 할 일" 칸에 적힌 한 줄을 이메일만 바꿔 실행하면 됩니다.
 - 중간에 노란 **NOTICE** 가 여러 줄 나오는 것은 정상입니다. 오류가 아닙니다.
 - **여러 번 실행해도 안전합니다.** 이미 있는 것은 건너뛰고 데이터를 지우지 않습니다.
+- `syntax error` 가 났다면 **아무것도 만들어지지 않은 상태**입니다. Postgres 는 전체를 하나로 묶어
+  거부하므로 중간까지 만들어지는 일이 없습니다. 지금 상태가 궁금하면 이것만 따로 실행해 보세요:
+
+  ```sql
+  select
+    (select count(*) from information_schema.tables
+      where table_schema = 'public' and table_type = 'BASE TABLE') as "만들어진 표",
+    (select count(*) from auth.users)                              as "로그인 계정";
+  ```
 
 > 이 파일에는 표 · 접근 권한 · 파일 보관함 · 대표 계정 연결이 모두 들어 있습니다.
 > 예전처럼 여러 파일을 순서대로 실행하실 필요가 없습니다.

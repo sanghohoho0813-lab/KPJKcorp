@@ -5,7 +5,14 @@
 --  이 파일 하나만 실행하면 서버 준비가 끝납니다.
 --
 --  실행 방법
---    Supabase 대시보드 → SQL Editor → New query → 이 파일 전체를 붙여넣고 Run
+--    Supabase 대시보드 → SQL Editor → New query
+--    편집기 안을 클릭 → Ctrl+A (전체 선택) → Ctrl+V (붙여넣기) → Run
+--
+--    ※ Ctrl+A 를 꼭 먼저 누르세요.
+--      그냥 붙여넣으면 편집기에 있던 글자가 맨 아래에 남아
+--      "syntax error at or near ..." 오류가 납니다.
+--      그럴 때는 맨 아랫줄의 남은 글자만 지우고 다시 Run 하면 됩니다.
+--      (오류가 나면 아무것도 만들어지지 않으니 안심하고 다시 실행하세요)
 --
 --  권장 순서
 --    1) 먼저 Authentication → Users → "Add user" 로 대표님 로그인 계정을 만드세요.
