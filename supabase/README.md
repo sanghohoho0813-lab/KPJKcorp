@@ -22,44 +22,42 @@ Dashboard → Project Settings → General → Region.
 
 ---
 
-## 1. 표 만들기 — SQL 3개 실행
+## 1. SQL 한 번 실행
 
-Dashboard → **SQL Editor** → New query → 파일 내용을 통째로 붙여넣고 **Run**.
-**순서대로 하나씩** 실행하세요.
-
-| 순서 | 파일 | 무엇을 하는가 |
-|---|---|---|
-| 1 | `migrations/001_schema.sql` | 표 19개를 만듭니다 (기업·프로젝트·상담·계약·자료·일정·업무·문의·견적·기록 등) |
-| 2 | `migrations/002_rls.sql` | 누가 무엇을 볼 수 있는지 정합니다. **이게 보안의 핵심입니다** |
-| 3 | `migrations/003_storage.sql` | 파일 보관함 2개를 만듭니다 (제출자료 / 결과자료) |
-
-`Success. No rows returned` 이 나오면 정상입니다. 노란 NOTICE 는 오류가 아닙니다.
-
-> 001과 002는 **반드시 둘 다** 실행해야 합니다. 001만 실행하고 멈추면 표는 생겼는데
-> 잠금장치가 없는 상태가 됩니다.
-
----
-
-## 2. 대표 계정 만들기
-
-**(1) 로그인 계정 생성**
+**(1) 먼저 로그인 계정부터**
 Dashboard → **Authentication** → Users → **Add user** → *Create new user*
 - Email: 대표님이 쓰실 이메일
 - Password: 쓰실 비밀번호 (6자 이상)
 - **Auto Confirm User: 켜기** ← 이걸 켜야 확인 메일 없이 바로 로그인됩니다
 
-**(2) 대표 권한 부여**
-`migrations/004_bootstrap.sql` 을 열어 **맨 마지막 줄**의 이메일·이름을 고친 뒤 SQL Editor에서 실행:
+**(2) SQL 실행**
+Dashboard → **SQL Editor** → New query → [`setup.sql`](./setup.sql) 전체를 붙여넣고 **Run**.
 
-```sql
-select public.kpjk_bootstrap_admin('대표님이메일@example.com', '김상호', '대표이사');
+바로 복사할 수 있는 주소:
+```
+https://raw.githubusercontent.com/sanghohoho0813-lab/KPJKcorp/claude/read-and-answer-tbrjsf/supabase/setup.sql
 ```
 
-`대표 계정 연결 완료: …` 이 나오면 성공입니다.
+표 19개, 접근 권한, 파일 보관함 2개가 한 번에 만들어지고, (1)에서 만든 계정이
+자동으로 **대표 권한**을 받습니다.
+
+실행이 끝나면 아래 같은 표가 한 줄 나옵니다. 이것으로 확인하세요.
+
+| 표 | 권한정책 | 파일보관함 | 대표계정 | 다음 할 일 |
+|---|---|---|---|---|
+| 19 | 48 | 2 | 대표님이메일 | 설치 완료. Project Settings → API … |
+
+- **대표계정이 "아직 없음"** 이면 (1)을 먼저 하지 않으신 것입니다. 계정을 만들고 이 파일을 한 번 더 실행하세요.
+- **로그인 계정이 여러 개**여서 대표를 못 고른 경우에는 "다음 할 일" 칸에 적힌 한 줄을 이메일만 바꿔 실행하면 됩니다.
+- 중간에 노란 **NOTICE** 가 여러 줄 나오는 것은 정상입니다. 오류가 아닙니다.
+- **여러 번 실행해도 안전합니다.** 이미 있는 것은 건너뛰고 데이터를 지우지 않습니다.
+
+> 이 파일에는 표 · 접근 권한 · 파일 보관함 · 대표 계정 연결이 모두 들어 있습니다.
+> 예전처럼 여러 파일을 순서대로 실행하실 필요가 없습니다.
 
 ---
 
-## 3. 앱에 연결 정보 넣기
+## 2. 앱에 연결 정보 넣기
 
 Dashboard → **Project Settings** → **API** 에서 두 값을 복사합니다.
 
@@ -77,7 +75,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...
 
 > **service_role key 는 절대 넣지 마세요.** 그 열쇠는 모든 권한 검사를 통과합니다.
 > `anon public` 은 브라우저에 그대로 나가도 되는 값입니다 — 그 열쇠로 할 수 있는 일은
-> 002_rls.sql 의 정책이 전부 정하기 때문입니다.
+> setup.sql 2부(접근 권한)가 전부 정하기 때문입니다.
 
 `npm run dev` 로 다시 띄우면 로그인 화면에 **서버 연결** 표시가 붙습니다.
 배포(Vercel 등)한다면 같은 두 값을 그쪽 환경변수에도 넣으세요.
@@ -87,7 +85,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...
 
 ---
 
-## 4. 나머지 계정 만들기
+## 3. 나머지 계정 만들기
 
 앱에 대표 계정으로 로그인한 뒤 **설정 → 사용자 관리**에서 컨설턴트와 고객 담당자
 계정을 만듭니다. 비밀번호는 그 자리에서 정해 전달하고, 본인이 로그인 화면의
@@ -103,7 +101,7 @@ Authentication → Providers → Email → **Confirm email**
 
 ---
 
-## 5. 컨설턴트 열람 범위
+## 4. 컨설턴트 열람 범위
 
 지금은 **전체 공유** 입니다 — 컨설턴트가 모든 기업고객을 봅니다.
 나중에 "자기 담당만" 으로 바꾸려면 설정 화면에서 전환하면 되고, 데이터베이스 정책이
@@ -117,10 +115,10 @@ update public.app_settings set consultant_scope = 'all' where id = 1;   -- 전�
 
 ---
 
-## 6. 권한이 정말 막히는지 확인하기
+## 5. 권한이 정말 막히는지 확인하기
 
 정책을 "설정했다"와 "실제로 막는다"는 다릅니다. 노트북에 Postgres가 있다면
-`test/000_supabase_stub.sql` → `001` → `002` → `003` → `test/010_rls_test.sql` 순서로
+`test/000_supabase_stub.sql` → `setup.sql` → `test/010_rls_test.sql` 순서로
 실행해 32개 항목을 직접 확인할 수 있습니다. 이 저장소에서는 전부 통과했습니다:
 
 - 고객은 자기 회사만 보이고, 남의 회사는 기업·프로젝트·문의·파일 어느 것도 안 보임

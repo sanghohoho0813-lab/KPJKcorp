@@ -10,7 +10,7 @@ import { userFromRow, userToRow } from "./rows";
  * 지금까지의 로그인은 브라우저 안에서 해시를 비교하는 것이었다. 개발자도구를 열 줄
  * 아는 사람은 우회할 수 있었고, 그래서 코드 주석에도 "보안 경계가 아니다"라고 적어 두었다.
  * 여기서부터는 Supabase Auth 가 비밀번호를 검증하고 토큰을 발급하며,
- * 그 토큰으로 무엇을 할 수 있는지는 데이터베이스의 정책(002_rls.sql)이 정한다.
+ * 그 토큰으로 무엇을 할 수 있는지는 데이터베이스의 정책(supabase/setup.sql 2부)이 정한다.
  */
 
 export interface SignInResult {

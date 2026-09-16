@@ -10,7 +10,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import * as M from "../../src/lib/server/rows";
 
-const sql = readFileSync(join(import.meta.dirname, "../migrations/001_schema.sql"), "utf8");
+const sql = readFileSync(join(import.meta.dirname, "../setup.sql"), "utf8");
 
 /** create table public.X ( ... ) 에서 컬럼 이름을 뽑는다 */
 function columnsOf(table: string): Set<string> {

@@ -9,7 +9,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
  * 서버를 붙이는 일이 데모를 망가뜨리면 안 된다. 발표 중에 인터넷이 끊겨도 화면은 살아야 한다.
  *
  * anon key 는 브라우저에 그대로 나간다. 그래도 되는 열쇠다 — 이 열쇠로 할 수 있는 일은
- * 002_rls.sql 의 정책이 전부 정한다. 절대 service_role key 를 여기에 넣지 않는다.
+ * supabase/setup.sql 2부의 정책이 전부 정한다. 절대 service_role key 를 여기에 넣지 않는다.
  */
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
