@@ -371,9 +371,64 @@ export interface Baseline {
   clientsPerConsultant?: number;
   /** 대표가 직접 챙겨야 했던 업무 비중 (%) */
   ceoHandledPct?: number;
+  /** "어디까지 됐나요" 류 단순 진행문의 (건/주) — 시스템이 Inquiry.category 로 실측할 수 있다 */
+  progressInquiryPerWeek?: number;
   recordedAt?: string;
   recordedBy?: string;
   note?: string;
+}
+
+/* ---------- 도입 전 기준선 조사 ---------- */
+
+/** 언제 물었는가. before 는 도입 전, 나머지는 같은 문항을 다시 묻는 시점이다. */
+export type BaselinePhase = "before" | "day7" | "day14";
+
+/**
+ * 선택지에서 환산한 수치. 전부 선택이다 — "모르겠음"을 고르면 비워 둔다.
+ * 환산 규칙은 src/lib/baseline-survey.ts 에 한 곳으로 모아 두었다.
+ */
+export interface BaselineMetrics {
+  /** 자료요청 → 실제 제출까지 (일) */
+  docLeadDays?: number;
+  /** 자료가 다 들어올 때까지 추가로 연락한 횟수 */
+  docReminderCount?: number;
+  /** 하루에 지난 자료·상담내용을 다시 찾아본 횟수 */
+  customerSearchesPerDay?: number;
+  /** 한 건 찾는 데 걸린 시간 (분) */
+  customerSearchMinutes?: number;
+  /** 진행상황을 수기로 확인한 하루 시간 (분) — 7일차·14일차에 다시 묻는 핵심 지표 */
+  dailyManualCheckMinutes?: number;
+  /** 대표가 직접 챙겨야 했던 업무 비중 (%) */
+  ceoHandledPct?: number;
+  missedFollowupsPerWeek?: number;
+  /** 정보 차이·전달착오로 다시 한 일 (건/주) */
+  reworkPerWeek?: number;
+  inquiryResponseHours?: number;
+  /** "어디까지 됐나요" 류 단순 문의 (건/주) */
+  progressInquiryPerWeek?: number;
+  consultationsActualPerMonth?: number;
+  /** 그중 실제로 기록이 남은 건수 — 기존 Baseline.consultationsPerMonth 와 연결된다 */
+  consultationsRecordedPerMonth?: number;
+  clientsPerConsultant?: number;
+  biggestPainPoints?: string[];
+}
+
+export interface BaselineSurveyResponse {
+  id: string;
+  surveyVersion: string;
+  phase: BaselinePhase;
+  respondentUserId: string;
+  respondentName: string;
+  recordedAt: string;
+  /** 고른 선택지 그대로 — 나중에 문항이 바뀌어도 원본을 잃지 않는다 */
+  answers: Record<string, string | string[]>;
+  /** 선택지를 환산한 수치. 계산 근거로 쓰므로 따로 보관한다 */
+  metrics: BaselineMetrics;
+  recentPainExample?: string;
+  /** 어디서 온 값인가 — 시스템 실측이 아니라 사람의 기억이다 */
+  source: "ceo_recall";
+  /** 작성 중 임시저장. 제출하면 false 가 된다 */
+  draft?: boolean;
 }
 
 /* ---------- AX 고도화 설문 ---------- */
@@ -455,7 +510,8 @@ export type ActivityType =
   | "demo_reset"
   | "samples_removed"
   | "samples_restored"
-  | "company_doc_read";
+  | "company_doc_read"
+  | "baseline_survey_saved";
 
 export interface Activity {
   id: string;
@@ -512,6 +568,11 @@ export interface Settings {
   sprintStartedAt?: string;
   /** 도입 전 기준선 (대표 입력값) */
   baseline?: Baseline;
+  /**
+   * 기준선 조사 응답. 시점(before/day7/day14)당 한 건씩 쌓인다.
+   * 조직 전체가 공유하는 값이라 개인 취향(테마·글자크기)과 달리 서버에도 저장된다.
+   */
+  baselineSurveys?: BaselineSurveyResponse[];
   tutorialDonePortal: boolean;
   timezone: string;
   /** 시간 규칙 켜기/끄기. 키가 없으면 켜진 것으로 본다 */

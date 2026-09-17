@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { type ReactNode, useState } from "react";
-import { AlertTriangle, Archive, ArrowRight, Building2, KeyRound, Pencil, ShieldAlert, Trash2, UserPlus, CalendarDays, CheckCircle2, ChevronDown, FileUp, MessageSquare, Clock, FileText, RefreshCw, Sparkles, Upload, UserCheck, Search, Briefcase, Bell, LogIn, Download, RotateCcw, TrendingUp, ShieldCheck, ClipboardList, UserMinus, Repeat, Receipt } from "lucide-react";
+import { AlertTriangle, Archive, ArrowRight, Building2, KeyRound, Pencil, ShieldAlert, Trash2, UserPlus, CalendarDays, CheckCircle2, ChevronDown, FileUp, MessageSquare, Clock, FileText, RefreshCw, Sparkles, Upload, UserCheck, Search, Briefcase, Bell, LogIn, Download, RotateCcw, TrendingUp, ShieldCheck, ClipboardList, UserMinus, Repeat, Receipt, Ruler } from "lucide-react";
 import type { Activity, DocStatus, InternalStage, Schedule, TaskStatus, Priority, InquiryStatus } from "@/lib/types";
 import { DOC_STATUS, INQUIRY_STATUS, PRIORITY, SCHEDULE_TYPE, TASK_STATUS, stageLabel, stageProgress } from "@/lib/stages";
 import type { BriefItem } from "@/lib/brief";
@@ -161,6 +161,7 @@ export function BriefList({ items, limit, compact }: { items: BriefItem[]; limit
 
 /* ---------- Activity feed (Evidence) ---------- */
 const ACT_ICON: Record<Activity["type"], ReactNode> = {
+  baseline_survey_saved: <Ruler size={14} />,
   samples_removed: <Trash2 size={14} />,
   samples_restored: <RotateCcw size={14} />,
   company_doc_read: <FileText size={14} />,

@@ -434,6 +434,7 @@ create table if not exists public.app_settings (
   id                integer primary key default 1 check (id = 1),
   org               jsonb,                          -- 인쇄물 상단 회사 정보
   baseline          jsonb,                          -- 도입 전 기준선 (대표 입력값)
+  baseline_surveys  jsonb,                          -- 기준선 조사 응답 (도입 전 / 7일차 / 14일차)
   sprint_started_at timestamptz,
   auto_rules        jsonb,
   consultant_scope  text not null default 'all' check (consultant_scope in ('all','own')),
@@ -443,6 +444,10 @@ comment on column public.app_settings.consultant_scope is
   'all = 컨설턴트가 전 기업을 본다(현재). own = 자기 담당만 본다. 이 값 하나로 RLS 전체가 바뀐다.';
 
 insert into public.app_settings (id) values (1) on conflict (id) do nothing;
+
+-- 이 파일을 예전 버전으로 이미 실행하셨다면 아래 한 줄이 새 칸을 더해 줍니다.
+-- 이미 있으면 아무 일도 하지 않습니다.
+alter table public.app_settings add column if not exists baseline_surveys jsonb;
 
 -- -----------------------------------------------------------------------------
 -- 18. updated_at 자동 갱신

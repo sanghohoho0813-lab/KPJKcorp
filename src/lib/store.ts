@@ -12,7 +12,7 @@ import type {
   ActivityType,
   Approval,
   ApprovalKind,
-  Baseline,
+  BaselineSurveyResponse,
   Consultation,
   DocumentRequest,
   InternalStage,
@@ -38,9 +38,10 @@ import { nowIso, uid, addDays, iso, daysBetween } from "./format";
 import { stageLabel } from "./stages";
 import { OPP_STATUS, SERVICE_BY_KEY } from "./services";
 import { can, type Permission } from "./permissions";
+import { toLegacyBaseline } from "./baseline-survey";
 import { serverConfigured } from "./server/client";
 import { currentServerUser, serverSignIn as authSignIn, serverSignOut } from "./server/auth";
-import { loadAll, pushChanges, pushSettings, type ServerSettings } from "./server/sync";
+import { loadAll, ORG_SETTING_KEYS, pushChanges, pushSettings, type ServerSettings } from "./server/sync";
 
 export interface StoreState extends SeedData {
   hydrated: boolean;
@@ -149,7 +150,11 @@ export interface StoreState extends SeedData {
   startSprint: () => void;
   resetSprint: () => void;
   /** 도입 전 기준선 기록 — 전후 비교의 Before 쪽 */
-  saveBaseline: (data: Baseline, byUserId: string) => void;
+  /**
+   * 기준선 조사 저장. 같은 시점(before/day7/day14)의 이전 응답은 대체한다.
+   * 임시저장(draft)도 같은 자리를 쓰므로 이어서 작성할 수 있다.
+   */
+  saveBaselineSurvey: (res: BaselineSurveyResponse, byUserId: string) => void;
   /** 브리핑 추천을 실제로 실행했을 때 — "추천 후 실행" 건수의 근거가 된다. */
   logAiAction: (label: string, ctx: { companyId?: string; kind: string }, byUserId: string) => void;
   logEvidenceExport: (byUserId: string, rows: number) => void;
@@ -275,6 +280,7 @@ function applyServer(
       // 조직 공용 설정만 서버 값으로 덮는다
       org: server?.org ?? cur.org,
       baseline: server?.baseline ?? cur.baseline,
+      baselineSurveys: server?.baselineSurveys ?? cur.baselineSurveys,
       sprintStartedAt: server?.sprintStartedAt ?? cur.sprintStartedAt,
       autoRules: server?.autoRules ?? cur.autoRules,
       consultantScope: server?.consultantScope ?? "all",
@@ -297,7 +303,18 @@ export const useStore = create<StoreState>()(
       const set = ((partial: unknown, replace?: boolean) => {
         const before = get();
         (rawSet as (p: unknown, r?: boolean) => void)(partial, replace);
-        if (!loadingFromServer && before?.serverMode) pushChanges(before, get());
+        if (loadingFromServer || !before?.serverMode) return;
+        const after = get();
+        pushChanges(before, after);
+        // 조직 공용 설정(회사 정보·기준선·실증 시작일·시간 규칙)은 목록이 아니라 한 행이라
+        // 위의 diff 경로를 타지 않는다. 여기서 따로 보낸다 — 빠뜨리면 새로고침 시 서버 값으로 덮인다.
+        if (before.settings !== after.settings) {
+          const patch: Record<string, unknown> = {};
+          for (const k of ORG_SETTING_KEYS) {
+            if (JSON.stringify(before.settings[k]) !== JSON.stringify(after.settings[k])) patch[k] = after.settings[k];
+          }
+          if (Object.keys(patch).length) void pushSettings(patch);
+        }
       }) as typeof rawSet;
 
       return {
@@ -1443,15 +1460,32 @@ export const useStore = create<StoreState>()(
           activities: [makeActivity({ type: "task_created", actorId: st.session?.userId ?? "u_admin", actorRole: "admin", text: "AX 실증 14일 시작", meta: { sprint: "start" } }), ...st.activities],
         });
       },
-      saveBaseline: (data, byUserId) => {
+      saveBaselineSurvey: (res, byUserId) => {
         const st = get();
-        if (deny(st, "baseline.write", "도입 전 기준선 입력", set)) return;
-        const now = nowIso();
+        if (deny(st, "baseline.write", "도입 전 기준선 조사", set)) return;
+        const rest = (st.settings.baselineSurveys ?? []).filter((x) => x.phase !== res.phase);
+        const settings: Settings = { ...st.settings, baselineSurveys: [res, ...rest] };
+        // 제출된 응답만 기존 도입 전후 비교 카드로 옮긴다. 작성 중인 값이 비교표에 뜨면 안 된다.
+        if (!res.draft && res.phase === "before") {
+          settings.baseline = {
+            ...st.settings.baseline,
+            ...toLegacyBaseline(res.metrics),
+            recordedAt: res.recordedAt,
+            recordedBy: byUserId,
+            note: st.settings.baseline?.note,
+          };
+        }
         set({
-          settings: { ...st.settings, baseline: { ...data, recordedAt: now, recordedBy: byUserId } },
-          activities: [makeActivity({ type: "evidence_exported", actorId: byUserId, actorRole: "admin", text: "도입 전 기준선 기록", meta: { fields: Object.values(data).filter((v) => typeof v === "number").length } }), ...st.activities],
+          settings,
+          // 임시저장까지 기록으로 남기면 활동 로그가 의미 없이 길어진다. 제출만 남긴다.
+          activities: res.draft ? st.activities : [makeActivity({
+            type: "baseline_survey_saved", actorId: byUserId, actorRole: "admin",
+            text: `${res.phase === "before" ? "도입 전" : res.phase === "day7" ? "7일차" : "14일차"} 기준선 조사 기록 (${res.respondentName})`,
+            meta: { phase: res.phase, answered: Object.keys(res.answers).length },
+          }), ...st.activities],
         });
       },
+
       resetSprint: () => {
         const st = get();
         set({ settings: { ...st.settings, sprintStartedAt: undefined } });

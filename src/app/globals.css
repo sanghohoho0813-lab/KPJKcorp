@@ -358,8 +358,12 @@ html[data-motion="reduce"] .coach-glow { animation: none; }
   html { font-size: 11pt !important; }
   body { background: #fff !important; }
   .print-hide { display: none !important; }
-  .print-sheet { break-after: page; page-break-after: always; box-shadow: none !important; border: 0 !important; border-radius: 0 !important; }
+  /* min-height 는 화면에서 종이처럼 보이라고 준 값이다. 인쇄할 때 그대로 두면
+     시트가 A4 와 정확히 같은 297mm 가 되어 반올림 한 픽셀에 빈 페이지가 하나 더 생긴다. */
+  .print-sheet { min-height: 0 !important; break-after: page; page-break-after: always; box-shadow: none !important; border: 0 !important; border-radius: 0 !important; }
   .print-sheet:last-child { break-after: auto; page-break-after: auto; }
+  /* 내용이 정말 한 장을 넘기면 절이나 표의 한 줄이 가운데서 잘리지 않게 한다 */
+  .print-sheet section, .print-sheet header, .print-sheet footer, .print-sheet tr { break-inside: avoid; page-break-inside: avoid; }
   .print-page { max-width: none !important; padding: 0 !important; }
   a[href]::after { content: none !important; }
 }

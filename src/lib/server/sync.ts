@@ -68,6 +68,7 @@ const SPEC: Record<Key, Spec> = {
 export interface ServerSettings {
   org?: StoreState["settings"]["org"];
   baseline?: StoreState["settings"]["baseline"];
+  baselineSurveys?: StoreState["settings"]["baselineSurveys"];
   sprintStartedAt?: string;
   autoRules?: Record<string, boolean>;
   consultantScope: "all" | "own";
@@ -131,6 +132,7 @@ export async function loadAll(): Promise<LoadResult> {
       settings: {
         org: (st?.org ?? undefined) as StoreState["settings"]["org"],
         baseline: (st?.baseline ?? undefined) as StoreState["settings"]["baseline"],
+        baselineSurveys: (st?.baseline_surveys ?? undefined) as StoreState["settings"]["baselineSurveys"],
         sprintStartedAt: (st?.sprint_started_at ?? undefined) as string | undefined,
         autoRules: (st?.auto_rules ?? undefined) as Record<string, boolean> | undefined,
         consultantScope: (st?.consultant_scope ?? "all") as "all" | "own",
@@ -252,19 +254,33 @@ async function flush(
   }
 }
 
-/** 조직 설정은 한 행이라 따로 보낸다 */
+/**
+ * 조직 공용 설정은 목록이 아니라 한 행(app_settings)이라 diff 경로를 타지 않는다.
+ * 그래서 따로 보낸다 — 회사 정보·기준선·기준선 조사·실증 시작일·시간 규칙·열람 범위.
+ */
 export async function pushSettings(patch: {
-  org?: unknown; baseline?: unknown; sprintStartedAt?: string; autoRules?: unknown; consultantScope?: "all" | "own";
+  org?: unknown; baseline?: unknown; baselineSurveys?: unknown;
+  sprintStartedAt?: string; autoRules?: unknown; consultantScope?: "all" | "own";
 }): Promise<{ ok: boolean; reason?: string }> {
   const sb = supa();
   if (!sb) return { ok: false, reason: "서버가 설정되지 않았습니다." };
   const row: Record<string, unknown> = {};
   if (patch.org !== undefined) row.org = patch.org;
   if (patch.baseline !== undefined) row.baseline = patch.baseline;
+  if (patch.baselineSurveys !== undefined) row.baseline_surveys = patch.baselineSurveys;
   if (patch.sprintStartedAt !== undefined) row.sprint_started_at = patch.sprintStartedAt;
   if (patch.autoRules !== undefined) row.auto_rules = patch.autoRules;
   if (patch.consultantScope !== undefined) row.consultant_scope = patch.consultantScope;
   if (!Object.keys(row).length) return { ok: true };
   const { error } = await sb.from("app_settings").update(row).eq("id", 1);
-  return error ? { ok: false, reason: explain(error) } : { ok: true };
+  if (error) {
+    const msg = `설정 저장 실패 — ${explain(error)}`;
+    console.error("[sync] app_settings", error);
+    onError?.(msg);
+    return { ok: false, reason: explain(error) };
+  }
+  return { ok: true };
 }
+
+/** 조직이 공유하는 설정 키 — 기기별 취향(테마·글자크기)은 여기 없다 */
+export const ORG_SETTING_KEYS = ["org", "baseline", "baselineSurveys", "sprintStartedAt", "autoRules"] as const;

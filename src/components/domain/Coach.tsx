@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { useState } from "react";
-import { ArrowRight, Check, ChevronDown, Compass, Play, TrendingUp } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, Compass, Play, Ruler, TrendingUp } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useNow } from "@/lib/hooks";
 import { buildSprint, coachLine, coverageOf, WHY_EVIDENCE, type EvidenceArea, type SprintState } from "@/lib/evidence";
@@ -104,6 +104,43 @@ function WhyToggle({ open, onToggle }: { open: boolean; onToggle: () => void }) 
   );
 }
 
+/**
+ * 도입 전 기준선 알림.
+ *
+ * 이 조사는 딱 한 번 하는 일이라, 메뉴에 두면 아무도 찾지 않는다.
+ * 대표가 매일 처음 보는 자리(대시보드 코치 카드)에 놓고, 끝나면 사라지게 한다.
+ * 기록을 시작하기 전에 해야 의미가 있다 — 며칠 쓴 뒤의 기억은 이미 새 시스템에 물든다.
+ */
+function BaselineNudge() {
+  const role = useStore((st) => st.session?.role);
+  const baseline = useStore((st) => st.settings.baseline);
+  const surveys = useStore((st) => st.settings.baselineSurveys);
+  if (role !== "admin") return null;
+  const done = !!(surveys ?? []).find((x) => x.phase === "before" && !x.draft);
+  // 예전 방식으로 숫자만 넣어 둔 경우도 "기록됨"으로 본다 — 다시 시키지 않는다.
+  const legacy = baseline && Object.values(baseline).some((v) => typeof v === "number");
+  if (done || legacy) return null;
+  const draft = (surveys ?? []).find((x) => x.phase === "before" && x.draft);
+
+  return (
+    <Link
+      href="/ax/baseline"
+      className="pressable flex flex-wrap items-center gap-x-2.5 gap-y-1 border-t border-warning/30 bg-warning-bg/60 px-5 py-3 text-[0.85rem] text-warning hover:bg-warning-bg"
+    >
+      <Ruler size={16} className="shrink-0" />
+      <span className="min-w-0 flex-1">
+        <b>도입 전 기준선이 아직 없습니다.</b>
+        <span className="ml-1 font-normal">
+          {draft
+            ? "작성하시던 내용이 남아 있습니다. 이어서 마치면 도입 전후 비교가 열립니다."
+            : "지금 기록해 두어야 나중에 무엇이 달라졌는지 말할 수 있습니다. 대부분 클릭으로 3~5분."}
+        </span>
+      </span>
+      <span className="flex shrink-0 items-center gap-1 font-bold">{draft ? "이어서 작성" : "조사 시작"} <ArrowRight size={14} /></span>
+    </Link>
+  );
+}
+
 export function CoachCard() {
   const s = useSprint();
   const start = useStore((st) => st.startSprint);
@@ -112,7 +149,7 @@ export function CoachCard() {
 
   if (!s.active) {
     return (
-      <Card className="coach-box coach-glow anim-rise p-5">
+      <Card className="coach-box coach-glow anim-rise overflow-hidden p-5">
         <div className="flex flex-col gap-4 md:flex-row md:items-center">
           <div className="flex min-w-0 flex-1 items-start gap-3">
             <span className="hover-pop flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-ink"><Compass size={20} /></span>
@@ -128,6 +165,7 @@ export function CoachCard() {
           </Button>
         </div>
         <WhyToggle open={why} onToggle={() => setWhy((v) => !v)} />
+        <div className="-mx-5 -mb-5 mt-4"><BaselineNudge /></div>
       </Card>
     );
   }
@@ -176,6 +214,7 @@ export function CoachCard() {
         )}
         <WhyToggle open={why} onToggle={() => setWhy((v) => !v)} />
       </div>
+      <BaselineNudge />
     </Card>
   );
 }
