@@ -40,3 +40,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# QA 스크립트가 남기는 스크린샷·PDF (scratchpad 로 옮겨 보관)
+/doc/
+/empty/
+/c-*.png
