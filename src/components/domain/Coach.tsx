@@ -8,6 +8,8 @@ import { useStore } from "@/lib/store";
 import { useNow } from "@/lib/hooks";
 import { buildSprint, coachLine, coverageOf, WHY_EVIDENCE, type EvidenceArea, type SprintState } from "@/lib/evidence";
 import { Badge, Button, Card, Progress, cx } from "@/components/ui/ui";
+import { followupState, usePhaseSurveys, useSprintElapsed } from "@/components/domain/BaselineCard";
+import { PHASE_LABEL } from "@/lib/baseline-survey";
 
 /** 화면 여러 곳에서 같은 실증 상태를 쓰기 위한 단일 계산 지점. */
 export function useSprint(): SprintState {
@@ -111,34 +113,74 @@ function WhyToggle({ open, onToggle }: { open: boolean; onToggle: () => void }) 
  * 대표가 매일 처음 보는 자리(대시보드 코치 카드)에 놓고, 끝나면 사라지게 한다.
  * 기록을 시작하기 전에 해야 의미가 있다 — 며칠 쓴 뒤의 기억은 이미 새 시스템에 물든다.
  */
+function NudgeBar({ href, tone, title, body, cta }: { href: string; tone: "warning" | "accent"; title: string; body: string; cta: string }) {
+  return (
+    <Link
+      href={href}
+      className={cx(
+        "pressable flex flex-wrap items-center gap-x-2.5 gap-y-1 border-t px-5 py-3 text-[0.85rem]",
+        tone === "warning" ? "border-warning/30 bg-warning-bg/60 text-warning hover:bg-warning-bg" : "border-accent/30 bg-soft/70 text-accent hover:bg-soft",
+      )}
+    >
+      <Ruler size={16} className="shrink-0" />
+      <span className="min-w-0 flex-1"><b>{title}</b><span className="ml-1 font-normal">{body}</span></span>
+      <span className="flex shrink-0 items-center gap-1 font-bold">{cta} <ArrowRight size={14} /></span>
+    </Link>
+  );
+}
+
+/**
+ * 기준선 관련 알림 — 한 번에 하나만.
+ *
+ * 도입 전이 없으면 그것부터. 있으면 7일차·14일차 재조사가 열렸는지 본다.
+ * 사이드바에 메뉴를 늘리지 않기로 했으므로, 재조사로 들어가는 길은 사실상 이 줄 하나다.
+ * 그래서 "열렸을 때만" 뜨고, 응답하면 바로 사라진다.
+ */
 function BaselineNudge() {
   const role = useStore((st) => st.session?.role);
   const baseline = useStore((st) => st.settings.baseline);
   const surveys = useStore((st) => st.settings.baselineSurveys);
+  const phases = usePhaseSurveys();
+  const elapsed = useSprintElapsed();
   if (role !== "admin") return null;
+
   const done = !!(surveys ?? []).find((x) => x.phase === "before" && !x.draft);
   // 예전 방식으로 숫자만 넣어 둔 경우도 "기록됨"으로 본다 — 다시 시키지 않는다.
   const legacy = baseline && Object.values(baseline).some((v) => typeof v === "number");
-  if (done || legacy) return null;
-  const draft = (surveys ?? []).find((x) => x.phase === "before" && x.draft);
 
-  return (
-    <Link
-      href="/ax/baseline"
-      className="pressable flex flex-wrap items-center gap-x-2.5 gap-y-1 border-t border-warning/30 bg-warning-bg/60 px-5 py-3 text-[0.85rem] text-warning hover:bg-warning-bg"
-    >
-      <Ruler size={16} className="shrink-0" />
-      <span className="min-w-0 flex-1">
-        <b>도입 전 기준선이 아직 없습니다.</b>
-        <span className="ml-1 font-normal">
-          {draft
-            ? "작성하시던 내용이 남아 있습니다. 이어서 마치면 도입 전후 비교가 열립니다."
-            : "지금 기록해 두어야 나중에 무엇이 달라졌는지 말할 수 있습니다. 대부분 클릭으로 3~5분."}
-        </span>
-      </span>
-      <span className="flex shrink-0 items-center gap-1 font-bold">{draft ? "이어서 작성" : "조사 시작"} <ArrowRight size={14} /></span>
-    </Link>
-  );
+  if (!done && !legacy) {
+    const draft = (surveys ?? []).find((x) => x.phase === "before" && x.draft);
+    return (
+      <NudgeBar
+        href="/ax/baseline"
+        tone="warning"
+        title="도입 전 기준선이 아직 없습니다."
+        body={draft
+          ? "작성하시던 내용이 남아 있습니다. 이어서 마치면 도입 전후 비교가 열립니다."
+          : "지금 기록해 두어야 나중에 무엇이 달라졌는지 말할 수 있습니다. 대부분 클릭으로 3~5분."}
+        cta={draft ? "이어서 작성" : "조사 시작"}
+      />
+    );
+  }
+
+  // 재조사 — 7일차가 먼저, 끝났으면 14일차. 열리지 않았으면 아무 말도 하지 않는다.
+  for (const p of ["day7", "day14"] as const) {
+    if (phases[p]) continue;
+    if (!followupState(p, elapsed, phases).open) break;
+    const draft = (surveys ?? []).find((x) => x.phase === p && x.draft);
+    return (
+      <NudgeBar
+        href={`/ax/baseline?phase=${p}`}
+        tone="accent"
+        title={`${PHASE_LABEL[p]} 재조사가 열렸습니다.`}
+        body={draft
+          ? "작성하시던 내용이 남아 있습니다. 6문항 중 남은 것만 고르시면 됩니다."
+          : "도입 전과 같은 질문 6개입니다. 약 2분이면 도입 전후 비교가 채워집니다."}
+        cta={draft ? "이어서 작성" : "재조사"}
+      />
+    );
+  }
+  return null;
 }
 
 export function CoachCard() {

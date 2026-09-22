@@ -53,6 +53,11 @@ export interface BaselineQuestion {
    * 나머지는 시스템이 실측으로 대체할 수 있다.
    */
   recallOnly?: boolean;
+  /**
+   * 7일차·14일차에 다시 물을 때 쓰는 문구. 도입 전 문항은 전부 과거형("걸렸습니까?")이라
+   * 그대로 다시 물으면 지금 이야기인지 예전 이야기인지 헷갈린다. 이 값이 있는 문항만 재조사한다.
+   */
+  followupLabel?: string;
 }
 
 export interface BaselineSection {
@@ -131,6 +136,7 @@ export const BASELINE_SECTIONS: BaselineSection[] = [
         unit: "회",
         recallOnly: true,
         label: "하루에 기존 고객 자료나 상담내용을 다시 찾아보는 일이 몇 번 정도 있었습니까?",
+        followupLabel: "요즘 하루에 기존 고객 자료나 상담내용을 다시 찾아보는 일이 몇 번 정도 있습니까?",
         options: [
           { key: "none", label: "거의 없음", value: 0 },
           { key: "t1_2", label: "1~2회", value: 1.5 },
@@ -146,6 +152,7 @@ export const BASELINE_SECTIONS: BaselineSection[] = [
         unit: "분",
         recallOnly: true,
         label: "자료나 과거 상담내용 하나를 찾는 데 평균 얼마나 걸렸습니까?",
+        followupLabel: "지금 자료나 과거 상담내용 하나를 찾는 데 평균 얼마나 걸립니까?",
         hint: "카카오톡·메일·폴더·엑셀을 뒤지던 시간을 포함합니다.",
         options: [
           { key: "u1", label: "1분 이내", value: 1 },
@@ -170,6 +177,7 @@ export const BASELINE_SECTIONS: BaselineSection[] = [
         unit: "분",
         recallOnly: true,
         label: "고객별 진행상태를 확인하려고 카카오톡·엑셀·문서·메모를 들여다본 시간은 하루 평균 어느 정도였습니까?",
+        followupLabel: "요즘 고객별 진행상태를 확인하는 데 쓰시는 시간은 하루 평균 어느 정도입니까?",
         hint: "이 항목은 7일차·14일차에 같은 질문으로 다시 여쭤봅니다.",
         options: [
           { key: "u15", label: "15분 미만", value: 10 },
@@ -187,6 +195,7 @@ export const BASELINE_SECTIONS: BaselineSection[] = [
         unit: "%",
         recallOnly: true,
         label: "전체 업무 중 대표가 직접 기억하고 확인하거나 지시해야 돌아가던 업무는 어느 정도였습니까?",
+        followupLabel: "지금 전체 업무 중 대표가 직접 기억하고 확인하거나 지시해야 돌아가는 업무는 어느 정도입니까?",
         options: [
           { key: "u20", label: "20% 미만", value: 15 },
           { key: "p20", label: "약 20%", value: 20 },
@@ -216,6 +225,7 @@ export const BASELINE_SECTIONS: BaselineSection[] = [
         unit: "건/주",
         recallOnly: true,
         label: "자료 누락·전달착오·담당자 간 정보 차이로 같은 내용을 다시 확인하거나 재작업한 일이 얼마나 있었습니까?",
+        followupLabel: "요즘 자료 누락·전달착오·담당자 간 정보 차이로 같은 내용을 다시 확인하거나 재작업하는 일이 얼마나 있습니까?",
         options: [
           { key: "none", label: "거의 없음", value: 0 },
           { key: "m1_2", label: "월 1~2건", value: 0.3 },
@@ -322,6 +332,7 @@ export const BASELINE_SECTIONS: BaselineSection[] = [
         type: "multi",
         max: 3,
         label: "AX 도입 전 가장 부담이 컸던 업무를 최대 3개 골라 주세요.",
+        followupLabel: "지금도 여전히 부담이 되는 업무를 최대 3개 골라 주세요. (없으면 고르지 않으셔도 됩니다)",
         options: [
           { key: "progress", label: "고객별 진행상황 확인" },
           { key: "docs_req", label: "자료 요청 / 독촉" },
@@ -340,6 +351,7 @@ export const BASELINE_SECTIONS: BaselineSection[] = [
         id: "recentPainExample",
         type: "text",
         label: "실제로 가장 기억나는 불편 사례가 있다면 적어 주세요. (선택)",
+        followupLabel: "쓰기 시작하신 뒤 달라졌다고 느끼신 점, 또는 여전히 불편한 점을 적어 주세요. (선택)",
         hint: "심사자에게 숫자보다 이 한 줄이 더 잘 전달될 때가 많습니다.",
         placeholder:
           "예: 고객에게 이미 받은 자료를 다시 요청한 적이 있었음\n예: 후속 연락을 놓쳐 일주일 뒤에 다시 연락함\n예: 대표가 없으면 담당자가 현재 진행상황을 알기 어려웠음",
@@ -351,6 +363,104 @@ export const BASELINE_SECTIONS: BaselineSection[] = [
 export const BASELINE_QUESTIONS = BASELINE_SECTIONS.flatMap((s) => s.questions);
 /** 자유입력을 뺀 문항 수 — 진행률은 클릭으로 답할 것만 센다 */
 export const CLICKABLE_COUNT = BASELINE_QUESTIONS.filter((q) => q.type !== "text").length;
+
+/* -------------------------------------------------------------------------- */
+/* 도입 후 재조사 (7일차 · 14일차)                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * 15문항을 전부 다시 묻지 않는다.
+ *
+ *  - 시스템이 셀 수 있는 것(자료 소요일·후속 누락·문의 응답시간·진행상황 문의·상담 기록 수)은
+ *    다시 물을 이유가 없다. 기억보다 로그가 정확하고, 같은 값을 두 번 받으면 어느 쪽이
+ *    맞는 값인지 심사에서 되묻게 된다.
+ *  - 구조값(담당자 1인당 고객기업 수, 월 상담 건수)은 2주 안에 바뀌지 않는다.
+ *  - 남는 것은 **사람의 체감**뿐이다. 이건 도입 후에도 시스템이 만들어낼 수 없어서,
+ *    도입 전과 똑같이 대표에게 다시 물어야 비교가 성립한다.
+ *
+ * 그래서 재조사는 7문항(클릭 6 + 자유 1) · 2단계다. 15문항을 2주 간격으로 두 번 더 받으면
+ * 세 번째에는 아무도 답하지 않는다.
+ */
+const followupOf = (id: string): BaselineQuestion => {
+  const q = BASELINE_QUESTIONS.find((x) => x.id === id);
+  if (!q) throw new Error(`알 수 없는 문항: ${id}`);
+  return { ...q, label: q.followupLabel ?? q.label, hint: undefined };
+};
+
+export const FOLLOWUP_SECTIONS: BaselineSection[] = [
+  {
+    key: "ceo_now",
+    title: "지금 대표님의 반복 확인",
+    desc: "도입 전과 같은 질문입니다. 지금 기준으로 골라 주세요.",
+    questions: ["dailyManualCheckMinutes", "ceoHandledPct", "reworkPerWeek"].map(followupOf),
+  },
+  {
+    key: "search_now",
+    title: "지금 자료 찾기",
+    desc: "자료와 과거 상담내용을 다시 찾는 데 드는 수고입니다.",
+    questions: ["customerSearchesPerDay", "customerSearchMinutes"].map(followupOf),
+  },
+  {
+    key: "left",
+    title: "아직 남아 있는 불편",
+    desc: "다음에 무엇을 먼저 고칠지 정하는 데 씁니다.",
+    questions: ["biggestPainPoints", "recentPainExample"].map(followupOf),
+  },
+];
+
+export function sectionsFor(phase: BaselinePhase): BaselineSection[] {
+  return phase === "before" ? BASELINE_SECTIONS : FOLLOWUP_SECTIONS;
+}
+
+export function questionsFor(phase: BaselinePhase): BaselineQuestion[] {
+  return sectionsFor(phase).flatMap((s) => s.questions);
+}
+
+export function clickableCountFor(phase: BaselinePhase): number {
+  return questionsFor(phase).filter((q) => q.type !== "text").length;
+}
+
+/**
+ * 재조사가 열리는 날.
+ * 실증을 시작하지 않았거나 아직 그 날이 오지 않았으면 열지 않는다 —
+ * 3일차에 "14일차 조사"를 받아 두면 그 값은 14일차 값이 아니다.
+ */
+export const FOLLOWUP_DUE_DAY: Record<Exclude<BaselinePhase, "before">, number> = { day7: 7, day14: 14 };
+
+/* -------------------------------------------------------------------------- */
+/* 도입 전 ↔ 재조사 비교                                                        */
+/* -------------------------------------------------------------------------- */
+
+export interface RecallMetric {
+  key: keyof BaselineMetrics | "dailySearchMinutes";
+  label: string;
+  unit: string;
+  /** 낮을수록 좋은 지표인가 */
+  lowerIsBetter: boolean;
+  /** 입력값을 곱해 만든 계산치 */
+  computed?: boolean;
+}
+
+/**
+ * 재조사로만 비교할 수 있는 항목 — 전부 "대표 체감"이다.
+ * 시스템 실측과 같은 표에 섞지 않는다. 섞는 순간 어느 숫자가 로그이고 어느 숫자가
+ * 기억인지 구분되지 않아 자료 전체의 신뢰가 깎인다.
+ */
+export const RECALL_METRICS: RecallMetric[] = [
+  { key: "dailyManualCheckMinutes", label: "하루 진행상황 확인 시간", unit: "분", lowerIsBetter: true },
+  { key: "ceoHandledPct", label: "대표 직접관리 비중", unit: "%", lowerIsBetter: true },
+  { key: "customerSearchesPerDay", label: "하루 자료 검색 횟수", unit: "회", lowerIsBetter: true },
+  { key: "customerSearchMinutes", label: "건당 검색 소요", unit: "분", lowerIsBetter: true },
+  { key: "dailySearchMinutes", label: "하루 자료 검색 시간", unit: "분", lowerIsBetter: true, computed: true },
+  { key: "reworkPerWeek", label: "재작업 · 재확인", unit: "건/주", lowerIsBetter: true },
+];
+
+export function recallValue(m: BaselineMetrics | undefined, key: RecallMetric["key"]): number | undefined {
+  if (!m) return undefined;
+  if (key === "dailySearchMinutes") return dailySearchMinutes(m);
+  const v = m[key as keyof BaselineMetrics];
+  return typeof v === "number" ? v : undefined;
+}
 
 export function optionOf(qid: string, key: string | undefined): BaselineOption | undefined {
   if (!key) return undefined;
@@ -446,6 +556,12 @@ export interface SummaryRow {
   value: string;
   /** 대표 입력값을 곱해 만든 계산치 */
   computed?: boolean;
+  /**
+   * 7일차·14일차에 같은 질문을 다시 묻는 행.
+   * 그 시점 응답으로 똑같은 문장을 만들어 한 표 안에서 나란히 볼 수 있게 한다
+   * (숫자 대신 고른 구간 그대로 쓴다 — 두 칸의 말이 달라지면 같은 질문으로 안 읽힌다).
+   */
+  followup?: (a: BaselineAnswers, m: BaselineMetrics) => string;
 }
 
 export interface SummaryGroup {
@@ -457,7 +573,9 @@ export interface SummaryGroup {
 const MISSING = "미입력";
 
 export function summarize(answers: BaselineAnswers, m: BaselineMetrics): SummaryGroup[] {
-  const pick = (qid: string) => labelOf(qid, answers[qid] as string | undefined) ?? MISSING;
+  const from = (a: BaselineAnswers, qid: string) => labelOf(qid, a[qid] as string | undefined) ?? MISSING;
+  const pick = (qid: string) => from(answers, qid);
+  const again = (qid: string) => (a: BaselineAnswers) => from(a, qid);
   const search = dailySearchMinutes(m);
 
   return [
@@ -465,8 +583,8 @@ export function summarize(answers: BaselineAnswers, m: BaselineMetrics): Summary
       key: "ceo",
       title: "대표 반복업무",
       rows: [
-        { label: "하루 진행상황 확인 시간", value: pick("dailyManualCheckMinutes") },
-        { label: "대표 직접관리 비중", value: pick("ceoHandledPct") },
+        { label: "하루 진행상황 확인 시간", value: pick("dailyManualCheckMinutes"), followup: again("dailyManualCheckMinutes") },
+        { label: "대표 직접관리 비중", value: pick("ceoHandledPct"), followup: again("ceoHandledPct") },
       ],
     },
     {
@@ -475,9 +593,21 @@ export function summarize(answers: BaselineAnswers, m: BaselineMetrics): Summary
       rows: [
         { label: "자료 수집 소요기간", value: pick("docLeadDays") },
         { label: "자료 수집 중 추가 연락", value: pick("docReminderCount") },
-        { label: "고객자료 검색", value: `${pick("customerSearchesPerDay")} / 건당 ${pick("customerSearchMinutes")}` },
+        {
+          label: "고객자료 검색",
+          value: `${pick("customerSearchesPerDay")} / 건당 ${pick("customerSearchMinutes")}`,
+          followup: (a) => `${from(a, "customerSearchesPerDay")} / 건당 ${from(a, "customerSearchMinutes")}`,
+        },
         ...(search !== undefined
-          ? [{ label: "하루 자료 검색 시간", value: `약 ${search}분`, computed: true }]
+          ? [{
+              label: "하루 자료 검색 시간",
+              value: `약 ${search}분`,
+              computed: true,
+              followup: (_a: BaselineAnswers, fm: BaselineMetrics) => {
+                const v = dailySearchMinutes(fm);
+                return v === undefined ? MISSING : `약 ${v}분`;
+              },
+            }]
           : []),
       ],
     },
@@ -486,7 +616,7 @@ export function summarize(answers: BaselineAnswers, m: BaselineMetrics): Summary
       title: "누락 · 커뮤니케이션",
       rows: [
         { label: "후속업무 누락", value: pick("missedFollowupsPerWeek") },
-        { label: "재작업", value: pick("reworkPerWeek") },
+        { label: "재작업", value: pick("reworkPerWeek"), followup: again("reworkPerWeek") },
         { label: "고객 문의 대응시간", value: pick("inquiryResponseHours") },
         { label: "단순 진행상황 문의", value: pick("progressInquiryPerWeek") },
       ],

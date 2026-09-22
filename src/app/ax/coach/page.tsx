@@ -7,7 +7,7 @@ import { useStore } from "@/lib/store";
 import { coachLine, coverageOf } from "@/lib/evidence";
 import { fmtDate } from "@/lib/format";
 import { AreaBar, WhyEvidence, useSprint } from "@/components/domain/Coach";
-import { BaselineCard } from "@/components/domain/BaselineCard";
+import { BaselineCard, RecallCompareCard } from "@/components/domain/BaselineCard";
 import { Badge, Button, Card, MoreButton, PageHeader, Progress, SectionTitle, cx } from "@/components/ui/ui";
 import { Confirm } from "@/components/ui/overlay";
 
@@ -79,6 +79,7 @@ export default function CoachPage() {
           </Card>
 
           <BaselineCard />
+          <RecallCompareCard />
 
           {openMissions.length > 0 && (
             <Card className="p-5">

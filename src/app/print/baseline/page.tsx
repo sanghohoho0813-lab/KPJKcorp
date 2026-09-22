@@ -1,7 +1,8 @@
 "use client";
 
 import { useStore } from "@/lib/store";
-import { dailySearchMinutes, labelOf, summarize } from "@/lib/baseline-survey";
+import { PHASE_LABEL, dailySearchMinutes, labelOf, summarize } from "@/lib/baseline-survey";
+import type { BaselinePhase, BaselineSurveyResponse } from "@/lib/types";
 import { fmtDate, fmtDateTime } from "@/lib/format";
 
 /**
@@ -9,12 +10,19 @@ import { fmtDate, fmtDateTime } from "@/lib/format";
  *
  * 벤처기업확인·정책자금·보증 심사에 그대로 낼 수 있어야 한다. 그래서
  * 이 값이 "대표자가 기억으로 적은 것"이라는 사실을 표에도, 하단 고지에도 적는다.
- * 개선율·절감시간은 넣지 않는다 — 도입 후 수치는 아직 측정 중이기 때문이다.
+ * 개선율·절감시간은 넣지 않는다 — 두 시점의 기억을 나눈 값은 근거가 되지 못한다.
+ *
+ * 7일차·14일차 재조사가 기록되어 있으면 같은 표에 칸으로 붙인다. 별도 절로 빼면 같은
+ * 항목이 두 번 나와 한 장을 넘기고, 읽는 사람이 두 표를 눈으로 맞춰야 한다.
  */
 export default function PrintBaselinePage() {
   const st = useStore();
   const org = st.settings.org ?? { name: "KPJK CORPORATION" };
-  const res = (st.settings.baselineSurveys ?? []).find((x) => x.phase === "before" && !x.draft);
+  const all = st.settings.baselineSurveys ?? [];
+  const res = all.find((x) => x.phase === "before" && !x.draft);
+  const followups = (["day7", "day14"] as const)
+    .map((phase) => ({ phase, r: all.find((x) => x.phase === phase && !x.draft) }))
+    .filter((x): x is { phase: Exclude<BaselinePhase, "before">; r: BaselineSurveyResponse } => !!x.r);
 
   if (!res) {
     return (
@@ -51,17 +59,24 @@ export default function PrintBaselinePage() {
       </section>
 
       <section className="mt-4">
-        <h2 className="text-[1rem] font-bold">1. 도입 전 기준선</h2>
+        <h2 className="text-[1rem] font-bold">1. 도입 전 기준선{followups.length > 0 ? " 및 도입 후 재조사" : ""}</h2>
         <p className="mt-1 text-[0.8rem] leading-relaxed text-ink-3">
           아래 값은 시스템 도입 전 업무 상태를 대표자가 직접 기록한 것입니다. 각 항목은 구간 선택으로 응답했으며,
           응답하지 않은 항목은 임의로 채우지 않고 &ldquo;미입력&rdquo;으로 둡니다.
+          {followups.length > 0 && " 오른쪽 칸은 같은 질문을 도입 후 같은 방식으로 다시 받은 응답이며, 두 값 모두 대표자 입력값입니다."}
         </p>
-        <table className="mt-2 w-full text-[0.85rem]">
+        {/* 폰에서 이 화면을 열면 A4 폭(210mm)이 화면보다 넓다. 인쇄물 레이아웃은 그대로 두고
+            화면에서만 표를 옆으로 밀 수 있게 한다 — 글자를 줄이면 인쇄물이 같이 작아진다. */}
+        <div className="thin-scroll -mx-1 overflow-x-auto px-1 print:mx-0 print:overflow-visible print:px-0">
+        <table className="mt-2 w-full min-w-[420px] text-[0.85rem] print:min-w-0">
           <thead>
             <tr className="border-y border-ink text-left">
               <th className="py-1 pr-3 font-semibold whitespace-nowrap">구분</th>
               <th className="py-1 font-semibold">항목</th>
-              <th className="py-1 text-right font-semibold">도입 전 (대표 입력)</th>
+              <th className="py-1 text-right font-semibold whitespace-nowrap">도입 전</th>
+              {followups.map((f) => (
+                <th key={f.phase} className="py-1 pl-3 text-right font-semibold whitespace-nowrap">{PHASE_LABEL[f.phase]}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -74,11 +89,17 @@ export default function PrintBaselinePage() {
                     {r.computed && <span className="ml-1.5 text-[0.72rem] text-ink-3">(입력값 기준 계산)</span>}
                   </td>
                   <td className="py-1 text-right tnum">{r.value}</td>
+                  {followups.map((f) => (
+                    <td key={f.phase} className="py-1 pl-3 text-right tnum">
+                      {r.followup ? r.followup(f.r.answers, f.r.metrics) : <span className="text-ink-3">–</span>}
+                    </td>
+                  ))}
                 </tr>
               )),
             )}
           </tbody>
         </table>
+        </div>
         {search !== undefined && (
           <p className="mt-1.5 text-[0.78rem] leading-relaxed text-ink-3">
             &ldquo;하루 자료 검색 약 {search}분&rdquo;은 응답한 두 값(하루 검색 횟수 × 건당 소요시간)을 곱한 계산치이며, 시스템 측정값이 아닙니다.
@@ -106,11 +127,15 @@ export default function PrintBaselinePage() {
 
       <footer className="mt-6 border-t border-line pt-2.5 text-[0.75rem] leading-relaxed text-ink-3">
         <p>
-          본 자료의 도입 전 수치는 시스템 도입 전 대표자의 실제 업무 경험을 기준으로 입력한 Baseline이며,
-          도입 후 수치는 향후 시스템 Event Log 및 실제 사용데이터를 통해 별도 측정합니다.
+          본 자료의 수치는 대표자가 구간 선택으로 직접 응답한 값입니다. 시스템이 측정한 값이 아니며,
+          {followups.length > 0
+            ? " 시점 간 차이에 대한 개선율·절감시간·비용효과는 산출하지 않습니다. 시스템이 직접 집계할 수 있는 항목(자료 소요기간·후속 누락·문의 응답시간 등)은 Event Log 로 별도 측정합니다."
+            : " 도입 후 수치는 향후 시스템 Event Log 및 실제 사용데이터를 통해 별도 측정합니다."}
         </p>
         <p className="mt-1.5">
-          문항 버전 {res.surveyVersion} · 출력 {fmtDateTime(new Date().toISOString())}
+          문항 버전 {res.surveyVersion} · 도입 전 {fmtDate(res.recordedAt, { year: true })}
+          {followups.map((f) => ` · ${PHASE_LABEL[f.phase]} ${fmtDate(f.r.recordedAt, { year: true })}`).join("")}
+          {" · 출력 "}{fmtDateTime(new Date().toISOString())}
         </p>
       </footer>
     </article>
