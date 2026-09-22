@@ -37,7 +37,7 @@ export function AutoRulesPanel() {
                 aria-label={`${r.label} ${on ? "끄기" : "켜기"}`}
                 disabled={!manage}
                 onClick={() => { setRule(r.key, !on); toast(`${r.label} 규칙을 ${on ? "껐습니다" : "켰습니다"}.`); }}
-                className={cx("pressable relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition-colors disabled:cursor-not-allowed", on ? "bg-accent" : "bg-line-2")}
+                className={cx("pressable relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition-colors after:absolute after:-inset-2 after:content-[''] disabled:cursor-not-allowed", on ? "bg-accent" : "bg-line-2")}
               >
                 <span className={cx("absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform", on ? "left-[22px]" : "left-0.5")} />
               </button>

@@ -171,7 +171,7 @@ export default function ReportsPage() {
                       : "AX 코치에서 실증을 시작하면 이 화면이 기간 기준으로 집계됩니다. 지금은 전체 기간 기준입니다."}
                   </p>
                 </div>
-                <Link href="/ax/coach" className="flex shrink-0 items-center gap-1 whitespace-nowrap text-[0.85rem] font-semibold text-accent">AX 코치 <ArrowRight size={14} /></Link>
+                <Link href="/ax/coach" className="link-more link-accent shrink-0">AX 코치 <ArrowRight size={14} /></Link>
               </div>
             </Card>
 
@@ -191,7 +191,7 @@ export default function ReportsPage() {
                       <Badge tone={coverageOf(a) >= 100 ? "success" : coverageOf(a) >= 40 ? "warning" : "error"}>
                         {coverageOf(a) >= 100 ? "충분" : coverageOf(a) >= 40 ? "수집 중" : a.count === 0 ? "기록 없음" : "부족"}
                       </Badge>
-                      <Link href={a.href} className="text-[0.8rem] font-semibold text-ink-2 hover:text-ink">{a.how} →</Link>
+                      <Link href={a.href} className="link-more text-[0.8rem]">{a.how} →</Link>
                     </div>
                   </div>
                 ))}

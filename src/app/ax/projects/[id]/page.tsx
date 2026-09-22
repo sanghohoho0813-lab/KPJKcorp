@@ -91,12 +91,12 @@ export default function ProjectDetailPage() {
 
   return (
     <div className="space-y-5">
-      <Link href="/ax/projects" className="inline-flex items-center gap-1 text-[0.85rem] font-semibold text-ink-2 hover:text-ink"><ArrowLeft size={16} /> 프로젝트</Link>
+      <Link href="/ax/projects" className="link-more"><ArrowLeft size={16} /> 프로젝트</Link>
 
       <Card className="p-5 md:p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <Link href={`/ax/clients/${c.id}`} className="text-[0.9rem] font-semibold text-ink-2 hover:text-accent">{c.name} →</Link>
+            <Link href={`/ax/clients/${c.id}`} className="link-more text-[0.9rem] hover:text-accent">{c.name} →</Link>
             <div className="mt-1 flex flex-wrap items-center gap-2"><h1 className="text-[1.6rem] font-bold md:text-[1.85rem]">{p.name}</h1>{p.archived && <Badge>보관됨</Badge>}<StageBadge stage={p.stage} /><Badge>{p.type}</Badge></div>
             <p className="mt-1 text-[0.9rem] text-ink-2">{p.description}</p>
           </div>
@@ -164,7 +164,7 @@ export default function ProjectDetailPage() {
                     <span className="hidden w-24 text-right sm:block"><DueText iso={d.dueDate} pending={d.status === "requested" || d.status === "revision"} /></span>
                   </button>
                   {may("doc.update") && DOC_EDITABLE.includes(d.status) && (
-                    <button onClick={() => setEditDoc(d.id)} aria-label={`${d.name} 요청 수정`} className="pressable shrink-0 rounded-lg p-2 text-ink-3 hover:bg-surface-2 hover:text-ink"><Pencil size={15} /></button>
+                    <button onClick={() => setEditDoc(d.id)} aria-label={`${d.name} 요청 수정`} className="pressable shrink-0 icon-btn text-ink-3 hover:bg-surface-2 hover:text-ink"><Pencil size={15} /></button>
                   )}
                   </div>
                 ))}

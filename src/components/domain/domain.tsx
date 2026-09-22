@@ -64,7 +64,7 @@ const KIND_ICON: Record<BriefItem["kind"], ReactNode> = {
   quote_pending: <Receipt size={18} />,
 };
 
-export function BriefList({ items, limit, compact }: { items: BriefItem[]; limit?: number; compact?: boolean }) {
+export function BriefList({ items, limit, compact, emptyText }: { items: BriefItem[]; limit?: number; compact?: boolean; emptyText?: string }) {
   const [open, setOpen] = useState<string | null>(null);
   // 처리하면 규칙상 항목이 즉시 사라진다. 잘못 눌렀을 때 되돌릴 수 있게 잠시 붙잡아 둔다.
   const [handled, setHandled] = useState<BriefItem[]>([]);
@@ -99,7 +99,7 @@ export function BriefList({ items, limit, compact }: { items: BriefItem[]; limit
       <div className="space-y-2">
         {undoStrip}
         <div className="flex items-center gap-3 rounded-xl bg-success-bg px-4 py-4 text-[0.95rem] font-semibold text-success">
-          <CheckCircle2 size={20} /> 오늘 먼저 처리할 긴급 항목이 없습니다.
+          <CheckCircle2 size={20} /> {emptyText ?? "오늘 먼저 처리할 긴급 항목이 없습니다."}
         </div>
       </div>
     );
@@ -275,7 +275,7 @@ export function ScheduleItem({ s, showCompany, client, onEdit }: { s: Schedule; 
       </div>
       <span className="hidden text-[0.78rem] text-ink-3 sm:block">{fmtDateTime(s.start)}</span>
       {onEdit && (
-        <button onClick={() => onEdit(s.id)} aria-label={`${s.title} 수정`} className="pressable shrink-0 rounded-lg p-2 text-ink-3 hover:bg-surface-2 hover:text-ink">
+        <button onClick={() => onEdit(s.id)} aria-label={`${s.title} 수정`} className="pressable shrink-0 icon-btn text-ink-3 hover:bg-surface-2 hover:text-ink">
           <Pencil size={15} />
         </button>
       )}

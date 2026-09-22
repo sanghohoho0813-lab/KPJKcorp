@@ -128,7 +128,7 @@ export function BaselineCard({ compact }: { compact?: boolean }) {
             대표님이 직접 한 번 기록해 주셔야 합니다. {draft ? "작성하시던 내용이 남아 있습니다." : "대부분 클릭으로 3~5분이면 됩니다."}
           </p>
           {isAdmin && (
-            <Link href="/ax/baseline" className="pressable mt-2 inline-flex items-center gap-1 text-[0.85rem] font-bold underline">
+            <Link href="/ax/baseline" className="link-more link-accent pressable mt-1 font-bold underline">
               {draft ? "이어서 작성하기" : "지금 조사 시작하기"} <ArrowRight size={14} />
             </Link>
           )}

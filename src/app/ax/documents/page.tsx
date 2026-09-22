@@ -8,7 +8,7 @@ import { useStore } from "@/lib/store";
 import { useUi } from "@/lib/ui-store";
 import { daysBetween, fmtDate, fmtSize, relativeDay } from "@/lib/format";
 import type { DocStatus, DocumentRequest } from "@/lib/types";
-import { Badge, Button, Card, EmptyState, KpiCard, PageHeader, SegmentedControl, NextBadge, Tabs, cx } from "@/components/ui/ui";
+import { Badge, Button, Card, EmptyState, KpiCard, LinkButton, PageHeader, SegmentedControl, NextBadge, Tabs, cx } from "@/components/ui/ui";
 import { ResultsGrid } from "@/components/domain/ResultsGrid";
 import { DOC_EDITABLE, EditDocRequestModal, useMay } from "@/components/domain/EntityModals";
 import { Modal } from "@/components/ui/overlay";
@@ -57,7 +57,13 @@ function DocumentsInner() {
     <div>
       <PageHeader title="자료관리" desc="고객이 Portal에서 제출한 자료가 여기에 도착합니다. 마감 임박·보완필요 항목을 먼저 처리하고, 완성된 결과자료는 결과자료 탭에서 공유 이력을 확인합니다." actions={top === "requests" ? <Button variant="primary" icon={<BellRing size={16} />} onClick={() => setRemind(true)}>리마인드 대상 {remindTargets.length}</Button> : undefined} />
       <Tabs tabs={[{ key: "requests", label: "요청자료", count: counts.missing + counts.waiting + counts.revision }, { key: "results", label: "결과자료", count: st.results.length }]} value={top} onChange={setTop} />
-      {top === "results" ? <div className="mt-5"><ResultsGrid /><p className="mt-3 text-[0.8rem] text-ink-3">결과자료를 공유하면 고객 Portal 완료자료에 표시되고 알림이 전송됩니다. 등록은 프로젝트 상세에서 합니다.</p></div> : <>
+      {top === "results" ? <div className="mt-5"><ResultsGrid /><p className="mt-3 text-[0.8rem] text-ink-3">결과자료를 공유하면 고객 Portal 완료자료에 표시되고 알림이 전송됩니다. 등록은 프로젝트 상세에서 합니다.</p></div>
+      : all.length === 0 ? (
+        <Card className="mt-5">
+          <EmptyState icon={<FolderOpen size={32} />} title="아직 요청한 자료가 없습니다" desc="프로젝트 상세에서 자료를 요청하면 고객 Portal에 제출 항목으로 뜨고, 고객이 올리면 여기에 도착합니다. 자료 목록은 서비스별로 미리 채워져 있습니다."
+            action={<LinkButton href="/ax/projects" variant="accent">프로젝트로 가기</LinkButton>} />
+        </Card>
+      ) : <>
       <div className="mb-5 mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
         <KpiCard label="미제출" value={counts.missing} sub={counts.overdue ? `기한 초과 ${counts.overdue}` : "기한 초과 없음"} tone={counts.overdue ? "error" : undefined} />
         <KpiCard label="검토 대기 · 검토중" value={counts.waiting} sub="담당자 검토 필요" accentValue={counts.waiting > 0} />

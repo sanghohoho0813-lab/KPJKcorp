@@ -75,14 +75,14 @@ function Inner() {
       </Card>
 
       <div className="grid gap-3 md:grid-cols-3">
-        <Card className="p-5"><div className="text-[0.78rem] font-bold text-ink-3">다음 조치</div><div className="mt-1 text-[1.15rem] font-bold">{nextAction}</div>{todo[0] && <Link href="/portal/documents" className="mt-2 inline-block text-[0.85rem] font-semibold text-accent">요청자료로 이동 →</Link>}</Card>
+        <Card className="p-5"><div className="text-[0.78rem] font-bold text-ink-3">다음 조치</div><div className="mt-1 text-[1.15rem] font-bold">{nextAction}</div>{todo[0] && <Link href="/portal/documents" className="link-more link-accent mt-1">요청자료로 이동 →</Link>}</Card>
         {/* 담당자가 적은 "다음 예정"이 있으면 그것을 먼저 보여준다. 시스템은 예상일을 계산하지 않는다 — 표준 소요일이 없기 때문이다. */}
         {p.nextMilestone ? (
           <Card className="p-5 border-accent/40"><div className="text-[0.78rem] font-bold text-accent">다음 예정</div><div className="mt-1 text-[1.15rem] font-bold">{fmtDate(p.nextMilestone.date)}</div><div className="text-[0.82rem] text-ink-2">{p.nextMilestone.label} ({relativeDay(p.nextMilestone.date)})</div><div className="mt-1 text-[0.72rem] text-ink-3">담당 컨설턴트가 안내한 일정입니다</div></Card>
         ) : (
           <Card className="p-5"><div className="text-[0.78rem] font-bold text-ink-3">{next ? "다음 일정" : "예상 완료"}</div><div className="mt-1 text-[1.15rem] font-bold">{next ? fmtDate(next.start) : fmtDate(p.dueDate)}</div><div className="text-[0.82rem] text-ink-2">{next ? `${next.title.replace(c.name, "").trim()} (${relativeDay(next.start)})` : `${relativeDay(p.dueDate)} · 프로젝트 마감 기준`}</div></Card>
         )}
-        <Card className="p-5"><div className="text-[0.78rem] font-bold text-ink-3">담당 컨설턴트</div><div className="mt-1 text-[1.15rem] font-bold">{consultant?.name} {consultant?.title}</div><Link href="/portal/inquiries" className="mt-1 inline-block text-[0.85rem] font-semibold text-accent">문의하기 →</Link></Card>
+        <Card className="p-5"><div className="text-[0.78rem] font-bold text-ink-3">담당 컨설턴트</div><div className="mt-1 text-[1.15rem] font-bold">{consultant?.name} {consultant?.title}</div><Link href="/portal/inquiries" className="link-more link-accent">문의하기 →</Link></Card>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-2">

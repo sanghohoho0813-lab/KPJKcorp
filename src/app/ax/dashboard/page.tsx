@@ -11,7 +11,7 @@ import { OPP_STATUS } from "@/lib/services";
 import { useNow } from "@/lib/hooks";
 import { AiReadyBadge, Card, KpiCard, SectionTitle, Badge, IconTile, cx } from "@/components/ui/ui";
 import { BriefList, ScheduleItem } from "@/components/domain/domain";
-import { CoachCard } from "@/components/domain/Coach";
+import { FirstRunOrCoach } from "@/components/domain/FirstRun";
 
 export default function DashboardPage() {
   const st = useStore();
@@ -51,7 +51,7 @@ export default function DashboardPage() {
         </Link>
       </div>
 
-      <CoachCard />
+      <FirstRunOrCoach />
 
       {/* 첫 화면 숫자는 "지금 문제가 있는 것"만. 상태 숫자는 각 메뉴에서 본다. */}
       <div id="tut-kpi" className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
@@ -63,7 +63,7 @@ export default function DashboardPage() {
 
       {pendingApprovals.length > 0 && (
         <Card className="border-accent/50 p-5">
-          <SectionTitle action={<Link href="/ax/opportunities?tab=approvals" className="text-[0.85rem] font-semibold text-ink-2 hover:text-ink">전체 보기 →</Link>}>
+          <SectionTitle action={<Link href="/ax/opportunities?tab=approvals" className="link-more">전체 보기 →</Link>}>
             <span className="flex items-center gap-2"><ShieldCheck size={18} className="text-accent" /> {isAdmin ? "대표님 확인이 필요합니다" : "대표 승인 대기"}</span>
           </SectionTitle>
           <div className="divide-y divide-line">
@@ -93,7 +93,7 @@ export default function DashboardPage() {
       <div className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
         <div className="space-y-6">
           <Card id="tut-brief" className="p-5">
-            <SectionTitle action={<div className="flex items-center gap-2"><AiReadyBadge onClick={() => openAi({ title: "오늘의 업무 브리핑 — AI 적용 설명", key: "brief" })} /><Link href="/ax/brief" className="text-[0.85rem] font-semibold text-ink-2 hover:text-ink">전체 보기 →</Link></div>}>
+            <SectionTitle action={<div className="flex items-center gap-2"><AiReadyBadge onClick={() => openAi({ title: "오늘의 업무 브리핑 — AI 적용 설명", key: "brief" })} /><Link href="/ax/brief" className="link-more">전체 보기 →</Link></div>}>
               <span className="flex items-center gap-2"><Sparkles size={18} className="text-accent" /> 오늘의 업무 브리핑</span>
             </SectionTitle>
             <BriefList items={brief} limit={3} />
@@ -104,7 +104,7 @@ export default function DashboardPage() {
         <div className="space-y-6">
           {newOpps.length > 0 && (
             <Card className="p-5">
-              <SectionTitle action={<Link href="/ax/opportunities?tab=pipeline" className="text-[0.85rem] font-semibold text-ink-2 hover:text-ink">기회 →</Link>}>
+              <SectionTitle action={<Link href="/ax/opportunities?tab=pipeline" className="link-more">기회 →</Link>}>
                 <span className="flex items-center gap-2"><TrendingUp size={18} className="text-accent" /> 새 매출기회</span>
               </SectionTitle>
               <div className="divide-y divide-line">
@@ -118,7 +118,7 @@ export default function DashboardPage() {
             </Card>
           )}
           <Card className="p-5">
-            <SectionTitle action={<Link href="/ax/schedule" className="text-[0.85rem] font-semibold text-ink-2 hover:text-ink">일정 →</Link>}>
+            <SectionTitle action={<Link href="/ax/schedule" className="link-more">일정 →</Link>}>
               <span className="flex items-center gap-2"><CalendarDays size={18} className="text-ink-3" /> 이번 주 일정 {todaySchedules.length > 0 && <Badge tone="accent">오늘 {todaySchedules.length}</Badge>}</span>
             </SectionTitle>
             {weekSchedules.length === 0 ? <div className="py-6 text-center text-[0.9rem] text-ink-3">이번 주 일정이 없습니다.</div> : <div className="divide-y divide-line">{weekSchedules.slice(0, 7).map((s, i) => <div key={s.id} className={i >= 4 ? "hidden md:block" : undefined}><ScheduleItem s={s} showCompany /></div>)}</div>}

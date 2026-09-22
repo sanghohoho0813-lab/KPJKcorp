@@ -70,7 +70,7 @@ function ApprovalCard({ ap, onDecide }: { ap: Approval; onDecide: (ap: Approval,
       <div className="flex flex-wrap items-center gap-2">
         <Badge tone={ap.kind === "discount" ? "warning" : ap.kind === "promise" ? "info" : "accent"}>{KIND_LABEL[ap.kind]}</Badge>
         {company && (
-          <Link href={`/ax/clients/${company.id}`} className="flex items-center gap-1 text-[0.85rem] font-semibold text-ink-2 hover:text-ink">
+          <Link href={`/ax/clients/${company.id}`} className="link-more">
             <Building2 size={14} /> {company.name}
           </Link>
         )}
@@ -132,7 +132,7 @@ function OppRow({ o, onPropose }: { o: Opportunity; onPropose: (o: Opportunity) 
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone={tone}>{OPP_STATUS[o.status].label}</Badge>
           <span className="font-bold">{o.serviceName}</span>
-          <Link href={`/ax/clients/${o.companyId}`} className="text-[0.88rem] font-semibold text-ink-2 hover:text-ink">{company?.name}</Link>
+          <Link href={`/ax/clients/${o.companyId}`} className="link-more text-[0.88rem]">{company?.name}</Link>
         </div>
         {o.reason && <div className="mt-1 text-[0.82rem] text-ink-2">근거 · {o.reason}</div>}
         {o.note && <div className="mt-1 text-[0.85rem] text-ink">“{o.note}”</div>}

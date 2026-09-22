@@ -200,6 +200,21 @@ h1, h2, h3, h4 { letter-spacing: -0.01em; line-height: 1.25; }
 .pressable { transition: background-color var(--motion-fast) ease-out, transform var(--motion-fast) ease-out, opacity var(--motion-fast) ease-out; }
 .pressable:active { transform: scale(0.985); }
 
+/* 손가락 타깃 — 모바일에서 36px 아래로 내려가던 것들.
+   utilities 레이어보다 아래(@layer components)에 두어 hidden / lg:block 같은 유틸리티가 이긴다. */
+@layer components {
+  /* 연필·닫기·로그아웃 같은 아이콘 버튼: 모바일 40px, 마우스 화면 36px */
+  .icon-btn { display: inline-flex; align-items: center; justify-content: center; border-radius: 0.5rem; min-width: 2.5rem; min-height: 2.5rem; padding: 0.5rem; }
+  /* "전체 보기 →" 같은 작은 글자 링크: 글자는 그대로, 누르는 면만 36px */
+  .link-more { display: inline-flex; align-items: center; gap: 0.25rem; min-height: 2.25rem; margin: 0 -0.25rem; padding: 0 0.25rem; border-radius: 0.5rem; font-size: 0.85rem; font-weight: 600; color: var(--neutral-text-2); }
+  .link-more:hover { color: var(--neutral-text); background: var(--neutral-surface-2); }
+  .link-more.link-accent { color: var(--theme-accent-strong); }
+  .link-more.link-accent:hover { background: var(--theme-soft); }
+  @media (min-width: 768px) {
+    .icon-btn { min-width: 2.25rem; min-height: 2.25rem; }
+  }
+}
+
 /* Table */
 .tbl { width: 100%; border-collapse: separate; border-spacing: 0; }
 .tbl th { text-align: left; font-weight: 600; font-size: 0.8rem; color: var(--neutral-text-2); padding: 0.75rem 1rem; border-bottom: 1px solid var(--neutral-border); background: var(--neutral-surface-2); white-space: nowrap; }

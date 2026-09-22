@@ -86,8 +86,9 @@ export function DemoBadge({ className }: { className?: string }) {
 }
 export function AiReadyBadge({ onClick, label = "AI READY" }: { onClick?: () => void; label?: string }) {
   return (
-    <button type="button" onClick={onClick} className="pressable inline-flex items-center gap-1 rounded-md border border-line-2 bg-surface px-2 py-0.5 text-[0.7rem] font-bold tracking-wide text-ink-2 hover:bg-surface-2">
-      <Sparkles size={12} className="text-accent" /> {label}
+    // 폰에서는 아이콘만 — 카드 제목 옆에 글자까지 두면 제목이 세 줄로 쪼개진다
+    <button type="button" onClick={onClick} aria-label={label} title={label} className="pressable inline-flex min-h-9 items-center gap-1 whitespace-nowrap rounded-md border border-line-2 bg-surface px-2 py-0.5 text-[0.7rem] font-bold tracking-wide text-ink-2 hover:bg-surface-2 md:min-h-0">
+      <Sparkles size={12} className="text-accent" /> <span className="hidden sm:inline">{label}</span>
     </button>
   );
 }
@@ -155,9 +156,10 @@ export function PageHeader({ title, desc, actions, badge, id }: { title: ReactNo
 
 export function SectionTitle({ children, action, className }: { children: ReactNode; action?: ReactNode; className?: string }) {
   return (
-    <div className={cx("mb-3 flex items-center justify-between", className)}>
-      <h2 className="text-[1.15rem] font-bold">{children}</h2>
-      {action}
+    <div className={cx("mb-3 flex items-center justify-between gap-3", className)}>
+      {/* 제목이 줄바꿈되더라도 오른쪽 버튼·배지는 한 줄을 지킨다 — 좁은 화면에서 "AI READY"가 세 줄로 찢어졌다 */}
+      <h2 className="min-w-0 text-[1.15rem] font-bold">{children}</h2>
+      {action && <div className="flex shrink-0 items-center gap-2">{action}</div>}
     </div>
   );
 }

@@ -98,14 +98,14 @@ export default function ClientCardPage() {
 
   return (
     <div className="space-y-5">
-      <Link href="/ax/clients" className="inline-flex items-center gap-1 text-[0.85rem] font-semibold text-ink-2 hover:text-ink"><ArrowLeft size={16} /> 기업고객</Link>
+      <Link href="/ax/clients" className="link-more"><ArrowLeft size={16} /> 기업고객</Link>
 
       {/* Header — SIGNATURE 01 Enterprise Client Card */}
       <Card className="p-5 md:p-6">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex items-start gap-4">
             <span className="tnum flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-shell text-[1.2rem] font-black text-white">{c.code}</span>
-            <div>
+            <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-[1.6rem] font-bold md:text-[1.85rem]">{c.name}</h1>
                 {c.sample && <Badge tone="info">샘플</Badge>}
@@ -128,7 +128,7 @@ export default function ClientCardPage() {
                   {c.leadSource && <Badge tone="neutral">유입 · {c.leadSource}</Badge>}
                 </div>
               ) : null}
-              <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1.5 text-[0.85rem] md:grid-cols-3">
+              <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-1.5 text-[0.85rem] sm:grid-cols-2 md:grid-cols-3">
                 <span className="flex items-center gap-1.5 text-ink-2"><UserRound size={14} className="shrink-0 text-ink-3" /> <span className="shrink-0">대표</span> <b className="text-ink">{c.ceo}</b></span>
                 <span className="flex items-center gap-1.5 text-ink-2"><UserRound size={14} className="shrink-0 text-ink-3" /> <span className="shrink-0">담당자</span> <b className="text-ink">{c.contactName} {c.contactTitle}</b></span>
                 <span className="flex items-center gap-1.5 text-ink-2"><Phone size={14} className="text-ink-3" /> {c.contactPhone || <span className="text-ink-3">연락처 없음</span>}{c.companyPhone ? <span className="text-ink-3"> · 대표 {c.companyPhone}</span> : null}</span>
@@ -137,7 +137,7 @@ export default function ClientCardPage() {
                 <span className="flex items-center gap-1.5 text-ink-2"><CalendarDays size={14} className="text-ink-3" /> 최초 상담 {fmtDate(c.firstConsultDate, { year: true })}</span>
                 {c.website && <span className="flex items-center gap-1.5 text-ink-2"><ChevronRight size={14} className="text-ink-3" /> {c.website}</span>}
                 {c.docs && (Object.keys(c.docs) as (keyof typeof c.docs)[]).some((k) => c.docs?.[k]) && (
-                  <span className="col-span-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-ink-2 md:col-span-3">
+                  <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-ink-2 sm:col-span-2 md:col-span-3">
                     {(Object.keys(c.docs) as (keyof typeof c.docs)[]).map((k) => { const d = c.docs?.[k]; if (!d) return null; return (
                       <span key={k} className="flex items-center gap-1.5"><FileCheck2 size={14} className="shrink-0 text-success" /> {DOC_SOURCE_LABEL[k]} 확인 <span className="text-ink-3">· {fmtDate(d.readAt, { year: true })} · {EXTRACT_METHOD_LABEL[d.method]}</span></span>
                     ); })}
@@ -207,7 +207,7 @@ export default function ClientCardPage() {
             </Card>
             {opps.length > 0 && (
               <Card className="p-5">
-                <SectionTitle action={<Link href="/ax/opportunities?tab=pipeline" className="text-[0.85rem] font-semibold text-ink-2 hover:text-ink">기회 →</Link>}>매출기회</SectionTitle>
+                <SectionTitle action={<Link href="/ax/opportunities?tab=pipeline" className="link-more">기회 →</Link>}>매출기회</SectionTitle>
                 <div className="divide-y divide-line">
                   {opps.map((o) => (
                     // 한 줄에 다 넣으면 좁은 화면에서 서비스명이 먼저 잘린다 — 이름이 가장 중요한 정보다.

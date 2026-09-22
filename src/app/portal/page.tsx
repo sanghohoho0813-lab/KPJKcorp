@@ -60,7 +60,7 @@ export default function PortalHome() {
               <div className="rounded-xl bg-surface-2 p-4"><div className="text-[0.75rem] font-bold text-ink-3">현재 단계</div><div className="mt-1 text-[1.2rem] font-bold">{CUSTOMER_STEPS[step].label}</div><div className="mt-1 text-[0.82rem] text-ink-2">{customerStageMessage(main.stage)}</div></div>
               <div className="rounded-xl bg-surface-2 p-4"><div className="text-[0.75rem] font-bold text-ink-3">다음 일정</div><div className="mt-1 text-[1.2rem] font-bold">{next ? fmtDate(next.start) : "-"}</div><div className="mt-1 text-[0.82rem] text-ink-2">{next ? `${next.title.replace(c.name, "").trim()} ${fmtTime(next.start)}${next.location ? ` · ${next.location}` : ""}` : "예정된 일정이 없습니다"}</div></div>
               <div className="rounded-xl bg-surface-2 p-4"><div className="text-[0.75rem] font-bold text-ink-3">요청자료</div><div className="mt-1 text-[1.2rem] font-bold">{todo.length ? `${todo.length}건 남음` : "모두 제출"}</div>{todo[0] && <Button size="sm" variant="accent" className="mt-2" onClick={() => setUpload(todo[0])}>자료 제출하기</Button>}</div>
-              <div className="rounded-xl bg-surface-2 p-4"><div className="text-[0.75rem] font-bold text-ink-3">담당 컨설턴트</div><div className="mt-1 text-[1.2rem] font-bold">{consultant?.name} {consultant?.title}</div><Link href="/portal/inquiries" className="mt-2 inline-flex items-center gap-1 text-[0.85rem] font-semibold text-accent">문의 남기기 <ArrowRight size={14} /></Link></div>
+              <div className="rounded-xl bg-surface-2 p-4"><div className="text-[0.75rem] font-bold text-ink-3">담당 컨설턴트</div><div className="mt-1 text-[1.2rem] font-bold">{consultant?.name} {consultant?.title}</div><Link href="/portal/inquiries" className="link-more link-accent mt-1">문의 남기기 <ArrowRight size={14} /></Link></div>
             </div>
           </div>
         ) : (
@@ -85,7 +85,7 @@ export default function PortalHome() {
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Card className="p-5">
-          <div className="mb-3 flex items-center justify-between"><h2 className="text-[1.1rem] font-bold">지금 해야 할 일</h2><Link href="/portal/documents" className="text-[0.85rem] font-semibold text-ink-2">전체 보기 →</Link></div>
+          <div className="mb-3 flex items-center justify-between"><h2 className="text-[1.1rem] font-bold">지금 해야 할 일</h2><Link href="/portal/documents" className="link-more">전체 보기 →</Link></div>
           {todo.length === 0 ? <div className="flex items-center gap-2 rounded-xl bg-success-bg px-4 py-3 text-[0.9rem] font-semibold text-success"><FileCheck2 size={18} /> 지금 제출할 자료가 없습니다.</div> : (
             <div className="space-y-2">
               {todo.slice(0, 3).map((d) => {
@@ -101,7 +101,7 @@ export default function PortalHome() {
           )}
         </Card>
         <Card className="p-5">
-          <div className="mb-3 flex items-center justify-between"><h2 className="flex items-center gap-2 text-[1.1rem] font-bold"><Bell size={18} className="text-ink-3" /> 최근 안내</h2><Link href="/portal/notifications" className="text-[0.85rem] font-semibold text-ink-2">전체 보기 →</Link></div>
+          <div className="mb-3 flex items-center justify-between"><h2 className="flex items-center gap-2 text-[1.1rem] font-bold"><Bell size={18} className="text-ink-3" /> 최근 안내</h2><Link href="/portal/notifications" className="link-more">전체 보기 →</Link></div>
           {notifs.length === 0 ? <div className="text-[0.9rem] text-ink-3">새 안내가 없습니다.</div> : (
             <div className="divide-y divide-line">
               {notifs.map((n) => (
@@ -118,7 +118,7 @@ export default function PortalHome() {
         <Card className="p-5">
           <div className="mb-3 flex items-center justify-between gap-3">
             <h2 className="flex items-center gap-2 text-[1.1rem] font-bold"><Sparkles size={18} className="text-accent" /> 함께 검토해볼 수 있는 것</h2>
-            <Link href="/portal/services" className="whitespace-nowrap text-[0.85rem] font-semibold text-ink-2">전체 보기 →</Link>
+            <Link href="/portal/services" className="link-more whitespace-nowrap">전체 보기 →</Link>
           </div>
           {myOpps.length > 0 && (
             <div className="mb-3 space-y-1.5">

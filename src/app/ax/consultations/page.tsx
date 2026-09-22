@@ -50,14 +50,14 @@ function ConsultationsInner() {
                 <Card key={cs.id} className="p-5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Link href={`/ax/clients/${cs.companyId}`} className="font-bold hover:text-accent">{c?.name}</Link>
+                      <Link href={`/ax/clients/${cs.companyId}`} className="link-more text-[1rem] font-bold text-ink hover:text-accent">{c?.name}</Link>
                       <Badge tone="info">{cs.type}</Badge><Badge>{cs.channel}</Badge>
                       <span className="text-[0.85rem] text-ink-2">{fmtDateTime(cs.date)} · {st.users.find((u) => u.id === cs.consultantId)?.name}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <AiReadyBadge label="AI 요약" onClick={() => openAi({ title: "상담 요약 — AI 적용 설명", key: "consult" })} />
                       {may("consultation.update") && (
-                        <button onClick={() => setEditCs(cs.id)} aria-label="상담기록 수정" className="pressable rounded-lg p-2 text-ink-3 hover:bg-surface-2 hover:text-ink"><Pencil size={15} /></button>
+                        <button onClick={() => setEditCs(cs.id)} aria-label="상담기록 수정" className="pressable icon-btn text-ink-3 hover:bg-surface-2 hover:text-ink"><Pencil size={15} /></button>
                       )}
                     </div>
                   </div>

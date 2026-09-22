@@ -324,12 +324,12 @@ function Header() {
       </div>
       <span className="shrink-0"><NotificationBell audience="internal" /></span>
       <div className="hidden items-center gap-2 pl-2 lg:flex">
-        <Avatar name={user?.name ?? "K"} size={34} />
+        <Avatar name={user?.name ?? "K"} size={38} />
         <div className="hdr-optional hidden whitespace-nowrap leading-tight xl:block">
           <div className="text-[0.82rem] font-bold">{user?.name}</div>
           <div className="text-[0.7rem] text-ink-3">{user?.title}</div>
         </div>
-        <button onClick={() => { logout(); router.push("/login"); }} className="pressable ml-1 rounded-lg p-2 text-ink-3 hover:bg-surface-2 hover:text-ink" title="로그아웃" aria-label="로그아웃">
+        <button onClick={() => { logout(); router.push("/login"); }} className="pressable ml-1 icon-btn text-ink-3 hover:bg-surface-2 hover:text-ink" title="로그아웃" aria-label="로그아웃">
           <LogOut size={18} />
         </button>
       </div>

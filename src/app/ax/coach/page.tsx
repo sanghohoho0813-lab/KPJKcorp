@@ -119,7 +119,7 @@ export default function CoachPage() {
 
         <div className="space-y-5">
           <Card className="p-5">
-            <SectionTitle action={<Link href="/ax/reports" className="text-[0.85rem] font-semibold text-ink-2 hover:text-ink">리포트 →</Link>}>
+            <SectionTitle action={<Link href="/ax/reports" className="link-more">리포트 →</Link>}>
               Evidence 상태
             </SectionTitle>
             <div className="mb-4 flex items-baseline gap-2">
@@ -142,7 +142,7 @@ export default function CoachPage() {
               <div className={cx("mt-3 rounded-xl bg-surface-2 px-4 py-3 text-[0.85rem]")}>
                 <b className="text-ink">채우는 방법</b><br />{s.weakest.how}
               </div>
-              <Link href={s.weakest.href} className="mt-3 inline-flex items-center gap-1 text-[0.85rem] font-semibold text-accent">
+              <Link href={s.weakest.href} className="link-more link-accent mt-2">
                 해당 화면으로 <ArrowRight size={14} className="arrow-slide" />
               </Link>
             </Card>

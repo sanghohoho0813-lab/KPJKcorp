@@ -94,7 +94,7 @@ export function WhyEvidence({ variant = "full" }: { variant?: "full" | "inline" 
 function WhyToggle({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   return (
     <div className="mt-4 border-t border-line pt-3">
-      <button onClick={onToggle} aria-expanded={open} className="pressable flex w-full items-center gap-2 rounded-lg py-1 text-left text-[0.85rem] font-semibold text-ink-2 hover:text-ink">
+      <button onClick={onToggle} aria-expanded={open} className="pressable flex min-h-9 w-full items-center gap-2 rounded-lg py-1 text-left text-[0.85rem] font-semibold text-ink-2 hover:text-ink">
         <TrendingUp size={15} className="shrink-0 text-accent" />
         <span className="min-w-0 flex-1">왜 이게 이 시스템의 핵심인가요?</span>
         <ChevronDown size={15} className={cx("shrink-0 transition-transform", open && "rotate-180")} />
@@ -178,7 +178,7 @@ export function CoachCard() {
         <span className="font-bold">오늘의 AX 코치</span>
         {s.finished ? <Badge tone="success">14일 완료</Badge> : <Badge tone="accent">Day {s.day} / {s.totalDays}</Badge>}
         <span className="tnum ml-auto text-[0.82rem] text-ink-3">미션 {s.doneCount} / {s.missions.length}</span>
-        <Link href="/ax/coach" className="whitespace-nowrap text-[0.85rem] font-semibold text-ink-2 hover:text-ink">전체 보기 →</Link>
+        <Link href="/ax/coach" className="link-more whitespace-nowrap">전체 보기 →</Link>
       </div>
 
       <div className="px-5 pt-3">

@@ -30,7 +30,10 @@ export default function BriefPage() {
       <PageHeader title={<span className="flex items-center gap-2"><Sparkles size={26} className="text-accent" /> AI 브리핑</span>} desc={`${fmtFull(now)} ${fmtClock(now).slice(0, 5)} 기준 · ${user?.name} ${user?.title}님을 위한 오늘의 업무 브리핑`} actions={<AiReadyBadge onClick={() => openAi({ title: "오늘의 업무 브리핑 — AI 적용 설명", key: "brief" })} />} />
       {/* 모바일: 숫자 타일 7개가 화면을 다 먹지 않게 한 줄 칩으로. 이 화면의 본체는 목록이다. */}
       <div className="mb-4 flex flex-wrap gap-1.5 md:hidden">
+        {/* 전부 0이면 0짜리 칩 8개 대신 한 줄 */}
+        {!Object.values(counts).some((n) => n > 0) && <span className="inline-flex items-center gap-1.5 rounded-lg border border-success/30 bg-success-bg px-2.5 py-1.5 text-[0.8rem] font-semibold text-success">오늘 확인할 이슈 없음</span>}
         {[
+
           { label: "후속연락", n: counts.followups, hot: true },
           { label: "자료 기한", n: counts.docs, hot: true },
           { label: "정체", n: counts.stalled, hot: true },
@@ -39,7 +42,7 @@ export default function BriefPage() {
           { label: "견적 회신", n: counts.quotes, hot: true },
           { label: "이탈 위험", n: counts.churn, hot: true },
           { label: "재상담", n: counts.reengage },
-        ].map((c) => (
+        ].filter((c) => c.n > 0).map((c) => (
           <span key={c.label} className={cx("inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[0.8rem] font-semibold", c.n && c.hot ? "border-error/30 bg-error-bg text-error" : "border-line text-ink-2")}>
             {c.label} <span className="tnum">{c.n}</span>
           </span>
@@ -64,7 +67,7 @@ export default function BriefPage() {
           </Card>
           <Card className="p-5">
             <SectionTitle action={<Badge>{normal.length}</Badge>}>오늘 중 확인</SectionTitle>
-            <BriefList items={normal} />
+            <BriefList items={normal} emptyText="오늘 중 확인할 항목이 없습니다." />
           </Card>
         </div>
         <div className="space-y-5">

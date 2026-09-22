@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { useMemo, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Columns3, List, Plus } from "lucide-react";
+import { Columns3, KanbanSquare, List, Plus } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { INTERNAL_STAGES, KANBAN_STAGES, stageLabel } from "@/lib/stages";
 import { daysBetween, fmtDate, relativeDay } from "@/lib/format";
 import type { InternalStage } from "@/lib/types";
-import { Badge, Button, Card, PageHeader, SegmentedControl, cx } from "@/components/ui/ui";
+import { Badge, Button, Card, EmptyState, LinkButton, PageHeader, SegmentedControl, cx } from "@/components/ui/ui";
 import { ProjectModal, useMay } from "@/components/domain/EntityModals";
 import { SearchBox, StageBadge, StageProgressBar } from "@/components/domain/domain";
 
@@ -37,6 +37,9 @@ function ProjectsInner() {
   }).filter((r) => (filter === "mine" ? r.p.consultantId === me : filter === "delayed" ? r.delayed : filter === "done" ? ["done", "aftercare"].includes(r.p.stage) : true))
     .filter((r) => !q || r.p.name.includes(q) || (r.c?.name ?? "").includes(q)), [st, q, filter, me, now]);
 
+  const totalActive = st.projects.filter((p) => !p.archived).length;
+  const hasCompany = st.companies.some((c) => !c.archived);
+
   const grouped = (stage: InternalStage) => rows.filter((r) => {
     if (stage === "consult") return r.p.stage === "inquiry" || r.p.stage === "consult";
     if (stage === "doc_request") return r.p.stage === "doc_request" || r.p.stage === "doc_received";
@@ -57,7 +60,12 @@ function ProjectsInner() {
         <SegmentedControl size="sm" value={filter} onChange={setFilter} options={[{ key: "all", label: "진행 전체" }, { key: "mine", label: "내 담당" }, { key: "delayed", label: "지연" }, { key: "done", label: "완료" }, { key: "archived", label: "보관" }]} />
       </div>
 
-      {view === "board" ? (
+      {totalActive === 0 && filter !== "archived" ? (
+        <Card>
+          <EmptyState icon={<KanbanSquare size={32} />} title="아직 프로젝트가 없습니다" desc={hasCompany ? "기업고객을 고르고 프로젝트를 만들면 상담 → 자료요청 → 분석 → 완료 단계별로 여기서 진행을 봅니다." : "프로젝트는 기업고객 아래에 만듭니다. 먼저 기업고객을 등록해 주세요."}
+            action={hasCompany ? (may("project.create") ? <Button variant="accent" icon={<Plus size={16} />} onClick={() => setNewOpen(true)}>첫 프로젝트 등록</Button> : undefined) : <LinkButton href={may("company.create") ? "/ax/clients?new=1" : "/ax/clients"} variant="accent">기업고객 등록하러 가기</LinkButton>} />
+        </Card>
+      ) : view === "board" ? (
         <>
         {/* 모바일: 가로로 미는 Kanban 대신 단계 요약 → 선택 → 목록 */}
         <div className="lg:hidden">

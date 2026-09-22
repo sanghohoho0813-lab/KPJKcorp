@@ -60,7 +60,13 @@ function TasksInner() {
         value={tab}
         onChange={setTab}
       />
-      {tab === "inquiry" ? <div className="mt-5"><InquiryConsole embedded /></div> : <>
+      {tab === "inquiry" ? <div className="mt-5"><InquiryConsole embedded /></div>
+      : all.length === 0 ? (
+        <Card className="mt-5">
+          <EmptyState icon={<CheckSquare size={32} />} title="아직 업무가 없습니다" desc="고객이 자료를 제출하거나 문의를 남기면 처리할 업무가 자동으로 생깁니다. 지금 해야 할 일이 있으면 직접 등록해 두세요."
+            action={may("task.create") ? <Button variant="accent" icon={<Plus size={16} />} onClick={() => setOpen(true)}>업무 등록</Button> : undefined} />
+        </Card>
+      ) : <>
       <div className="mb-5 mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
         <KpiCard label="오늘 처리" value={today.length} sub={overdue.length ? `기한 초과 ${overdue.length} 포함` : "기한 내"} accentValue={today.length > 0} />
         <KpiCard label="기한 초과" value={overdue.length} sub="먼저 처리" tone={overdue.length ? "error" : undefined} />
@@ -74,11 +80,17 @@ function TasksInner() {
             {rows.map((t) => {
               const c = st.companies.find((x) => x.id === t.companyId);
               const isDone = t.status === "done";
+              const actions = (
+                <>
+                  {!isDone && t.status !== "doing" && <Button size="sm" variant="ghost" onClick={() => setStatus(t, "doing")}>시작</Button>}
+                  {!isDone && t.status !== "hold" && <Button size="sm" variant="ghost" onClick={() => setStatus(t, "hold")}>보류</Button>}
+                </>
+              );
               return (
-                <div key={t.id} className={cx("flex items-center gap-3 px-4 py-3 md:px-5", isDone && "opacity-60")}>
+                <div key={t.id} className={cx("flex items-start gap-3 px-4 py-3 md:items-center md:px-5", isDone && "opacity-60")}>
                   <button onClick={() => setStatus(t, isDone ? "todo" : "done")} // 체크박스는 이 화면에서 가장 자주 누르는 버튼이다. 보이는 크기는 24px로 두되
                     // 실제 터치 영역만 44px로 넓힌다(after 의사요소).
-                    className={cx("pressable relative flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 transition-colors after:absolute after:-inset-2.5 after:content-[''] md:after:content-none", isDone ? "border-success bg-success text-white" : "border-line-2 hover:border-accent")} aria-label={isDone ? "완료 취소" : "완료"}>
+                    className={cx("pressable relative mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 transition-colors after:absolute after:-inset-2.5 after:content-[''] md:mt-0 md:after:content-none", isDone ? "border-success bg-success text-white" : "border-line-2 hover:border-accent")} aria-label={isDone ? "완료 취소" : "완료"}>
                     {isDone && <CheckSquare size={14} />}
                   </button>
                   <div className="min-w-0 flex-1">
@@ -89,19 +101,23 @@ function TasksInner() {
                     </div>
                     <div className="mt-0.5 flex flex-wrap gap-x-2 text-[0.8rem] text-ink-3">
                       <span>{t.type}</span>
-                      {c && <Link href={`/ax/clients/${c.id}`} className="hover:text-accent">· {c.name}</Link>}
+                      {c && <Link href={`/ax/clients/${c.id}`} className="-my-2 py-2 hover:text-accent">· {c.name}</Link>}
                       <span>· {st.users.find((u) => u.id === t.assigneeId)?.name}</span>
                       {t.memo && <span>· {t.memo}</span>}
                       {t.completedAt && <span>· 완료 {fmtDate(t.completedAt)}</span>}
                     </div>
+                    {/* 모바일: 상태·시작·보류·기한을 제목 아래 줄로. 오른쪽에 같이 두면 제목 칸이 한 글자 폭까지 눌린다. */}
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5 md:hidden">
+                      <TaskStatusBadge status={t.status} />
+                      {!isDone && <span className="text-[0.8rem]"><DueText iso={t.dueDate} /></span>}
+                      <span className="ml-auto flex items-center gap-1">{actions}</span>
+                    </div>
                   </div>
-                  <div className="hidden w-24 text-right sm:block">{!isDone && <DueText iso={t.dueDate} />}</div>
-                  <div className="flex items-center gap-1">
-                    <TaskStatusBadge status={t.status} />
-                    {!isDone && t.status !== "doing" && <Button size="sm" variant="ghost" onClick={() => setStatus(t, "doing")}>시작</Button>}
-                    {!isDone && t.status !== "hold" && <Button size="sm" variant="ghost" onClick={() => setStatus(t, "hold")}>보류</Button>}
+                  <div className="hidden w-24 text-right md:block">{!isDone && <DueText iso={t.dueDate} />}</div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <span className="hidden items-center gap-1 md:flex"><TaskStatusBadge status={t.status} />{actions}</span>
                     {may("task.update") && (
-                      <button onClick={() => setEditId(t.id)} aria-label={`${t.title} 수정`} className="pressable rounded-lg p-2 text-ink-3 hover:bg-surface-2 hover:text-ink">
+                      <button onClick={() => setEditId(t.id)} aria-label={`${t.title} 수정`} className="pressable icon-btn text-ink-3 hover:bg-surface-2 hover:text-ink">
                         <Pencil size={15} />
                       </button>
                     )}

@@ -48,7 +48,9 @@ export function RestoreSamplesButton({ size = "md" }: { size?: "sm" | "md" }) {
   const restore = useStore((s) => s.restoreSamples);
   const toast = useStore((s) => s.toast);
   const me = useStore((s) => s.session?.userId) ?? "u_admin";
-  if (hasSamples || !manage) return null;
+  const serverMode = useStore((s) => s.serverMode);
+  // 서버 모드에서는 샘플을 되살리지 않는다 — 서버에 시연용 기업이 실제 데이터처럼 저장되기 때문이다.
+  if (hasSamples || !manage || serverMode) return null;
   return (
     <Button size={size} variant="ghost" icon={<Eye size={size === "sm" ? 14 : 16} />} onClick={() => {
       const r = restore(me);
@@ -85,6 +87,7 @@ export function RemoveSamplesConfirm({ open, onClose }: { open: boolean; onClose
 /** 설정 화면용 카드 */
 export function SamplePanel() {
   const { samples, hasSamples, own, manage } = useSampleState();
+  const serverMode = useStore((s) => s.serverMode);
   const [confirm, setConfirm] = useState(false);
   return (
     <div className="rounded-xl border border-line p-4">
@@ -99,7 +102,7 @@ export function SamplePanel() {
       <div className="mt-3 flex flex-wrap gap-2">
         {hasSamples
           ? <Button size="sm" variant="outline" icon={<Trash2 size={14} />} disabled={!manage} onClick={() => setConfirm(true)}>샘플 {samples.length}개 지우기</Button>
-          : <RestoreSamplesButton size="sm" />}
+          : serverMode ? <span className="text-[0.82rem] text-ink-3">서버에 연결된 동안에는 샘플을 넣지 않습니다 — 실제 데이터와 섞이지 않게 하기 위해서입니다.</span> : <RestoreSamplesButton size="sm" />}
       </div>
       {!manage && <p className="mt-2 text-[0.78rem] text-ink-3">샘플 지우기·다시 보기는 대표 계정에서만 가능합니다.</p>}
       <RemoveSamplesConfirm open={confirm} onClose={() => setConfirm(false)} />

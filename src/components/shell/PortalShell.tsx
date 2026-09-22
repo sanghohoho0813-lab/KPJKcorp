@@ -144,10 +144,10 @@ export function PortalShell({ children }: { children: ReactNode }) {
               <div className="truncate text-[0.82rem] font-bold">{company?.name}</div>
               <div className="truncate text-[0.7rem] text-ink-3">{isInternal ? company?.contactName : user?.name} {isInternal ? company?.contactTitle : user?.title}</div>
             </div>
-            <Avatar name={isInternal ? company?.contactName ?? "K" : user?.name ?? "K"} size={34} />
+            <Avatar name={isInternal ? company?.contactName ?? "K" : user?.name ?? "K"} size={38} />
           </Link>
           {!isInternal && (
-            <button onClick={() => { logout(); router.push("/login"); }} className="pressable hidden rounded-lg p-2 text-ink-3 hover:bg-surface-2 hover:text-ink lg:block" title="로그아웃" aria-label="로그아웃">
+            <button onClick={() => { logout(); router.push("/login"); }} className="pressable hidden icon-btn text-ink-3 hover:bg-surface-2 hover:text-ink lg:block" title="로그아웃" aria-label="로그아웃">
               <LogOut size={18} />
             </button>
           )}

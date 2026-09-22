@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Check, Database, HelpCircle, Palette, RotateCcw, ShieldCheck, Sparkles, Award, Play, Repeat } from "lucide-react";
+import { Suspense, createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Check, ChevronDown, Database, HelpCircle, Palette, RotateCcw, ShieldCheck, Sparkles, Award, Play, Repeat } from "lucide-react";
 import { FontScalePicker } from "@/components/shell/FontScale";
 import { useStore, useCurrentUser } from "@/lib/store";
 import { useUi, NEXT_FEATURES } from "@/lib/ui-store";
@@ -12,10 +12,10 @@ import { UserAdmin } from "@/components/domain/UserModals";
 import { AutoRulesPanel } from "@/components/domain/AutoRulesPanel";
 import { DataPanel } from "@/components/domain/DataPanel";
 import { fmtDateTime } from "@/lib/format";
-import { Badge, Button, Card, DemoBadge, NextBadge, PageHeader, SectionTitle, SegmentedControl, cx, AiReadyBadge } from "@/components/ui/ui";
+import { Badge, Button, Card, DemoBadge, NextBadge, PageHeader, SegmentedControl, cx, AiReadyBadge } from "@/components/ui/ui";
 import { Confirm } from "@/components/ui/overlay";
 
-export default function SettingsPage() {
+function SettingsInner() {
   const settings = useStore((s) => s.settings);
   const me = useCurrentUser();
   const setSettings = useStore((s) => s.setSettings);
@@ -28,15 +28,18 @@ export default function SettingsPage() {
   const openAi = useUi((s) => s.openAi);
   const openNext = useUi((s) => s.openNext);
   const router = useRouter();
+  const params = useSearchParams();
+  const openId = params.get("open");
   const [confirm, setConfirm] = useState(false);
   const [permTab, setPermTab] = useState<"admin" | "consultant" | "client">(session?.role === "consultant" ? "consultant" : "admin");
 
   return (
     <div>
       <PageHeader title="설정" desc="화면 · 권한 · 데모 · 데이터 · AI 상태를 관리합니다. 모든 설정은 즉시 반영됩니다." />
+      {/* 모바일: 섹션 8개를 전부 펼치면 한 화면이 10,000px가 된다. 제목만 보이고, 누른 것만 펼친다. */}
+      <SectionCtx.Provider value={openId}>
       <div className="grid gap-5 xl:grid-cols-2">
-        <Card className="p-5">
-          <SectionTitle><span className="flex items-center gap-2"><Palette size={18} className="text-ink-3" /> 화면</span></SectionTitle>
+        <Section id="display" icon={<Palette size={18} className="text-ink-3" />} title="화면">
           <div className="mb-2 text-[0.85rem] font-semibold text-ink-2">테마 (KPJK Signature + 7종)</div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 2xl:grid-cols-5">
             {THEMES.map((t) => {
@@ -54,10 +57,9 @@ export default function SettingsPage() {
             <div><div className="mb-1.5 text-[0.85rem] font-semibold text-ink-2">모션 줄이기</div><SegmentedControl value={settings.reduceMotion ? "on" : "off"} onChange={(k) => setSettings({ reduceMotion: k === "on" })} options={[{ key: "off", label: "Off" }, { key: "on", label: "On" }]} /></div>
           </div>
           <div className="mt-4 text-[0.78rem] text-ink-3">테마는 Sidebar·CTA·강조색만 바꾸며 본문·표·폼의 가독성은 항상 고정됩니다. 오류/위험 색은 의미상 고정입니다.</div>
-        </Card>
+        </Section>
 
-        <Card className="p-5">
-          <SectionTitle><span className="flex items-center gap-2"><ShieldCheck size={18} className="text-ink-3" /> 사용자 / 권한</span></SectionTitle>
+        <Section id="users" icon={<ShieldCheck size={18} className="text-ink-3" />} title="사용자 / 권한">
           <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl bg-surface-2 px-4 py-3 text-[0.85rem]">
             <span className="text-ink-2">현재 로그인</span>
             <b>{me?.name} {me?.title}</b>
@@ -97,15 +99,13 @@ export default function SettingsPage() {
             </table>
           </div>
           <div className="mt-3 text-[0.78rem] text-ink-3">한계 — 이 검사는 브라우저 안에서 이루어집니다. 개발자도구로 우회하는 것은 막지 못하므로 현재는 업무 규칙이지 보안 경계가 아닙니다. 서버 DB·세션(Supabase Auth + RLS)을 연결할 때 같은 정책을 서버에서 한 번 더 검사하도록 옮깁니다.</div>
-        </Card>
+        </Section>
 
-        <Card className="p-5">
-          <SectionTitle><span className="flex items-center gap-2"><Repeat size={18} className="text-ink-3" /> 자동 업무 규칙</span></SectionTitle>
+        <Section id="rules" icon={<Repeat size={18} className="text-ink-3" />} title="자동 업무 규칙">
           <AutoRulesPanel />
-        </Card>
+        </Section>
 
-        <Card className="p-5">
-          <SectionTitle><span className="flex items-center gap-2"><HelpCircle size={18} className="text-ink-3" /> 데모</span></SectionTitle>
+        <Section id="demo" icon={<HelpCircle size={18} className="text-ink-3" />} title="데모">
           <div className="mb-3 flex flex-wrap items-center gap-2"><DemoBadge /><span className="text-[0.85rem] text-ink-2">{settings.liveMode ? <>현재 상태: <b>운영</b> · 데모 초기화는 잠겨 있습니다 (데이터 섹션에서 데모 모드로 돌리면 풀립니다)</> : <>현재 상태: <b>DEMO</b> · 실제 데이터를 넣기 전에 데이터 섹션에서 운영 모드를 켜세요</>}</span></div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" icon={<HelpCircle size={16} />} onClick={() => openTutorial("ax")}>튜토리얼 다시 보기</Button>
@@ -113,15 +113,13 @@ export default function SettingsPage() {
             <Button variant="danger" icon={<RotateCcw size={16} />} disabled={!!settings.liveMode} title={settings.liveMode ? "운영 모드에서는 잠깁니다" : undefined} onClick={() => setConfirm(true)}>데모 초기화</Button>
           </div>
           <div className="mt-3 text-[0.78rem] text-ink-3">데모 초기화는 Action 상태·고객 제출·문의·알림을 초기값으로 되돌립니다. 마지막 Seed: {fmtDateTime(seededAt)}{settings.liveMode ? " · 운영 모드라 자동 초기화되지 않습니다." : " · 20시간이 지나면 날짜가 오늘 기준으로 자동 갱신됩니다."}</div>
-        </Card>
+        </Section>
 
-        <Card className="p-5">
-          <SectionTitle><span className="flex items-center gap-2"><Database size={18} className="text-ink-3" /> 데이터</span></SectionTitle>
+        <Section id="data" icon={<Database size={18} className="text-ink-3" />} title="데이터">
           <DataPanel />
-        </Card>
+        </Section>
 
-        <Card className="p-5">
-          <SectionTitle><span className="flex items-center gap-2"><Sparkles size={18} className="text-accent" /> AI</span></SectionTitle>
+        <Section id="ai" icon={<Sparkles size={18} className="text-accent" />} title="AI">
           <div className="space-y-2 text-[0.88rem]">
             {[
               { k: "brief", n: "AI-02 오늘의 업무 브리핑", m: "RULE + LLM", s: "규칙 동작 중" },
@@ -134,28 +132,57 @@ export default function SettingsPage() {
             ))}
           </div>
           <div className="mt-3 text-[0.78rem] text-ink-3">외부 LLM API 미연결 상태. 모든 AI 기능은 L1 Assist이며 경영·법률 판단을 자동 확정하지 않습니다. API Key 연결 시 상담 요약부터 실제 연결합니다.</div>
-        </Card>
+        </Section>
 
-        <Card className="p-5">
-          <SectionTitle><span className="flex items-center gap-2"><Award size={18} className="text-ink-3" /> 기술 · 사업화 자산</span></SectionTitle>
+        <Section id="assets" icon={<Award size={18} className="text-ink-3" />} title="기술 · 사업화 자산">
           <div className="grid gap-2 text-[0.88rem] md:grid-cols-2">
             {[["특허", "해당없음"], ["벤처기업확인", "해당없음"], ["연구개발", "해당없음"], ["인증", "해당없음"]].map(([k, v]) => (
               <div key={k} className="flex items-center justify-between rounded-xl bg-surface-2 px-3 py-2.5"><span className="font-semibold">{k}</span><Badge>{v}</Badge></div>
             ))}
           </div>
           <div className="mt-3 text-[0.78rem] text-ink-3">실제 존재하는 자산만 표시합니다. 출원·확인이 이루어지면 이 곳에 정확한 상태를 기록합니다.</div>
-        </Card>
+        </Section>
 
-        <Card className="p-5 xl:col-span-2">
-          <SectionTitle action={<NextBadge />}>향후 확장 (NEXT)</SectionTitle>
+        <Section id="next" title="향후 확장 (NEXT)" action={<NextBadge />} wide>
           <div className="grid gap-2 md:grid-cols-5">
             {NEXT_FEATURES.map((f) => (
               <button key={f.key} onClick={() => openNext(f.key)} className="pressable rounded-xl border border-dashed border-line-2 p-3 text-left hover:bg-surface-2"><div className="text-[0.88rem] font-bold">{f.title}</div><div className="mt-1 line-clamp-2 text-[0.75rem] text-ink-3">{f.desc}</div></button>
             ))}
           </div>
-        </Card>
+        </Section>
       </div>
+      </SectionCtx.Provider>
       <Confirm open={confirm} onClose={() => setConfirm(false)} onConfirm={() => { resetDemo(); toast("데모 데이터를 초기화했습니다."); }} title="데모 초기화" desc="모든 Action 상태, 고객 제출, 문의, 알림을 초기 상태로 되돌립니다. 테마·글자 설정은 유지됩니다." confirmText="초기화" danger />
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return <Suspense><SettingsInner /></Suspense>;
+}
+
+const SectionCtx = createContext<string | null>(null);
+
+/**
+ * 설정 카드 한 장. md 미만에서는 제목만 보이는 접이식이고, md 이상에서는 평소 카드다.
+ * `/ax/settings?open=users` 처럼 열어 둘 섹션을 주소로 받는다 — 대시보드 "처음 시작하기"가 이 주소로 보낸다.
+ */
+function Section({ id, icon, title, action, wide, children }: { id: string; icon?: ReactNode; title: string; action?: ReactNode; wide?: boolean; children: ReactNode }) {
+  const openId = useContext(SectionCtx);
+  const [open, setOpen] = useState(openId === id);
+  useEffect(() => {
+    if (openId === id) document.getElementById(id)?.scrollIntoView({ block: "start" });
+  }, [openId, id]);
+  return (
+    <Card id={id} className={cx("scroll-mt-4 p-5", wide && "xl:col-span-2")}>
+      <div className="flex items-center justify-between gap-2 md:mb-3">
+        <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-controls={`${id}-body`} className="pressable -mx-2 -my-1.5 flex min-h-11 min-w-0 flex-1 items-center justify-between gap-2 rounded-lg px-2 text-left hover:bg-surface-2 md:pointer-events-none md:my-0 md:min-h-0 md:hover:bg-transparent">
+          <h2 className="flex min-w-0 items-center gap-2 text-[1.15rem] font-bold">{icon} <span className="truncate">{title}</span></h2>
+          <ChevronDown size={18} className={cx("shrink-0 text-ink-3 transition-transform md:hidden", open && "rotate-180")} />
+        </button>
+        {action}
+      </div>
+      <div id={`${id}-body`} className={cx(open ? "mt-3 md:mt-0" : "hidden md:block")}>{children}</div>
+    </Card>
   );
 }

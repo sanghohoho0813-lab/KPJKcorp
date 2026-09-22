@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Building2, ChevronRight, LayoutGrid, List, Plus } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { daysBetween, fmtDate, fmtRelative } from "@/lib/format";
@@ -13,13 +13,15 @@ import { SearchBox, StageBadge, StageProgressBar } from "@/components/domain/dom
 import { RestoreSamplesButton, SampleBanner } from "@/components/domain/SampleData";
 import { CONSULT_AREA_LABEL, companySummary } from "@/lib/company-options";
 
-export default function ClientsPage() {
+function ClientsInner() {
   const st = useStore();
   const router = useRouter();
+  const params = useSearchParams();
   const [q, setQ] = useState("");
   const [view, setView] = useState<"card" | "table">("card");
   const [filter, setFilter] = useState<"all" | "mine" | "issue" | "archived">("all");
-  const [newOpen, setNewOpen] = useState(false);
+  // 대시보드 "처음 시작하기"에서 오면 등록 창이 바로 열린다
+  const [newOpen, setNewOpen] = useState(params.get("new") === "1");
   const may = useMay();
   const now = new Date().toISOString();
   const me = st.session?.userId;
@@ -42,13 +44,15 @@ export default function ClientsPage() {
       .filter((r) => (filter === "mine" ? r.c.consultantId === me : filter === "issue" ? r.hasIssue : true))
       .filter((r) => !q || r.c.name.includes(q) || r.c.ceo.includes(q) || r.c.industry.includes(q) || r.c.contactName.includes(q) || r.c.bizNo.includes(q) || (r.c.region ?? "").includes(q) || (r.c.interests ?? []).some((k) => (CONSULT_AREA_LABEL[k] ?? "").includes(q)));
   }, [st, q, filter, me, now]);
+  const totalActive = st.companies.filter((c) => !c.archived).length;
 
   return (
     <div>
       <PageHeader title="기업고객" desc="기업고객 단위로 상담·계약·프로젝트·자료·일정·문의를 연결합니다." badge={<Badge>{st.companies.filter((c) => !c.archived).length}개 기업</Badge>} actions={
         <div className="flex flex-wrap items-center gap-2">
           <SegmentedControl value={view} onChange={setView} options={[{ key: "card", label: <span className="flex items-center gap-1"><LayoutGrid size={14} /> 카드</span> }, { key: "table", label: <span className="flex items-center gap-1"><List size={14} /> 목록</span> }]} />
-          <RestoreSamplesButton />
+          {/* 비어 있을 때는 빈 상태 카드 안의 버튼 하나만 둔다 — 같은 버튼이 두 개면 어느 쪽을 눌러야 할지 고민하게 된다 */}
+          {totalActive > 0 && <RestoreSamplesButton />}
           {may("company.create") && <Button variant="accent" icon={<Plus size={16} />} onClick={() => setNewOpen(true)}>기업고객 등록</Button>}
         </div>
       } />
@@ -59,7 +63,17 @@ export default function ClientsPage() {
       </div>
 
       {rows.length === 0 ? (
-        <Card><EmptyState icon={<Building2 size={32} />} title="조건에 맞는 기업이 없습니다" desc="검색어나 필터를 바꿔보세요." /></Card>
+        <Card>
+          {/* "없다"에도 세 가지가 있다 — 아직 하나도 없음 / 보관함이 빔 / 조건에 안 맞음. 첫 번째만 다음 행동을 붙인다. */}
+          {totalActive === 0 && filter !== "archived" ? (
+            <EmptyState icon={<Building2 size={32} />} title="아직 등록된 기업고객이 없습니다" desc="첫 기업고객을 등록하면 상담·프로젝트·자료·일정·문의가 이 기업 아래로 연결됩니다. 사업자등록증을 올리면 기본 정보가 자동으로 채워집니다."
+              action={<div className="flex flex-wrap justify-center gap-2">{may("company.create") && <Button variant="accent" icon={<Plus size={16} />} onClick={() => setNewOpen(true)}>첫 기업고객 등록</Button>}<RestoreSamplesButton /></div>} />
+          ) : filter === "archived" ? (
+            <EmptyState icon={<Building2 size={32} />} title="보관된 기업이 없습니다" desc="기업 상세에서 보관하면 목록에서 빠지고 여기에 모입니다." />
+          ) : (
+            <EmptyState icon={<Building2 size={32} />} title="조건에 맞는 기업이 없습니다" desc="검색어나 필터를 바꿔보세요." action={(q || filter !== "all") ? <Button variant="outline" onClick={() => { setQ(""); setFilter("all"); }}>전체 보기</Button> : undefined} />
+          )}
+        </Card>
       ) : view === "card" ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {rows.map(({ c, active, missing, overdue, openIq, next, last, consultant }) => (
@@ -141,4 +155,8 @@ export default function ClientsPage() {
       <CompanyModal open={newOpen} onClose={() => setNewOpen(false)} onCreated={(id) => router.push(`/ax/clients/${id}`)} />
     </div>
   );
+}
+
+export default function ClientsPage() {
+  return <Suspense><ClientsInner /></Suspense>;
 }
