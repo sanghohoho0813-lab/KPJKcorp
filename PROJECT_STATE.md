@@ -75,17 +75,22 @@ KPJK의 경영컨설팅 업무를 기억·카톡·개별파일 의존 구조에�
 - [x] 자료 요청 등록 / 일정 등록 / 결과자료 공유 → 고객 알림
 
 ## 진행중
-- 없음 (고도화 1차 종료). 다음 작업은 `BACKLOG.md` 상단부터.
+- 없음 (고도화 16차 종료). 다음 작업은 `BACKLOG.md` 상단부터.
 
-## 미완료 (CONDITIONAL / NEXT)
-- [ ] Supabase Auth · RLS · Storage (실데이터 연결)
-- [ ] LLM API 연결 (AI-01 상담 요약, AI-05 톤 조정)
-- [ ] 알림 발송 채널 (카카오/이메일) — NEXT-01
+## 미완료
+### 코드로 끝낼 수 없는 것 (외부 입력 대기)
+- [ ] **Supabase 첫 연결 확인** — 스키마·권한·인증·파일 업로드 코드는 13차 완료, 권한 32항목은 로컬 Postgres 로 검증 통과. 이 개발 환경은 `*.supabase.co` 로 나가는 연결이 막혀 있어 **대표님 PC 에서 1회 확인 필요**
+- [ ] LLM API 연결 (AI-01 상담 요약, AI-05 톤 조정) — API Key 필요
+- [ ] 알림 발송 채널 (카카오/이메일) — NEXT-01. 발신번호 등록·비용 발생
+- [ ] 실제 14일 실증 — 7일차·14일차 재조사 화면은 16차 완료. 값은 대표님이 실제로 써야 생긴다
+
+### 코드로 남은 것
+- [ ] 실시간 반영 (지금은 새로고침해야 남의 변경이 보인다)
 - [ ] AX Owner 지정 필드 (설정)
 
 ## 현재 Demo 기능 / 실제 연결된 기능
-- Demo: 전부 (브라우저 로컬 Store). 파일은 메타만 기록
-- Live: 없음
+- **Demo 모드** (환경변수 없음): 브라우저 로컬 Store. 발표·시연용으로 계속 유지
+- **서버 모드** (`NEXT_PUBLIC_SUPABASE_URL` + anon key 입력 시): 표 19개 · 접근권한 정책 47개 · Supabase Auth 로그인 · 파일 실제 업로드(버킷 2개). 코드 완료 / 실기기 첫 연결 미확인
 
 ## 알려진 문제
 - Next dev 모드에서 화면 좌하단 "N" Dev 배지가 모바일 Bottom Nav와 겹침 (production build에서는 없음)
@@ -95,14 +100,15 @@ KPJK의 경영컨설팅 업무를 기억·카톡·개별파일 의존 구조에�
 - 파일은 메타만 저장, 결과자료 "열람"은 기록만 남김 (실제 파일 저장소 없음 — CONDITIONAL)
 
 ## 다음 최우선 작업
-1. KPJK 대표 시연 → 실제 업무 흐름과 11단계/자료 상태 명칭 확정
-2. Baseline 측정 항목 확정 (SPEC §1 KPI 3종)
-3. Supabase 전환 결정 시 migrations + RLS + Storage
+1. **Supabase 첫 연결** (대표님 PC) — `supabase/README.md` 순서대로. 이것이 "실데이터 운영"의 유일한 남은 관문
+2. 실제 업무 흐름 확인 → 11단계/자료 상태 명칭 확정
+3. 실증 14일 실제 수행 → 도입 전후 비교 채우기 (화면은 16차 완료)
 
 ## USER ACTION QUEUE
 - [OPTIONAL] ANTHROPIC_API_KEY 또는 OPENAI_API_KEY 제공 시 AI-01 실제 연결
 - [OPTIONAL] KPJK 실제 CI(로고·색) 제공 시 Signature Theme 조정
-- [OPTIONAL] Vercel 배포: `npm run build` 통과 확인됨, 환경변수 불필요
+- [OPTIONAL] Vercel 배포: `npm run build` 통과 확인됨. Demo 모드는 환경변수 불필요, 서버 모드는 Supabase URL + anon key 2개
+- [REQUIRED] Supabase 에서 `supabase/setup.sql` 재실행 (14차에 추가된 `baseline_surveys` 컬럼 반영)
 
 ## 최근 주요 변경
 - 2026-09-22 고도화 16차 — 도입 후 재조사(7일차·14일차): 같은 질문 6개를 2분 만에 다시 받아 시스템이 셀 수 없는 4개 지표의 전·후 비교를 완성. 실증 일차가 지나야 열리는 날짜 잠금, 문항마다 도입 전 답변 표시, 대표 체감 변화 카드(데스크톱 표·폰 목록), A4 인쇄물에 시점 칸 추가(1쪽 유지). 개선율·ROI 는 여전히 산출하지 않음
