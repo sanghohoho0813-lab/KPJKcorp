@@ -45,3 +45,6 @@ next-env.d.ts
 /doc/
 /empty/
 /c-*.png
+
+# 영상 렌더 결과물 (용량이 커서 저장소에 넣지 않는다)
+/tools/video/out/
