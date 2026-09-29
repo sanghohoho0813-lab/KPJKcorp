@@ -98,7 +98,7 @@ const NAV_GROUPS: NavGroup[] = [
     color: "var(--nav-ai)",
     inkColor: "var(--nav-ai-ink)",
     items: [
-      { href: "/ax/schedule", label: "일정", icon: <CalendarDays size={18} /> },
+      { href: "/ax/schedule", label: "일정 · 공지", icon: <CalendarDays size={18} /> },
       { href: "/ax/reports", label: "리포트 · 실증", icon: <BarChart3 size={18} />, hint: "Evidence · KPI" },
     ],
   },

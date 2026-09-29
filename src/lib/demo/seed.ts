@@ -1,21 +1,4 @@
-import type {
-  Activity,
-  Approval,
-  Company,
-  Consultation,
-  Contract,
-  DocumentRequest,
-  Inquiry,
-  Notification,
-  Opportunity,
-  Project,
-  Quote,
-  ResultFile,
-  Schedule,
-  SurveyResponse,
-  Task,
-  User,
-} from "../types";
+import type { Activity, Approval, Company, Consultation, Contract, DocumentRequest, Inquiry, Notification, Opportunity, Project, Quote, ResultFile, Schedule, SurveyResponse, Task, User, Notice } from "../types";
 import { addDays, iso } from "../format";
 
 /**
@@ -38,6 +21,7 @@ export interface SeedData {
   quotes: Quote[];
   approvals: Approval[];
   surveys: SurveyResponse[];
+  notices: Notice[];
   activities: Activity[];
   notifications: Notification[];
 }
@@ -357,6 +341,12 @@ export function buildSeed(now = new Date()): SeedData {
 
   const surveys: SurveyResponse[] = [];
 
+  // 샘플 공지는 샘플 기업에만 붙인다 — "샘플 지우기"를 누르면 함께 사라져 실제 고객에게 새지 않는다
+  const notices: Notice[] = [
+    { id: "nc_a1", companyId: "co_a", title: "중간 보고 전 확인 부탁드립니다", body: "다음 주 중간 보고에서 원가 개선안 초안을 함께 보려고 합니다.\n요청자료 화면에 남은 항목이 있으면 이번 주 안에 올려 주세요. 올리신 자료는 담당 컨설턴트가 바로 확인합니다.", pinned: true, publishedAt: d(-1, 10), authorId: "u_park" },
+    { id: "nc_a2", companyId: "co_a", title: "자료는 카카오톡 대신 이 화면으로 보내 주세요", body: "카카오톡으로 받은 파일은 담당자 한 사람의 휴대폰에만 남습니다. 요청자료 화면에 올려 주시면 담당자·대표가 함께 확인하고, 검토 결과도 이곳에서 바로 알려 드립니다.", publishedAt: d(-9, 9), authorId: "u_park" },
+  ];
+
   const oppActivities: Activity[] = [
     { id: "ac_op1", type: "opportunity_created", companyId: "co_b", actorId: "c_b", actorRole: "client", at: d(-1, 14), text: "고객 관심표시: 벤처기업확인" },
     { id: "ac_op2", type: "approval_requested", companyId: "co_e", actorId: "u_lee", actorRole: "consultant", at: d(-1, 9), text: "대표 승인 요청: 이플러스바이오(주) 법인 정비 연간 자문 제안" },
@@ -372,5 +362,5 @@ export function buildSeed(now = new Date()): SeedData {
   const allActivities = [...oppActivities, ...activities].sort((a, b) => b.at.localeCompare(a.at));
   const allNotifications = [...oppNotifs, ...notifications].sort((a, b) => b.at.localeCompare(a.at));
 
-  return { users, companies, consultations, contracts, projects, docRequests, schedules, tasks, inquiries, results, opportunities, quotes, approvals, surveys, activities: allActivities, notifications: allNotifications };
+  return { users, companies, consultations, contracts, projects, docRequests, schedules, tasks, inquiries, results, opportunities, quotes, approvals, surveys, notices, activities: allActivities, notifications: allNotifications };
 }

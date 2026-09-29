@@ -1,6 +1,7 @@
 "use client";
 
-import { CalendarDays, MapPin } from "lucide-react";
+import { CalendarDays, MapPin, Megaphone } from "lucide-react";
+import { NoticeList, liveNoticesFor } from "@/components/domain/Notices";
 import { useStore, usePortalCompanyId } from "@/lib/store";
 import { SCHEDULE_TYPE } from "@/lib/stages";
 import { fmtDate, fmtTime, relativeDay, isSameDay } from "@/lib/format";
@@ -15,6 +16,7 @@ export default function PortalSchedulePage() {
   const all = st.schedules.filter((s) => s.companyId === companyId && s.visibleToClient).sort((a, b) => a.start.localeCompare(b.start));
   const upcoming = all.filter((s) => s.start >= new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString());
   const past = all.filter((s) => s.start < new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()).reverse();
+  const notices = liveNoticesFor(st.notices, companyId, nowIso);
   const clientLabel = (t: keyof typeof SCHEDULE_TYPE) => (t === "doc_due" ? "자료 제출기한" : t === "report" ? "결과보고" : t === "consult" ? "상담" : t === "followup" ? "담당자 연락 예정" : "미팅");
 
   const Item = ({ s }: { s: (typeof all)[number] }) => {
@@ -34,7 +36,11 @@ export default function PortalSchedulePage() {
 
   return (
     <div>
-      <PageHeader title="일정" desc="미팅·상담·자료 제출기한·결과보고 일정입니다. 변경이 필요하면 문의하기로 알려주세요." />
+      <PageHeader title="일정 · 공지" desc="담당 컨설턴트의 공지와 미팅·상담·자료 제출기한·결과보고 일정입니다. 변경이 필요하면 문의하기로 알려주세요." />
+      <Card className="mb-5 p-5" id="notices">
+        <h2 className="mb-3 flex items-center gap-2 text-[1.05rem] font-bold"><Megaphone size={18} className="text-accent" /> 공지 <span className="text-ink-3">{notices.length}</span></h2>
+        {notices.length === 0 ? <p className="py-3 text-center text-[0.9rem] text-ink-3">새 공지가 없습니다.</p> : <NoticeList items={notices} />}
+      </Card>
       <Card className="p-5">
         <h2 className="mb-3 text-[1.05rem] font-bold">예정된 일정 <span className="text-ink-3">{upcoming.length}</span></h2>
         {upcoming.length === 0 ? <EmptyState icon={<CalendarDays size={30} />} title="예정된 일정이 없습니다" /> : <div className="space-y-2">{upcoming.map((s) => <Item key={s.id} s={s} />)}</div>}

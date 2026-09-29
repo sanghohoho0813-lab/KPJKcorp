@@ -25,7 +25,7 @@ import * as M from "./rows";
 /** 부모 먼저. 프로젝트를 기업보다 먼저 보내면 외래키에 걸린다. */
 const ORDER = [
   "companies", "projects",
-  "consultations", "contracts", "docRequests", "schedules", "tasks",
+  "consultations", "contracts", "docRequests", "schedules", "notices", "tasks",
   "inquiries", "results", "opportunities",
   "quotes", "approvals",
   "activities", "notifications", "surveys",
@@ -50,6 +50,7 @@ const SPEC: Record<Key, Spec> = {
   contracts:     { table: "contracts",         toRow: M.contractToRow as Spec["toRow"],     fromRow: M.contractFromRow,     deletable: true },
   docRequests:   { table: "document_requests", toRow: M.docRequestToRow as Spec["toRow"],   fromRow: M.docRequestFromRow,   deletable: true,  order: { column: "requested_at", ascending: false } },
   schedules:     { table: "schedules",         toRow: M.scheduleToRow as Spec["toRow"],     fromRow: M.scheduleFromRow,     deletable: true,  order: { column: "start_at", ascending: true } },
+  notices:       { table: "notices",           toRow: M.noticeToRow as Spec["toRow"],       fromRow: M.noticeFromRow,       deletable: true,  order: { column: "published_at", ascending: false } },
   tasks:         { table: "tasks",             toRow: M.taskToRow as Spec["toRow"],         fromRow: M.taskFromRow,         deletable: true,  order: { column: "due_date", ascending: true } },
   inquiries:     { table: "inquiries",         toRow: M.inquiryToRow as Spec["toRow"],      fromRow: M.inquiryFromRow,      deletable: true,  order: { column: "created_at", ascending: false } },
   results:       { table: "results",           toRow: M.resultToRow as Spec["toRow"],       fromRow: M.resultFromRow,       deletable: true,  order: { column: "shared_at", ascending: false } },

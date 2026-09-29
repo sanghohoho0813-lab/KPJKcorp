@@ -26,7 +26,7 @@
 --    - 맨 마지막에 설치 결과 표가 한 줄 나옵니다. 그것으로 성공을 확인하세요.
 --
 --  이 파일이 만드는 것
---    1부. 표 19개          — 기업·프로젝트·상담·계약·자료·일정·업무·문의·견적·기록
+--    1부. 표 20개          — 기업·프로젝트·상담·계약·자료·일정·공지·업무·문의·견적·기록
 --    2부. 접근 권한        — 누가 무엇을 볼 수 있는지. 데이터베이스가 직접 막습니다
 --    3부. 파일 보관함 2개  — 고객 제출자료 / 결과자료
 --    4부. 대표 계정 연결
@@ -239,6 +239,21 @@ create table if not exists public.schedules (
   updated_at        timestamptz not null default now()
 );
 create index if not exists schedules_start_idx on public.schedules(start_at);
+
+-- 고객 공지 — company_id 가 비어 있으면 모든 기업고객에게 보인다
+create table if not exists public.notices (
+  id           text primary key,
+  company_id   text references public.companies(id) on delete cascade,
+  title        text not null,
+  body         text not null default '',
+  pinned       boolean not null default false,
+  published_at timestamptz not null default now(),
+  expires_at   timestamptz,
+  author_id    uuid references public.profiles(id) on delete set null,
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
+);
+create index if not exists notices_published_idx on public.notices(published_at desc);
 
 -- -----------------------------------------------------------------------------
 -- 8. 업무
@@ -464,7 +479,7 @@ declare t text;
 begin
   foreach t in array array[
     'companies','projects','consultations','contracts','document_requests',
-    'schedules','tasks','inquiries','opportunities','quotes','app_settings'
+    'schedules','notices','tasks','inquiries','opportunities','quotes','app_settings'
   ] loop
     execute format('drop trigger if exists touch_%1$s on public.%1$s', t);
     execute format(
@@ -570,7 +585,7 @@ declare t text;
 begin
   foreach t in array array[
     'profiles','companies','projects','consultations','contracts','document_requests',
-    'document_files','schedules','tasks','inquiries','inquiry_messages','results',
+    'document_files','schedules','notices','tasks','inquiries','inquiry_messages','results',
     'opportunities','quotes','approvals','activities','notifications','surveys','app_settings'
   ] loop
     execute format('alter table public.%I enable row level security', t);
@@ -713,6 +728,20 @@ create policy schedules_select on public.schedules for select to authenticated
 
 drop policy if exists schedules_write on public.schedules;
 create policy schedules_write on public.schedules for all to authenticated
+  using (public.kpjk_is_internal()) with check (public.kpjk_is_internal());
+
+-- 공지 — 내부는 전부 보고 쓴다. 고객은 자기 회사 공지와 전체 공지 중 "게시 중"인 것만 본다.
+-- 게시 종료일이 지나면 서버가 알아서 내린다. 화면이 거르는 것에 기대지 않는다.
+drop policy if exists notices_select on public.notices;
+create policy notices_select on public.notices for select to authenticated
+  using (public.kpjk_is_internal()
+         or (public.kpjk_is_client()
+             and (company_id is null or company_id = public.kpjk_my_company())
+             and published_at <= now()
+             and (expires_at is null or expires_at > now())));
+
+drop policy if exists notices_write on public.notices;
+create policy notices_write on public.notices for all to authenticated
   using (public.kpjk_is_internal()) with check (public.kpjk_is_internal());
 
 -- 업무는 내부 전용이다. 고객에게는 존재하지 않는 개념이다.
@@ -954,7 +983,7 @@ end $$;
 -- =============================================================================
 --  설치 결과 — 아래 한 줄로 확인하세요
 -- =============================================================================
---  표 19 · 권한정책 48 · 파일보관함 2 가 나오면 설치는 끝난 것입니다.
+--  표 20 · 권한정책 50 · 파일보관함 2 가 나오면 설치는 끝난 것입니다.
 --  "다음 할 일" 칸에 적힌 대로 하시면 됩니다.
 
 select

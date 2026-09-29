@@ -28,6 +28,7 @@ import type {
   ResultFile,
   Role,
   Schedule,
+  Notice,
   Session,
   Settings,
   SurveyResponse,
@@ -137,6 +138,11 @@ export interface StoreState extends SeedData {
   updateTaskStatus: (taskId: string, status: TaskStatus, byUserId: string) => void;
   createTask: (data: Omit<Task, "id" | "createdAt" | "status"> & { status?: TaskStatus }, byUserId: string) => void;
   createSchedule: (data: Omit<Schedule, "id">, byUserId: string) => void;
+  /** 고객 공지 — companyId 가 없으면 모든 기업고객에게 나간다. 게시하는 순간 해당 고객들에게 알림이 간다. */
+  createNotice: (data: { companyId?: string; title: string; body: string; pinned?: boolean; expiresAt?: string }, byUserId: string) => string | null;
+  updateNotice: (id: string, patch: { title?: string; body?: string; pinned?: boolean; expiresAt?: string | null }, byUserId: string) => void;
+  /** 게시 내리기 — 공지는 지워도 "언제 누가 무엇을 공지했는지"는 기록에 남는다 */
+  removeNotice: (id: string, byUserId: string) => void;
   shareResult: (data: Omit<ResultFile, "id" | "sharedAt">, byUserId: string) => void;
   downloadResult: (resultId: string, byUserId: string) => void;
   // opportunity / approval / survey
@@ -245,7 +251,7 @@ function makeNotification(n: Omit<Notification, "id" | "at" | "read">): Notifica
 const EMPTY_DATA: SeedData = {
   users: [], companies: [], consultations: [], contracts: [], projects: [], docRequests: [],
   schedules: [], tasks: [], inquiries: [], results: [], opportunities: [], quotes: [],
-  approvals: [], surveys: [], activities: [], notifications: [],
+  approvals: [], surveys: [], notices: [], activities: [], notifications: [],
 };
 
 /**
@@ -329,6 +335,11 @@ export const useStore = create<StoreState>()(
       setHydrated: () => set({ hydrated: true }),
       // Demo freshness: reseed if the persisted seed is older than 20 hours so relative dates stay "today".
       reseedIfStale: () => {
+        // 새 버전에서 늘어난 목록(예: 공지)은 예전 저장본에 없다. 비어 있는 채로 두면 화면이 깨지므로
+        // 운영 모드 여부와 상관없이 빈 목록으로 채운다 — 기존 데이터는 건드리지 않는다.
+        const cur = get() as unknown as Record<string, unknown>;
+        const missing = (Object.keys(EMPTY_DATA) as (keyof SeedData)[]).filter((k) => !Array.isArray(cur[k]));
+        if (missing.length) set(Object.fromEntries(missing.map((k) => [k, []])) as Partial<StoreState>);
         // 운영 모드에서는 절대 초기화하지 않는다. 실제 데이터가 들어오기 시작하면 이 한 줄이 전부를 지킨다.
         if (get().serverMode || get().settings.liveMode) return;
         const age = Date.now() - new Date(get().seededAt).getTime();
@@ -892,7 +903,7 @@ export const useStore = create<StoreState>()(
         const st = get();
         if (deny(st, "data.manage", "백업 내보내기", set)) return null;
         const now = nowIso();
-        const keys: (keyof SeedData)[] = ["users", "companies", "consultations", "contracts", "projects", "docRequests", "schedules", "tasks", "inquiries", "results", "opportunities", "quotes", "approvals", "surveys", "activities", "notifications"];
+        const keys: (keyof SeedData)[] = ["users", "companies", "consultations", "contracts", "projects", "docRequests", "schedules", "tasks", "inquiries", "results", "opportunities", "quotes", "approvals", "surveys", "notices", "activities", "notifications"];
         const data: Record<string, unknown> = {};
         for (const k of keys) data[k] = st[k];
         const payload = {
@@ -923,7 +934,7 @@ export const useStore = create<StoreState>()(
         let parsed: { format?: string; version?: number; data?: Record<string, unknown>; settings?: Partial<Settings>; seededAt?: string; exportedAt?: string };
         try { parsed = JSON.parse(json); } catch { return { ok: false, reason: "JSON 파일이 아닙니다." }; }
         if (parsed?.format !== "kpjk-ax-backup" || !parsed.data) return { ok: false, reason: "이 시스템의 백업 파일이 아닙니다." };
-        const keys: (keyof SeedData)[] = ["users", "companies", "consultations", "contracts", "projects", "docRequests", "schedules", "tasks", "inquiries", "results", "opportunities", "quotes", "approvals", "surveys", "activities", "notifications"];
+        const keys: (keyof SeedData)[] = ["users", "companies", "consultations", "contracts", "projects", "docRequests", "schedules", "tasks", "inquiries", "results", "opportunities", "quotes", "approvals", "surveys", "notices", "activities", "notifications"];
         const next: Partial<SeedData> = {};
         const counts: Record<string, number> = {};
         for (const k of keys) {
@@ -1149,6 +1160,52 @@ export const useStore = create<StoreState>()(
         const s: Schedule = { ...data, id: uid("sc") };
         const notifs = data.visibleToClient && data.companyId ? [makeNotification({ audience: "client", companyId: data.companyId, title: "새 일정이 등록되었습니다", body: data.title, href: "/portal/schedule" })] : [];
         set({ schedules: [...st.schedules, s], activities: [makeActivity({ type: "schedule_created", companyId: data.companyId, projectId: data.projectId, actorId: byUserId, actorRole: "consultant", text: `일정 등록: ${data.title}` }), ...st.activities], notifications: [...notifs, ...st.notifications] });
+      },
+      createNotice: (data, byUserId) => {
+        const st = get();
+        if (deny(st, "notice.write", `고객 공지 (${data.title})`, set)) return null;
+        const title = data.title.trim();
+        if (!title) return null;
+        const now = nowIso();
+        const n: Notice = { id: uid("nc"), companyId: data.companyId || undefined, title, body: data.body.trim(), pinned: !!data.pinned, expiresAt: data.expiresAt || undefined, publishedAt: now, authorId: byUserId };
+        // 전체 공지는 보관되지 않은 기업마다 알림을 하나씩 — 고객 알림함은 기업 단위로 나뉘어 있다
+        const targets = n.companyId ? [n.companyId] : st.companies.filter((c) => !c.archived).map((c) => c.id);
+        const notifs = targets.map((cid) => makeNotification({ audience: "client", companyId: cid, title: `공지: ${title}`, body: n.body.slice(0, 80), href: "/portal/schedule#notices" }));
+        const who = n.companyId ? st.companies.find((c) => c.id === n.companyId)?.name ?? "기업" : `전체 고객 ${targets.length}곳`;
+        set({
+          notices: [n, ...st.notices],
+          notifications: [...notifs, ...st.notifications],
+          activities: [makeActivity({ type: "notice_published", companyId: n.companyId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `공지 게시: ${title} (${who})` }), ...st.activities],
+        });
+        return n.id;
+      },
+      updateNotice: (id, patch, byUserId) => {
+        const st = get();
+        const cur = st.notices.find((x) => x.id === id);
+        if (!cur) return;
+        if (deny(st, "notice.write", `공지 수정 (${cur.title})`, set)) return;
+        const next: Notice = {
+          ...cur,
+          ...(patch.title !== undefined ? { title: patch.title.trim() || cur.title } : {}),
+          ...(patch.body !== undefined ? { body: patch.body.trim() } : {}),
+          ...(patch.pinned !== undefined ? { pinned: patch.pinned } : {}),
+          ...(patch.expiresAt !== undefined ? { expiresAt: patch.expiresAt || undefined } : {}),
+          updatedAt: nowIso(),
+        };
+        set({
+          notices: st.notices.map((x) => (x.id === id ? next : x)),
+          activities: [makeActivity({ type: "notice_updated", companyId: cur.companyId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `공지 수정: ${next.title}` }), ...st.activities],
+        });
+      },
+      removeNotice: (id, byUserId) => {
+        const st = get();
+        const cur = st.notices.find((x) => x.id === id);
+        if (!cur) return;
+        if (deny(st, "notice.write", `공지 내리기 (${cur.title})`, set)) return;
+        set({
+          notices: st.notices.filter((x) => x.id !== id),
+          activities: [makeActivity({ type: "notice_removed", companyId: cur.companyId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `공지 내림: ${cur.title}` }), ...st.activities],
+        });
       },
       shareResult: (data, byUserId) => {
         const st = get();
@@ -1601,6 +1658,7 @@ export const useStore = create<StoreState>()(
           approvals: st.approvals.filter(keepC),
           activities: st.activities.filter((a) => keepC(a) && keepP(a)),
           notifications: st.notifications.filter(keepC),
+          notices: st.notices.filter(keepC),
         };
         const after = next.projects.length + next.consultations.length + next.contracts.length + next.docRequests.length + next.schedules.length + next.tasks.length + next.inquiries.length + next.results.length + next.opportunities.length + next.quotes.length + next.approvals.length + next.activities.length + next.notifications.length;
         const counts = { companies: ids.size, projects: pids.size, records: before - after };
@@ -1652,6 +1710,7 @@ export const useStore = create<StoreState>()(
           quotes: [...st.quotes, ...seed.quotes.filter((x) => inC(x) || inP(x))],
           approvals: [...st.approvals, ...seed.approvals.filter(inC)],
           notifications: [...st.notifications, ...seed.notifications.filter(inC)],
+          notices: [...st.notices, ...seed.notices.filter(inC)],
           activities: [
             makeActivity({ type: "samples_restored", actorId: byUserId, actorRole: "admin", text: `샘플 데이터 다시 보기 — 기업 ${companies.length} · 프로젝트 ${projects.length}` }),
             ...st.activities,

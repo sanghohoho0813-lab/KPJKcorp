@@ -84,6 +84,12 @@ insert into public.inquiries(id, company_id, title) values
   ('iq_a1','co_a','A 문의'), ('iq_b1','co_b','B 문의');
 insert into public.activities(id, type, company_id, actor_id, actor_role, message) values
   ('ac_a1','company_created','co_a','00000000-0000-0000-0000-00000000a001','admin','기업 등록');
+insert into public.notices(id, company_id, title, published_at, expires_at) values
+  ('nc_all',   null,  '전체 공지',        now() - interval '1 day', null),
+  ('nc_a',     'co_a','A사 공지',         now() - interval '1 day', null),
+  ('nc_b',     'co_b','B사 공지',         now() - interval '1 day', null),
+  ('nc_old',   'co_a','기한 지난 A사 공지', now() - interval '9 day', now() - interval '1 day'),
+  ('nc_later', null,  '예약된 전체 공지',   now() + interval '2 day', null);
 insert into storage.objects(bucket_id, name) values
   ('documents','co_a/dr_a1/f1__사업자등록증.pdf'),
   ('documents','co_b/dr_b1/f2__비밀자료.pdf');
@@ -121,6 +127,14 @@ select chk('고객A: 스스로 대표가 못 된다',
        affected($$update public.profiles set role='admin' where id=auth.uid()$$), 0::bigint);
 
 -- 고객이 해도 되는 것
+select chk('고객A: 공지는 자기 회사 + 전체 공지만',  (select count(*) from public.notices), 2::bigint);
+select chk('고객A: B사 공지는 안 보인다',       (select count(*) from public.notices where id='nc_b'), 0::bigint);
+select chk('고객A: 게시 기한 지난 공지는 안 보인다', (select count(*) from public.notices where id='nc_old'), 0::bigint);
+select chk('고객A: 게시 전 공지는 안 보인다',     (select count(*) from public.notices where id='nc_later'), 0::bigint);
+select chk('고객A: 공지를 쓸 수 없다',
+       denied($$insert into public.notices(id, title) values ('nc_x','고객이 쓴 공지')$$), true);
+select chk('고객A: 공지를 고칠 수 없다',
+       affected($$update public.notices set title='변조' where id='nc_a'$$), 0::bigint);
 select chk('고객A: 자료 제출은 된다',
        affected($$update public.document_requests set status='submitted' where id='dr_a1'$$), 1::bigint);
 select chk('고객A: 견적 수락은 된다',
@@ -136,6 +150,9 @@ set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000c001';
 select chk('컨설턴트(전체): 두 기업 다 보인다',   (select count(*) from public.companies), 2::bigint);
 select chk('컨설턴트(전체): 비공개 프로젝트도 보인다', (select count(*) from public.projects), 4::bigint);
 select chk('컨설턴트(전체): 상담기록 보인다',     (select count(*) from public.consultations), 1::bigint);
+select chk('컨설턴트: 공지는 전부 보인다',        (select count(*) from public.notices), 5::bigint);
+select chk('컨설턴트: 공지를 쓸 수 있다',
+       affected($$insert into public.notices(id, title) values ('nc_c','컨설턴트 공지')$$), 1::bigint);
 select chk('컨설턴트: 스스로 대표가 못 된다',
        affected($$update public.profiles set role='admin' where id=auth.uid()$$), 0::bigint);
 select chk('컨설턴트: 남의 계정을 못 만든다',

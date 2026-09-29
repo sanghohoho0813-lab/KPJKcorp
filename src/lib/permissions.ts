@@ -50,7 +50,8 @@ export type Permission =
   | "contract.manage"
   | "result.withdraw"
   | "rules.manage"
-  | "data.manage";
+  | "data.manage"
+  | "notice.write";
 
 const POLICY: Record<Permission, Role[]> = {
   "company.create": ["admin", "consultant"],
@@ -94,6 +95,8 @@ const POLICY: Record<Permission, Role[]> = {
   "rules.manage": ["admin"],
   // 운영 모드 전환·백업·복원·데모 초기화. 데이터 전체를 바꾸는 일이라 대표만
   "data.manage": ["admin"],
+  // 공지는 여러 고객에게 한 번에 나간다 — 내부 계정만 쓴다
+  "notice.write": ["admin", "consultant"],
 };
 
 export function can(role: Role | undefined | null, p: Permission): boolean {
@@ -117,6 +120,7 @@ export const PERMISSION_ROWS: { label: string; perms: Permission[] }[] = [
   { label: "대표 승인 요청", perms: ["approval.request"] },
   { label: "대표 승인 / 반려", perms: ["approval.decide"] },
   { label: "결과자료 공유", perms: ["result.share"] },
+  { label: "고객 공지 작성 · 수정", perms: ["notice.write"] },
   { label: "문의 작성", perms: ["inquiry.create"] },
   { label: "문의 답변", perms: ["inquiry.answer"] },
   { label: "실증 기준선 · 스프린트", perms: ["baseline.write", "sprint.manage"] },

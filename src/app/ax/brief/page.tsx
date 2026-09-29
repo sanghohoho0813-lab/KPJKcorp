@@ -10,6 +10,7 @@ import { fmtFull, fmtClock } from "@/lib/format";
 import { AiReadyBadge, Badge, Card, KpiCard, PageHeader, SectionTitle, cx } from "@/components/ui/ui";
 import { BriefList } from "@/components/domain/domain";
 import { BriefActionHint } from "@/components/domain/BriefActions";
+import { CeoSummaryCard } from "@/components/domain/CeoSummary";
 
 export default function BriefPage() {
   const st = useStore();
@@ -28,6 +29,7 @@ export default function BriefPage() {
   return (
     <div>
       <PageHeader title={<span className="flex items-center gap-2"><Sparkles size={26} className="text-accent" /> AI 브리핑</span>} desc={`${fmtFull(now)} ${fmtClock(now).slice(0, 5)} 기준 · ${user?.name} ${user?.title}님을 위한 오늘의 업무 브리핑`} actions={<AiReadyBadge onClick={() => openAi({ title: "오늘의 업무 브리핑 — AI 적용 설명", key: "brief" })} />} />
+      <CeoSummaryCard className="mb-5" />
       {/* 모바일: 숫자 타일 7개가 화면을 다 먹지 않게 한 줄 칩으로. 이 화면의 본체는 목록이다. */}
       <div className="mb-4 flex flex-wrap gap-1.5 md:hidden">
         {/* 전부 0이면 0짜리 칩 8개 대신 한 줄 */}

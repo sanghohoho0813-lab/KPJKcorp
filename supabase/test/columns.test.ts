@@ -59,6 +59,10 @@ const full = {
     requestedAt: "x", dueDate: "x", status: "planned" as const, assigneeId: "u1",
     submittedAt: "x", reviewedAt: "x", reviewNote: "r", memo: "m", files: [],
   },
+  notice: {
+    id: "nc_1", companyId: "co_1", title: "t", body: "b", pinned: true,
+    publishedAt: "2026-01-01T00:00:00Z", expiresAt: "2026-02-01T00:00:00Z", authorId: "u1", updatedAt: "x",
+  },
   schedule: {
     id: "sc_1", companyId: "co_1", projectId: "pj_1", title: "t", type: "meeting" as const,
     start: "x", end: "x", location: "l", assigneeId: "u1", visibleToClient: true, memo: "m",
@@ -116,6 +120,7 @@ const CASES: [string, string, Record<string, unknown>][] = [
   ["contracts",         "contract",    M.contractToRow(full.contract)],
   ["document_requests", "docRequest",  M.docRequestToRow(full.docRequest)],
   ["schedules",         "schedule",    M.scheduleToRow(full.schedule)],
+  ["notices",           "notice",      M.noticeToRow(full.notice)],
   ["tasks",             "task",        M.taskToRow(full.task)],
   ["inquiries",         "inquiry",     M.inquiryToRow(full.inquiry)],
   ["results",           "result",      M.resultToRow(full.result)],

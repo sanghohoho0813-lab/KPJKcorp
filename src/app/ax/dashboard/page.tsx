@@ -12,6 +12,7 @@ import { useNow } from "@/lib/hooks";
 import { AiReadyBadge, Card, KpiCard, SectionTitle, Badge, IconTile, cx } from "@/components/ui/ui";
 import { BriefList, ScheduleItem } from "@/components/domain/domain";
 import { FirstRunOrCoach } from "@/components/domain/FirstRun";
+import { CeoSummaryCard, OpsStrip } from "@/components/domain/CeoSummary";
 
 export default function DashboardPage() {
   const st = useStore();
@@ -35,6 +36,7 @@ export default function DashboardPage() {
   // 대표가 막고 있는 것 — 다른 무엇보다 먼저 보여야 팀이 멈추지 않는다.
   const pendingApprovals = st.approvals.filter((a) => a.status === "pending").sort((a, b) => a.requestedAt.localeCompare(b.requestedAt));
   const isAdmin = st.session?.role === "admin";
+  const hasCompanies = st.companies.some((c) => !c.archived);
   const newOpps = st.opportunities.filter((o) => o.status === "interest" && (!assigneeId || o.assigneeId === assigneeId));
 
 
@@ -60,6 +62,9 @@ export default function DashboardPage() {
         <KpiCard label="미답변 문의" value={openInquiries} sub={openInquiries ? "답변 필요" : "모두 답변됨"} href="/ax/tasks?tab=inquiry" tone={openInquiries ? "error" : undefined} icon={<IconTile color="var(--mod-customer)" size={32}><MessageSquare size={16} /></IconTile>} />
         <KpiCard label="지연 프로젝트" value={delayed} sub={delayed ? "대표 확인 필요" : "정상"} href="/ax/projects?filter=delayed" tone={delayed ? "error" : undefined} icon={<IconTile color="var(--mod-alert)" size={32}><AlertTriangle size={16} /></IconTile>} />
       </div>
+
+      {/* 첫 사용(기업 0개)에는 0 만 가득한 현황 대신 '처음 시작하기'에만 집중하게 한다 */}
+      {hasCompanies && <OpsStrip />}
 
       {pendingApprovals.length > 0 && (
         <Card className="border-accent/50 p-5">
@@ -92,6 +97,7 @@ export default function DashboardPage() {
 
       <div className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
         <div className="space-y-6">
+          {hasCompanies && <CeoSummaryCard />}
           <Card id="tut-brief" className="p-5">
             <SectionTitle action={<div className="flex items-center gap-2"><AiReadyBadge onClick={() => openAi({ title: "오늘의 업무 브리핑 — AI 적용 설명", key: "brief" })} /><Link href="/ax/brief" className="link-more">전체 보기 →</Link></div>}>
               <span className="flex items-center gap-2"><Sparkles size={18} className="text-accent" /> 오늘의 업무 브리핑</span>

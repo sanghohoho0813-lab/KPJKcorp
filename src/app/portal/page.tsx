@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowRight, Bell, CalendarDays, FileCheck2, FolderUp, MessageSquare, Briefcase, Sparkles } from "lucide-react";
+import { ArrowRight, Bell, CalendarDays, FileCheck2, FolderUp, MessageSquare, Briefcase, Pin, Sparkles } from "lucide-react";
 import { useStore, usePortalCompanyId, useCurrentUser } from "@/lib/store";
 import { CUSTOMER_STEPS, customerStageMessage, stageProgress, stageToCustomerStep } from "@/lib/stages";
 import { OPP_STATUS, recommendServices } from "@/lib/services";
@@ -11,6 +11,7 @@ import type { DocumentRequest } from "@/lib/types";
 import { Badge, Button, Card, IconTile, Progress, cx } from "@/components/ui/ui";
 import { UploadModal } from "@/components/domain/DocActions";
 import { DocStatusBadge } from "@/components/domain/domain";
+import { NoticeList, liveNoticesFor } from "@/components/domain/Notices";
 
 export default function PortalHome() {
   const st = useStore();
@@ -30,6 +31,8 @@ export default function PortalHome() {
   const todo = docs.filter((d) => d.status === "requested" || d.status === "revision").sort((a, b) => a.dueDate.localeCompare(b.dueDate));
   const next = st.schedules.filter((s) => s.companyId === c.id && s.visibleToClient && s.start >= now).sort((a, b) => a.start.localeCompare(b.start))[0];
   const notifs = st.notifications.filter((n) => n.audience === "client" && n.companyId === c.id).slice(0, 3);
+  // 고정 공지는 진행률보다 먼저 — 담당자가 "꼭 읽어 주세요"라고 표시한 것이다
+  const pinned = liveNoticesFor(st.notices, c.id, now).filter((n) => n.pinned);
   const openIq = st.inquiries.filter((i) => i.companyId === c.id && i.status === "open").length;
   const results = st.results.filter((r) => r.companyId === c.id).length;
   const step = main ? stageToCustomerStep(main.stage) : 0;
@@ -44,6 +47,15 @@ export default function PortalHome() {
 
   return (
     <div className="space-y-5">
+      {pinned.length > 0 && (
+        <Card className="p-4 md:p-5">
+          <div className="mb-2.5 flex items-center justify-between gap-2">
+            <span className="flex items-center gap-2 text-[0.95rem] font-bold"><Pin size={16} className="text-accent" /> 담당자 공지</span>
+            <Link href="/portal/schedule#notices" className="link-more">전체 보기 →</Link>
+          </div>
+          <NoticeList items={pinned} limit={2} compact />
+        </Card>
+      )}
       {/* Hero */}
       <Card className="p-5 md:p-7" id="tut-p-progress">
         <div className="text-[0.9rem] text-ink-2">안녕하세요, <b className="text-ink">{c.name} {displayName}</b>님.</div>

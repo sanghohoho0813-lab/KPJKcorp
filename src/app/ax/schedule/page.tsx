@@ -1,17 +1,27 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { CalendarDays, ChevronLeft, ChevronRight, List, Plus } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { SCHEDULE_TYPE } from "@/lib/stages";
 import { isSameDay, fmtTime } from "@/lib/format";
-import { Badge, Button, Card, PageHeader, SegmentedControl, cx, EmptyState } from "@/components/ui/ui";
+import { Badge, Button, Card, PageHeader, SegmentedControl, Tabs, cx, EmptyState } from "@/components/ui/ui";
+import { NoticeManager } from "@/components/domain/Notices";
 import { ScheduleItem } from "@/components/domain/domain";
 import { NewScheduleModal } from "@/components/domain/CreateModals";
 import { EditScheduleModal, useMay } from "@/components/domain/EntityModals";
 
 export default function SchedulePage() {
+  return <Suspense><ScheduleInner /></Suspense>;
+}
+
+function ScheduleInner() {
   const st = useStore();
+  const params = useSearchParams();
+  const [tab, setTab] = useState<"schedule" | "notice">(params.get("tab") === "notice" ? "notice" : "schedule");
+  const nowIsoTab = new Date().toISOString();
+  const liveNotices = st.notices.filter((n) => n.publishedAt <= nowIsoTab && (!n.expiresAt || n.expiresAt > nowIsoTab)).length;
   const [view, setView] = useState<"list" | "calendar">("list");
   const [cursor, setCursor] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
   const [selected, setSelected] = useState<Date>(new Date());
@@ -46,7 +56,10 @@ export default function SchedulePage() {
 
   return (
     <div>
-      <PageHeader title="일정" desc="상담·미팅·자료 제출기한·내부 마감·후속연락을 하나의 일정에서 관리합니다. 모든 일정은 기업·프로젝트와 연결됩니다." actions={<><SegmentedControl value={view} onChange={setView} options={[{ key: "list", label: <span className="flex items-center gap-1"><List size={14} /> 목록</span> }, { key: "calendar", label: <span className="flex items-center gap-1"><CalendarDays size={14} /> 달력</span> }]} /><Button variant="accent" icon={<Plus size={16} />} onClick={() => setOpen(true)}>일정 등록</Button></>} />
+      <PageHeader title="일정 · 공지" desc="상담·미팅·자료 제출기한·후속연락 일정과, 고객에게 알리는 공지를 관리합니다. 모든 일정은 기업·프로젝트와 연결됩니다." actions={tab === "notice" ? undefined : <><SegmentedControl value={view} onChange={setView} options={[{ key: "list", label: <span className="flex items-center gap-1"><List size={14} /> 목록</span> }, { key: "calendar", label: <span className="flex items-center gap-1"><CalendarDays size={14} /> 달력</span> }]} /><Button variant="accent" icon={<Plus size={16} />} onClick={() => setOpen(true)}>일정 등록</Button></>} />
+      <Tabs tabs={[{ key: "schedule", label: "일정" }, { key: "notice", label: "고객 공지", count: liveNotices }]} value={tab} onChange={setTab} />
+      <div className="mt-5" />
+      {tab === "notice" ? <NoticeManager /> : <>
       <div className="mb-4 flex flex-wrap gap-2">
         {(Object.keys(SCHEDULE_TYPE) as (keyof typeof SCHEDULE_TYPE)[]).map((k) => (
           <span key={k} className="flex items-center gap-1.5 text-[0.78rem] text-ink-2"><span className="h-2.5 w-2.5 rounded-full" style={{ background: SCHEDULE_TYPE[k].color }} />{SCHEDULE_TYPE[k].label}</span>
@@ -97,6 +110,7 @@ export default function SchedulePage() {
           </Card>
         </div>
       )}
+      </>}
       <EditScheduleModal open={!!editId} scheduleId={editId} onClose={() => setEditId(null)} />
       <NewScheduleModal open={open} onClose={() => setOpen(false)} />
     </div>

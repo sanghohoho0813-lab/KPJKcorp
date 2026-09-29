@@ -203,6 +203,26 @@ export interface Schedule {
   memo?: string;
 }
 
+/**
+ * 고객 공지 — 한 기업에게, 또는 모든 기업고객에게.
+ * 일정은 "언제 무엇을"이고 공지는 "알아 두실 것"이다. 휴무·서류 제출 방법·제도 변경 안내처럼
+ * 여러 고객에게 같은 말을 해야 할 때 카톡을 하나씩 보내지 않게 한다.
+ */
+export interface Notice {
+  id: string;
+  /** 비어 있으면 모든 기업고객에게 보인다 */
+  companyId?: string;
+  title: string;
+  body: string;
+  /** 고객 홈 맨 위에 고정 */
+  pinned?: boolean;
+  publishedAt: string;
+  /** 이 날이 지나면 고객 화면에서 내려간다 (선택) */
+  expiresAt?: string;
+  authorId: string;
+  updatedAt?: string;
+}
+
 export interface Task {
   id: string;
   companyId?: string;
@@ -511,7 +531,10 @@ export type ActivityType =
   | "samples_removed"
   | "samples_restored"
   | "company_doc_read"
-  | "baseline_survey_saved";
+  | "baseline_survey_saved"
+  | "notice_published"
+  | "notice_updated"
+  | "notice_removed";
 
 export interface Activity {
   id: string;

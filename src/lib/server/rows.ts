@@ -1,6 +1,6 @@
 import type {
   Activity, Approval, Company, Consultation, Contract, DocumentFile, DocumentRequest,
-  Inquiry, Message, Notification, Opportunity, Project, Quote, ResultFile, Schedule,
+  Inquiry, Message, Notice, Notification, Opportunity, Project, Quote, ResultFile, Schedule,
   SurveyResponse, Task, User,
 } from "../types";
 
@@ -227,6 +227,26 @@ export const docRequestToRow = (x: Partial<DocumentRequest> & { id?: string }): 
   ...(x.reviewNote !== undefined && { review_note: n(x.reviewNote) }),
   ...(x.memo !== undefined && { memo: n(x.memo) }),
   // files 는 이 테이블에 없다 — document_files 로 따로 간다
+});
+
+/* ---------------------------------- 공지 ---------------------------------- */
+
+export const noticeFromRow = (r: Row): Notice => ({
+  id: s(r.id), companyId: u(r.company_id as string | null),
+  title: s(r.title), body: s(r.body), pinned: bool(r.pinned),
+  publishedAt: s(r.published_at), expiresAt: u(r.expires_at as string | null),
+  authorId: s(r.author_id), updatedAt: u(r.updated_at as string | null),
+});
+
+export const noticeToRow = (x: Partial<Notice> & { id?: string }): Row => ({
+  ...(x.id !== undefined && { id: x.id }),
+  ...(x.companyId !== undefined && { company_id: n(x.companyId) }),
+  ...(x.title !== undefined && { title: x.title }),
+  ...(x.body !== undefined && { body: x.body }),
+  ...(x.pinned !== undefined && { pinned: x.pinned }),
+  ...(x.publishedAt !== undefined && { published_at: x.publishedAt }),
+  ...(x.expiresAt !== undefined && { expires_at: n(x.expiresAt) }),
+  ...(x.authorId !== undefined && { author_id: x.authorId || null }),
 });
 
 /* ---------------------------------- 일정 ---------------------------------- */
