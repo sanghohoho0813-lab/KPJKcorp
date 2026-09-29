@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { Suspense, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Building2, ChevronRight, LayoutGrid, List, Plus } from "lucide-react";
+import { Building2, ChevronRight, FileSpreadsheet, LayoutGrid, List, Plus } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { daysBetween, fmtDate, fmtRelative } from "@/lib/format";
 import { stageLabel } from "@/lib/stages";
 import { PageHeader, Badge, Button, SegmentedControl, EmptyState, Card } from "@/components/ui/ui";
 import { CompanyModal, useMay } from "@/components/domain/EntityModals";
+import { CompanyImportModal } from "@/components/domain/CompanyImport";
 import { SearchBox, StageBadge, StageProgressBar } from "@/components/domain/domain";
 import { RestoreSamplesButton, SampleBanner } from "@/components/domain/SampleData";
 import { CONSULT_AREA_LABEL, companySummary } from "@/lib/company-options";
@@ -22,6 +23,7 @@ function ClientsInner() {
   const [filter, setFilter] = useState<"all" | "mine" | "issue" | "archived">("all");
   // 대시보드 "처음 시작하기"에서 오면 등록 창이 바로 열린다
   const [newOpen, setNewOpen] = useState(params.get("new") === "1");
+  const [importOpen, setImportOpen] = useState(params.get("import") === "1");
   const may = useMay();
   const now = new Date().toISOString();
   const me = st.session?.userId;
@@ -53,6 +55,7 @@ function ClientsInner() {
           <SegmentedControl value={view} onChange={setView} options={[{ key: "card", label: <span className="flex items-center gap-1"><LayoutGrid size={14} /> 카드</span> }, { key: "table", label: <span className="flex items-center gap-1"><List size={14} /> 목록</span> }]} />
           {/* 비어 있을 때는 빈 상태 카드 안의 버튼 하나만 둔다 — 같은 버튼이 두 개면 어느 쪽을 눌러야 할지 고민하게 된다 */}
           {totalActive > 0 && <RestoreSamplesButton />}
+          {may("company.create") && totalActive > 0 && <Button variant="outline" icon={<FileSpreadsheet size={16} />} onClick={() => setImportOpen(true)}>엑셀로 등록</Button>}
           {may("company.create") && <Button variant="accent" icon={<Plus size={16} />} onClick={() => setNewOpen(true)}>기업고객 등록</Button>}
         </div>
       } />
@@ -67,7 +70,7 @@ function ClientsInner() {
           {/* "없다"에도 세 가지가 있다 — 아직 하나도 없음 / 보관함이 빔 / 조건에 안 맞음. 첫 번째만 다음 행동을 붙인다. */}
           {totalActive === 0 && filter !== "archived" ? (
             <EmptyState icon={<Building2 size={32} />} title="아직 등록된 기업고객이 없습니다" desc="첫 기업고객을 등록하면 상담·프로젝트·자료·일정·문의가 이 기업 아래로 연결됩니다. 사업자등록증을 올리면 기본 정보가 자동으로 채워집니다."
-              action={<div className="flex flex-wrap justify-center gap-2">{may("company.create") && <Button variant="accent" icon={<Plus size={16} />} onClick={() => setNewOpen(true)}>첫 기업고객 등록</Button>}<RestoreSamplesButton /></div>} />
+              action={<div className="flex flex-wrap justify-center gap-2">{may("company.create") && <Button variant="accent" icon={<Plus size={16} />} onClick={() => setNewOpen(true)}>첫 기업고객 등록</Button>}{may("company.create") && <Button variant="outline" icon={<FileSpreadsheet size={16} />} onClick={() => setImportOpen(true)}>쓰던 명단 엑셀로 올리기</Button>}<RestoreSamplesButton /></div>} />
           ) : filter === "archived" ? (
             <EmptyState icon={<Building2 size={32} />} title="보관된 기업이 없습니다" desc="기업 상세에서 보관하면 목록에서 빠지고 여기에 모입니다." />
           ) : (
@@ -153,6 +156,7 @@ function ClientsInner() {
         </>
       )}
       <CompanyModal open={newOpen} onClose={() => setNewOpen(false)} onCreated={(id) => router.push(`/ax/clients/${id}`)} />
+      <CompanyImportModal open={importOpen} onClose={() => setImportOpen(false)} onDone={() => { setFilter("all"); setQ(""); }} />
     </div>
   );
 }

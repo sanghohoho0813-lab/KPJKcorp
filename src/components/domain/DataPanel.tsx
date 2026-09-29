@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Cloud, CloudOff, Download, ShieldCheck, Upload, Building2, Users } from "lucide-react";
+import { Cloud, CloudOff, Download, FileSpreadsheet, ShieldCheck, Upload, Building2, Users } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useNow } from "@/lib/hooks";
 import { can } from "@/lib/permissions";
@@ -11,6 +11,9 @@ import { Badge, Button, Field, Input, cx } from "@/components/ui/ui";
 import { Confirm, Modal } from "@/components/ui/overlay";
 import { serverConfigured } from "@/lib/server/client";
 import { SamplePanel } from "./SampleData";
+import { CompanyImportModal, downloadCompanyTemplate } from "./CompanyImport";
+import { buildExportSheets, exportFileName } from "@/lib/export-workbook";
+import { buildXlsx, downloadBytes } from "@/lib/xlsx";
 
 /**
  * 실사용 안전장치 — 서버가 붙기 전까지 실제 데이터를 넣기 시작했을 때 지켜주는 세 가지.
@@ -122,6 +125,8 @@ export function DataPanel() {
         {!manage && <p className="mt-2 text-[0.78rem] text-ink-3">백업과 복원은 대표 계정에서만 가능합니다.</p>}
       </div>
 
+      <ExcelPanel />
+
       <SamplePanel />
 
       {/* 회사 정보 (인쇄용) */}
@@ -163,6 +168,50 @@ export function DataPanel() {
       />
 
       <OrgModal open={orgOpen} onClose={() => setOrgOpen(false)} onSave={(o) => { setOrg(o, me); toast("회사 정보를 저장했습니다."); setOrgOpen(false); }} initial={st.settings.org} />
+    </div>
+  );
+}
+
+/**
+ * 엑셀 — 사람이 열어 보는 파일. 백업(JSON)과 역할이 다르다.
+ * 내보내기는 대표만(개인정보가 한 파일에 다 들어가므로), 가져오기는 기업고객을 등록할 수 있는 사람 모두.
+ */
+function ExcelPanel() {
+  const st = useStore();
+  const logDataExport = useStore((s) => s.logDataExport);
+  const toast = useStore((s) => s.toast);
+  const me = st.session?.userId ?? "";
+  const role = st.session?.role;
+  const [importOpen, setImportOpen] = useState(false);
+  if (!can(role, "company.create") && !can(role, "data.manage")) return null;
+
+  const exportAll = () => {
+    const now = new Date();
+    const sheets = buildExportSheets({
+      companies: st.companies, projects: st.projects, consultations: st.consultations, contracts: st.contracts, docRequests: st.docRequests,
+      schedules: st.schedules, tasks: st.tasks, inquiries: st.inquiries, notices: st.notices, activities: st.activities, users: st.users,
+      orgName: st.settings.org?.name, exportedBy: st.users.find((u) => u.id === me)?.name ?? me, now,
+    });
+    const summary = `기업 ${st.companies.length} · 프로젝트 ${st.projects.length} · 기록 ${st.activities.length}건`;
+    // 권한 확인과 기록을 먼저 — 거절되면 파일을 만들지 않는다
+    if (!logDataExport(me, summary)) { toast("전체 데이터를 내보낼 권한이 없습니다.", "error"); return; }
+    downloadBytes(buildXlsx(sheets), exportFileName(now));
+    toast("엑셀 파일을 내려받았습니다. 개인정보가 들어 있으니 보관에 주의해 주세요.");
+  };
+
+  return (
+    <div className="rounded-xl border border-line p-4" id="excel-panel">
+      <span className="flex items-center gap-2 font-bold"><FileSpreadsheet size={16} className="text-ink-3" /> 엑셀</span>
+      <p className="mt-1 text-[0.85rem] leading-relaxed text-ink-2">
+        쓰시던 고객 명단을 한 번에 올리거나, 지금까지의 데이터를 엑셀로 받아 보고서·회의 자료로 씁니다. 되살리기용 파일은 위의 백업(JSON)입니다.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {can(role, "company.create") && <Button size="sm" variant="accent" icon={<Upload size={14} />} onClick={() => setImportOpen(true)}>기업고객 엑셀로 등록</Button>}
+        {can(role, "company.create") && <Button size="sm" variant="ghost" icon={<Download size={14} />} onClick={downloadCompanyTemplate}>등록 양식</Button>}
+        {can(role, "data.manage") && <Button size="sm" variant="outline" icon={<Download size={14} />} onClick={exportAll}>전체 데이터 엑셀로 받기</Button>}
+      </div>
+      {can(role, "data.manage") && <p className="mt-2 text-[0.78rem] text-ink-3">기업고객·프로젝트·상담·계약·요청자료·일정·업무·문의·공지·처리 기록 10개 시트. 내보낸 사실은 처리 기록에 남습니다.</p>}
+      <CompanyImportModal open={importOpen} onClose={() => setImportOpen(false)} />
     </div>
   );
 }

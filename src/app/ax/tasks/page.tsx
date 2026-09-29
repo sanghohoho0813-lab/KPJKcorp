@@ -97,7 +97,7 @@ function TasksInner() {
                     <div className="flex flex-wrap items-center gap-2">
                       <PriorityBadge priority={t.priority} />
                       <span className={cx("font-semibold", isDone && "line-through")}>{t.title}</span>
-                      {t.ruleKey ? <Badge tone="info" >규칙 · {ruleOfTask(t.ruleKey)?.label.split(" ")[0] ?? "자동"}</Badge> : t.source === "auto" && <Badge tone="info">자동</Badge>}
+                      {t.ruleKey ? <Badge tone="info" >규칙 · {ruleOfTask(t.ruleKey)?.short ?? "자동"}</Badge> : t.source === "auto" && <Badge tone="info">자동</Badge>}
                     </div>
                     <div className="mt-0.5 flex flex-wrap gap-x-2 text-[0.8rem] text-ink-3">
                       <span>{t.type}</span>

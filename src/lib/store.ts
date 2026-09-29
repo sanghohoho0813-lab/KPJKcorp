@@ -37,6 +37,7 @@ import type {
 } from "./types";
 import { nowIso, uid, addDays, iso, daysBetween } from "./format";
 import { stageLabel } from "./stages";
+import { RULE_BY_KEY, ruleDays, ruleOn } from "./rules";
 import { OPP_STATUS, SERVICE_BY_KEY } from "./services";
 import { can, type Permission } from "./permissions";
 import { toLegacyBaseline } from "./baseline-survey";
@@ -112,6 +113,8 @@ export interface StoreState extends SeedData {
   /** 규칙을 훑어 아직 없는 업무를 만든다. 멱등 — ruleKey 가 같으면 다시 만들지 않는다. 만든 개수를 돌려준다 */
   syncRuleTasks: () => number;
   setAutoRule: (key: string, enabled: boolean) => void;
+  /** 규칙 기준일 변경 — 고를 수 있는 값(rules.ts options)만 받는다 */
+  setAutoRuleDays: (key: string, days: number) => void;
 
   // ---- 실사용 안전장치 ----
   /** 운영 모드 — 자동 초기화 중지, 데모 안내 숨김, 데모 초기화 잠금 */
@@ -164,6 +167,10 @@ export interface StoreState extends SeedData {
   /** 브리핑 추천을 실제로 실행했을 때 — "추천 후 실행" 건수의 근거가 된다. */
   logAiAction: (label: string, ctx: { companyId?: string; kind: string }, byUserId: string) => void;
   logEvidenceExport: (byUserId: string, rows: number) => void;
+  /** 기업고객 여러 곳을 한 번에 등록 (엑셀·CSV). 검사는 화면(company-import)에서 끝난 행만 받는다. 등록한 수를 돌려준다 */
+  importCompanies: (rows: Omit<Company, "id" | "code">[], byUserId: string, source: string) => number;
+  /** 전체 데이터 엑셀 내보내기 — 권한 확인 후 기록을 남긴다. 거절되면 false */
+  logDataExport: (byUserId: string, summary: string) => boolean;
 
   // 견적 (상담 → 견적 → 계약)
   createQuote: (data: { companyId: string; projectId?: string; opportunityId?: string; title: string; scope: string; period: string; items: QuoteItem[]; discountPct: number; validUntil: string }, byUserId: string) => void;
@@ -802,7 +809,9 @@ export const useStore = create<StoreState>()(
       // 앱을 열 때와 10분마다 훑어서 아직 없는 업무를 만든다. ruleKey 로 멱등을 보장한다.
       syncRuleTasks: () => {
         const st = get();
-        const on = (k: string) => st.settings.autoRules?.[k] !== false;
+        const on = (k: string) => ruleOn(st.settings.autoRules, k);
+        const N = (k: string) => ruleDays(st.settings.autoRules, k);
+        const lbl = (k: string) => RULE_BY_KEY[k].label(N(k));
         const has = (key: string) => st.tasks.some((t) => t.ruleKey === key);
         const now = new Date();
         const nowIsoStr = now.toISOString();
@@ -816,64 +825,69 @@ export const useStore = create<StoreState>()(
           acts.push(makeActivity({ type: "rule_task_created", companyId: t.companyId, projectId: t.projectId, actorId: "system", actorRole: "system", text: `규칙 생성 (${ruleLabel}): ${t.title}`, meta: { ruleKey: t.ruleKey ?? "" } }));
         };
 
-        // 1) 계약 만료 30일 전 → 갱신 협의
+        // 1) 계약 만료 N일 전(기본 30) → 갱신 협의
         if (on("contract_renewal")) {
+          const n = N("contract_renewal");
           for (const ct of st.contracts) {
             if (ct.status !== "signed" || !ct.endDate) continue;
             const c = liveCompany(ct.companyId); if (!c) continue;
             const d = daysBetween(nowIsoStr, ct.endDate);
-            if (d < 0 || d > 30) continue;
+            if (d < 0 || d > n) continue;
             const key = `contract_renewal:${ct.id}`;
             if (has(key)) continue;
-            push({ companyId: ct.companyId, projectId: ct.projectId, title: `${c.name} 계약 만료 D-${d} — 갱신 협의`, type: "후속연락", dueDate: iso(addDays(now, Math.max(1, Math.min(7, d - 7)), 18)), assigneeId: c.consultantId, priority: d <= 14 ? "urgent" : "normal", ruleKey: key, memo: `계약 종료일 ${ct.endDate.slice(0, 10)}. 갱신 여부와 조건을 미리 확인합니다.` }, "계약 만료 30일 전");
+            push({ companyId: ct.companyId, projectId: ct.projectId, title: `${c.name} 계약 만료 D-${d} — 갱신 협의`, type: "후속연락", dueDate: iso(addDays(now, Math.max(1, Math.min(7, d - 7)), 18)), assigneeId: c.consultantId, priority: d <= 14 ? "urgent" : "normal", ruleKey: key, memo: `계약 종료일 ${ct.endDate.slice(0, 10)}. 갱신 여부와 조건을 미리 확인합니다.` }, lbl("contract_renewal"));
           }
         }
-        // 2) 사후관리 90일 경과 → 종료 점검
+        // 2) 사후관리 N일(기본 90) 경과 → 종료 점검
         if (on("aftercare_review")) {
+          const n = N("aftercare_review");
           for (const p of st.projects) {
             if (p.stage !== "aftercare" || p.archived) continue;
             const c = liveCompany(p.companyId); if (!c) continue;
             const d = daysBetween(p.stageChangedAt, nowIsoStr);
-            if (d < 90) continue;
+            if (d < n) continue;
             const key = `aftercare_review:${p.id}`;
             if (has(key)) continue;
-            push({ companyId: p.companyId, projectId: p.id, title: `${c.name} ${p.name} 사후관리 ${d}일 — 종료 점검`, type: "후속연락", dueDate: iso(addDays(now, 5, 18)), assigneeId: p.consultantId, priority: "normal", ruleKey: key, memo: "사후관리를 마무리할지, 추가 컨설팅으로 이을지 대표와 정리합니다." }, "사후관리 90일 경과");
+            push({ companyId: p.companyId, projectId: p.id, title: `${c.name} ${p.name} 사후관리 ${d}일 — 종료 점검`, type: "후속연락", dueDate: iso(addDays(now, 5, 18)), assigneeId: p.consultantId, priority: "normal", ruleKey: key, memo: "사후관리를 마무리할지, 추가 컨설팅으로 이을지 대표와 정리합니다." }, lbl("aftercare_review"));
           }
         }
-        // 3) 결과자료 공유 후 7일 미열람 → 확인 안내
+        // 3) 결과자료 공유 후 N일(기본 7) 미열람 → 확인 안내
         if (on("result_unread")) {
+          const n = N("result_unread");
           for (const r of st.results) {
             const c = liveCompany(r.companyId); if (!c) continue;
-            if (daysBetween(r.sharedAt, nowIsoStr) < 7) continue;
+            if (daysBetween(r.sharedAt, nowIsoStr) < n) continue;
             const viewed = st.activities.some((a) => a.type === "result_downloaded" && a.companyId === r.companyId && a.text.includes(r.name) && a.at >= r.sharedAt);
             if (viewed) continue;
             const key = `result_unread:${r.id}`;
             if (has(key)) continue;
-            push({ companyId: r.companyId, projectId: r.projectId, title: `${c.name} 결과자료 미열람 7일 — 확인 안내`, type: "후속연락", dueDate: iso(addDays(now, 2, 18)), assigneeId: c.consultantId, priority: "normal", ruleKey: key, memo: `${r.name}을(를) 고객이 아직 열지 않았습니다. 전달됐는지 확인합니다.` }, "결과자료 7일 미열람");
+            push({ companyId: r.companyId, projectId: r.projectId, title: `${c.name} 결과자료 미열람 ${n}일 — 확인 안내`, type: "후속연락", dueDate: iso(addDays(now, 2, 18)), assigneeId: c.consultantId, priority: "normal", ruleKey: key, memo: `${r.name}을(를) 고객이 아직 열지 않았습니다. 전달됐는지 확인합니다.` }, lbl("result_unread"));
           }
         }
-        // 4) 발송 견적 유효기간 D-3 무회신 → 연장 협의
+        // 4) 발송 견적 유효기간 D-N(기본 3) 무회신 → 연장 협의
         if (on("quote_expiring")) {
+          const n = N("quote_expiring");
           for (const q of st.quotes) {
             if (q.status !== "sent") continue;
             const c = liveCompany(q.companyId); if (!c) continue;
             const d = daysBetween(nowIsoStr, q.validUntil);
-            if (d < 0 || d > 3) continue;
+            if (d < 0 || d > n) continue;
             const key = `quote_expiring:${q.id}`;
             if (has(key)) continue;
-            push({ companyId: q.companyId, projectId: q.projectId, title: `${c.name} 견적 유효기간 D-${d} — 회신·연장 확인`, type: "후속연락", dueDate: iso(addDays(now, 1, 18)), assigneeId: c.consultantId, priority: "urgent", ruleKey: key, memo: `${q.title} 유효기간 ${q.validUntil.slice(0, 10)}. 회신을 받거나 기간을 연장합니다.` }, "견적 유효기간 D-3");
+            push({ companyId: q.companyId, projectId: q.projectId, title: `${c.name} 견적 유효기간 D-${d} — 회신·연장 확인`, type: "후속연락", dueDate: iso(addDays(now, 1, 18)), assigneeId: c.consultantId, priority: "urgent", ruleKey: key, memo: `${q.title} 유효기간 ${q.validUntil.slice(0, 10)}. 회신을 받거나 기간을 연장합니다.` }, lbl("quote_expiring"));
           }
         }
-        // 5) 자료 미제출 기한 초과 3일 → 독촉 (브리핑엔 있지만 업무함엔 없던 것)
+        // 5) 자료 미제출 기한 초과 N일(기본 3) → 독촉 (브리핑엔 있지만 업무함엔 없던 것)
         if (on("doc_overdue_followup")) {
+          const n = N("doc_overdue_followup");
           for (const d of st.docRequests) {
             if (d.status !== "requested" && d.status !== "revision") continue;
             const c = liveCompany(d.companyId); if (!c || !liveProject(d.projectId)) continue;
             const over = daysBetween(d.dueDate, nowIsoStr);
-            if (over < 3) continue;
+            if (over < n) continue;
             const key = `doc_overdue_followup:${d.id}`;
             if (has(key)) continue;
-            push({ companyId: d.companyId, projectId: d.projectId, title: `${c.name} ${d.name} 기한 ${over}일 초과 — 독촉`, type: "후속연락", dueDate: iso(addDays(now, 1, 18)), assigneeId: d.assigneeId, priority: "urgent", ruleKey: key, memo: "미제출 사유를 확인하고 필요하면 기한을 조정합니다." }, "자료 기한 3일 초과");
+            push({ companyId: d.companyId, projectId: d.projectId, title: `${c.name} ${d.name} 기한 ${over}일 초과 — 독촉`, type: "후속연락", dueDate: iso(addDays(now, 1, 18)), assigneeId: d.assigneeId, priority: "urgent", ruleKey: key, memo: "미제출 사유를 확인하고 필요하면 기한을 조정합니다." }, lbl("doc_overdue_followup"));
           }
         }
 
@@ -885,7 +899,24 @@ export const useStore = create<StoreState>()(
       setAutoRule: (key, enabled) => {
         const st = get();
         if (deny(st, "rules.manage", `자동 업무 규칙 ${enabled ? "켜기" : "끄기"} (${key})`, set)) return;
-        set({ settings: { ...st.settings, autoRules: { ...(st.settings.autoRules ?? {}), [key]: enabled } } });
+        const def = RULE_BY_KEY[key];
+        set({
+          settings: { ...st.settings, autoRules: { ...(st.settings.autoRules ?? {}), [key]: enabled } },
+          activities: [makeActivity({ type: "rule_changed", actorId: st.session?.userId ?? "", actorRole: st.session?.role ?? "admin", text: `자동 규칙 ${enabled ? "켬" : "끔"}: ${def ? def.label(ruleDays(st.settings.autoRules, key)) : key}` }), ...st.activities],
+        });
+      },
+
+      setAutoRuleDays: (key, days) => {
+        const st = get();
+        const def = RULE_BY_KEY[key];
+        if (!def || !def.days.options.includes(days)) return;
+        if (deny(st, "rules.manage", `자동 업무 규칙 기준일 변경 (${key})`, set)) return;
+        const before = ruleDays(st.settings.autoRules, key);
+        if (before === days) return;
+        set({
+          settings: { ...st.settings, autoRules: { ...(st.settings.autoRules ?? {}), [`${key}.days`]: days } },
+          activities: [makeActivity({ type: "rule_changed", actorId: st.session?.userId ?? "", actorRole: st.session?.role ?? "admin", text: `자동 규칙 기준 변경: ${def.label(before)} → ${def.label(days)}`, meta: { key, before, after: days } }), ...st.activities],
+        });
       },
 
       // ---------- 실사용 안전장치 ----------
@@ -1553,6 +1584,44 @@ export const useStore = create<StoreState>()(
           activities: [makeActivity({ type: "ai_action_taken", companyId: c.companyId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `AI 추천 실행: ${label}`, meta: { kind: c.kind } }), ...st.activities],
         });
       },
+      importCompanies: (rows, byUserId, source) => {
+        const st = get();
+        if (deny(st, "company.create", `기업고객 일괄 등록 (${rows.length}곳)`, set)) return 0;
+        // 화면 검사 뒤에 다른 사람이 같은 기업을 넣었을 수도 있다 — 마지막으로 한 번 더 거른다
+        const norm = (n: string) => n.toLowerCase().replace(/\(주\)|㈜|주식회사|\(유\)|유한회사|\s/g, "");
+        const names = new Set(st.companies.map((c) => norm(c.name)));
+        const bizs = new Set(st.companies.map((c) => c.bizNo.replace(/\D/g, "")).filter((b) => b.length === 10));
+        const codes = st.companies.map((c) => c.code);
+        const added: Company[] = [];
+        for (const r of rows) {
+          const n = norm(r.name);
+          const b = r.bizNo.replace(/\D/g, "");
+          if (!r.name.trim() || !r.ceo.trim() || names.has(n) || (b.length === 10 && bizs.has(b))) continue;
+          names.add(n);
+          if (b.length === 10) bizs.add(b);
+          const code = nextCompanyCode(codes);
+          codes.push(code);
+          added.push({ ...r, id: uid("co"), code, sample: undefined });
+        }
+        if (!added.length) return 0;
+        const role = st.session?.role ?? "consultant";
+        const at = nowIso();
+        // 기업마다 등록 기록을 남긴다 — 기업 상세의 활동 이력이 "언제 어떻게 들어왔는지"로 시작하도록
+        const each = added.map((c) => ({ ...makeActivity({ type: "company_created", companyId: c.id, actorId: byUserId, actorRole: role, text: `기업고객 등록(일괄): ${c.name}`, meta: { via: "import" } }), at }));
+        const summary = makeActivity({ type: "companies_imported", actorId: byUserId, actorRole: role, text: `기업고객 일괄 등록: ${added.length}곳 (${source})`, meta: { count: added.length, source } });
+        set({ companies: [...st.companies, ...added], activities: [summary, ...each, ...st.activities] });
+        return added.length;
+      },
+
+      logDataExport: (byUserId, summary) => {
+        const st = get();
+        if (deny(st, "data.manage", "전체 데이터 엑셀 내보내기", set)) return false;
+        set({
+          activities: [makeActivity({ type: "data_exported", actorId: byUserId, actorRole: st.session?.role ?? "admin", text: `전체 데이터 엑셀 내보내기 (${summary})` }), ...st.activities],
+        });
+        return true;
+      },
+
       logEvidenceExport: (byUserId, rows) => {
         const st = get();
         set({

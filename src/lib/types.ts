@@ -523,8 +523,11 @@ export type ActivityType =
   | "contract_updated"
   | "result_withdrawn"
   | "rule_task_created"
+  | "rule_changed"
   | "live_mode_changed"
   | "backup_exported"
+  | "companies_imported"
+  | "data_exported"
   | "backup_imported"
   | "org_updated"
   | "demo_reset"
@@ -598,8 +601,8 @@ export interface Settings {
   baselineSurveys?: BaselineSurveyResponse[];
   tutorialDonePortal: boolean;
   timezone: string;
-  /** 시간 규칙 켜기/끄기. 키가 없으면 켜진 것으로 본다 */
-  autoRules?: Record<string, boolean>;
+  /** 시간 규칙 켜기/끄기(규칙키 → boolean, 없으면 켜짐)와 기준일(규칙키.days → 숫자). rules.ts 참고 */
+  autoRules?: Record<string, boolean | number>;
   /**
    * 운영 모드 — 켜면 20시간 자동 초기화가 멈추고, 데모 계정 안내가 사라지며, 데모 초기화가 잠긴다.
    * 서버가 붙기 전까지 실제 데이터를 넣기 시작할 때의 유일한 보호막이다.

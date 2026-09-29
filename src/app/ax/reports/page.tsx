@@ -1,24 +1,32 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { BarChart3, Download, Printer } from "lucide-react";
+import { Suspense, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { BarChart3, Printer } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { daysBetween, fmtDateTime } from "@/lib/format";
+import { daysBetween } from "@/lib/format";
 import { INTERNAL_STAGES } from "@/lib/stages";
-import { Badge, Button, Card, DemoBadge, PageHeader, SectionTitle, Tabs, cx } from "@/components/ui/ui";
-import { ActivityFeed } from "@/components/domain/domain";
+import { Badge, Card, DemoBadge, PageHeader, SectionTitle, Tabs, cx } from "@/components/ui/ui";
+import { EvidenceExplorer } from "@/components/domain/EvidenceExplorer";
 import { AreaBar, WhyEvidence, useSprint } from "@/components/domain/Coach";
 import { BaselineCard, RecallCompareCard } from "@/components/domain/BaselineCard";
 import { coverageOf } from "@/lib/evidence";
 import Link from "next/link";
 import { ArrowRight, Compass } from "lucide-react";
 
+type ReportTab = "sprint" | "kpi" | "ops" | "evidence";
+const REPORT_TABS: ReportTab[] = ["sprint", "kpi", "ops", "evidence"];
+
 export default function ReportsPage() {
+  // ?tab=evidence 로 바로 열 수 있게 (대표자 요약의 "지난 7일 처리" 줄이 여기로 온다)
+  return <Suspense><ReportsInner /></Suspense>;
+}
+
+function ReportsInner() {
+  const params = useSearchParams();
+  const initialTab = params.get("tab") as ReportTab | null;
   const st = useStore();
-  const toast = useStore((s) => s.toast);
-  const logExport = useStore((s) => s.logEvidenceExport);
-  const me = useStore((s) => s.session?.userId) ?? "u_admin";
-  const [tab, setTab] = useState<"sprint" | "kpi" | "ops" | "evidence">("sprint");
+  const [tab, setTab] = useState<ReportTab>(initialTab && REPORT_TABS.includes(initialTab) ? initialTab : "sprint");
   const sprint = useSprint();
   const now = new Date().toISOString();
 
@@ -82,18 +90,6 @@ export default function ReportsPage() {
     };
   }, [st, now]);
 
-  const exportCsv = () => {
-    const rows = [["at", "type", "company", "project", "actor", "role", "text"], ...st.activities.map((a) => [a.at, a.type, st.companies.find((c) => c.id === a.companyId)?.name ?? "", st.projects.find((p) => p.id === a.projectId)?.name ?? "", st.users.find((u) => u.id === a.actorId)?.name ?? a.actorId, a.actorRole, a.text])];
-    const csv = rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
-    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = `kpjk_evidence_${now.slice(0, 10)}.csv`; a.click();
-    URL.revokeObjectURL(url);
-    logExport(me, st.activities.length);
-    toast("Evidence Log CSV를 내려받았습니다.");
-  };
-
   interface Metric { name: string; point: string; value: string; baseline?: string }
   const axes: { key: string; title: string; desc: string; items: Metric[] }[] = [
     {
@@ -155,7 +151,7 @@ export default function ReportsPage() {
 
   return (
     <div>
-      <PageHeader title="리포트 · 실증" desc="KPI 측정지점과 Evidence Log입니다. 실제 Baseline이 없는 숫자는 개선율로 표시하지 않습니다." badge={<DemoBadge />} actions={<><Button variant="outline" icon={<Download size={16} />} onClick={exportCsv}>Evidence CSV</Button><Link href="/print/evidence" className="pressable lift inline-flex h-11 items-center gap-2 rounded-[var(--radius-btn)] bg-accent px-4 text-[0.9rem] font-semibold text-accent-ink"><Printer size={16} /> 실증 리포트 인쇄 · PDF</Link></>} />
+      <PageHeader title="리포트 · 실증" desc="KPI 측정지점과 Evidence Log입니다. 실제 Baseline이 없는 숫자는 개선율로 표시하지 않습니다." badge={<DemoBadge />} actions={<><Link href="/print/evidence" className="pressable lift inline-flex h-11 items-center gap-2 rounded-[var(--radius-btn)] bg-accent px-4 text-[0.9rem] font-semibold text-accent-ink"><Printer size={16} /> 실증 리포트 인쇄 · PDF</Link></>} />
       <Tabs tabs={[{ key: "kpi", label: "KPI 측정지점" }, { key: "ops", label: "운영 현황" }, { key: "evidence", label: "Evidence Log", count: st.activities.length }]} value={tab} onChange={setTab} />
       <div className="mt-5">
         {tab === "sprint" && (
@@ -286,8 +282,8 @@ export default function ReportsPage() {
         )}
         {tab === "evidence" && (
           <Card className="p-5">
-            <div className="mb-3 text-[0.85rem] text-ink-2">Evidence Pack 구조: Baseline → Trigger → Recommendation → Human Approval → Action → Result → KPI Delta → Provenance → User/Time Log. 모든 Event는 Append-only로 기록됩니다. 마지막 기록: {st.activities[0] ? fmtDateTime(st.activities[0].at) : "-"}</div>
-            <ActivityFeed items={st.activities} showCompany />
+            <div className="mb-4 hidden text-[0.85rem] text-ink-2 md:block">Evidence Pack 구조: Baseline → Trigger → Recommendation → Human Approval → Action → Result → KPI Delta → Provenance → User/Time Log.</div>
+            <EvidenceExplorer />
           </Card>
         )}
       </div>

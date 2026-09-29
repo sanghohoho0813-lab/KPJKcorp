@@ -71,7 +71,7 @@ export interface ServerSettings {
   baseline?: StoreState["settings"]["baseline"];
   baselineSurveys?: StoreState["settings"]["baselineSurveys"];
   sprintStartedAt?: string;
-  autoRules?: Record<string, boolean>;
+  autoRules?: Record<string, boolean | number>;
   consultantScope: "all" | "own";
 }
 
@@ -135,7 +135,7 @@ export async function loadAll(): Promise<LoadResult> {
         baseline: (st?.baseline ?? undefined) as StoreState["settings"]["baseline"],
         baselineSurveys: (st?.baseline_surveys ?? undefined) as StoreState["settings"]["baselineSurveys"],
         sprintStartedAt: (st?.sprint_started_at ?? undefined) as string | undefined,
-        autoRules: (st?.auto_rules ?? undefined) as Record<string, boolean> | undefined,
+        autoRules: (st?.auto_rules ?? undefined) as Record<string, boolean | number> | undefined,
         consultantScope: (st?.consultant_scope ?? "all") as "all" | "own",
       },
     };
