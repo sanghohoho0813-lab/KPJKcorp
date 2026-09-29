@@ -24,6 +24,9 @@ export function supa(): SupabaseClient | null {
   return cached;
 }
 
+/** 연결 점검용 — anon 키는 원래 브라우저에 나가는 값이다. 화면에 표시하지는 않는다 */
+export const serverEnv = () => ({ url, key: anonKey });
+
 /** 서버 연결이 설정돼 있는가 (로그인 여부와 무관) */
 export const serverConfigured = () => !!(url && anonKey);
 

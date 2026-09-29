@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Cloud, CloudOff, Download, FileSpreadsheet, ShieldCheck, Upload, Building2, Users } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ClipboardCopy, Cloud, CloudOff, Download, FileSpreadsheet, MinusCircle, ShieldCheck, Stethoscope, Upload, Building2, Users, XCircle } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useNow } from "@/lib/hooks";
 import { can } from "@/lib/permissions";
@@ -9,7 +9,8 @@ import { fmtDateTime } from "@/lib/format";
 import type { OrgInfo } from "@/lib/types";
 import { Badge, Button, Field, Input, cx } from "@/components/ui/ui";
 import { Confirm, Modal } from "@/components/ui/overlay";
-import { serverConfigured } from "@/lib/server/client";
+import { serverConfigured, serverEnv, supa } from "@/lib/server/client";
+import { checkReport, runServerCheck, type CheckItem, type HealthClient } from "@/lib/server/health";
 import { SamplePanel } from "./SampleData";
 import { CompanyImportModal, downloadCompanyTemplate } from "./CompanyImport";
 import { buildExportSheets, exportFileName } from "@/lib/export-workbook";
@@ -216,6 +217,72 @@ function ExcelPanel() {
   );
 }
 
+const CHECK_ICON = {
+  ok: <CheckCircle2 size={17} className="shrink-0 text-success" />,
+  warn: <AlertTriangle size={17} className="shrink-0 text-warning" />,
+  fail: <XCircle size={17} className="shrink-0 text-error" />,
+  skip: <MinusCircle size={17} className="shrink-0 text-ink-3" />,
+};
+
+/**
+ * 서버 연결 점검 — 연결 첫날 "왜 안 되지?"를 화면에서 바로 답한다. 읽기만 하고 아무것도 바꾸지 않는다.
+ * 결과는 복사해서 담당자에게 그대로 보낼 수 있다(키 값은 넣지 않는다).
+ */
+function ServerCheck() {
+  const toast = useStore((s) => s.toast);
+  const [items, setItems] = useState<CheckItem[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [at, setAt] = useState<Date | null>(null);
+
+  const run = async () => {
+    setBusy(true);
+    try {
+      const env = serverEnv();
+      const r = await runServerCheck({ url: env.url, key: env.key, client: supa() as unknown as HealthClient | null });
+      setItems(r);
+      setAt(new Date());
+    } catch (e) {
+      setItems([{ key: "error", label: "점검", status: "fail", detail: e instanceof Error ? e.message : "점검 중 오류가 났습니다." }]);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const copy = async () => {
+    if (!items || !at) return;
+    try { await navigator.clipboard.writeText(checkReport(items, at)); toast("점검 결과를 복사했습니다."); }
+    catch { toast("복사하지 못했습니다.", "error"); }
+  };
+  const fails = items?.filter((i) => i.status === "fail").length ?? 0;
+
+  return (
+    <div className="mt-3" id="server-check">
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="outline" icon={<Stethoscope size={14} />} disabled={busy} onClick={run}>{busy ? "점검 중…" : items ? "다시 점검" : "연결 점검"}</Button>
+        {items && <Button size="sm" variant="ghost" icon={<ClipboardCopy size={14} />} onClick={copy}>결과 복사</Button>}
+      </div>
+      {items && (
+        <div className="mt-3 rounded-xl border border-line bg-surface">
+          <div className={cx("border-b border-line px-4 py-2.5 text-[0.85rem] font-bold", fails ? "text-error" : "text-success")}>
+            {fails ? `막힌 곳 ${fails}군데 — 위에서부터 순서대로 해결하세요` : items.some((i) => i.status === "warn") ? "연결은 되지만 확인할 것이 있습니다" : "모두 정상입니다"}
+          </div>
+          <ul className="divide-y divide-line">
+            {items.map((i) => (
+              <li key={i.key} className="flex items-start gap-2.5 px-4 py-2.5">
+                <span className="mt-0.5">{CHECK_ICON[i.status]}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[0.88rem] font-semibold">{i.label}</div>
+                  <div className="break-words text-[0.82rem] text-ink-2">{i.detail}</div>
+                  {i.fix && i.status !== "ok" && <div className="mt-1 rounded-lg bg-surface-2 px-2.5 py-1.5 text-[0.8rem] leading-relaxed text-ink">→ {i.fix}</div>}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function OrgModal({ open, onClose, onSave, initial }: { open: boolean; onClose: () => void; onSave: (o: OrgInfo) => void; initial?: OrgInfo }) {
   if (!open) return null;
   return <OrgModalInner onClose={onClose} onSave={onSave} initial={initial} />;
@@ -279,6 +346,7 @@ function ServerPanel() {
                 ? "연결 정보는 들어와 있지만 아직 서버 계정으로 로그인하지 않았습니다. 로그아웃 후 서버 계정으로 다시 로그인해 주세요."
                 : "지금은 이 브라우저 안에만 저장됩니다. 다른 PC에서는 아무것도 보이지 않고, 브라우저 데이터를 지우면 함께 사라집니다. 연결 방법은 supabase/README.md 에 있습니다."}
           </p>
+          {manage && <ServerCheck />}
           {st.syncError && (
             <p className="mt-2 rounded-lg bg-error-bg px-3 py-2 text-[0.82rem] font-semibold text-error">
               마지막 저장 실패: {st.syncError}
