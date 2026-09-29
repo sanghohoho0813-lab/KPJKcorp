@@ -86,8 +86,9 @@ export function DemoBadge({ className }: { className?: string }) {
 }
 export function AiReadyBadge({ onClick, label = "AI READY" }: { onClick?: () => void; label?: string }) {
   return (
-    // 폰에서는 아이콘만 — 카드 제목 옆에 글자까지 두면 제목이 세 줄로 쪼개진다
-    <button type="button" onClick={onClick} aria-label={label} title={label} className="pressable inline-flex min-h-9 items-center gap-1 whitespace-nowrap rounded-md border border-line-2 bg-surface px-2 py-0.5 text-[0.7rem] font-bold tracking-wide text-ink-2 hover:bg-surface-2 md:min-h-0">
+    // 폰에서는 아이콘만 — 카드 제목 옆에 글자까지 두면 제목이 세 줄로 쪼개진다.
+    // 아이콘만 남으면 폭이 33px 이라 손가락 기준(36px)에 못 미친다 → 폰에서만 최소 폭을 준다
+    <button type="button" onClick={onClick} aria-label={label} title={label} className="pressable inline-flex min-h-9 min-w-9 items-center justify-center gap-1 whitespace-nowrap rounded-md border border-line-2 bg-surface px-2 py-0.5 text-[0.7rem] font-bold tracking-wide text-ink-2 hover:bg-surface-2 md:min-h-0 md:min-w-0">
       <Sparkles size={12} className="text-accent" /> <span className="hidden sm:inline">{label}</span>
     </button>
   );
