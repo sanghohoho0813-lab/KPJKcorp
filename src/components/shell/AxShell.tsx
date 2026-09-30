@@ -40,6 +40,7 @@ import { Presentation, PresentationButton } from "./Presentation";
 import { NextSheet } from "./NextSheet";
 import { AiReadyModal, DraftModal } from "@/components/ai/AiModals";
 import { Toaster } from "@/components/ui/Toaster";
+import { ServerBanner } from "./ServerBanner";
 import { Modal, Sheet, Confirm } from "@/components/ui/overlay";
 import { Avatar, Badge, Button, DemoBadge, NextBadge, PageSkeleton, cx } from "@/components/ui/ui";
 
@@ -471,6 +472,7 @@ export function AxShell({ children }: { children: ReactNode }) {
       <div className="lg:pl-[var(--sidebar-w)]">
         <Header />
         <main className={cx("mx-auto w-full max-w-[1720px] px-4 py-5 md:px-6 md:py-7", isMobile && "pb-24")}>
+          <ServerBanner audience="internal" />
           {ready ? <div key={pathname} className="anim-page">{children}</div> : <PageSkeleton />}
         </main>
       </div>

@@ -13,6 +13,7 @@ import { Tutorial } from "./Tutorial";
 import { FontScaleStepper } from "./FontScale";
 import { Presentation } from "./Presentation";
 import { Toaster } from "@/components/ui/Toaster";
+import { ServerBanner } from "./ServerBanner";
 import { Modal } from "@/components/ui/overlay";
 import { Avatar, PageSkeleton, cx } from "@/components/ui/ui";
 import { AiReadyModal, DraftModal } from "@/components/ai/AiModals";
@@ -159,6 +160,7 @@ export function PortalShell({ children }: { children: ReactNode }) {
         </div>
       </header>
       <main className={cx("mx-auto w-full max-w-[1280px] px-4 py-5 md:px-6 md:py-8", isMobile && "pb-24")}>
+          <ServerBanner audience="client" />
         {ready ? <div key={pathname} className="anim-page">{children}</div> : <PageSkeleton />}
       </main>
 

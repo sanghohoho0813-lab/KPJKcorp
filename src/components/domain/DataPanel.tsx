@@ -115,12 +115,18 @@ export function DataPanel() {
           )}
         </div>
         <p className="mt-1 text-[0.85rem] leading-relaxed text-ink-2">
-          데이터가 이 브라우저에만 저장되는 동안, 백업 파일이 유일한 복사본입니다. 다른 PC에서 이어서 쓰거나 실수를 되돌릴 때 가져오기로 복원합니다.
-          {live && (!last || (staleDays ?? 0) >= 7) && <b className="text-warning"> 운영 모드에서는 주 1회 이상 백업을 권합니다.</b>}
+          {st.serverMode ? (
+            <>데이터는 서버에 저장됩니다. 백업 파일은 서버와 별도로 보관하는 사본입니다 — 서버에 연결된 동안에는 가져오기로 덮어쓰지 않습니다.</>
+          ) : (
+            <>
+              데이터가 이 브라우저에만 저장되는 동안, 백업 파일이 유일한 복사본입니다. 다른 PC에서 이어서 쓰거나 실수를 되돌릴 때 가져오기로 복원합니다.
+              {live && (!last || (staleDays ?? 0) >= 7) && <b className="text-warning"> 운영 모드에서는 주 1회 이상 백업을 권합니다.</b>}
+            </>
+          )}
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <Button size="sm" variant="accent" icon={<Download size={14} />} disabled={!manage} onClick={download}>백업 내보내기</Button>
-          <Button size="sm" variant="outline" icon={<Upload size={14} />} disabled={!manage} onClick={() => fileRef.current?.click()}>백업 가져오기</Button>
+          {!st.serverMode && <Button size="sm" variant="outline" icon={<Upload size={14} />} disabled={!manage} onClick={() => fileRef.current?.click()}>백업 가져오기</Button>}
           <input ref={fileRef} type="file" accept="application/json,.json" className="hidden" onChange={(e) => pick(e.target.files?.[0])} />
         </div>
         {!manage && <p className="mt-2 text-[0.78rem] text-ink-3">백업과 복원은 대표 계정에서만 가능합니다.</p>}
@@ -128,7 +134,8 @@ export function DataPanel() {
 
       <ExcelPanel />
 
-      <SamplePanel />
+      {/* 서버 운영 중에는 샘플(시연용 기업)을 다루지 않는다 */}
+      {!st.serverMode && <SamplePanel />}
 
       {/* 회사 정보 (인쇄용) */}
       <div className="rounded-xl border border-line p-4">

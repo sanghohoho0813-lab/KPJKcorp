@@ -20,7 +20,7 @@ interface PStep {
 const STEPS: PStep[] = [
   { route: "/ax/why", title: "① 왜 이 AX인가", body: "고객·자료·일정·진행상황이 카톡과 파일에 흩어져 있던 구조를, 기업고객 단위의 하나의 데이터 흐름으로 바꿉니다." },
   { route: "/ax/dashboard", title: "② 오늘의 업무 브리핑", body: "대표가 시스템을 열면 기한 초과 자료, 정체 프로젝트, 이탈 위험 고객이 우선순위로 정리됩니다. 각 항목에 '왜?' 근거가 붙고, 바로 아래 버튼으로 그 자리에서 처리합니다 — 말만 하는 브리핑이 아닙니다." },
-  { route: "/ax/clients/co_a", title: "③ 기업고객 카드", body: "에이정밀 하나를 열면 상담·계약·프로젝트·자료·일정·문의·결과·이력이 한 화면에 연결됩니다. 이것이 Single Source of Truth입니다." },
+  { route: "/ax/clients/co_a", title: "③ 기업고객 카드", body: "기업 하나를 열면 상담·계약·프로젝트·자료·일정·문의·결과·이력이 한 화면에 연결됩니다. 이것이 Single Source of Truth입니다." },
   { route: "/ax/projects", title: "④ 프로젝트 운영 Board", body: "상담부터 완료까지 단계별 병목을 한눈에 봅니다. 카드를 열면 자료 누락 체크와 프로젝트 요약이 자동으로 정리됩니다." },
   { route: "/portal", title: "⑤ 고객 Portal", body: "고객이 로그인하면 5초 안에 '어디까지 진행됐는지, 지금 무엇을 내야 하는지, 다음 일정이 뭔지'를 알 수 있습니다.", portal: true },
   { route: "/portal/documents", title: "⑥ 고객이 직접 자료 제출", body: "고객이 요청자료를 업로드하면 내부 AX에 즉시 도착하고 담당자 검토 Task가 자동 생성됩니다. (직접 눌러보세요)", portal: true },
@@ -62,7 +62,14 @@ export function Presentation() {
       const pick = cos.find((c) => c.id === "co_a")?.id ?? cos[0]?.id;
       if (pick) setPortalPreview(pick);
     }
-    if (pathname !== cur.route) router.push(cur.route);
+    // 기업 카드 단계는 실제로 있는 기업으로 연다 — 서버 운영 중에는 데모 기업(co_a)이 없다
+    let route = cur.route;
+    if (route === "/ax/clients/co_a") {
+      const cos = useStore.getState().companies.filter((c) => !c.archived);
+      const id = cos.find((c) => c.id === "co_a")?.id ?? cos[0]?.id;
+      route = id ? `/ax/clients/${id}` : "/ax/clients";
+    }
+    if (pathname !== route) router.push(route);
   }, [active, cur, pathname, router, session, setPortalPreview]);
 
   useEffect(() => {

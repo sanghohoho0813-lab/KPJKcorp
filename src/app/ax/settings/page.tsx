@@ -36,7 +36,7 @@ function SettingsInner() {
 
   return (
     <div>
-      <PageHeader title="설정" desc="화면 · 권한 · 데모 · 데이터 · AI 상태를 관리합니다. 모든 설정은 즉시 반영됩니다." />
+      <PageHeader title="설정" desc={serverMode ? "화면 · 권한 · 데이터 · 서버 연결 · AI 상태를 관리합니다. 모든 설정은 즉시 반영됩니다." : "화면 · 권한 · 데모 · 데이터 · AI 상태를 관리합니다. 모든 설정은 즉시 반영됩니다."} />
       {/* 모바일: 섹션 8개를 전부 펼치면 한 화면이 10,000px가 된다. 제목만 보이고, 누른 것만 펼친다. */}
       <SectionCtx.Provider value={openId}>
       <div className="grid gap-5 xl:grid-cols-2">
@@ -108,14 +108,15 @@ function SettingsInner() {
           <AutoRulesPanel />
         </Section>
 
-        <Section id="demo" icon={<HelpCircle size={18} className="text-ink-3" />} title="데모">
-          <div className="mb-3 flex flex-wrap items-center gap-2"><DemoBadge /><span className="text-[0.85rem] text-ink-2">{serverMode ? <>현재 상태: <b>서버 운영</b> · 데이터는 서버에 저장됩니다. 데모 초기화는 서버 연결 중에는 쓰지 않습니다</> : settings.liveMode ? <>현재 상태: <b>운영</b> · 데모 초기화는 잠겨 있습니다 (데이터 섹션에서 데모 모드로 돌리면 풀립니다)</> : <>현재 상태: <b>DEMO</b> · 실제 데이터를 넣기 전에 데이터 섹션에서 운영 모드를 켜세요</>}</span></div>
+        <Section id="demo" icon={<HelpCircle size={18} className="text-ink-3" />} title={serverMode ? "안내 · 시연" : "데모"}>
+          <div className="mb-3 flex flex-wrap items-center gap-2"><DemoBadge /><span className="text-[0.85rem] text-ink-2">{serverMode ? <>현재 상태: <b>서버 운영</b> · 데이터는 서버에 저장되며, 로그인한 계정의 권한만큼 보입니다</> : settings.liveMode ? <>현재 상태: <b>운영</b> · 데모 초기화는 잠겨 있습니다 (데이터 섹션에서 데모 모드로 돌리면 풀립니다)</> : <>현재 상태: <b>DEMO</b> · 실제 데이터를 넣기 전에 데이터 섹션에서 운영 모드를 켜세요</>}</span></div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" icon={<HelpCircle size={16} />} onClick={() => openTutorial("ax")}>튜토리얼 다시 보기</Button>
             <Button variant="outline" icon={<Play size={16} />} onClick={openPresentation}>시연 모드</Button>
-            <Button variant="danger" icon={<RotateCcw size={16} />} disabled={!!settings.liveMode} title={settings.liveMode ? "운영 모드에서는 잠깁니다" : undefined} onClick={() => setConfirm(true)}>데모 초기화</Button>
+            {/* 서버 운영 중에는 데모 초기화가 의미 없다 — 버튼 자체를 보이지 않는다 */}
+            {!serverMode && <Button variant="danger" icon={<RotateCcw size={16} />} disabled={!!settings.liveMode} title={settings.liveMode ? "운영 모드에서는 잠깁니다" : undefined} onClick={() => setConfirm(true)}>데모 초기화</Button>}
           </div>
-          <div className="mt-3 text-[0.78rem] text-ink-3">데모 초기화는 Action 상태·고객 제출·문의·알림을 초기값으로 되돌립니다. 마지막 Seed: {fmtDateTime(seededAt)}{settings.liveMode ? " · 운영 모드라 자동 초기화되지 않습니다." : " · 20시간이 지나면 날짜가 오늘 기준으로 자동 갱신됩니다."}</div>
+          {!serverMode && <div className="mt-3 text-[0.78rem] text-ink-3">데모 초기화는 Action 상태·고객 제출·문의·알림을 초기값으로 되돌립니다. 마지막 Seed: {fmtDateTime(seededAt)}{settings.liveMode ? " · 운영 모드라 자동 초기화되지 않습니다." : " · 20시간이 지나면 날짜가 오늘 기준으로 자동 갱신됩니다."}</div>}
         </Section>
 
         <Section id="data" icon={<Database size={18} className="text-ink-3" />} title="데이터">

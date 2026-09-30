@@ -236,6 +236,62 @@ set role anon;
 select chk('비로그인: 기업 목록 접근 불가', denied($$select count(*) from public.companies$$), true);
 reset role;
 
+-- =========================== 고객 행동의 자동 후속 (트리거) ====================
+-- 고객은 내부 업무·자동 기록·고객용 알림을 직접 쓸 수 없다. 대신 "제출·문의" 한 줄을 쓰면 서버가 후속을 만든다.
+update public.projects set stage='doc_request' where id='pj_a1';
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000f001';   -- 고객 A
+select chk('고객A: 내부 업무를 직접 못 만든다',
+       denied($$insert into public.tasks(id, company_id, title) values ('tk_evil','co_a','가짜 업무')$$), true);
+select chk('고객A: 작성자 없는 자동 기록(system)을 못 쓴다',
+       denied($$insert into public.activities(id, type, company_id, actor_id, actor_role, message) values ('ac_evil','task_created','co_a',null,'system','가짜')$$), true);
+select chk('고객A: 고객용 알림을 직접 못 만든다',
+       denied($$insert into public.notifications(id, audience, company_id, title) values ('nt_evil','client','co_a','가짜')$$), true);
+select chk('고객A: 담당자 알림은 보낼 수 있다',
+       affected($$insert into public.notifications(id, audience, company_id, title) values ('nt_ok','internal','co_a','새 자료 도착')$$), 1::bigint);
+select chk('고객A: 자료요청을 제출함으로 바꾼다',
+       affected($$update public.document_requests set status='submitted', submitted_at=now() where id='dr_a1'$$), 1::bigint);
+select chk('고객A: 제출 파일 기록',
+       affected($$insert into public.document_files(id, request_id, file_name, size, uploaded_by, version) values ('df_t1','dr_a1','bizreg.pdf',1000,'00000000-0000-0000-0000-00000000f001',1)$$), 1::bigint);
+select chk('고객A: 문의를 남긴다',
+       affected($$insert into public.inquiries(id, company_id, title, created_by, status) values ('iq_t1','co_a','트리거 문의','00000000-0000-0000-0000-00000000f001','open')$$), 1::bigint);
+reset role; reset request.jwt.claim.sub;
+
+select chk('서버: 제출 → 검토 업무 자동 생성(담당 컨설턴트)',
+       (select count(*) from public.tasks where source='auto' and title like '%사업자등록증 검토' and assignee_id='00000000-0000-0000-0000-00000000c001'), 1::bigint);
+select chk('서버: 제출 → 고객 접수 알림',
+       (select count(*) from public.notifications where audience='client' and company_id='co_a' and title='자료가 접수되었습니다'), 1::bigint);
+select chk('서버: 제출 → 자동 기록(system)',
+       (select count(*) from public.activities where type='task_created' and actor_id is null and actor_role='system' and company_id='co_a' and message like '%사업자등록증 검토%'), 1::bigint);
+select chk('서버: 요청자료가 다 모이면 단계 → 자료접수',
+       (select stage from public.projects where id='pj_a1'), 'doc_received');
+select chk('서버: 고객 문의 → 답변 업무(담당 컨설턴트)',
+       (select count(*) from public.tasks where source='auto' and title like '%문의 답변: 트리거 문의' and assignee_id='00000000-0000-0000-0000-00000000c001'), 1::bigint);
+select chk('서버: 문의 담당자 자동 지정',
+       (select assignee_id::text from public.inquiries where id='iq_t1'), '00000000-0000-0000-0000-00000000c001');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000c001';   -- 컨설턴트
+select chk('컨설턴트: 고객용 알림을 보낸다(자기는 못 읽어도)',
+       affected($$insert into public.notifications(id, audience, company_id, title) values ('nt_c1','client','co_a','검토 완료')$$), 1::bigint);
+select chk('컨설턴트: 자동 기록(system)을 남긴다',
+       affected($$insert into public.activities(id, type, company_id, actor_id, actor_role, message) values ('ac_sys1','project_stage_changed','co_a',null,'system','자동')$$), 1::bigint);
+select chk('컨설턴트: 남의 이름으로 기록 못 남긴다',
+       denied($$insert into public.activities(id, type, company_id, actor_id, actor_role, message) values ('ac_fake','sign_in','co_a','00000000-0000-0000-0000-00000000a001','admin','가짜')$$), true);
+select chk('컨설턴트: 답변',
+       affected($$insert into public.inquiry_messages(id, inquiry_id, author_id, author_role, body) values ('m_c1','iq_t1','00000000-0000-0000-0000-00000000c001','consultant','답변')$$), 1::bigint);
+update public.inquiries set status='answered' where id='iq_t1';
+reset role; reset request.jwt.claim.sub;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000f001';   -- 고객 A 추가 질문
+select chk('고객A: 문의 행을 직접 못 고친다',
+       affected($$update public.inquiries set status='closed' where id='iq_t1'$$), 0::bigint);
+select chk('고객A: 추가 질문',
+       affected($$insert into public.inquiry_messages(id, inquiry_id, author_id, author_role, body) values ('m_f1','iq_t1','00000000-0000-0000-0000-00000000f001','client','추가 질문')$$), 1::bigint);
+reset role; reset request.jwt.claim.sub;
+select chk('서버: 고객 추가 질문 → 문의가 다시 답변 대기', (select status from public.inquiries where id='iq_t1'), 'open');
+
 -- =========================== 결과 ===========================================
 select n, case when pass then '통과' else '실패' end as 결과, label as 검증, detail as 비고
 from _r order by n;

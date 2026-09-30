@@ -10,6 +10,16 @@ const { chromium } = pw;
 const SANDBOX_CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const CHROME = process.env.CHROME_PATH || (fs.existsSync(SANDBOX_CHROME) ? SANDBOX_CHROME : undefined);
 export const B = process.env.APP_URL || 'http://localhost:3000';
+/**
+ * 서버(Supabase)에 붙은 앱을 녹화할 때 — 녹화 브라우저는 앱 밖 주소를 막으므로 서버 주소만 열어 준다.
+ * SUPABASE_URL 이 없으면 저장소의 .env.local 에서 읽는다. 없으면 데모 모드 녹화다.
+ */
+export const SERVER_URL = (process.env.SUPABASE_URL || (() => {
+  try {
+    const env = fs.readFileSync(new URL('../../.env.local', import.meta.url), 'utf8');
+    return env.match(/^NEXT_PUBLIC_SUPABASE_URL=(.+)$/m)?.[1]?.trim() || '';
+  } catch { return ''; }
+})()).replace(/\/$/, '');
 export const FF = process.env.FFMPEG || (() => {
   try { return execFileSync('python3', ['-c', 'import imageio_ffmpeg as f; print(f.get_ffmpeg_exe())'], { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); }
   catch { return 'ffmpeg'; }
@@ -94,7 +104,7 @@ export async function session(browser, { w = 1440, h = 810, dpr = 4 / 3, mobile 
   const page = await ctx.newPage();
   await page.route('**/*', (r) => {
     const u = r.request().url();
-    return u.startsWith(B) || u.startsWith('data:') || u.startsWith('about:') ? r.continue() : r.abort();
+    return u.startsWith(B) || (SERVER_URL && u.startsWith(SERVER_URL)) || u.startsWith('data:') || u.startsWith('about:') ? r.continue() : r.abort();
   });
   const errs = [];
   page.on('pageerror', (e) => errs.push(String(e)));
@@ -114,7 +124,9 @@ export async function sameOriginCard(ctx, html) {
 /** 로그인 — 녹화 밖에서 쓴다. 튜토리얼 팝업까지 닫는다 */
 export async function login(page, id, pwd, to) {
   await page.bringToFront();
-  await page.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.includes('kpjk')); if (k) { const s = JSON.parse(localStorage.getItem(k)); s.state.session = null; localStorage.setItem(k, JSON.stringify(s)); } }).catch(() => {});
+  // 계정 전환: 화면 세션을 비우고, 서버 모드라면 서버 로그인 토큰(kpjk-auth)도 지운다 —
+  // 남아 있으면 로그인 화면이 앞 사람으로 다시 붙는다.
+  await page.evaluate(() => { localStorage.removeItem('kpjk-auth'); const k = Object.keys(localStorage).find((x) => x.startsWith('kpjk-ax')); if (k) { const s = JSON.parse(localStorage.getItem(k)); s.state.session = null; localStorage.setItem(k, JSON.stringify(s)); } }).catch(() => {});
   await page.goto(B + '/login', { waitUntil: 'networkidle' }); await sleep(700);
   await page.getByLabel('아이디 (이메일)').fill(id);
   await page.locator('input[type=password]').first().fill(pwd);

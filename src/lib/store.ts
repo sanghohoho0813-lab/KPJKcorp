@@ -1936,14 +1936,20 @@ export const useStore = create<StoreState>()(
         if (pendingWrites() > 0) return false;
         const before = writeSeq();
         const me = await currentServerUser();
-        if (me.offline) return false;
+        if (me.offline) {
+          set({ syncError: "서버에 연결하지 못했습니다. 인터넷이 돌아오면 자동으로 다시 불러옵니다 — 그 사이 바꾼 내용은 저장되지 않을 수 있습니다." });
+          return false;
+        }
         if (!me.user || me.user.id !== st.session.userId) {
           // 로그인이 풀렸거나 계정이 중지됐다
           await get().serverLogout();
           return false;
         }
         const loaded = await loadAll();
-        if (!loaded.ok || !loaded.data) return false;
+        if (!loaded.ok || !loaded.data) {
+          if (loaded.offline) set({ syncError: "서버에 연결하지 못했습니다. 인터넷이 돌아오면 자동으로 다시 불러옵니다 — 그 사이 바꾼 내용은 저장되지 않을 수 있습니다." });
+          return false;
+        }
         if (pendingWrites() > 0 || writeSeq() !== before || !get().serverMode) return false;
         const cur = get();
         loadingFromServer = true;

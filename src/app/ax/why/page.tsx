@@ -1,5 +1,6 @@
 "use client";
 
+import { useStore } from "@/lib/store";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, LayoutDashboard } from "lucide-react";
@@ -9,10 +10,16 @@ import { Badge, Card, NextBadge, cx } from "@/components/ui/ui";
  * WHY AX — 회사 맞춤 Story (14 Section)
  * 정책자금·정부지원용 장식이 아니라 실제 업무·데이터·성과 구조를 설명한다.
  */
+/** 데모(샘플 데이터)일 때만 보이는 문장 — 서버 운영 중에는 사실이 아니게 된다 */
+function DemoOnly({ children }: { children: React.ReactNode }) {
+  const serverMode = useStore((s) => s.serverMode);
+  return serverMode ? null : <>{children}</>;
+}
+
 const STORY: { n: string; title: string; body: React.ReactNode; visual?: React.ReactNode }[] = [
   {
     n: "01", title: "KPJK의 현재",
-    body: <>KPJK는 기업·법인을 대상으로 경영진단, 운영개선, 법인 경영자문, 정책자금 준비, 기업부설연구소 설립 자문 등을 수행하는 경영컨설팅 회사입니다. 이 데모는 컨설턴트 3명이 6개 기업·8개 프로젝트를 동시에 관리하는 상황을 가정합니다. 프로젝트 하나는 보통 2~3개월, 자료 요청 4~6건, 미팅 3~4회, 문의 수 건으로 이루어집니다 (실제 수치는 운영 데이터로 대체).</>,
+    body: <>KPJK는 기업·법인을 대상으로 경영진단, 운영개선, 법인 경영자문, 정책자금 준비, 기업부설연구소 설립 자문 등을 수행하는 경영컨설팅 회사입니다. <DemoOnly>시연용 샘플 데이터는 컨설턴트 3명이 6개 기업·8개 프로젝트를 동시에 관리하는 상황을 가정합니다. </DemoOnly>프로젝트 하나는 보통 2~3개월, 자료 요청 4~6건, 미팅 3~4회, 문의 수 건으로 이루어집니다 (실제 수치는 운영 데이터로 대체).</>,
     visual: <Image src="/assets/photo_consulting.jpg" alt="대표와 컨설턴트가 자료를 검토하는 모습" width={1680} height={945} loading="eager" className="h-56 w-full rounded-xl object-cover md:h-72" />,
   },
   {
@@ -93,7 +100,7 @@ const STORY: { n: string; title: string; body: React.ReactNode; visual?: React.R
   },
   {
     n: "12", title: "성과는 어떻게 증명하는가",
-    body: <>Demo에서는 개선율을 만들지 않습니다. 운영 시작 후 4주간 Baseline을 측정하고, 이후 <b>자료요청→제출 소요기간 · 후속업무 누락건수 · 문의 대응시간 · 진행상황 단순문의 건수 · Portal 직접 제출 비율 · 담당자 1인당 관리 기업 수</b>를 같은 Event Log에서 계산합니다. 리포트 메뉴의 KPI 측정지점 표가 그 구조입니다.</>,
+    body: <>이 시스템은 개선율을 임의로 만들지 않습니다. 운영 시작 후 4주간 Baseline을 측정하고, 이후 <b>자료요청→제출 소요기간 · 후속업무 누락건수 · 문의 대응시간 · 진행상황 단순문의 건수 · Portal 직접 제출 비율 · 담당자 1인당 관리 기업 수</b>를 같은 Event Log에서 계산합니다. 리포트 메뉴의 KPI 측정지점 표가 그 구조입니다.</>,
   },
   {
     n: "13", title: "정책·기술사업화 관점 (장식이 아닌 실제)",

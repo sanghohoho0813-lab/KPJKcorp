@@ -975,16 +975,17 @@ $$;
 -- (1) 고객 자료 제출 → 검토 업무 · 접수 알림 · 자동 기록 · 요청자료가 다 모이면 단계 자동 변경
 create or replace function public.kpjk_after_client_file() returns trigger
 language plpgsql security definer set search_path = public as $$
-declare r public.document_requests; v_company text; v_stage text; v_left int;
+declare r public.document_requests; v_company text; v_consultant uuid; v_stage text; v_left int;
 begin
   if not public.kpjk_is_client() then return new; end if;
   select * into r from public.document_requests where id = new.request_id;
   if not found then return new; end if;
-  select name into v_company from public.companies where id = r.company_id;
+  select name, consultant_id into v_company, v_consultant from public.companies where id = r.company_id;
 
+  -- 요청에 담당자가 비어 있으면 기업 담당 컨설턴트에게 — 담당자 없는 업무는 아무도 안 본다
   insert into public.tasks (id, company_id, project_id, title, type, due_date, assignee_id, status, priority, created_at, source)
   values (public.kpjk_new_id('tk'), r.company_id, r.project_id, trim(coalesce(v_company, '') || ' ' || r.name || ' 검토'),
-          '자료검토', public.kpjk_due(2), r.assignee_id, 'todo', 'normal', now(), 'auto');
+          '자료검토', public.kpjk_due(2), coalesce(r.assignee_id, v_consultant), 'todo', 'normal', now(), 'auto');
   insert into public.activities (id, type, company_id, project_id, actor_id, actor_role, at, message)
   values (public.kpjk_new_id('ac'), 'task_created', r.company_id, r.project_id, null, 'system', now(), '자동 생성: ' || r.name || ' 검토 Task');
   insert into public.notifications (id, audience, company_id, title, body, at, read, href)
