@@ -90,7 +90,7 @@ export function StatusBoard({ companies }: { companies: Company[] }) {
           return (
             <li key={r.c.id} className="card p-4">
               <div className="flex flex-wrap items-center gap-1.5">
-                <Link href={`/ax/clients/${r.c.id}`} className="text-[1.05rem] font-bold hover:text-accent">{r.c.name}</Link>
+                <Link href={`/ax/clients/${r.c.id}`} className="inline-flex min-h-9 items-center sm:min-h-0 text-[1.05rem] font-bold hover:text-accent">{r.c.name}</Link>
                 {r.critical > 0 && <Badge tone="error">지금 처리 {r.critical}</Badge>}
                 <span className="ml-auto text-[0.78rem] text-ink-3">진행 {r.progress.percent}%</span>
               </div>
@@ -100,8 +100,8 @@ export function StatusBoard({ companies }: { companies: Company[] }) {
                 {rest > 0 && <span className="text-[0.75rem] text-ink-3">그 외 {rest}건(완료·보류)</span>}
               </div>
               <div className="mt-2 flex flex-wrap gap-x-3 text-[0.8rem] text-ink-3">
-                <Link href={`/ax/clients/${r.c.id}?tab=vault`} className="hover:text-ink">서류 {r.progress.docsUsable}/{r.progress.docsTotal}</Link>
-                {r.money.unpaid > 0 && <Link href={`/ax/clients/${r.c.id}?tab=contract`} className={r.money.overdue ? "font-semibold text-error" : "hover:text-ink"}>못 받은 돈 {won(r.money.unpaid)}</Link>}
+                <Link href={`/ax/clients/${r.c.id}?tab=vault`} className="inline-flex min-h-9 items-center sm:min-h-0 hover:text-ink">서류 {r.progress.docsUsable}/{r.progress.docsTotal}</Link>
+                {r.money.unpaid > 0 && <Link href={`/ax/clients/${r.c.id}?tab=contract`} className={cx("inline-flex min-h-9 items-center sm:min-h-0", r.money.overdue ? "font-semibold text-error" : "hover:text-ink")}>못 받은 돈 {won(r.money.unpaid)}</Link>}
               </div>
             </li>
           );

@@ -157,8 +157,8 @@ function AddPayment({ company, projects }: { company: Company; projects: { id: s
         <label className="text-[0.8rem] text-ink-2">금액 (원)
           <Input className="mt-1 tnum" inputMode="numeric" value={fmt(amount)} onChange={(e) => setAmount(e.target.value)} placeholder="미정이면 비워 두세요" aria-label="금액" />
           <span className="mt-1 flex flex-wrap gap-1">
-            {([["+10만", 100000], ["+100만", 1000000], ["+1,000만", 10000000]] as const).map(([l, n]) => <button key={l} type="button" onClick={() => bump(n)} className="pressable rounded-full border border-line px-2 py-0.5 text-[0.72rem] font-semibold">{l}</button>)}
-            <button type="button" onClick={() => setAmount("")} className="pressable rounded-full px-2 py-0.5 text-[0.72rem] text-ink-3">지우기</button>
+            {([["+10만", 100000], ["+100만", 1000000], ["+1,000만", 10000000]] as const).map(([l, n]) => <button key={l} type="button" onClick={() => bump(n)} className="pressable inline-flex min-h-9 items-center rounded-full border border-line px-3 text-[0.72rem] font-semibold sm:min-h-0 sm:px-2 sm:py-0.5">{l}</button>)}
+            <button type="button" onClick={() => setAmount("")} className="pressable inline-flex min-h-9 items-center rounded-full px-3 text-[0.72rem] text-ink-3 sm:min-h-0 sm:px-2 sm:py-0.5">지우기</button>
           </span>
         </label>
         <label className="text-[0.8rem] text-ink-2">받기로 한 날
@@ -171,7 +171,7 @@ function AddPayment({ company, projects }: { company: Company; projects: { id: s
           <label className="text-[0.8rem] text-ink-2">영업자 이름<Input className="mt-1" value={agentName} onChange={(e) => setAgentName(e.target.value)} /></label>
           {num(amount) !== undefined && num(agentFee) !== undefined && <p className="text-[0.78rem] text-ink-2 sm:col-span-2">→ 내 몫 {won(net)}</p>}
         </div>
-      ) : <button type="button" onClick={() => setAgentOpen(true)} className="text-[0.78rem] font-semibold text-ink-3 hover:text-ink">+ 영업자 수수료가 있으면</button>}
+      ) : <button type="button" onClick={() => setAgentOpen(true)} className="inline-flex min-h-9 items-center sm:min-h-0 text-[0.78rem] font-semibold text-ink-3 hover:text-ink">+ 영업자 수수료가 있으면</button>}
       <div className="flex justify-end gap-2">
         <Button variant="ghost" onClick={() => setOpen(false)}>취소</Button>
         <Button variant="accent" onClick={submit}>추가</Button>

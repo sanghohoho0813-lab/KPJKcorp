@@ -71,7 +71,7 @@ export function ProfileCard({ company }: { company: Company }) {
       </div>
 
       {!allEmpty && empties > 0 && (
-        <button type="button" onClick={() => setShowEmpty((v) => !v)} className="pressable mt-3 text-[0.82rem] font-semibold text-accent">
+        <button type="button" onClick={() => setShowEmpty((v) => !v)} className="pressable mt-2 inline-flex min-h-9 items-center sm:min-h-0 text-[0.82rem] font-semibold text-accent">
           {showEmpty ? "아직 안 적은 칸 접기" : `아직 안 적은 ${empties}칸 채우기 · 칸 추가`}
         </button>
       )}
@@ -143,7 +143,7 @@ function Row({ row: r, company, may, editing, onEdit, copied, copy }: {
               <span key={i} className="flex items-center gap-1">
                 {i > 0 && <span className="text-ink-3" aria-hidden>-</span>}
                 <button type="button" onClick={() => copy(sg, `${r.key}:${i}`)} aria-label={`${r.label} ${sg} 만 복사`} title={`${sg} 만 복사 — 칸이 나뉜 신청서용`}
-                  className={cx("pressable tnum rounded-md border px-1.5 py-0.5 text-[0.9rem] font-semibold", copied === `${r.key}:${i}` ? "border-success/40 bg-success-bg text-success" : "border-line bg-surface hover:border-accent/50")}>{sg}</button>
+                  className={cx("pressable tnum inline-flex min-h-9 min-w-9 items-center justify-center rounded-md border px-2 text-[0.9rem] font-semibold sm:min-h-0 sm:min-w-0 sm:px-1.5 sm:py-0.5", copied === `${r.key}:${i}` ? "border-success/40 bg-success-bg text-success" : "border-line bg-surface hover:border-accent/50")}>{sg}</button>
               </span>
             ))}
             <button type="button" onClick={() => copy(r.value, r.key)} className="pressable icon-btn text-ink-3 hover:text-ink" aria-label={`${r.label} 전체 복사`} title="하이픈 포함 전체 복사">
@@ -151,11 +151,11 @@ function Row({ row: r, company, may, editing, onEdit, copied, copy }: {
             </button>
             {digits !== r.value && (
               <button type="button" onClick={() => copy(digits, `${r.key}:d`)} title="숫자만 복사 — 하이픈 없이"
-                className={cx("pressable rounded-full border px-2 py-0.5 text-[0.72rem] font-bold", copied === `${r.key}:d` ? "border-success/40 bg-success-bg text-success" : "border-line text-ink-3 hover:text-ink")}>{copied === `${r.key}:d` ? "복사됨" : "숫자만"}</button>
+                className={cx("pressable inline-flex min-h-9 items-center rounded-full border px-3 text-[0.72rem] font-bold sm:min-h-0 sm:px-2 sm:py-0.5", copied === `${r.key}:d` ? "border-success/40 bg-success-bg text-success" : "border-line text-ink-3 hover:text-ink")}>{copied === `${r.key}:d` ? "복사됨" : "숫자만"}</button>
             )}
           </div>
         ) : r.copyable ? (
-          <button type="button" onClick={() => copy(r.value, r.key)} title="눌러서 복사 — 보이는 그대로" className={cx("pressable -mx-1 max-w-full rounded px-1 text-left text-[0.9rem] font-medium break-words", copied === r.key ? "bg-success-bg text-success" : "hover:bg-surface-2")}>
+          <button type="button" onClick={() => copy(r.value, r.key)} title="눌러서 복사 — 보이는 그대로" className={cx("pressable -mx-1 inline-flex min-h-9 max-w-full items-center rounded px-1 text-left text-[0.9rem] font-medium break-words sm:min-h-0", copied === r.key ? "bg-success-bg text-success" : "hover:bg-surface-2")}>
             {r.value}{copied === r.key && <span className="ml-1.5 text-[0.75rem] font-bold">복사됨</span>}
           </button>
         ) : (

@@ -59,3 +59,9 @@
 ## #12 기술스택: Next.js 16 + TypeScript + Tailwind 4 + zustand
 - WHY: v3.0 기본 권장 스택. Next 16의 React Compiler 기본 활성으로 수동 memo 최소화.
 - NOTE: `next/font/google`은 프록시 환경에서 실패 가능성이 있어 Pretendard CDN + 시스템 폰트 Fallback 사용.
+
+## #13 운영 OS 고객 관리 기능 이식 — 일반 기능만, 전문 모듈은 절대 넣지 않는다 (18차)
+- DECISION: AX MVP Factory OS 의 고객 관리 중 회사 기본 정보·서류함·진행 상태/현황표·업무 일기·수금만 옮긴다. 정책자금·절세·재무분석·크레탑·고용지원금·연구소 도구·특허/벤처 작업실·AX 제작·웹스튜디오·도구함, OS 의 외부 고객 플랫폼(My MIRAE)·보험 계약 모델은 옮기지 않는다.
+- WHY: 전문 모듈은 미래 AI 랩(김상호)의 자산이다. KPJK 가 메인이므로 화면·색·구조는 KPJK 것을 쓰고 기능만 붙인다.
+- HOW: OS 의 서비스 목록(특허·벤처·AX·정책자금)에 묶인 "진행 업무"는 규칙(상태·색·경고)만 가져와 KPJK 프로젝트에 적용. 서류 자동 분류에서도 모듈 관련 서류 이름(벤처확인서·특허증·연구소 인정서·재무제표)은 뺐다. `tools/test/no-os-modules.test.ts` 가 src/ 를 검사한다.
+- 서류함 상태는 companies 와 분리(company_vaults) — 고객은 자기 회사 정보를 읽지만 보관 메모는 내부 전용. 원본은 vault 보관함(내부 전용).

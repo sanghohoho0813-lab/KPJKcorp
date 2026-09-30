@@ -21,7 +21,7 @@ export function WorkChip({ project, today = todayYmd(), onClick, compact }: { pr
   const text = c.overdue ? `기한 ${dueText(c.daysLeft)}` : compact ? WORK_STATUS[c.status].short : WORK_STATUS[c.status].label;
   const Tag = onClick ? "button" : "span";
   return (
-    <Tag type={onClick ? "button" : undefined} onClick={onClick} className={cx("inline-flex max-w-full items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[0.75rem] font-semibold", cls, onClick && "pressable")}
+    <Tag type={onClick ? "button" : undefined} onClick={onClick} className={cx("inline-flex max-w-full items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[0.75rem] font-semibold", cls, onClick && "pressable min-h-9 sm:min-h-0")}
       aria-label={onClick ? `${project.name} 상태 바꾸기 (지금 ${WORK_STATUS[c.status].label})` : undefined}>
       {text}{!c.overdue && c.dueSoon && <span className="font-bold text-warning">· {dueText(c.daysLeft)}</span>}
     </Tag>
@@ -139,7 +139,7 @@ function WorkCard({ project: p, may }: { project: Project; may: boolean }) {
             {may && (
               <span className="flex flex-wrap gap-1">
                 {([["오늘", 0], ["내일", 1], ["1주", 7], ["2주", 14], ["1개월", 30]] as const).map(([l, d]) => (
-                  <button key={l} type="button" onClick={() => setDue(d)} className="pressable rounded-full border border-line px-2 py-0.5 text-[0.72rem] font-semibold text-ink-2 hover:bg-surface-2">{l}</button>
+                  <button key={l} type="button" onClick={() => setDue(d)} className="pressable inline-flex min-h-9 items-center rounded-full border border-line px-3 text-[0.72rem] font-semibold text-ink-2 hover:bg-surface-2 sm:min-h-0 sm:px-2 sm:py-0.5">{l}</button>
                 ))}
               </span>
             )}
