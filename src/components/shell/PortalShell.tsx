@@ -87,7 +87,12 @@ export function PortalShell({ children }: { children: ReactNode }) {
       router.replace("/login");
       return;
     }
-    if (session.role !== "client" && !session.portalPreviewCompanyId) setPreview("co_a");
+    // 내부 계정이 미리보기 대상 없이 들어오면 첫 기업으로 보여준다. 서버 모드에는 데모 기업(co_a)이 없다.
+    if (session.role !== "client" && !session.portalPreviewCompanyId) {
+      const cos = useStore.getState().companies.filter((c) => !c.archived);
+      const pick = cos.find((c) => c.id === "co_a")?.id ?? cos[0]?.id;
+      if (pick) setPreview(pick);
+    }
   }, [hydrated, session, router, setPreview]);
 
   // First-run tutorial — only auto-opens on the portal home so it never pulls the user away from another screen.

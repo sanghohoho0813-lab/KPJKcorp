@@ -32,13 +32,34 @@ export function ThemeBoot() {
     });
   }, []);
 
-  // 새로고침해도 로그인이 유지되게 한다. 서버가 설정돼 있을 때만 시도한다.
+  // 새로고침해도 로그인이 유지되게 한다. 이 브라우저에 남은 지난 화면을 그대로 믿지 않고
+  // 앱을 열 때마다 서버에서 새로 읽는다 — 다른 기기에서 바뀐 것이 보여야 한다.
+  // 로그인이 풀렸으면 남은 화면을 비운다.
   const resume = useStore((s) => s.resumeServerSession);
-  const serverMode = useStore((s) => s.serverMode);
   useEffect(() => {
-    if (!hydrated || serverMode || !serverConfigured()) return;
+    if (!hydrated) return;
+    if (!serverConfigured() && !useStore.getState().serverMode) return;
     void resume();
-  }, [hydrated, serverMode, resume]);
+  }, [hydrated, resume]);
+
+  // 로그인한 동안에는 서버의 최신 내용을 주기적으로 다시 읽는다 — 고객이 폰에서 올린 자료가
+  // PC 화면에 새로고침 없이 나타나야 한다. 창을 다시 볼 때도 바로 읽는다. 화면이 숨겨져 있으면 쉰다.
+  const serverMode = useStore((s) => s.serverMode);
+  const refresh = useStore((s) => s.refreshFromServer);
+  useEffect(() => {
+    if (!hydrated || !serverMode) return;
+    let busy = false;
+    const run = async () => {
+      if (busy || document.visibilityState !== "visible") return;
+      busy = true;
+      try { await refresh(); } finally { busy = false; }
+    };
+    const onVisible = () => { if (document.visibilityState === "visible") void run(); };
+    const t = setInterval(run, 15000);
+    window.addEventListener("focus", onVisible);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { clearInterval(t); window.removeEventListener("focus", onVisible); document.removeEventListener("visibilitychange", onVisible); };
+  }, [hydrated, serverMode, refresh]);
 
   // 없어진 테마·옛 글자크기 값이 저장돼 있으면 한 번 정리한다.
   useEffect(() => {

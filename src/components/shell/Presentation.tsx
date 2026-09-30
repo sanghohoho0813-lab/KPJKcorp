@@ -57,7 +57,11 @@ export function Presentation() {
 
   useEffect(() => {
     if (!active || !cur) return;
-    if (cur.portal && session && session.role !== "client" && !session.portalPreviewCompanyId) setPortalPreview("co_a");
+    if (cur.portal && session && session.role !== "client" && !session.portalPreviewCompanyId) {
+      const cos = useStore.getState().companies.filter((c) => !c.archived);
+      const pick = cos.find((c) => c.id === "co_a")?.id ?? cos[0]?.id;
+      if (pick) setPortalPreview(pick);
+    }
     if (pathname !== cur.route) router.push(cur.route);
   }, [active, cur, pathname, router, session, setPortalPreview]);
 

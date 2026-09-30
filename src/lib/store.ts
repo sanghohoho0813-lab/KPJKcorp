@@ -50,9 +50,9 @@ import { JOURNAL_TYPE } from "./journal";
 import { OPP_STATUS, SERVICE_BY_KEY } from "./services";
 import { can, type Permission } from "./permissions";
 import { toLegacyBaseline } from "./baseline-survey";
-import { serverConfigured } from "./server/client";
+import { serverConfigured, setDemoForced } from "./server/client";
 import { currentServerUser, serverSignIn as authSignIn, serverSignOut } from "./server/auth";
-import { loadAll, ORG_SETTING_KEYS, pushChanges, pushSettings, type ServerSettings } from "./server/sync";
+import { loadAll, ORG_SETTING_KEYS, pendingWrites, pushChanges, pushSettings, writeSeq, type ServerSettings } from "./server/sync";
 
 export interface StoreState extends SeedData {
   hydrated: boolean;
@@ -79,10 +79,15 @@ export interface StoreState extends SeedData {
   /** 서버 저장이 실패했을 때 사용자에게 보일 마지막 사유 */
   syncError?: string;
   /** 서버 로그인 → 볼 수 있는 데이터 전부 읽기 → 세션 설정까지 한 번에 */
-  serverSignIn: (email: string, password: string) => Promise<{ ok: boolean; reason?: string }>;
-  /** 새로고침 후에도 로그인이 살아 있으면 다시 연결한다 */
+  serverSignIn: (email: string, password: string) => Promise<{ ok: boolean; reason?: string; offline?: boolean }>;
+  /** 새로고침 후에도 로그인이 살아 있으면 서버에서 새로 읽어 다시 연결한다 */
   resumeServerSession: () => Promise<boolean>;
+  /** 로그인한 채로 서버의 최신 내용을 다시 읽는다 (다른 기기·다른 사람이 바꾼 것). 세션·미리보기는 그대로 */
+  refreshFromServer: () => Promise<boolean>;
   serverLogout: () => Promise<void>;
+  /** 현장 비상용: 이 브라우저만 데모 모드로 전환 / 서버로 복귀. 서버 데이터는 건드리지 않는다 */
+  enterEmergencyDemo: () => void;
+  leaveEmergencyDemo: () => void;
   /** 컨설턴트 열람 범위 전환 (대표만). 서버 정책이 즉시 따라 바뀐다. */
   setConsultantScope: (scope: "all" | "own", byUserId: string) => Promise<{ ok: boolean; reason?: string }>;
 
@@ -1877,28 +1882,112 @@ export const useStore = create<StoreState>()(
       // ---------- 서버 연결 ----------
       serverSignIn: async (email, password) => {
         const r = await authSignIn(email, password);
-        if (!r.ok || !r.user) return { ok: false, reason: r.reason };
+        if (!r.ok || !r.user) return { ok: false, reason: r.reason, offline: r.offline };
         const loaded = await loadAll();
-        if (!loaded.ok || !loaded.data) return { ok: false, reason: loaded.reason };
+        if (!loaded.ok || !loaded.data) return { ok: false, reason: loaded.reason, offline: loaded.offline };
         applyServer(set, get, r.user, loaded.data, loaded.settings);
+        // 데모와 같은 기록을 서버에도 남긴다 — 고객 Portal 접속 횟수·실증 기록이 서버 모드에서 0으로 보이면 안 된다.
+        // (새로고침으로 다시 붙을 때는 남기지 않는다 — 로그인한 것이 아니다)
+        const u = r.user;
+        set({
+          activities: [
+            makeActivity({ type: "sign_in", companyId: u.companyId, actorId: u.id, actorRole: u.role, text: `로그인: ${u.name} ${u.title}` }),
+            ...(u.role === "client" ? [makeActivity({ type: "portal_login", companyId: u.companyId, actorId: u.id, actorRole: "client", text: "고객 Portal 접속" })] : []),
+            ...get().activities,
+          ],
+        });
         return { ok: true };
       },
 
       resumeServerSession: async () => {
-        if (!serverConfigured()) return false;
-        const user = await currentServerUser();
-        if (!user) return false;
+        const wasServer = get().serverMode;
+        const clearLocal = () => {
+          // 로그인이 풀렸거나(만료·다른 곳에서 로그아웃·계정 중지) 이 브라우저가 비상 데모로 바뀌었다.
+          // 지난번 서버 내용이 이 브라우저에 남아 보이면 안 된다.
+          if (!wasServer) return;
+          loadingFromServer = true;
+          set({ ...EMPTY_DATA, session: null, serverMode: false, syncError: undefined });
+          loadingFromServer = false;
+        };
+        if (!serverConfigured()) { clearLocal(); return false; }
+        const me = await currentServerUser();
+        if (me.offline) {
+          // 서버에 닿지 못했다 — 마지막으로 받은 화면은 지키고 알린다. 저장은 되지 않는다.
+          if (wasServer) set({ syncError: "서버에 연결하지 못했습니다. 마지막으로 불러온 내용을 보여 드립니다 — 지금 바꾼 것은 저장되지 않을 수 있습니다." });
+          return false;
+        }
+        if (!me.user) { clearLocal(); return false; }
+        const loaded = await loadAll();
+        if (!loaded.ok || !loaded.data) {
+          if (wasServer) set({ syncError: loaded.reason ?? "서버에서 데이터를 가져오지 못했습니다." });
+          return false;
+        }
+        // 미리보기 중이던 고객 화면은 유지한다
+        const preview = get().session?.userId === me.user.id ? get().session?.portalPreviewCompanyId : undefined;
+        applyServer(set, get, me.user, loaded.data, loaded.settings);
+        if (preview) set({ session: { ...get().session!, portalPreviewCompanyId: preview } });
+        return true;
+      },
+
+      refreshFromServer: async () => {
+        const st = get();
+        if (!st.serverMode || !st.session || !serverConfigured()) return false;
+        // 내가 보낸 변경이 아직 서버로 가는 중이면 건너뛴다 — 옛 내용으로 화면이 잠깐 되돌아가는 것을 막는다
+        if (pendingWrites() > 0) return false;
+        const before = writeSeq();
+        const me = await currentServerUser();
+        if (me.offline) return false;
+        if (!me.user || me.user.id !== st.session.userId) {
+          // 로그인이 풀렸거나 계정이 중지됐다
+          await get().serverLogout();
+          return false;
+        }
         const loaded = await loadAll();
         if (!loaded.ok || !loaded.data) return false;
-        applyServer(set, get, user, loaded.data, loaded.settings);
+        if (pendingWrites() > 0 || writeSeq() !== before || !get().serverMode) return false;
+        const cur = get();
+        loadingFromServer = true;
+        set({
+          ...loaded.data,
+          syncError: undefined,
+          // 역할이 바뀌었으면 따라간다. 미리보기·로그인 시각은 그대로 둔다
+          session: cur.session ? { ...cur.session, role: me.user.role, companyId: me.user.companyId } : cur.session,
+          settings: {
+            ...cur.settings,
+            org: loaded.settings?.org ?? cur.settings.org,
+            baseline: loaded.settings?.baseline ?? cur.settings.baseline,
+            baselineSurveys: loaded.settings?.baselineSurveys ?? cur.settings.baselineSurveys,
+            sprintStartedAt: loaded.settings?.sprintStartedAt ?? cur.settings.sprintStartedAt,
+            autoRules: loaded.settings?.autoRules ?? cur.settings.autoRules,
+            consultantScope: loaded.settings?.consultantScope ?? cur.settings.consultantScope,
+          },
+        });
+        loadingFromServer = false;
         return true;
       },
 
       serverLogout: async () => {
-        await serverSignOut();
+        try { await serverSignOut(); } catch { /* 서버에 닿지 못해도 이 브라우저에서는 로그아웃한다 */ }
         loadingFromServer = true;
         // 공용 PC 에서 다음 사람에게 앞사람 데이터가 보이면 안 된다 — 목록을 비운다.
         set({ ...EMPTY_DATA, session: null, serverMode: false, syncError: undefined });
+        loadingFromServer = false;
+      },
+
+      enterEmergencyDemo: () => {
+        // 서버 로그인 흔적을 이 브라우저에서 지운다 (네트워크 없이). 서버 데이터는 그대로다.
+        try { window.localStorage.removeItem("kpjk-auth"); } catch { /* 저장소 막힘 */ }
+        setDemoForced(true);
+        loadingFromServer = true;
+        set({ ...buildSeed(), seededAt: nowIso(), session: null, serverMode: false, syncError: undefined, settings: { ...get().settings, liveMode: false } });
+        loadingFromServer = false;
+      },
+
+      leaveEmergencyDemo: () => {
+        setDemoForced(false);
+        loadingFromServer = true;
+        // 데모 기업이 서버 화면에 섞이지 않게 비운다. 로그인하면 서버에서 새로 읽는다.
+        set({ ...EMPTY_DATA, session: null, serverMode: false, syncError: undefined, settings: { ...get().settings, liveMode: true } });
         loadingFromServer = false;
       },
 

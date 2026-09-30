@@ -17,6 +17,7 @@ import { Confirm } from "@/components/ui/overlay";
 
 function SettingsInner() {
   const settings = useStore((s) => s.settings);
+  const serverMode = useStore((s) => s.serverMode);
   const me = useCurrentUser();
   const setSettings = useStore((s) => s.setSettings);
   const session = useStore((s) => s.session);
@@ -98,7 +99,9 @@ function SettingsInner() {
               </tbody>
             </table>
           </div>
-          <div className="mt-3 text-[0.78rem] text-ink-3">한계 — 이 검사는 브라우저 안에서 이루어집니다. 개발자도구로 우회하는 것은 막지 못하므로 현재는 업무 규칙이지 보안 경계가 아닙니다. 서버 DB·세션(Supabase Auth + RLS)을 연결할 때 같은 정책을 서버에서 한 번 더 검사하도록 옮깁니다.</div>
+          <div className="mt-3 text-[0.78rem] text-ink-3">{serverMode
+            ? "서버 연결 중 — 화면의 권한 검사에 더해, 같은 규칙을 서버 데이터베이스의 접근 정책(Supabase Auth + RLS)이 한 번 더 검사합니다. 화면을 우회해도 서버가 막습니다."
+            : "한계 — 데모 모드에서는 이 검사가 브라우저 안에서 이루어집니다. 개발자도구로 우회하는 것은 막지 못하므로 업무 규칙이지 보안 경계가 아닙니다. 서버(Supabase Auth + RLS)에 연결하면 같은 정책을 서버에서 한 번 더 검사합니다."}</div>
         </Section>
 
         <Section id="rules" icon={<Repeat size={18} className="text-ink-3" />} title="자동 업무 규칙">
@@ -106,7 +109,7 @@ function SettingsInner() {
         </Section>
 
         <Section id="demo" icon={<HelpCircle size={18} className="text-ink-3" />} title="데모">
-          <div className="mb-3 flex flex-wrap items-center gap-2"><DemoBadge /><span className="text-[0.85rem] text-ink-2">{settings.liveMode ? <>현재 상태: <b>운영</b> · 데모 초기화는 잠겨 있습니다 (데이터 섹션에서 데모 모드로 돌리면 풀립니다)</> : <>현재 상태: <b>DEMO</b> · 실제 데이터를 넣기 전에 데이터 섹션에서 운영 모드를 켜세요</>}</span></div>
+          <div className="mb-3 flex flex-wrap items-center gap-2"><DemoBadge /><span className="text-[0.85rem] text-ink-2">{serverMode ? <>현재 상태: <b>서버 운영</b> · 데이터는 서버에 저장됩니다. 데모 초기화는 서버 연결 중에는 쓰지 않습니다</> : settings.liveMode ? <>현재 상태: <b>운영</b> · 데모 초기화는 잠겨 있습니다 (데이터 섹션에서 데모 모드로 돌리면 풀립니다)</> : <>현재 상태: <b>DEMO</b> · 실제 데이터를 넣기 전에 데이터 섹션에서 운영 모드를 켜세요</>}</span></div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" icon={<HelpCircle size={16} />} onClick={() => openTutorial("ax")}>튜토리얼 다시 보기</Button>
             <Button variant="outline" icon={<Play size={16} />} onClick={openPresentation}>시연 모드</Button>

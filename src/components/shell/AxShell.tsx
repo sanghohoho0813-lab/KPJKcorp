@@ -205,12 +205,14 @@ function NextGroup({ mobile }: { mobile?: boolean }) {
 
 function SidebarFoot() {
   const live = useStore((s) => s.settings.liveMode);
+  const serverMode = useStore((s) => s.serverMode);
   const last = useStore((s) => s.settings.lastBackupAt);
   const tick = useNow(60000);
   const stale = !last || (tick ? tick.getTime() - new Date(last).getTime() > 7 * 86400000 : false);
   return (
     <div className="px-3 pb-1 pt-2 text-[0.7rem] text-shell-text-3">
-      {live ? <>운영 · v1.3{stale && <Link href="/ax/settings" className="ml-1 text-warning">· 백업 필요</Link>}</> : "DEMO DATA · v1.3"}
+      {/* 서버 모드에서는 데이터가 서버에 있다 — 브라우저 백업 경고는 필요 없다 */}
+      {serverMode ? "서버 운영 · v1.3" : live ? <>운영 · v1.3{stale && <Link href="/ax/settings" className="ml-1 text-warning">· 백업 필요</Link>}</> : "DEMO DATA · v1.3"}
     </div>
   );
 }

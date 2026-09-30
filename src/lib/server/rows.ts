@@ -27,6 +27,14 @@ const s = (v: unknown): string => (typeof v === "string" ? v : "");
 const num = (v: unknown): number => (typeof v === "number" ? v : Number(v) || 0);
 const bool = (v: unknown): boolean => v === true;
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/**
+ * 사람을 가리키는 칸(담당자·작성자 등)은 서버에서 계정 ID(uuid)다.
+ * 데모용 ID("u_admin")나 "system" 이 섞여 들어가면 그 한 줄 때문에 함께 보낸 행 전체가 거절된다.
+ * 계정 ID 모양이 아니면 비워서 보낸다.
+ */
+export const personId = (v: string | null | undefined): string | null => (v && UUID_RE.test(v) ? v : null);
+
 /* ---------------------------------- 사람 --------------------------------- */
 
 export const userFromRow = (r: Row): User => ({
@@ -98,7 +106,7 @@ export const companyToRow = (x: Partial<Company> & { id?: string }): Row => ({
   ...(x.employees !== undefined && { employees: x.employees }),
   ...(x.revenue !== undefined && { revenue: x.revenue }),
   ...(x.firstConsultDate !== undefined && { first_consult_date: x.firstConsultDate }),
-  ...(x.consultantId !== undefined && { consultant_id: x.consultantId || null }),
+  ...(x.consultantId !== undefined && { consultant_id: personId(x.consultantId) }),
   ...(x.memo !== undefined && { memo: x.memo }),
   ...(x.archived !== undefined && { archived: !!x.archived }),
   ...(x.archivedAt !== undefined && { archived_at: n(x.archivedAt) }),
@@ -143,7 +151,7 @@ export const projectToRow = (x: Partial<Project> & { id?: string }): Row => ({
   ...(x.companyId !== undefined && { company_id: x.companyId }),
   ...(x.name !== undefined && { name: x.name }),
   ...(x.type !== undefined && { type: x.type }),
-  ...(x.consultantId !== undefined && { consultant_id: x.consultantId || null }),
+  ...(x.consultantId !== undefined && { consultant_id: personId(x.consultantId) }),
   ...(x.startDate !== undefined && { start_date: x.startDate }),
   ...(x.dueDate !== undefined && { due_date: x.dueDate }),
   ...(x.stage !== undefined && { stage: x.stage }),
@@ -174,7 +182,7 @@ export const consultationToRow = (x: Partial<Consultation> & { id?: string }): R
   ...(x.companyId !== undefined && { company_id: x.companyId }),
   ...(x.projectId !== undefined && { project_id: n(x.projectId) }),
   ...(x.date !== undefined && { date: x.date }),
-  ...(x.consultantId !== undefined && { consultant_id: x.consultantId || null }),
+  ...(x.consultantId !== undefined && { consultant_id: personId(x.consultantId) }),
   ...(x.type !== undefined && { type: x.type }),
   ...(x.channel !== undefined && { channel: x.channel }),
   ...(x.notes !== undefined && { notes: x.notes }),
@@ -236,7 +244,7 @@ export const docRequestToRow = (x: Partial<DocumentRequest> & { id?: string }): 
   ...(x.requestedAt !== undefined && { requested_at: x.requestedAt }),
   ...(x.dueDate !== undefined && { due_date: x.dueDate }),
   ...(x.status !== undefined && { status: x.status }),
-  ...(x.assigneeId !== undefined && { assignee_id: x.assigneeId || null }),
+  ...(x.assigneeId !== undefined && { assignee_id: personId(x.assigneeId) }),
   ...(x.submittedAt !== undefined && { submitted_at: n(x.submittedAt) }),
   ...(x.reviewedAt !== undefined && { reviewed_at: n(x.reviewedAt) }),
   ...(x.reviewNote !== undefined && { review_note: n(x.reviewNote) }),
@@ -261,7 +269,7 @@ export const noticeToRow = (x: Partial<Notice> & { id?: string }): Row => ({
   ...(x.pinned !== undefined && { pinned: x.pinned }),
   ...(x.publishedAt !== undefined && { published_at: x.publishedAt }),
   ...(x.expiresAt !== undefined && { expires_at: n(x.expiresAt) }),
-  ...(x.authorId !== undefined && { author_id: x.authorId || null }),
+  ...(x.authorId !== undefined && { author_id: personId(x.authorId) }),
 });
 
 /* ---------------------------------- 일정 ---------------------------------- */
@@ -283,7 +291,7 @@ export const scheduleToRow = (x: Partial<Schedule> & { id?: string }): Row => ({
   ...(x.start !== undefined && { start_at: x.start }),
   ...(x.end !== undefined && { end_at: n(x.end) }),
   ...(x.location !== undefined && { location: n(x.location) }),
-  ...(x.assigneeId !== undefined && { assignee_id: x.assigneeId || null }),
+  ...(x.assigneeId !== undefined && { assignee_id: personId(x.assigneeId) }),
   ...(x.visibleToClient !== undefined && { visible_to_client: x.visibleToClient }),
   ...(x.memo !== undefined && { memo: n(x.memo) }),
 });
@@ -306,7 +314,7 @@ export const taskToRow = (x: Partial<Task> & { id?: string }): Row => ({
   ...(x.title !== undefined && { title: x.title }),
   ...(x.type !== undefined && { type: x.type }),
   ...(x.dueDate !== undefined && { due_date: x.dueDate }),
-  ...(x.assigneeId !== undefined && { assignee_id: x.assigneeId || null }),
+  ...(x.assigneeId !== undefined && { assignee_id: personId(x.assigneeId) }),
   ...(x.status !== undefined && { status: x.status }),
   ...(x.priority !== undefined && { priority: x.priority }),
   ...(x.memo !== undefined && { memo: n(x.memo) }),
@@ -338,9 +346,9 @@ export const inquiryToRow = (x: Partial<Inquiry> & { id?: string }): Row => ({
   ...(x.title !== undefined && { title: x.title }),
   ...(x.category !== undefined && { category: x.category }),
   ...(x.createdAt !== undefined && { created_at: x.createdAt }),
-  ...(x.createdBy !== undefined && { created_by: x.createdBy || null }),
+  ...(x.createdBy !== undefined && { created_by: personId(x.createdBy) }),
   ...(x.status !== undefined && { status: x.status }),
-  ...(x.assigneeId !== undefined && { assignee_id: x.assigneeId || null }),
+  ...(x.assigneeId !== undefined && { assignee_id: personId(x.assigneeId) }),
 });
 
 /* -------------------------------- 결과자료 -------------------------------- */
@@ -360,7 +368,7 @@ export const resultToRow = (x: Partial<ResultFile> & { id?: string }): Row => ({
   ...(x.name !== undefined && { name: x.name }),
   ...(x.kind !== undefined && { kind: x.kind }),
   ...(x.sharedAt !== undefined && { shared_at: x.sharedAt }),
-  ...(x.sharedBy !== undefined && { shared_by: x.sharedBy || null }),
+  ...(x.sharedBy !== undefined && { shared_by: personId(x.sharedBy) }),
   ...(x.size !== undefined && { size: x.size }),
   ...(x.description !== undefined && { description: x.description }),
   ...(x.storagePath !== undefined && { storage_path: n(x.storagePath) }),
@@ -383,9 +391,9 @@ export const opportunityToRow = (x: Partial<Opportunity> & { id?: string }): Row
   ...(x.serviceName !== undefined && { service_name: x.serviceName }),
   ...(x.source !== undefined && { source: x.source }),
   ...(x.status !== undefined && { status: x.status }),
-  ...(x.assigneeId !== undefined && { assignee_id: x.assigneeId || null }),
+  ...(x.assigneeId !== undefined && { assignee_id: personId(x.assigneeId) }),
   ...(x.createdAt !== undefined && { created_at: x.createdAt }),
-  ...(x.createdBy !== undefined && { created_by: x.createdBy || null }),
+  ...(x.createdBy !== undefined && { created_by: personId(x.createdBy) }),
   ...(x.note !== undefined && { note: n(x.note) }),
   ...(x.reason !== undefined && { reason: n(x.reason) }),
   ...(x.history !== undefined && { history: x.history }),
@@ -417,7 +425,7 @@ export const quoteToRow = (x: Partial<Quote> & { id?: string }): Row => ({
   ...(x.discountPct !== undefined && { discount_pct: x.discountPct }),
   ...(x.validUntil !== undefined && { valid_until: x.validUntil }),
   ...(x.status !== undefined && { status: x.status }),
-  ...(x.createdBy !== undefined && { created_by: x.createdBy || null }),
+  ...(x.createdBy !== undefined && { created_by: personId(x.createdBy) }),
   ...(x.createdAt !== undefined && { created_at: x.createdAt }),
   ...(x.sentAt !== undefined && { sent_at: n(x.sentAt) }),
   ...(x.respondedAt !== undefined && { responded_at: n(x.respondedAt) }),
@@ -450,10 +458,10 @@ export const approvalToRow = (x: Partial<Approval> & { id?: string }): Row => ({
   ...(x.quoteId !== undefined && { quote_id: n(x.quoteId) }),
   ...(x.baseAmount !== undefined && { base_amount: n(x.baseAmount) }),
   ...(x.discountPct !== undefined && { discount_pct: n(x.discountPct) }),
-  ...(x.requestedBy !== undefined && { requested_by: x.requestedBy || null }),
+  ...(x.requestedBy !== undefined && { requested_by: personId(x.requestedBy) }),
   ...(x.requestedAt !== undefined && { requested_at: x.requestedAt }),
   ...(x.status !== undefined && { status: x.status }),
-  ...(x.decidedBy !== undefined && { decided_by: n(x.decidedBy) }),
+  ...(x.decidedBy !== undefined && { decided_by: personId(x.decidedBy) }),
   ...(x.decidedAt !== undefined && { decided_at: n(x.decidedAt) }),
   ...(x.decisionNote !== undefined && { decision_note: n(x.decisionNote) }),
 });
@@ -464,14 +472,16 @@ export const approvalToRow = (x: Partial<Approval> & { id?: string }): Row => ({
 export const activityFromRow = (r: Row): Activity => ({
   id: s(r.id), type: r.type as Activity["type"],
   companyId: u(r.company_id as string | null), projectId: u(r.project_id as string | null),
-  actorId: s(r.actor_id), actorRole: r.actor_role as Activity["actorRole"],
+  // 자동 기록은 서버에 작성자 없이(null) 저장된다 — 화면에서는 예전처럼 "system" 으로 본다
+  actorId: r.actor_id ? s(r.actor_id) : r.actor_role === "system" ? "system" : "", actorRole: r.actor_role as Activity["actorRole"],
   at: s(r.at), text: s(r.message),
   meta: u(r.meta as Activity["meta"]),
 });
 
 export const activityToRow = (x: Activity): Row => ({
   id: x.id, type: x.type, company_id: n(x.companyId), project_id: n(x.projectId),
-  actor_id: x.actorId || null, actor_role: x.actorRole, at: x.at, message: x.text,
+  // 계정이 아닌 작성자(자동 처리)는 서버 규칙상 "system" 으로만 남는다
+  actor_id: personId(x.actorId), actor_role: personId(x.actorId) ? x.actorRole : "system", at: x.at, message: x.text,
   meta: n(x.meta),
 });
 
@@ -502,7 +512,7 @@ export const surveyFromRow = (r: Row): SurveyResponse => ({
 
 export const surveyToRow = (x: SurveyResponse): Row => ({
   id: x.id, survey_version: x.surveyVersion, stage: x.stage,
-  user_id: x.userId || null, user_name: x.userName, role: x.role,
+  user_id: personId(x.userId), user_name: x.userName, role: x.role,
   answers: x.answers, free_text: n(x.freeText),
   submitted_at: x.submittedAt, duration_sec: n(x.durationSec),
 });
@@ -538,7 +548,7 @@ export const companyFileToRow = (x: Partial<CompanyFile> & { id?: string }): Row
   ...(x.issuedAt !== undefined && { issued_at: n(x.issuedAt) }),
   ...(x.storagePath !== undefined && { storage_path: n(x.storagePath) }),
   ...(x.uploadedAt !== undefined && { uploaded_at: x.uploadedAt }),
-  ...(x.uploadedBy !== undefined && { uploaded_by: x.uploadedBy || null }),
+  ...(x.uploadedBy !== undefined && { uploaded_by: personId(x.uploadedBy) }),
 });
 
 export const journalFromRow = (r: Row): JournalEntry => ({
@@ -553,7 +563,7 @@ export const journalToRow = (x: Partial<JournalEntry> & { id?: string }): Row =>
   ...(x.content !== undefined && { content: x.content }),
   ...(x.entryDate !== undefined && { entry_date: x.entryDate }),
   ...(x.pinned !== undefined && { pinned: !!x.pinned }),
-  ...(x.authorId !== undefined && { author_id: x.authorId || null }),
+  ...(x.authorId !== undefined && { author_id: personId(x.authorId) }),
   ...(x.createdAt !== undefined && { created_at: x.createdAt }),
 });
 

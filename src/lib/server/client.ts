@@ -16,7 +16,21 @@ const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 let cached: SupabaseClient | null | undefined;
 
+/**
+ * 현장 비상용 — 서버가 설정돼 있어도 이 브라우저만 데모 모드로 돌린다.
+ * 인터넷이 끊기거나 Supabase 가 멈춰도 로그인 화면의 버튼 하나로 시연을 이어가기 위한 것이다.
+ * 기기별 표시라 localStorage 에 둔다. 서버 데이터에는 아무 영향이 없다.
+ */
+export const DEMO_FLAG_KEY = "kpjk-force-demo";
+export function demoForced(): boolean {
+  try { return typeof window !== "undefined" && window.localStorage.getItem(DEMO_FLAG_KEY) === "1"; } catch { return false; }
+}
+export function setDemoForced(on: boolean) {
+  try { if (on) window.localStorage.setItem(DEMO_FLAG_KEY, "1"); else window.localStorage.removeItem(DEMO_FLAG_KEY); } catch { /* 저장소 막힘 */ }
+}
+
 export function supa(): SupabaseClient | null {
+  if (demoForced()) return null;
   if (cached !== undefined) return cached;
   cached = url && anonKey ? createClient(url, anonKey, {
     auth: { persistSession: true, autoRefreshToken: true, storageKey: "kpjk-auth" },
@@ -27,8 +41,11 @@ export function supa(): SupabaseClient | null {
 /** 연결 점검용 — anon 키는 원래 브라우저에 나가는 값이다. 화면에 표시하지는 않는다 */
 export const serverEnv = () => ({ url, key: anonKey });
 
-/** 서버 연결이 설정돼 있는가 (로그인 여부와 무관) */
-export const serverConfigured = () => !!(url && anonKey);
+/** 이 앱 빌드에 서버 주소가 들어 있는가 (비상 데모 전환과 무관) */
+export const serverAvailable = () => !!(url && anonKey);
+
+/** 지금 이 브라우저가 서버로 도는가 (로그인 여부와 무관). 비상 데모로 돌렸으면 false */
+export const serverConfigured = () => serverAvailable() && !demoForced();
 
 /**
  * 계정을 만들 때만 쓰는 두 번째 연결.

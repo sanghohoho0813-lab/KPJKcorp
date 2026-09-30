@@ -899,7 +899,10 @@ create policy activities_select on public.activities for select to authenticated
 
 drop policy if exists activities_insert on public.activities;
 create policy activities_insert on public.activities for insert to authenticated
-  with check (actor_id = auth.uid()
+  -- 내가 한 일은 내 이름으로만. 작성자 없는 자동 기록(system)은 내부 계정만 남긴다
+  -- (고객 행동에 따른 자동 기록은 아래 4부 앞의 트리거가 서버에서 만든다).
+  with check ((actor_id = auth.uid()
+               or (actor_id is null and actor_role = 'system' and public.kpjk_is_internal()))
               and (company_id is null or public.kpjk_can_see_company(company_id)));
 
 -- -----------------------------------------------------------------------------
@@ -949,6 +952,139 @@ create policy app_settings_select on public.app_settings for select to authentic
 drop policy if exists app_settings_admin on public.app_settings;
 create policy app_settings_admin on public.app_settings for update to authenticated
   using (public.kpjk_is_admin()) with check (public.kpjk_is_admin());
+-- -----------------------------------------------------------------------------
+-- 14. 고객 행동의 자동 후속 — 서버가 직접 만든다
+-- -----------------------------------------------------------------------------
+-- 왜 서버가 하는가: 고객이 자료를 내면 담당자에게 "검토" 업무가 생겨야 Loop 가 닫힌다.
+-- 그런데 업무(tasks)·단계 변경·자동 기록은 내부 전용이라 고객 계정은 쓸 권한이 없다.
+-- 고객에게 그 권한을 열면 고객이 내부 업무를 마음대로 만들 수 있게 된다.
+-- 그래서 고객이 한 "행동 한 줄"(파일 제출·문의·상담요청·견적 회신)을 보고, 서버가 후속을 만든다.
+-- 고객이 내용을 지어 보낼 수 없다 — 서버가 요청·기업 정보를 직접 읽어 만든다.
+
+create or replace function public.kpjk_new_id(prefix text) returns text
+language sql volatile as $$
+  select prefix || '_' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 12)
+$$;
+
+-- 한국 시간으로 N일 뒤 18:00 (앱의 기한 규칙과 같다)
+create or replace function public.kpjk_due(days int) returns timestamptz
+language sql stable as $$
+  select (((now() at time zone 'Asia/Seoul')::date + days) + time '18:00') at time zone 'Asia/Seoul'
+$$;
+
+-- (1) 고객 자료 제출 → 검토 업무 · 접수 알림 · 자동 기록 · 요청자료가 다 모이면 단계 자동 변경
+create or replace function public.kpjk_after_client_file() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare r public.document_requests; v_company text; v_stage text; v_left int;
+begin
+  if not public.kpjk_is_client() then return new; end if;
+  select * into r from public.document_requests where id = new.request_id;
+  if not found then return new; end if;
+  select name into v_company from public.companies where id = r.company_id;
+
+  insert into public.tasks (id, company_id, project_id, title, type, due_date, assignee_id, status, priority, created_at, source)
+  values (public.kpjk_new_id('tk'), r.company_id, r.project_id, trim(coalesce(v_company, '') || ' ' || r.name || ' 검토'),
+          '자료검토', public.kpjk_due(2), r.assignee_id, 'todo', 'normal', now(), 'auto');
+  insert into public.activities (id, type, company_id, project_id, actor_id, actor_role, at, message)
+  values (public.kpjk_new_id('ac'), 'task_created', r.company_id, r.project_id, null, 'system', now(), '자동 생성: ' || r.name || ' 검토 Task');
+  insert into public.notifications (id, audience, company_id, title, body, at, read, href)
+  values (public.kpjk_new_id('nt'), 'client', r.company_id, '자료가 접수되었습니다',
+          r.name || ' 제출이 완료되었습니다. 담당자가 검토 후 안내드립니다.', now(), false, '/portal/documents');
+
+  if r.project_id is not null then
+    select stage into v_stage from public.projects where id = r.project_id;
+    if v_stage = 'doc_request' then
+      select count(*) into v_left from public.document_requests
+       where project_id = r.project_id and status in ('requested', 'revision');
+      if v_left = 0 then
+        update public.projects set stage = 'doc_received', stage_changed_at = now() where id = r.project_id;
+        insert into public.activities (id, type, company_id, project_id, actor_id, actor_role, at, message, meta)
+        values (public.kpjk_new_id('ac'), 'project_stage_changed', r.company_id, r.project_id, null, 'system', now(),
+                '단계 자동 변경: 자료요청 → 자료접수 (요청자료 전부 제출)', jsonb_build_object('from', 'doc_request', 'to', 'doc_received'));
+      end if;
+    end if;
+  end if;
+  return new;
+end $$;
+drop trigger if exists kpjk_client_file on public.document_files;
+create trigger kpjk_client_file after insert on public.document_files
+  for each row execute function public.kpjk_after_client_file();
+
+-- (2) 고객 문의 → 답변 업무
+create or replace function public.kpjk_after_client_inquiry() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare v_company text; v_consultant uuid;
+begin
+  if not public.kpjk_is_client() then return new; end if;
+  select name, consultant_id into v_company, v_consultant from public.companies where id = new.company_id;
+  if new.assignee_id is null and v_consultant is not null then
+    update public.inquiries set assignee_id = v_consultant where id = new.id;
+  end if;
+  insert into public.tasks (id, company_id, project_id, title, type, due_date, assignee_id, status, priority, created_at, source)
+  values (public.kpjk_new_id('tk'), new.company_id, new.project_id, trim(coalesce(v_company, '') || ' 문의 답변: ' || new.title),
+          '문의응대', public.kpjk_due(1), coalesce(new.assignee_id, v_consultant), 'todo', 'urgent', now(), 'auto');
+  return new;
+end $$;
+drop trigger if exists kpjk_client_inquiry on public.inquiries;
+create trigger kpjk_client_inquiry after insert on public.inquiries
+  for each row execute function public.kpjk_after_client_inquiry();
+
+-- (3) 고객이 답장하면 문의를 다시 "답변 대기"로 (고객은 문의 행을 직접 고칠 수 없다)
+create or replace function public.kpjk_after_client_message() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.kpjk_is_client() then return new; end if;
+  update public.inquiries set status = 'open' where id = new.inquiry_id and status <> 'open';
+  return new;
+end $$;
+drop trigger if exists kpjk_client_message on public.inquiry_messages;
+create trigger kpjk_client_message after insert on public.inquiry_messages
+  for each row execute function public.kpjk_after_client_message();
+
+-- (4) 고객 상담요청·관심 → 상담 연락 업무 · 접수 알림
+create or replace function public.kpjk_after_client_opportunity() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare v_company text; v_consultant uuid; v_req boolean := new.source = 'portal_request';
+begin
+  if not public.kpjk_is_client() then return new; end if;
+  select name, consultant_id into v_company, v_consultant from public.companies where id = new.company_id;
+  insert into public.tasks (id, company_id, title, type, due_date, assignee_id, status, priority, created_at, source, memo)
+  values (public.kpjk_new_id('tk'), new.company_id, trim(coalesce(v_company, '') || ' ' || new.service_name || ' 관심 — 상담 연락'),
+          '후속연락', public.kpjk_due(case when v_req then 1 else 2 end), coalesce(new.assignee_id, v_consultant), 'todo',
+          case when v_req then 'urgent' else 'normal' end, now(), 'auto', new.note);
+  insert into public.activities (id, type, company_id, actor_id, actor_role, at, message)
+  values (public.kpjk_new_id('ac'), 'task_created', new.company_id, null, 'system', now(), '자동 생성: ' || new.service_name || ' 상담 연락 Task');
+  insert into public.notifications (id, audience, company_id, title, body, at, read, href)
+  values (public.kpjk_new_id('nt'), 'client', new.company_id, '요청이 접수되었습니다',
+          new.service_name || ' 관련 문의가 담당 컨설턴트에게 전달되었습니다.', now(), false, '/portal/services');
+  return new;
+end $$;
+drop trigger if exists kpjk_client_opportunity on public.opportunities;
+create trigger kpjk_client_opportunity after insert on public.opportunities
+  for each row execute function public.kpjk_after_client_opportunity();
+
+-- (5) 고객 견적 회신 → 회신 확인 업무 닫기 · 계약 진행/보류 사유 확인 업무
+create or replace function public.kpjk_after_client_quote() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare v_company text; v_consultant uuid; v_ok boolean := new.status = 'accepted'; v_title text;
+begin
+  if not public.kpjk_is_client() or old.status <> 'sent' or new.status not in ('accepted', 'declined') then return new; end if;
+  select name, consultant_id into v_company, v_consultant from public.companies where id = new.company_id;
+  update public.tasks set status = 'done', completed_at = now()
+   where source = 'auto' and company_id = new.company_id and status <> 'done'
+     and position(new.title || ' 견적 회신 확인' in title) > 0;
+  v_title := trim(coalesce(v_company, '') || ' ' || new.title || case when v_ok then ' 계약 진행' else ' 보류 사유 확인' end);
+  insert into public.tasks (id, company_id, project_id, title, type, due_date, assignee_id, status, priority, created_at, source, memo)
+  values (public.kpjk_new_id('tk'), new.company_id, new.project_id, v_title, case when v_ok then '내부작업' else '후속연락' end,
+          public.kpjk_due(case when v_ok then 2 else 1 end), v_consultant, 'todo', 'urgent', now(), 'auto', new.client_note);
+  insert into public.activities (id, type, company_id, actor_id, actor_role, at, message)
+  values (public.kpjk_new_id('ac'), 'task_created', new.company_id, null, 'system', now(), '자동 생성: ' || v_title);
+  return new;
+end $$;
+drop trigger if exists kpjk_client_quote on public.quotes;
+create trigger kpjk_client_quote after update on public.quotes
+  for each row execute function public.kpjk_after_client_quote();
+
 -- =============================================================================
 --  3부. 파일 보관함 (Storage)
 -- =============================================================================

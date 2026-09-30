@@ -1,6 +1,7 @@
 "use client";
 
 import { useStore } from "@/lib/store";
+import { serverConfigured } from "@/lib/server/client";
 
 import Link from "next/link";
 import { type ReactNode, type ButtonHTMLAttributes, type InputHTMLAttributes, type SelectHTMLAttributes, type TextareaHTMLAttributes, forwardRef, useEffect, useRef, useState } from "react";
@@ -80,7 +81,12 @@ export function NextBadge({ tone = "ink" }: { tone?: "ink" | "shell" }) {
 }
 export function DemoBadge({ className }: { className?: string }) {
   // 운영 모드에서는 "DEMO DATA"가 거짓말이 된다. 배지도 같이 바뀐다.
+  // 서버가 붙은 앱은 로그인 전(아직 운영 표시가 켜지기 전)에도 데모가 아니다.
   const live = useStore((s) => s.settings.liveMode);
+  const onServer = useStore((s) => s.serverMode || (s.hydrated && serverConfigured()));
+  const hydrated = useStore((s) => s.hydrated);
+  if (!hydrated) return null;
+  if (onServer) return <span className={cx("inline-flex items-center rounded-md bg-success-bg px-1.5 py-0.5 text-[0.65rem] font-bold tracking-wide text-success", className)}>서버 운영</span>;
   if (live) return <span className={cx("inline-flex items-center rounded-md bg-success-bg px-1.5 py-0.5 text-[0.65rem] font-bold tracking-wide text-success", className)}>운영</span>;
   return <span className={cx("inline-flex items-center rounded-md bg-warning-bg px-1.5 py-0.5 text-[0.65rem] font-bold tracking-wide text-warning", className)}>DEMO DATA</span>;
 }

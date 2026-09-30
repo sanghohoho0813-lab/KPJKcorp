@@ -17,13 +17,31 @@ export interface SignInResult {
   ok: boolean;
   user?: User;
   reason?: string;
+  /** 서버에 닿지 못했다 — 비밀번호 틀림과 구분해야 현장에서 헤매지 않는다 */
+  offline?: boolean;
 }
+
+/** fetch 자체가 실패했는가 (인터넷 끊김·서버 멈춤·주소 오타) */
+export function isNetworkError(e: unknown): boolean {
+  if (!e || typeof e !== "object") return false;
+  const x = e as { name?: string; message?: string; status?: number };
+  return x.name === "AuthRetryableFetchError" || x.status === 0 || /Failed to fetch|NetworkError|fetch failed|Load failed|network/i.test(x.message ?? "");
+}
+
+export const OFFLINE_REASON = "서버에 연결하지 못했습니다. 인터넷 연결을 확인해 주세요.";
 
 export async function serverSignIn(email: string, password: string): Promise<SignInResult> {
   const sb = supa();
   if (!sb) return { ok: false, reason: "서버가 설정되지 않았습니다." };
 
-  const { data, error } = await sb.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
+  let data: Awaited<ReturnType<typeof sb.auth.signInWithPassword>>["data"];
+  let error: Awaited<ReturnType<typeof sb.auth.signInWithPassword>>["error"];
+  try {
+    ({ data, error } = await sb.auth.signInWithPassword({ email: email.trim().toLowerCase(), password }));
+  } catch (e) {
+    return { ok: false, offline: true, reason: isNetworkError(e) ? OFFLINE_REASON : "로그인 처리 중 문제가 발생했습니다." };
+  }
+  if (error && isNetworkError(error)) return { ok: false, offline: true, reason: OFFLINE_REASON };
   if (error || !data.user) {
     // 어느 쪽이 틀렸는지 알려주지 않는다 — 계정이 있는지 떠보는 것을 막는다.
     return { ok: false, reason: "아이디 또는 비밀번호가 올바르지 않습니다." };
@@ -49,16 +67,29 @@ export async function serverSignOut() {
   await supa()?.auth.signOut();
 }
 
-/** 새로고침 후에도 로그인이 유지되는지 확인한다 */
-export async function currentServerUser(): Promise<User | null> {
+/**
+ * 새로고침 후에도 로그인이 유지되는지 확인한다.
+ * "로그인이 풀렸다"와 "서버에 닿지 못했다"를 구분한다 — 앞의 것은 화면을 비우고,
+ * 뒤의 것은 마지막으로 받은 화면을 지키면서 알린다.
+ */
+export async function currentServerUser(): Promise<{ user: User | null; offline?: boolean }> {
   const sb = supa();
-  if (!sb) return null;
-  const { data } = await sb.auth.getUser();
-  if (!data.user) return null;
-  const { data: row } = await sb.from("profiles").select("*").eq("id", data.user.id).maybeSingle();
-  if (!row) return null;
-  const user = userFromRow(row);
-  return user.active === false ? null : user;
+  if (!sb) return { user: null };
+  try {
+    const { data: s, error: sErr } = await sb.auth.getSession();
+    if (sErr && isNetworkError(sErr)) return { user: null, offline: true };
+    if (!s.session) return { user: null };
+    const { data, error } = await sb.auth.getUser();
+    if (error && isNetworkError(error)) return { user: null, offline: true };
+    if (!data.user) return { user: null };
+    const { data: row, error: pErr } = await sb.from("profiles").select("*").eq("id", data.user.id).maybeSingle();
+    if (pErr && isNetworkError(pErr)) return { user: null, offline: true };
+    if (!row) return { user: null };
+    const user = userFromRow(row);
+    return { user: user.active === false ? null : user };
+  } catch (e) {
+    return { user: null, offline: isNetworkError(e) };
+  }
 }
 
 /**
