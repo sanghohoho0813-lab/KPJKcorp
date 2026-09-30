@@ -51,7 +51,10 @@ export type Permission =
   | "result.withdraw"
   | "rules.manage"
   | "data.manage"
-  | "notice.write";
+  | "notice.write"
+  | "vault.write"
+  | "journal.write"
+  | "payment.write";
 
 const POLICY: Record<Permission, Role[]> = {
   "company.create": ["admin", "consultant"],
@@ -97,6 +100,9 @@ const POLICY: Record<Permission, Role[]> = {
   "data.manage": ["admin"],
   // 공지는 여러 고객에게 한 번에 나간다 — 내부 계정만 쓴다
   "notice.write": ["admin", "consultant"],
+  "vault.write": ["admin", "consultant"],
+  "journal.write": ["admin", "consultant"],
+  "payment.write": ["admin", "consultant"],
 };
 
 export function can(role: Role | undefined | null, p: Permission): boolean {
@@ -121,6 +127,9 @@ export const PERMISSION_ROWS: { label: string; perms: Permission[] }[] = [
   { label: "대표 승인 / 반려", perms: ["approval.decide"] },
   { label: "결과자료 공유", perms: ["result.share"] },
   { label: "고객 공지 작성 · 수정", perms: ["notice.write"] },
+  { label: "기업 서류함 올리기 · 정리", perms: ["vault.write"] },
+  { label: "업무 일기 쓰기", perms: ["journal.write"] },
+  { label: "수금 항목 · 입금 확인", perms: ["payment.write"] },
   { label: "문의 작성", perms: ["inquiry.create"] },
   { label: "문의 답변", perms: ["inquiry.answer"] },
   { label: "실증 기준선 · 스프린트", perms: ["baseline.write", "sprint.manage"] },

@@ -25,6 +25,8 @@ function columnsOf(table: string): Set<string> {
     const name = /^([a-z_][a-z0-9_]*)\s/.exec(line)?.[1];
     if (name) cols.add(name);
   }
+  // 이미 설치된 곳을 위해 alter table … add column if not exists 로 붙인 칸도 센다
+  for (const a of sql.matchAll(new RegExp(`alter table public\\.${table} add column if not exists ([a-z_][a-z0-9_]*)`, "gi"))) cols.add(a[1]);
   return cols;
 }
 
@@ -38,12 +40,24 @@ const full = {
     corpNo: "1", establishedAt: "2020-01-01", bizCategory: "b", bizItem: "b", ceoBirth: "1980-01-01",
     capital: 1, region: "서울", employeeBand: "1-4", revenueBand: "<10", companyPhone: "p",
     website: "w", interests: ["a"], leadSource: "l", docs: {}, sample: true,
+    ceoGender: "male" as const, bizItemsExtra: "x", shareholders: "s", customFields: [{ id: "f1", group: "identity" as const, label: "l", value: "v" }],
   },
   project: {
     id: "pj_1", companyId: "co_1", name: "n", type: "t", consultantId: "u1",
     startDate: "x", dueDate: "x", stage: "consult" as const, description: "d",
     stageChangedAt: "x", clientVisible: true, archived: true, archivedAt: "x",
     nextMilestone: { label: "l", date: "d" },
+    workStatus: "waiting_client" as const, nextStep: "n", waitingSince: "2026-01-01T00:00:00Z",
+  },
+  vault: { id: "co_1", companyId: "co_1", slots: { bizReg: { received: true } }, customSlots: [], updatedAt: "x" },
+  companyFile: {
+    id: "cf_1", companyId: "co_1", slot: "bizReg", fileName: "f.pdf", size: 1, mime: "application/pdf",
+    folder: "a/b", issuedAt: "2026-01-01", storagePath: "co_1/cf_1__file.pdf", uploadedAt: "x", uploadedBy: "u1",
+  },
+  journal: { id: "jn_1", companyId: "co_1", type: "call" as const, content: "c", entryDate: "2026-01-01", pinned: true, authorId: "u1", createdAt: "x", updatedAt: "x" },
+  payment: {
+    id: "pm_1", companyId: "co_1", projectId: "pj_1", kind: "deposit" as const, label: "계약금", amount: 1,
+    dueDate: "2026-01-01", receivedAt: "2026-01-02", agentFee: 1, agentName: "a", note: "n", createdAt: "x",
   },
   consultation: {
     id: "cs_1", companyId: "co_1", projectId: "pj_1", date: "x", consultantId: "u1",
@@ -121,6 +135,10 @@ const CASES: [string, string, Record<string, unknown>][] = [
   ["document_requests", "docRequest",  M.docRequestToRow(full.docRequest)],
   ["schedules",         "schedule",    M.scheduleToRow(full.schedule)],
   ["notices",           "notice",      M.noticeToRow(full.notice)],
+  ["company_vaults",    "vault",       M.vaultToRow(full.vault)],
+  ["company_files",     "companyFile", M.companyFileToRow(full.companyFile)],
+  ["journal_entries",   "journal",     M.journalToRow(full.journal)],
+  ["payments",          "payment",     M.paymentToRow(full.payment)],
   ["tasks",             "task",        M.taskToRow(full.task)],
   ["inquiries",         "inquiry",     M.inquiryToRow(full.inquiry)],
   ["results",           "result",      M.resultToRow(full.result)],

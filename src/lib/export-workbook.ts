@@ -1,4 +1,7 @@
-import type { Activity, Company, Consultation, Contract, DocumentRequest, Inquiry, Notice, Project, Schedule, Task, User } from "./types";
+import type { Activity, Company, CompanyFile, CompanyVault, Consultation, Contract, DocumentRequest, Inquiry, JournalEntry, Notice, Payment, Project, Schedule, Task, User } from "./types";
+import { PAYMENT_KIND_LABEL, WORK_STATUS, workStatusOf } from "./work-status";
+import { slotLabel } from "./vault";
+import { JOURNAL_TYPE } from "./journal";
 import { DOC_STATUS, INQUIRY_STATUS, PRIORITY, SCHEDULE_TYPE, TASK_STATUS, stageLabel } from "./stages";
 import { CONSULT_AREA_LABEL, ENTITY_TYPES } from "./company-options";
 import type { SheetData } from "./xlsx";
@@ -23,6 +26,10 @@ export interface ExportCtx {
   notices: Notice[];
   activities: Activity[];
   users: User[];
+  payments?: Payment[];
+  companyFiles?: CompanyFile[];
+  companyVaults?: CompanyVault[];
+  journal?: JournalEntry[];
   orgName?: string;
   exportedBy: string;
   now: Date;
@@ -65,8 +72,8 @@ export function buildExportSheets(ctx: ExportCtx): SheetData[] {
     {
       name: "프로젝트",
       rows: [
-        ["기업", "프로젝트", "유형", "단계", "시작일", "마감일", "단계 변경일", "담당 컨설턴트", "고객 공개", "설명", "상태"],
-        ...ctx.projects.map((p) => [cname(p.companyId), p.name, p.type, stageLabel(p.stage), ymd(p.startDate), ymd(p.dueDate), ymd(p.stageChangedAt), who(p.consultantId), p.clientVisible ? "공개" : "비공개", p.description, p.archived ? "보관됨" : ""]),
+        ["기업", "프로젝트", "유형", "단계", "진행 상태", "다음 할 일", "시작일", "마감일", "단계 변경일", "담당 컨설턴트", "고객 공개", "설명", "상태"],
+        ...ctx.projects.map((p) => [cname(p.companyId), p.name, p.type, stageLabel(p.stage), WORK_STATUS[workStatusOf(p)].label, p.nextStep, ymd(p.startDate), ymd(p.dueDate), ymd(p.stageChangedAt), who(p.consultantId), p.clientVisible ? "공개" : "비공개", p.description, p.archived ? "보관됨" : ""]),
       ],
     },
     {
@@ -119,6 +126,28 @@ export function buildExportSheets(ctx: ExportCtx): SheetData[] {
       rows: [
         ["게시 시각", "받는 고객", "제목", "홈 고정", "게시 종료", "작성", "내용"],
         ...ctx.notices.map((n) => [ymdhm(n.publishedAt), n.companyId ? cname(n.companyId) : "전체 고객", n.title, n.pinned ? "고정" : "", ymdhm(n.expiresAt), who(n.authorId), n.body]),
+      ],
+    },
+    {
+      name: "수금",
+      rows: [
+        ["기업", "프로젝트", "종류", "이름", "금액(원)", "받기로 한 날", "입금일", "영업자", "영업자 수수료(원)", "메모"],
+        ...(ctx.payments ?? []).map((p) => [cname(p.companyId), pname(p.projectId), PAYMENT_KIND_LABEL[p.kind], p.label, p.amount ?? null, p.dueDate, p.receivedAt, p.agentName, p.agentFee ?? null, p.note]),
+      ],
+    },
+    {
+      // 파일 내용은 넣지 않는다 — 어떤 서류가 어디 있는지 목록만
+      name: "서류함 목록",
+      rows: [
+        ["기업", "서류 칸", "파일 이름", "폴더", "발급일", "올린 날", "올린 사람", "크기(byte)"],
+        ...(ctx.companyFiles ?? []).map((f) => [cname(f.companyId), slotLabel(ctx.companyVaults?.find((v) => v.companyId === f.companyId), f.slot), f.fileName, f.folder, f.issuedAt, ymdhm(f.uploadedAt), who(f.uploadedBy), f.size]),
+      ],
+    },
+    {
+      name: "업무 일기",
+      rows: [
+        ["날짜", "기업", "종류", "내용", "쓴 사람", "고정"],
+        ...(ctx.journal ?? []).map((j) => [j.entryDate, cname(j.companyId), JOURNAL_TYPE[j.type].label, j.content, who(j.authorId), j.pinned ? "고정" : ""]),
       ],
     },
     {

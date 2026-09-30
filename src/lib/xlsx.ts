@@ -26,7 +26,6 @@ const enc = new TextEncoder();
 
 function esc(s: string) {
   // XML 에 못 쓰는 제어문자는 뺀다 (탭·줄바꿈은 남김)
-  // eslint-disable-next-line no-control-regex
   return s.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 

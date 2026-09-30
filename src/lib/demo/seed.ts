@@ -1,4 +1,4 @@
-import type { Activity, Approval, Company, Consultation, Contract, DocumentRequest, Inquiry, Notification, Opportunity, Project, Quote, ResultFile, Schedule, SurveyResponse, Task, User, Notice } from "../types";
+import type { Activity, Approval, Company, Consultation, Contract, DocumentRequest, Inquiry, Notification, Opportunity, Project, Quote, ResultFile, Schedule, SurveyResponse, Task, User, Notice, CompanyVault, CompanyFile, JournalEntry, Payment } from "../types";
 import { addDays, iso } from "../format";
 
 /**
@@ -22,6 +22,10 @@ export interface SeedData {
   approvals: Approval[];
   surveys: SurveyResponse[];
   notices: Notice[];
+  companyVaults: CompanyVault[];
+  companyFiles: CompanyFile[];
+  journal: JournalEntry[];
+  payments: Payment[];
   activities: Activity[];
   notifications: Notification[];
 }
@@ -362,5 +366,19 @@ export function buildSeed(now = new Date()): SeedData {
   const allActivities = [...oppActivities, ...activities].sort((a, b) => b.at.localeCompare(a.at));
   const allNotifications = [...oppNotifs, ...notifications].sort((a, b) => b.at.localeCompare(a.at));
 
-  return { users, companies, consultations, contracts, projects, docRequests, schedules, tasks, inquiries, results, opportunities, quotes, approvals, surveys, notices, activities: allActivities, notifications: allNotifications };
+  // 고객 관리 — 샘플 기업에만. 금액·서류 파일은 넣지 않는다(지어낸 숫자·가짜 서류를 만들지 않는다)
+  const companyVaults: CompanyVault[] = [];
+  const companyFiles: CompanyFile[] = [];
+  const payments: Payment[] = [];
+  const journal: JournalEntry[] = [
+    { id: "jn_a1", companyId: "co_a", type: "call", content: "대표님 통화 — 중간 보고 일정은 다음 주 초로 잡기로 함. 매출채권 자료는 경리 담당이 준비 중.", entryDate: d(-2).slice(0, 10), authorId: "u_park", createdAt: d(-2, 16) },
+    { id: "jn_a2", companyId: "co_a", type: "decision", content: "원가 진단 범위를 본사 공장 1곳으로 한정. 2공장은 다음 단계에서 별도 논의.", entryDate: d(-12).slice(0, 10), pinned: true, authorId: "u_park", createdAt: d(-12, 11) },
+  ];
+  // 진행 상태 — 연구소 건은 고객 서류 회신을 기다리는 중(9일째 → "회신 지연" 경고 예시)
+  for (const p of projects) {
+    if (p.id === "pj_b1") { p.workStatus = "waiting_client"; p.waitingSince = d(-9); p.nextStep = "연구전담요원 재직증명 회신 받기"; }
+    if (p.id === "pj_a1") { p.workStatus = "in_progress"; p.nextStep = "원가구조 진단 결과 1차 정리"; }
+  }
+
+  return { users, companies, consultations, contracts, projects, docRequests, schedules, tasks, inquiries, results, opportunities, quotes, approvals, surveys, notices, companyVaults, companyFiles, journal, payments, activities: allActivities, notifications: allNotifications };
 }

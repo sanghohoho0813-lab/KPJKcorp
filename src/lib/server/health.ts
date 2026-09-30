@@ -22,8 +22,9 @@ export interface CheckItem {
 export const EXPECTED_TABLES = [
   "profiles", "companies", "projects", "consultations", "contracts", "document_requests", "document_files", "schedules", "notices", "tasks",
   "inquiries", "inquiry_messages", "results", "opportunities", "quotes", "approvals", "activities", "notifications", "surveys", "app_settings",
+  "company_vaults", "company_files", "journal_entries", "payments",
 ] as const;
-export const EXPECTED_BUCKETS = ["documents", "results"] as const;
+export const EXPECTED_BUCKETS = ["documents", "results", "vault"] as const;
 
 const RERUN = "Supabase → SQL Editor 에서 최신 setup.sql 을 전체 선택(Ctrl+A) 후 붙여넣어 다시 실행하세요. 여러 번 실행해도 데이터는 지워지지 않습니다.";
 
@@ -157,10 +158,10 @@ export async function runServerCheck(input: HealthInput): Promise<CheckItem[]> {
   const noBucket = buckets.filter((x) => x.r.error && /not found|does not exist/i.test(x.r.error.message ?? "")).map((x) => x.b);
   const bucketErr = buckets.filter((x) => x.r.error && !noBucket.includes(x.b));
   out.push(noBucket.length
-    ? { key: "buckets", label: "파일 보관함 2개", status: "fail", detail: `없는 보관함: ${noBucket.join(", ")} — ${noBucket.map((b) => (b === "documents" ? "고객이 요청자료를 올릴 수 없습니다" : "결과물을 올릴 수 없습니다")).join(", ")}.`, fix: RERUN }
+    ? { key: "buckets", label: `파일 보관함 ${EXPECTED_BUCKETS.length}개`, status: "fail", detail: `없는 보관함: ${noBucket.join(", ")} — ${noBucket.map((b) => (b === "documents" ? "고객이 요청자료를 올릴 수 없습니다" : b === "results" ? "결과물을 올릴 수 없습니다" : "기업 서류함에 파일을 둘 수 없습니다")).join(", ")}.`, fix: RERUN }
     : bucketErr.length
-      ? { key: "buckets", label: "파일 보관함 2개", status: "warn", detail: `확인하지 못한 보관함: ${bucketErr.map((x) => x.b).join(", ")}` }
-      : { key: "buckets", label: "파일 보관함 2개", status: "ok", detail: "자료(documents)·결과물(results) 보관함이 있습니다." });
+      ? { key: "buckets", label: `파일 보관함 ${EXPECTED_BUCKETS.length}개`, status: "warn", detail: `확인하지 못한 보관함: ${bucketErr.map((x) => x.b).join(", ")}` }
+      : { key: "buckets", label: `파일 보관함 ${EXPECTED_BUCKETS.length}개`, status: "ok", detail: "자료(documents)·결과물(results)·서류함(vault) 보관함이 있습니다." });
 
   return out;
 }

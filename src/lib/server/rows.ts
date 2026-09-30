@@ -1,4 +1,5 @@
 import type {
+  CompanyVault, CompanyFile, JournalEntry, Payment,
   Activity, Approval, Company, Consultation, Contract, DocumentFile, DocumentRequest,
   Inquiry, Message, Notice, Notification, Opportunity, Project, Quote, ResultFile, Schedule,
   SurveyResponse, Task, User,
@@ -76,6 +77,10 @@ export const companyFromRow = (r: Row): Company => ({
   leadSource: u(r.lead_source as string | null),
   docs: u(r.docs as Company["docs"]),
   sample: bool(r.sample) || undefined,
+  ceoGender: u(r.ceo_gender as Company["ceoGender"] | null),
+  bizItemsExtra: u(r.biz_items_extra as string | null),
+  shareholders: u(r.shareholders as string | null),
+  customFields: u(r.custom_fields as Company["customFields"] | null),
 });
 
 export const companyToRow = (x: Partial<Company> & { id?: string }): Row => ({
@@ -113,6 +118,10 @@ export const companyToRow = (x: Partial<Company> & { id?: string }): Row => ({
   ...(x.leadSource !== undefined && { lead_source: n(x.leadSource) }),
   ...(x.docs !== undefined && { docs: n(x.docs) }),
   ...(x.sample !== undefined && { sample: !!x.sample }),
+  ...(x.ceoGender !== undefined && { ceo_gender: n(x.ceoGender) }),
+  ...(x.bizItemsExtra !== undefined && { biz_items_extra: n(x.bizItemsExtra) }),
+  ...(x.shareholders !== undefined && { shareholders: n(x.shareholders) }),
+  ...(x.customFields !== undefined && { custom_fields: n(x.customFields) }),
 });
 
 /* --------------------------------- 프로젝트 ------------------------------- */
@@ -124,6 +133,9 @@ export const projectFromRow = (r: Row): Project => ({
   stageChangedAt: s(r.stage_changed_at), clientVisible: bool(r.client_visible),
   archived: bool(r.archived), archivedAt: u(r.archived_at as string | null),
   nextMilestone: u(r.next_milestone as Project["nextMilestone"]),
+  workStatus: u(r.work_status as Project["workStatus"] | null),
+  nextStep: u(r.next_step as string | null),
+  waitingSince: u(r.waiting_since as string | null),
 });
 
 export const projectToRow = (x: Partial<Project> & { id?: string }): Row => ({
@@ -141,6 +153,9 @@ export const projectToRow = (x: Partial<Project> & { id?: string }): Row => ({
   ...(x.archived !== undefined && { archived: !!x.archived }),
   ...(x.archivedAt !== undefined && { archived_at: n(x.archivedAt) }),
   ...(x.nextMilestone !== undefined && { next_milestone: n(x.nextMilestone) }),
+  ...(x.workStatus !== undefined && { work_status: n(x.workStatus) }),
+  ...(x.nextStep !== undefined && { next_step: n(x.nextStep) }),
+  ...(x.waitingSince !== undefined && { waiting_since: n(x.waitingSince) }),
 });
 
 /* --------------------------------- 상담기록 ------------------------------- */
@@ -490,4 +505,77 @@ export const surveyToRow = (x: SurveyResponse): Row => ({
   user_id: x.userId || null, user_name: x.userName, role: x.role,
   answers: x.answers, free_text: n(x.freeText),
   submitted_at: x.submittedAt, duration_sec: n(x.durationSec),
+});
+
+/* ------------------------------- 고객 관리 --------------------------------- */
+
+export const vaultFromRow = (r: Row): CompanyVault => ({
+  id: s(r.id), companyId: s(r.company_id),
+  slots: (r.slots as CompanyVault["slots"] | null) ?? {},
+  customSlots: (r.custom_slots as CompanyVault["customSlots"] | null) ?? [],
+  updatedAt: u(r.updated_at as string | null),
+});
+export const vaultToRow = (x: Partial<CompanyVault> & { id?: string }): Row => ({
+  ...(x.id !== undefined && { id: x.id }),
+  ...(x.companyId !== undefined && { company_id: x.companyId }),
+  ...(x.slots !== undefined && { slots: x.slots ?? {} }),
+  ...(x.customSlots !== undefined && { custom_slots: x.customSlots ?? [] }),
+});
+
+export const companyFileFromRow = (r: Row): CompanyFile => ({
+  id: s(r.id), companyId: s(r.company_id), slot: s(r.slot), fileName: s(r.file_name),
+  size: num(r.size), mime: s(r.mime), folder: u(r.folder as string | null), issuedAt: u(r.issued_at as string | null),
+  storagePath: u(r.storage_path as string | null), uploadedAt: s(r.uploaded_at), uploadedBy: s(r.uploaded_by),
+});
+export const companyFileToRow = (x: Partial<CompanyFile> & { id?: string }): Row => ({
+  ...(x.id !== undefined && { id: x.id }),
+  ...(x.companyId !== undefined && { company_id: x.companyId }),
+  ...(x.slot !== undefined && { slot: x.slot }),
+  ...(x.fileName !== undefined && { file_name: x.fileName }),
+  ...(x.size !== undefined && { size: x.size }),
+  ...(x.mime !== undefined && { mime: x.mime }),
+  ...(x.folder !== undefined && { folder: n(x.folder) }),
+  ...(x.issuedAt !== undefined && { issued_at: n(x.issuedAt) }),
+  ...(x.storagePath !== undefined && { storage_path: n(x.storagePath) }),
+  ...(x.uploadedAt !== undefined && { uploaded_at: x.uploadedAt }),
+  ...(x.uploadedBy !== undefined && { uploaded_by: x.uploadedBy || null }),
+});
+
+export const journalFromRow = (r: Row): JournalEntry => ({
+  id: s(r.id), companyId: s(r.company_id), type: r.type as JournalEntry["type"], content: s(r.content),
+  entryDate: s(r.entry_date), pinned: bool(r.pinned) || undefined, authorId: s(r.author_id),
+  createdAt: s(r.created_at), updatedAt: u(r.updated_at as string | null),
+});
+export const journalToRow = (x: Partial<JournalEntry> & { id?: string }): Row => ({
+  ...(x.id !== undefined && { id: x.id }),
+  ...(x.companyId !== undefined && { company_id: x.companyId }),
+  ...(x.type !== undefined && { type: x.type }),
+  ...(x.content !== undefined && { content: x.content }),
+  ...(x.entryDate !== undefined && { entry_date: x.entryDate }),
+  ...(x.pinned !== undefined && { pinned: !!x.pinned }),
+  ...(x.authorId !== undefined && { author_id: x.authorId || null }),
+  ...(x.createdAt !== undefined && { created_at: x.createdAt }),
+});
+
+export const paymentFromRow = (r: Row): Payment => ({
+  id: s(r.id), companyId: s(r.company_id), projectId: u(r.project_id as string | null),
+  kind: r.kind as Payment["kind"], label: s(r.label),
+  amount: r.amount === null || r.amount === undefined ? undefined : num(r.amount),
+  dueDate: u(r.due_date as string | null), receivedAt: u(r.received_at as string | null),
+  agentFee: r.agent_fee === null || r.agent_fee === undefined ? undefined : num(r.agent_fee),
+  agentName: u(r.agent_name as string | null), note: u(r.note as string | null), createdAt: s(r.created_at),
+});
+export const paymentToRow = (x: Partial<Payment> & { id?: string }): Row => ({
+  ...(x.id !== undefined && { id: x.id }),
+  ...(x.companyId !== undefined && { company_id: x.companyId }),
+  ...(x.projectId !== undefined && { project_id: n(x.projectId) }),
+  ...(x.kind !== undefined && { kind: x.kind }),
+  ...(x.label !== undefined && { label: x.label }),
+  ...(x.amount !== undefined && { amount: n(x.amount) }),
+  ...(x.dueDate !== undefined && { due_date: n(x.dueDate) }),
+  ...(x.receivedAt !== undefined && { received_at: n(x.receivedAt) }),
+  ...(x.agentFee !== undefined && { agent_fee: n(x.agentFee) }),
+  ...(x.agentName !== undefined && { agent_name: n(x.agentName) }),
+  ...(x.note !== undefined && { note: n(x.note) }),
+  ...(x.createdAt !== undefined && { created_at: x.createdAt }),
 });

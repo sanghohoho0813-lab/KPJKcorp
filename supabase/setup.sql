@@ -26,9 +26,9 @@
 --    - 맨 마지막에 설치 결과 표가 한 줄 나옵니다. 그것으로 성공을 확인하세요.
 --
 --  이 파일이 만드는 것
---    1부. 표 20개          — 기업·프로젝트·상담·계약·자료·일정·공지·업무·문의·견적·기록
+--    1부. 표 24개          — 기업·프로젝트·상담·계약·자료·일정·공지·업무·문의·견적·기록·서류함·업무 일기·수금
 --    2부. 접근 권한        — 누가 무엇을 볼 수 있는지. 데이터베이스가 직접 막습니다
---    3부. 파일 보관함 2개  — 고객 제출자료 / 결과자료
+--    3부. 파일 보관함 3개  — 고객 제출자료 / 결과자료 / 기업 서류함(내부 전용)
 --    4부. 대표 계정 연결
 --
 --  설치가 끝나면 Project Settings → API 의 두 값을 앱의 .env.local 에 넣으세요.
@@ -256,6 +256,79 @@ create table if not exists public.notices (
 create index if not exists notices_published_idx on public.notices(published_at desc);
 
 -- -----------------------------------------------------------------------------
+-- 7-2. 고객 관리 — 기본 정보 보강 · 진행 상태 · 서류함 · 업무 일기 · 수금 (전부 내부 전용)
+-- -----------------------------------------------------------------------------
+-- 이미 설치된 곳에도 칸이 붙도록 add column if not exists 로 둔다 (다시 실행해도 안전)
+alter table public.companies add column if not exists ceo_gender      text check (ceo_gender in ('male','female'));
+alter table public.companies add column if not exists biz_items_extra text;
+alter table public.companies add column if not exists shareholders    text;
+alter table public.companies add column if not exists custom_fields   jsonb;   -- 기업마다 직접 만든 칸
+
+alter table public.projects add column if not exists work_status  text
+  check (work_status in ('not_started','in_progress','waiting_client','done','on_hold','not_applicable'));
+alter table public.projects add column if not exists next_step     text;
+alter table public.projects add column if not exists waiting_since timestamptz;  -- 고객 회신 대기 시작 시각
+
+-- 서류함 상태 — 기업 정보(companies)와 떼어 둔다. 고객은 자기 회사 정보를 읽지만 보관 메모는 내부 전용이다
+create table if not exists public.company_vaults (
+  id           text primary key,                 -- = company_id
+  company_id   text not null unique references public.companies(id) on delete cascade,
+  slots        jsonb not null default '{}',      -- 칸별 받음·발급일·보관 메모 (비밀번호는 넣지 않는다)
+  custom_slots jsonb not null default '[]',      -- 직접 만든 서류 칸
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
+);
+
+-- 서류함 파일 — 원본은 vault 보관함(내부 전용)에 있다
+create table if not exists public.company_files (
+  id           text primary key,
+  company_id   text not null references public.companies(id) on delete cascade,
+  slot         text not null default 'other',
+  file_name    text not null,
+  size         bigint not null default 0,
+  mime         text not null default '',
+  folder       text,                             -- 폴더째 올렸을 때 폴더 안 경로
+  issued_at    date,
+  storage_path text,
+  uploaded_at  timestamptz not null default now(),
+  uploaded_by  uuid references public.profiles(id) on delete set null,
+  created_at   timestamptz not null default now()
+);
+create index if not exists company_files_company_idx on public.company_files(company_id);
+
+-- 업무 일기 — 고객에게 보이지 않는 내부 기록
+create table if not exists public.journal_entries (
+  id          text primary key,
+  company_id  text not null references public.companies(id) on delete cascade,
+  type        text not null check (type in ('note','call','decision','blocker','win','idea')),
+  content     text not null check (length(btrim(content)) > 0),
+  entry_date  date not null default current_date,
+  pinned      boolean not null default false,
+  author_id   uuid references public.profiles(id) on delete set null,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+create index if not exists journal_entries_company_idx on public.journal_entries(company_id, entry_date desc);
+
+-- 수금 — 계약금 · 중도금 · 성공보수
+create table if not exists public.payments (
+  id          text primary key,
+  company_id  text not null references public.companies(id) on delete cascade,
+  project_id  text references public.projects(id) on delete set null,
+  kind        text not null check (kind in ('deposit','interim','success')),
+  label       text not null,
+  amount      bigint,                            -- 미정이면 비움
+  due_date    date,
+  received_at date,                              -- 비어 있으면 미수
+  agent_fee   bigint,
+  agent_name  text,
+  note        text,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+create index if not exists payments_company_idx on public.payments(company_id);
+
+-- -----------------------------------------------------------------------------
 -- 8. 업무
 -- -----------------------------------------------------------------------------
 create table if not exists public.tasks (
@@ -479,7 +552,8 @@ declare t text;
 begin
   foreach t in array array[
     'companies','projects','consultations','contracts','document_requests',
-    'schedules','notices','tasks','inquiries','opportunities','quotes','app_settings'
+    'schedules','notices','tasks','inquiries','opportunities','quotes','app_settings',
+    'company_vaults','journal_entries','payments'
   ] loop
     execute format('drop trigger if exists touch_%1$s on public.%1$s', t);
     execute format(
@@ -586,7 +660,8 @@ begin
   foreach t in array array[
     'profiles','companies','projects','consultations','contracts','document_requests',
     'document_files','schedules','notices','tasks','inquiries','inquiry_messages','results',
-    'opportunities','quotes','approvals','activities','notifications','surveys','app_settings'
+    'opportunities','quotes','approvals','activities','notifications','surveys','app_settings',
+    'company_vaults','company_files','journal_entries','payments'
   ] loop
     execute format('alter table public.%I enable row level security', t);
   end loop;
@@ -814,14 +889,33 @@ create policy quotes_client_respond on public.quotes for update to authenticated
 -- 12. 활동 기록 — 추가만 (수정·삭제 정책을 아무에게도 주지 않는다)
 -- -----------------------------------------------------------------------------
 drop policy if exists activities_select on public.activities;
+-- 고객은 자기 회사 기록을 보되, 내부 전용 기록(서류함·수금·업무 일기·진행 상태·기본 정보 수정)은 빼고 본다
 create policy activities_select on public.activities for select to authenticated
   using (public.kpjk_is_internal()
-         or (company_id is not null and company_id = public.kpjk_my_company()));
+         or (company_id is not null and company_id = public.kpjk_my_company()
+             and type not in ('profile_updated','vault_updated','file_uploaded','file_removed',
+                              'work_status_changed','journal_written',
+                              'payment_added','payment_received','payment_removed')));
 
 drop policy if exists activities_insert on public.activities;
 create policy activities_insert on public.activities for insert to authenticated
   with check (actor_id = auth.uid()
               and (company_id is null or public.kpjk_can_see_company(company_id)));
+
+-- -----------------------------------------------------------------------------
+-- 12-2. 고객 관리 — 내부 전용. 컨설턴트 열람 범위(전체/내 담당)를 그대로 따른다
+-- -----------------------------------------------------------------------------
+do $$
+declare t text;
+begin
+  foreach t in array array['company_vaults','company_files','journal_entries','payments'] loop
+    execute format('drop policy if exists %1$s_internal on public.%1$s', t);
+    execute format(
+      'create policy %1$s_internal on public.%1$s for all to authenticated
+         using (public.kpjk_is_internal() and public.kpjk_can_see_company(company_id))
+         with check (public.kpjk_is_internal() and public.kpjk_can_see_company(company_id))', t);
+  end loop;
+end $$;
 
 -- -----------------------------------------------------------------------------
 -- 13. 알림 · 설문 · 설정
@@ -872,7 +966,8 @@ create policy app_settings_admin on public.app_settings for update to authentica
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values
   ('documents', 'documents', false, 52428800, null),
-  ('results',   'results',   false, 52428800, null)
+  ('results',   'results',   false, 52428800, null),
+  ('vault',     'vault',     false, 52428800, null)
 on conflict (id) do update
   set public = false, file_size_limit = excluded.file_size_limit;
 
@@ -913,6 +1008,28 @@ create policy results_write on storage.objects for insert to authenticated
 drop policy if exists results_remove on storage.objects;
 create policy results_remove on storage.objects for delete to authenticated
   using (bucket_id = 'results'
+         and public.kpjk_is_internal()
+         and public.kpjk_can_see_company((storage.foldername(name))[1]));
+
+-- -----------------------------------------------------------------------------
+-- vault — 기업 서류함. 신분증 사본 같은 것이 들어가므로 내부만 (고객은 읽지도 못한다)
+--   vault/{company_id}/{file_id}__{안전한 이름}
+-- -----------------------------------------------------------------------------
+drop policy if exists vault_read on storage.objects;
+create policy vault_read on storage.objects for select to authenticated
+  using (bucket_id = 'vault'
+         and public.kpjk_is_internal()
+         and public.kpjk_can_see_company((storage.foldername(name))[1]));
+
+drop policy if exists vault_write on storage.objects;
+create policy vault_write on storage.objects for insert to authenticated
+  with check (bucket_id = 'vault'
+              and public.kpjk_is_internal()
+              and public.kpjk_can_see_company((storage.foldername(name))[1]));
+
+drop policy if exists vault_remove on storage.objects;
+create policy vault_remove on storage.objects for delete to authenticated
+  using (bucket_id = 'vault'
          and public.kpjk_is_internal()
          and public.kpjk_can_see_company((storage.foldername(name))[1]));
 
@@ -983,14 +1100,14 @@ end $$;
 -- =============================================================================
 --  설치 결과 — 아래 한 줄로 확인하세요
 -- =============================================================================
---  표 20 · 권한정책 50 · 파일보관함 2 가 나오면 설치는 끝난 것입니다.
+--  표 24 · 권한정책 57 · 파일보관함 3 이 나오면 설치는 끝난 것입니다.
 --  "다음 할 일" 칸에 적힌 대로 하시면 됩니다.
 
 select
   (select count(*) from information_schema.tables
     where table_schema = 'public' and table_type = 'BASE TABLE')                as "표",
   (select count(*) from pg_policies where schemaname in ('public', 'storage'))  as "권한정책",
-  (select count(*) from storage.buckets where id in ('documents', 'results'))   as "파일보관함",
+  (select count(*) from storage.buckets where id in ('documents', 'results', 'vault')) as "파일보관함",
   (select coalesce(string_agg(email, ', '), '아직 없음')
      from public.profiles where role = 'admin')                                 as "대표계정",
   case

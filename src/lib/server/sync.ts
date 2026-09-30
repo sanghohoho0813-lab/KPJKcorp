@@ -26,6 +26,7 @@ import * as M from "./rows";
 const ORDER = [
   "companies", "projects",
   "consultations", "contracts", "docRequests", "schedules", "notices", "tasks",
+  "companyVaults", "companyFiles", "journal", "payments",
   "inquiries", "results", "opportunities",
   "quotes", "approvals",
   "activities", "notifications", "surveys",
@@ -50,6 +51,10 @@ const SPEC: Record<Key, Spec> = {
   contracts:     { table: "contracts",         toRow: M.contractToRow as Spec["toRow"],     fromRow: M.contractFromRow,     deletable: true },
   docRequests:   { table: "document_requests", toRow: M.docRequestToRow as Spec["toRow"],   fromRow: M.docRequestFromRow,   deletable: true,  order: { column: "requested_at", ascending: false } },
   schedules:     { table: "schedules",         toRow: M.scheduleToRow as Spec["toRow"],     fromRow: M.scheduleFromRow,     deletable: true,  order: { column: "start_at", ascending: true } },
+  companyVaults: { table: "company_vaults",    toRow: M.vaultToRow as Spec["toRow"],        fromRow: M.vaultFromRow,        deletable: true },
+  companyFiles:  { table: "company_files",     toRow: M.companyFileToRow as Spec["toRow"],  fromRow: M.companyFileFromRow,  deletable: true,  order: { column: "uploaded_at", ascending: false } },
+  journal:       { table: "journal_entries",   toRow: M.journalToRow as Spec["toRow"],      fromRow: M.journalFromRow,      deletable: true,  order: { column: "created_at", ascending: false } },
+  payments:      { table: "payments",          toRow: M.paymentToRow as Spec["toRow"],      fromRow: M.paymentFromRow,      deletable: true,  order: { column: "created_at", ascending: true } },
   notices:       { table: "notices",           toRow: M.noticeToRow as Spec["toRow"],       fromRow: M.noticeFromRow,       deletable: true,  order: { column: "published_at", ascending: false } },
   tasks:         { table: "tasks",             toRow: M.taskToRow as Spec["toRow"],         fromRow: M.taskFromRow,         deletable: true,  order: { column: "due_date", ascending: true } },
   inquiries:     { table: "inquiries",         toRow: M.inquiryToRow as Spec["toRow"],      fromRow: M.inquiryFromRow,      deletable: true,  order: { column: "created_at", ascending: false } },
@@ -162,7 +167,15 @@ function diff(prev: Partial<StoreState>, next: Partial<StoreState>): Change[] {
     for (const row of b) {
       const old = before.get(row.id);
       if (!old || JSON.stringify(old) !== JSON.stringify(row)) {
-        upsert.push(SPEC[key].toRow(row as never));
+        const out = SPEC[key].toRow(row as never);
+        // 값을 지운 칸(있다가 undefined 가 된 것)은 toRow 가 건너뛴다 → 서버에 옛 값이 남아 새로고침하면 되살아났다.
+        // 지운 칸만 따로 null 로 보낸다.
+        if (old) {
+          const cleared: Record<string, null> = {};
+          for (const [k, v] of Object.entries(old)) if (v !== undefined && (row as unknown as Record<string, unknown>)[k] === undefined) cleared[k] = null;
+          if (Object.keys(cleared).length) Object.assign(out, SPEC[key].toRow(cleared as never));
+        }
+        upsert.push(out);
       }
       before.delete(row.id);
     }

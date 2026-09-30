@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { type ReactNode, useState } from "react";
-import { AlertTriangle, Megaphone, Archive, ArrowRight, Building2, KeyRound, Pencil, ShieldAlert, Trash2, UserPlus, CalendarDays, CheckCircle2, ChevronDown, FileUp, MessageSquare, Clock, FileText, RefreshCw, Sparkles, Upload, UserCheck, Search, Briefcase, Bell, LogIn, Download, RotateCcw, TrendingUp, ShieldCheck, ClipboardList, UserMinus, Repeat, Receipt, Ruler } from "lucide-react";
+import { AlertTriangle, FileCheck2, NotebookPen, Wallet, Megaphone, Archive, ArrowRight, Building2, KeyRound, Pencil, ShieldAlert, Trash2, UserPlus, CalendarDays, CheckCircle2, ChevronDown, FileUp, MessageSquare, Clock, FileText, RefreshCw, Sparkles, Upload, UserCheck, Search, Briefcase, Bell, LogIn, Download, RotateCcw, TrendingUp, ShieldCheck, ClipboardList, UserMinus, Repeat, Receipt, Ruler } from "lucide-react";
 import type { Activity, DocStatus, InternalStage, Schedule, TaskStatus, Priority, InquiryStatus } from "@/lib/types";
 import { DOC_STATUS, INQUIRY_STATUS, PRIORITY, SCHEDULE_TYPE, TASK_STATUS, stageLabel, stageProgress } from "@/lib/stages";
 import type { BriefItem } from "@/lib/brief";
@@ -164,6 +164,15 @@ const ACT_ICON: Record<Activity["type"], ReactNode> = {
   notice_published: <Megaphone size={14} />,
   notice_updated: <Megaphone size={14} />,
   notice_removed: <Megaphone size={14} />,
+  profile_updated: <Pencil size={14} />,
+  vault_updated: <FileCheck2 size={14} />,
+  file_uploaded: <FileUp size={14} />,
+  file_removed: <Trash2 size={14} />,
+  work_status_changed: <RefreshCw size={14} />,
+  journal_written: <NotebookPen size={14} />,
+  payment_added: <Wallet size={14} />,
+  payment_received: <Wallet size={14} />,
+  payment_removed: <Trash2 size={14} />,
   baseline_survey_saved: <Ruler size={14} />,
   samples_removed: <Trash2 size={14} />,
   samples_restored: <RotateCcw size={14} />,

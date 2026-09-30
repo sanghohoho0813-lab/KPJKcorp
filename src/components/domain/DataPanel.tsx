@@ -191,6 +191,7 @@ function ExcelPanel() {
     const sheets = buildExportSheets({
       companies: st.companies, projects: st.projects, consultations: st.consultations, contracts: st.contracts, docRequests: st.docRequests,
       schedules: st.schedules, tasks: st.tasks, inquiries: st.inquiries, notices: st.notices, activities: st.activities, users: st.users,
+      payments: st.payments, companyFiles: st.companyFiles, companyVaults: st.companyVaults, journal: st.journal,
       orgName: st.settings.org?.name, exportedBy: st.users.find((u) => u.id === me)?.name ?? me, now,
     });
     const summary = `기업 ${st.companies.length} · 프로젝트 ${st.projects.length} · 기록 ${st.activities.length}건`;
@@ -211,7 +212,7 @@ function ExcelPanel() {
         {can(role, "company.create") && <Button size="sm" variant="ghost" icon={<Download size={14} />} onClick={downloadCompanyTemplate}>등록 양식</Button>}
         {can(role, "data.manage") && <Button size="sm" variant="outline" icon={<Download size={14} />} onClick={exportAll}>전체 데이터 엑셀로 받기</Button>}
       </div>
-      {can(role, "data.manage") && <p className="mt-2 text-[0.78rem] text-ink-3">기업고객·프로젝트·상담·계약·요청자료·일정·업무·문의·공지·처리 기록 10개 시트. 내보낸 사실은 처리 기록에 남습니다.</p>}
+      {can(role, "data.manage") && <p className="mt-2 text-[0.78rem] text-ink-3">기업고객·프로젝트·상담·계약·요청자료·일정·업무·문의·공지·수금·서류함 목록·업무 일기·처리 기록 13개 시트. 내보낸 사실은 처리 기록에 남습니다.</p>}
       <CompanyImportModal open={importOpen} onClose={() => setImportOpen(false)} />
     </div>
   );

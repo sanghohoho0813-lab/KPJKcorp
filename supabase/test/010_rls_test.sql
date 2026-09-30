@@ -92,7 +92,23 @@ insert into public.notices(id, company_id, title, published_at, expires_at) valu
   ('nc_later', null,  '예약된 전체 공지',   now() + interval '2 day', null);
 insert into storage.objects(bucket_id, name) values
   ('documents','co_a/dr_a1/f1__사업자등록증.pdf'),
-  ('documents','co_b/dr_b1/f2__비밀자료.pdf');
+  ('documents','co_b/dr_b1/f2__비밀자료.pdf'),
+  ('vault','co_a/cf_a1__file.pdf'),
+  ('vault','co_b/cf_b1__file.pdf');
+-- 고객 관리 (내부 전용)
+insert into public.company_vaults(id, company_id, slots) values
+  ('co_a','co_a','{"jointCert":{"received":true,"note":"대표실 금고"}}'), ('co_b','co_b','{}');
+insert into public.company_files(id, company_id, slot, file_name, storage_path) values
+  ('cf_a1','co_a','ceoId','대표자 신분증.pdf','co_a/cf_a1__file.pdf'),
+  ('cf_b1','co_b','bizReg','사업자등록증.pdf','co_b/cf_b1__file.pdf');
+insert into public.journal_entries(id, company_id, type, content) values
+  ('jn_a1','co_a','call','대표 통화 — 내부 메모'), ('jn_b1','co_b','note','B사 메모');
+insert into public.payments(id, company_id, kind, label, amount) values
+  ('pm_a1','co_a','deposit','계약금', 1000000), ('pm_b1','co_b','success','성공보수', 2000000);
+insert into public.activities(id, type, company_id, actor_id, actor_role, message) values
+  ('ac_a2','payment_received','co_a','00000000-0000-0000-0000-00000000a001','admin','입금 확인: 계약금'),
+  ('ac_a3','journal_written','co_a','00000000-0000-0000-0000-00000000a001','admin','업무 일기: 통화'),
+  ('ac_a4','document_uploaded','co_a','00000000-0000-0000-0000-00000000f001','client','자료 제출');
 
 -- =========================== 고객 A =========================================
 set role authenticated;
@@ -131,6 +147,21 @@ select chk('고객A: 공지는 자기 회사 + 전체 공지만',  (select count
 select chk('고객A: B사 공지는 안 보인다',       (select count(*) from public.notices where id='nc_b'), 0::bigint);
 select chk('고객A: 게시 기한 지난 공지는 안 보인다', (select count(*) from public.notices where id='nc_old'), 0::bigint);
 select chk('고객A: 게시 전 공지는 안 보인다',     (select count(*) from public.notices where id='nc_later'), 0::bigint);
+-- 고객 관리 기록은 자기 회사 것이라도 전부 내부 전용
+select chk('고객A: 서류함 상태 안 보인다(보관 메모 포함)', (select count(*) from public.company_vaults), 0::bigint);
+select chk('고객A: 서류함 파일 목록 안 보인다',   (select count(*) from public.company_files), 0::bigint);
+select chk('고객A: 업무 일기 안 보인다',          (select count(*) from public.journal_entries), 0::bigint);
+select chk('고객A: 수금 안 보인다',               (select count(*) from public.payments), 0::bigint);
+select chk('고객A: 수금·일기 기록은 안 보인다',
+       (select count(*) from public.activities where type in ('payment_received','journal_written')), 0::bigint);
+select chk('고객A: 일반 기록은 보인다(등록·자료 제출)', (select count(*) from public.activities), 2::bigint);
+select chk('고객A: 서류함 보관함 파일 못 본다',  (select count(*) from storage.objects where bucket_id='vault'), 0::bigint);
+select chk('고객A: 서류함 보관함에 못 올린다',
+       denied($$insert into storage.objects(bucket_id, name) values ('vault','co_a/x__file.pdf')$$), true);
+select chk('고객A: 수금을 못 만든다',
+       denied($$insert into public.payments(id, company_id, kind, label) values ('pm_x','co_a','deposit','x')$$), true);
+select chk('고객A: 입금 확인을 못 바꾼다',
+       affected($$update public.payments set received_at=current_date where id='pm_a1'$$), 0::bigint);
 select chk('고객A: 공지를 쓸 수 없다',
        denied($$insert into public.notices(id, title) values ('nc_x','고객이 쓴 공지')$$), true);
 select chk('고객A: 공지를 고칠 수 없다',
@@ -153,6 +184,15 @@ select chk('컨설턴트(전체): 상담기록 보인다',     (select count(*) 
 select chk('컨설턴트: 공지는 전부 보인다',        (select count(*) from public.notices), 5::bigint);
 select chk('컨설턴트: 공지를 쓸 수 있다',
        affected($$insert into public.notices(id, title) values ('nc_c','컨설턴트 공지')$$), 1::bigint);
+select chk('컨설턴트(전체): 서류함 두 곳 다 보인다', (select count(*) from public.company_vaults), 2::bigint);
+select chk('컨설턴트(전체): 수금 두 건 보인다',   (select count(*) from public.payments), 2::bigint);
+select chk('컨설턴트(전체): 서류함 보관함 파일 보인다', (select count(*) from storage.objects where bucket_id='vault'), 2::bigint);
+select chk('컨설턴트: 업무 일기를 쓸 수 있다',
+       affected($$insert into public.journal_entries(id, company_id, type, content) values ('jn_c','co_a','note','메모')$$), 1::bigint);
+select chk('컨설턴트: 빈 일기는 거절된다',
+       denied($$insert into public.journal_entries(id, company_id, type, content) values ('jn_e','co_a','note','   ')$$), true);
+select chk('컨설턴트: 입금 확인을 할 수 있다',
+       affected($$update public.payments set received_at=current_date where id='pm_a1'$$), 1::bigint);
 select chk('컨설턴트: 스스로 대표가 못 된다',
        affected($$update public.profiles set role='admin' where id=auth.uid()$$), 0::bigint);
 select chk('컨설턴트: 남의 계정을 못 만든다',
@@ -171,6 +211,10 @@ select chk('컨설턴트(내담당): 담당 기업만 보인다', (select count(
 select chk('컨설턴트(내담당): 그게 co_a 다',       (select id from public.companies), 'co_a');
 select chk('컨설턴트(내담당): B사 프로젝트 안 보인다',
        (select count(*) from public.projects where company_id='co_b'), 0::bigint);
+select chk('컨설턴트(내담당): B사 수금 안 보인다',   (select count(*) from public.payments where company_id='co_b'), 0::bigint);
+select chk('컨설턴트(내담당): B사 서류 파일 안 보인다', (select count(*) from public.company_files where company_id='co_b'), 0::bigint);
+select chk('컨설턴트(내담당): B사 보관함 원본 못 연다',
+       (select count(*) from storage.objects where bucket_id='vault' and name like 'co_b/%'), 0::bigint);
 reset role; reset request.jwt.claim.sub;
 
 set role authenticated;

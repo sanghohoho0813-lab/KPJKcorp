@@ -18,11 +18,18 @@ import { CompanyModal, ProjectModal, useMay } from "@/components/domain/EntityMo
 import { UserModal } from "@/components/domain/UserModals";
 import { Confirm } from "@/components/ui/overlay";
 import { NewConsultationModal } from "@/components/domain/ConsultationModal";
+import { ProfileCard } from "@/components/domain/client/ProfileCard";
+import { VaultTab } from "@/components/domain/client/VaultTab";
+import { WorkTab } from "@/components/domain/client/WorkTab";
+import { JournalTab } from "@/components/domain/client/JournalTab";
+import { MoneySection } from "@/components/domain/client/MoneySection";
+import { CompanyAlertsCard, PortalStatus } from "@/components/domain/client/PortalStatus";
 import { CONSULT_AREA_LABEL, ENTITY_TYPES, companySummary, yearsSince } from "@/lib/company-options";
 import { DOC_SOURCE_LABEL } from "@/lib/docparse";
 import { EXTRACT_METHOD_LABEL } from "@/lib/docextract";
 
-type TabKey = "overview" | "consult" | "contract" | "project" | "docs" | "schedule" | "inquiry" | "results" | "history";
+type TabKey = "overview" | "work" | "vault" | "docs" | "contract" | "consult" | "schedule" | "portal" | "journal" | "history";
+const TAB_KEYS: TabKey[] = ["overview", "work", "vault", "docs", "contract", "consult", "schedule", "portal", "journal", "history"];
 
 export default function ClientCardPage() {
   const { id } = useParams<{ id: string }>();
@@ -31,7 +38,11 @@ export default function ClientCardPage() {
   const openAi = useUi((s) => s.openAi);
   const openDraft = useUi((s) => s.openDraft);
   const setPreview = useStore((s) => s.setPortalPreview);
-  const [tab, setTab] = useState<TabKey>("overview");
+  // ?tab=vault 처럼 바로 열 수 있다 (현황표·경고에서 들어올 때)
+  const [tab, setTab] = useState<TabKey>(() => {
+    const q = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("tab");
+    return q && TAB_KEYS.includes(q as TabKey) ? (q as TabKey) : "overview";
+  });
   const [reviewReq, setReviewReq] = useState<DocumentRequest | null>(null);
   const [newDoc, setNewDoc] = useState<string | null>(null);
   const [editCompany, setEditCompany] = useState(false);
@@ -84,15 +95,17 @@ export default function ClientCardPage() {
   for (const i of openIq) actions.push({ text: `문의 답변: ${i.title}`, href: `/ax/inquiries?focus=${i.id}`, tone: "error" });
   if (upcoming[0]) actions.push({ text: `${relativeDay(upcoming[0].start)} ${fmtTime(upcoming[0].start)} ${upcoming[0].title}`, href: "/ax/schedule", tone: "info" });
 
+  const unpaid = st.payments.filter((x) => x.companyId === c.id && !x.receivedAt).length;
   const tabs: { key: TabKey; label: string; count?: number }[] = [
     { key: "overview", label: "Overview" },
-    { key: "consult", label: "상담", count: consultations.length },
-    { key: "contract", label: "계약", count: contracts.length },
-    { key: "project", label: "프로젝트", count: projects.length },
+    { key: "work", label: "진행 업무", count: projects.filter((p) => !p.archived).length },
+    { key: "vault", label: "서류함", count: st.companyFiles.filter((f) => f.companyId === c.id).length },
     { key: "docs", label: "요청자료", count: docs.length },
+    { key: "contract", label: "계약 · 수금", count: unpaid || contracts.length },
+    { key: "consult", label: "상담", count: consultations.length },
     { key: "schedule", label: "일정", count: upcoming.length },
-    { key: "inquiry", label: "문의", count: inquiries.length },
-    { key: "results", label: "결과자료", count: results.length },
+    { key: "portal", label: "고객 플랫폼", count: openIq.length || undefined },
+    { key: "journal", label: "업무 일기", count: st.journal.filter((j) => j.companyId === c.id).length },
     { key: "history", label: "History", count: activities.length },
   ];
 
@@ -192,6 +205,12 @@ export default function ClientCardPage() {
       <Tabs tabs={tabs} value={tab} onChange={setTab} id="tut-client-tabs" />
 
       {tab === "overview" && (
+        <div className="space-y-5">
+          <CompanyAlertsCard company={c} onOpen={(t) => setTab(t === "money" ? "contract" : t)} />
+          <ProfileCard company={c} />
+        </div>
+      )}
+      {tab === "overview" && (
         <div className="grid gap-5 xl:grid-cols-[1.4fr_1fr]">
           <div className="space-y-5">
             <Card className="p-5">
@@ -286,8 +305,14 @@ export default function ClientCardPage() {
         </div>
       )}
 
+      {tab === "work" && <WorkTab company={c} />}
+      {tab === "vault" && <VaultTab company={c} />}
+      {tab === "journal" && <JournalTab company={c} />}
+
       {tab === "contract" && (
         <>
+        <MoneySection company={c} />
+        <div className="mt-4 mb-2 text-[0.95rem] font-bold">계약</div>
         <div className="space-y-2 lg:hidden">
           {contracts.map((ct) => (
             <div key={ct.id} className="card p-4">
@@ -317,19 +342,6 @@ export default function ClientCardPage() {
           </table>
         </Card>
         </>
-      )}
-
-      {tab === "project" && (
-        <div className="grid gap-4 md:grid-cols-2">
-          {projects.map((p) => (
-            <Link key={p.id} href={`/ax/projects/${p.id}`} className="card card-hover block p-5">
-              <div className="flex items-center justify-between gap-2"><span className="text-[1.05rem] font-bold">{p.name}</span><StageBadge stage={p.stage} /></div>
-              <div className="mt-1 text-[0.85rem] text-ink-2">{p.description}</div>
-              <StageProgressBar stage={p.stage} className="mt-3" />
-              <div className="mt-2 grid grid-cols-3 gap-2 text-[0.8rem] text-ink-3"><span>시작 {fmtDate(p.startDate)}</span><span>마감 {fmtDate(p.dueDate)}</span><span>담당 {st.users.find((u) => u.id === p.consultantId)?.name}</span></div>
-            </Link>
-          ))}
-        </div>
       )}
 
       {tab === "docs" && (
@@ -390,8 +402,10 @@ export default function ClientCardPage() {
         </Card>
       )}
 
-      {tab === "inquiry" && (
-        <div className="space-y-3">
+      {tab === "portal" && <PortalStatus company={c} onMakeAccount={may("user.manage") ? () => setNewAccount(true) : undefined} />}
+      {tab === "portal" && (
+        <div className="mt-4 space-y-3">
+          <div className="text-[0.95rem] font-bold">고객 문의 {inquiries.length}</div>
           {inquiries.length === 0 && <Card><EmptyState icon={<MessageSquare size={30} />} title="문의가 없습니다" /></Card>}
           {inquiries.map((iq) => (
             <Link key={iq.id} href={`/ax/inquiries?focus=${iq.id}`} className="card card-hover block p-5">
@@ -403,8 +417,9 @@ export default function ClientCardPage() {
         </div>
       )}
 
-      {tab === "results" && (
-        <div className="grid gap-3 md:grid-cols-2">
+      {tab === "portal" && (
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <div className="text-[0.95rem] font-bold md:col-span-2">고객에게 공유한 결과자료 {results.length}</div>
           {results.length === 0 && <Card className="md:col-span-2"><EmptyState icon={<FileCheck2 size={30} />} title="공유된 결과자료가 없습니다" /></Card>}
           {results.map((r) => (
             <Card key={r.id} className="flex items-start gap-3 p-4">

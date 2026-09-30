@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { Suspense, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Building2, ChevronRight, FileSpreadsheet, LayoutGrid, List, Plus } from "lucide-react";
+import { Building2, ChevronRight, FileSpreadsheet, LayoutGrid, List, Plus, Table2 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { daysBetween, fmtDate, fmtRelative } from "@/lib/format";
 import { stageLabel } from "@/lib/stages";
 import { PageHeader, Badge, Button, SegmentedControl, EmptyState, Card } from "@/components/ui/ui";
 import { CompanyModal, useMay } from "@/components/domain/EntityModals";
 import { CompanyImportModal } from "@/components/domain/CompanyImport";
+import { StatusBoard } from "@/components/domain/client/StatusBoard";
 import { SearchBox, StageBadge, StageProgressBar } from "@/components/domain/domain";
 import { RestoreSamplesButton, SampleBanner } from "@/components/domain/SampleData";
 import { CONSULT_AREA_LABEL, companySummary } from "@/lib/company-options";
@@ -19,7 +20,7 @@ function ClientsInner() {
   const router = useRouter();
   const params = useSearchParams();
   const [q, setQ] = useState("");
-  const [view, setView] = useState<"card" | "table">("card");
+  const [view, setView] = useState<"card" | "table" | "board">(params.get("view") === "board" ? "board" : "card");
   const [filter, setFilter] = useState<"all" | "mine" | "issue" | "archived">("all");
   // 대시보드 "처음 시작하기"에서 오면 등록 창이 바로 열린다
   const [newOpen, setNewOpen] = useState(params.get("new") === "1");
@@ -52,7 +53,7 @@ function ClientsInner() {
     <div>
       <PageHeader title="기업고객" desc="기업고객 단위로 상담·계약·프로젝트·자료·일정·문의를 연결합니다." badge={<Badge>{st.companies.filter((c) => !c.archived).length}개 기업</Badge>} actions={
         <div className="flex flex-wrap items-center gap-2">
-          <SegmentedControl value={view} onChange={setView} options={[{ key: "card", label: <span className="flex items-center gap-1"><LayoutGrid size={14} /> 카드</span> }, { key: "table", label: <span className="flex items-center gap-1"><List size={14} /> 목록</span> }]} />
+          <SegmentedControl value={view} onChange={setView} options={[{ key: "card", label: <span className="flex items-center gap-1"><LayoutGrid size={14} /> 카드</span> }, { key: "table", label: <span className="flex items-center gap-1"><List size={14} /> 목록</span> }, { key: "board", label: <span className="flex items-center gap-1"><Table2 size={14} /> 현황표</span> }]} />
           {/* 비어 있을 때는 빈 상태 카드 안의 버튼 하나만 둔다 — 같은 버튼이 두 개면 어느 쪽을 눌러야 할지 고민하게 된다 */}
           {totalActive > 0 && <RestoreSamplesButton />}
           {may("company.create") && totalActive > 0 && <Button variant="outline" icon={<FileSpreadsheet size={16} />} onClick={() => setImportOpen(true)}>엑셀로 등록</Button>}
@@ -77,6 +78,8 @@ function ClientsInner() {
             <EmptyState icon={<Building2 size={32} />} title="조건에 맞는 기업이 없습니다" desc="검색어나 필터를 바꿔보세요." action={(q || filter !== "all") ? <Button variant="outline" onClick={() => { setQ(""); setFilter("all"); }}>전체 보기</Button> : undefined} />
           )}
         </Card>
+      ) : view === "board" ? (
+        <StatusBoard companies={rows.map((r) => r.c)} />
       ) : view === "card" ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {rows.map(({ c, active, missing, overdue, openIq, next, last, consultant }) => (

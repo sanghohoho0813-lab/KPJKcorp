@@ -14,6 +14,8 @@ import { explain, supa } from "./client";
 
 export const DOC_BUCKET = "documents";
 export const RESULT_BUCKET = "results";
+/** 기업 서류함 — 내부 전용 (고객은 읽지도 못한다) */
+export const VAULT_BUCKET = "vault";
 export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 
 /** 경로에 쓸 수 있는 이름으로. 원본 이름은 document_files.file_name 이 갖는다. */
@@ -41,6 +43,11 @@ async function put(bucket: string, path: string, file: File): Promise<UploadResu
 /** 고객이 제출하는 자료 */
 export function uploadDocument(companyId: string, requestId: string, fileId: string, file: File) {
   return put(DOC_BUCKET, `${companyId}/${requestId}/${fileId}__${safeName(file.name)}`, file);
+}
+
+/** 기업 서류함 원본 — 신분증 사본 같은 것이 들어가므로 별도 보관함 */
+export function uploadVault(companyId: string, fileId: string, file: File) {
+  return put(VAULT_BUCKET, `${companyId}/${fileId}__${safeName(file.name)}`, file);
 }
 
 /** 담당자가 고객에게 전달하는 결과물 */

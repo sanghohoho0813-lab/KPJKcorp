@@ -22,6 +22,6 @@ const st=(r:any[])=>r.map(i=>i.key+":"+i.status).join(" ");
   r=await runServerCheck({url:URL_,key:jwt("anon"),client:fake({missing:["notices"],noCol:true}),fetcher:f200}); ok(r.find(i=>i.key==="tables")!.status==="fail"&&r.find(i=>i.key==="tables")!.detail.includes("notices")&&r.find(i=>i.key==="columns")!.status==="fail","old setup.sql");
   r=await runServerCheck({url:URL_,key:jwt("anon"),client:fake({role:null}),fetcher:f200}); ok(r.find(i=>i.key==="role")!.status==="fail"&&r.find(i=>i.key==="role")!.detail.includes("대표 계정 연결"),"no role");
   r=await runServerCheck({url:URL_,key:jwt("anon"),client:fake({noBucket:["results"]}),fetcher:f200}); ok(r.find(i=>i.key==="buckets")!.status==="fail","bucket missing");
-  const rep=checkReport(r,new Date()); ok(rep.includes("파일 보관함 2개: 막힘")&&!rep.includes("eyJ"),"report has no key");
+  const rep=checkReport(r,new Date()); ok(rep.includes("파일 보관함 3개: 막힘")&&!rep.includes("eyJ"),"report has no key");
   process.exit(fail?1:0);
 })();

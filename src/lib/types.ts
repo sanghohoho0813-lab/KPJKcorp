@@ -93,7 +93,119 @@ export interface Company {
   docs?: Partial<Record<CompanyDocKind, CompanyDocMeta>>;
   /** 데모 샘플 기업 — "샘플 지우기 / 다시 보기"의 대상. 사용자가 직접 넣은 기업에는 붙지 않는다 */
   sample?: boolean;
+
+  /* ---- 기본 정보 보강 (고객 관리 카드) ---- */
+  /** 대표자 성별 */
+  ceoGender?: "male" | "female";
+  /** 종목이 여러 개일 때 첫 번째 뒤의 나머지 */
+  bizItemsExtra?: string;
+  /** 주주·임원 구성 (한 줄 메모) */
+  shareholders?: string;
+  /** 회사마다 필요한 칸을 직접 만든다 — 예: 공장 등록번호 */
+  customFields?: CustomField[];
 }
+
+export type ProfileGroup = "identity" | "people" | "contact" | "credential";
+export interface CustomField {
+  id: string;
+  group: ProfileGroup;
+  label: string;
+  value: string;
+}
+
+/** 서류함 — 칸(slot) 하나에 여러 파일이 올 수 있고, 파일 없이 "받음"만 표시하는 칸도 있다(공동인증서) */
+export interface VaultSlotState {
+  received: boolean;
+  /** 발급일 YYYY-MM-DD — 유효기간 계산 기준 */
+  issuedAt?: string;
+  /** 보관 위치·비고. 공동인증서는 "어디 두었는지"만 — 비밀번호는 적지 않는다 */
+  note?: string;
+  updatedAt?: string;
+}
+export interface CustomDocSlot {
+  key: string;
+  label: string;
+  /** 유효기간(개월). 없으면 기한 없음 */
+  validMonths?: number;
+  sensitive?: boolean;
+}
+/**
+ * 기업 서류함 상태 — 기업 한 곳에 하나. 기업 정보(companies)와 따로 두는 까닭:
+ * 고객은 자기 회사 정보를 읽을 수 있지만, 서류 보관 메모(공동인증서를 어디 두었는지 등)는 내부 전용이어야 한다.
+ */
+export interface CompanyVault {
+  /** = companyId */
+  id: string;
+  companyId: string;
+  slots: Record<string, VaultSlotState>;
+  customSlots: CustomDocSlot[];
+  updatedAt?: string;
+}
+
+/** 고객 Portal·고객 API 에 보이지 않는 내부 기록 종류 — 서버 권한정책(activities_select)과 같은 목록 */
+export const INTERNAL_ACTIVITY_TYPES = [
+  "profile_updated", "vault_updated", "file_uploaded", "file_removed", "work_status_changed",
+  "journal_written", "payment_added", "payment_received", "payment_removed",
+] as const;
+
+/** 서류함에 올린 파일 — 원본은 서버 내부 전용 보관함(vault) 또는 데모 모드에서는 이 브라우저에 있다 */
+export interface CompanyFile {
+  id: string;
+  companyId: string;
+  /** 서류 칸 키 (기본 칸·직접 만든 칸) 또는 "other"(기타 서류) */
+  slot: string;
+  fileName: string;
+  size: number;
+  mime: string;
+  /** 폴더째 올렸을 때 폴더 안의 경로 — 예: "2026 신청서류/정관.pdf" */
+  folder?: string;
+  /** 발급일 (글자에서 읽었거나 직접 입력) */
+  issuedAt?: string;
+  /** 서버 보관함 경로. 없으면 데모 모드 — 이 브라우저에 원본이 있다 */
+  storagePath?: string;
+  uploadedAt: string;
+  uploadedBy: string;
+}
+
+/** 업무 일기 — 고객에게는 보이지 않는 내부 기록 */
+export type JournalType = "note" | "call" | "decision" | "blocker" | "win" | "idea";
+export interface JournalEntry {
+  id: string;
+  companyId: string;
+  type: JournalType;
+  content: string;
+  /** 무슨 날의 일인지 YYYY-MM-DD */
+  entryDate: string;
+  pinned?: boolean;
+  authorId: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+/** 수금 — 계약금·중도금·성공보수 */
+export type PaymentKind = "deposit" | "interim" | "success";
+export interface Payment {
+  id: string;
+  companyId: string;
+  /** 어느 프로젝트의 대금인지 (전체 계약이면 없음) */
+  projectId?: string;
+  kind: PaymentKind;
+  label: string;
+  /** 금액(원). 미정이면 없음 */
+  amount?: number;
+  /** 받기로 한 날 YYYY-MM-DD */
+  dueDate?: string;
+  /** 입금 확인일 YYYY-MM-DD. 없으면 미수 */
+  receivedAt?: string;
+  /** 영업자 수수료(원) · 이름 — 있으면 "내 몫" = 금액 − 수수료 */
+  agentFee?: number;
+  agentName?: string;
+  note?: string;
+  createdAt: string;
+}
+
+/** 진행 업무 상태 — 단계(stage)와 별개로 "지금 공이 누구에게 있나" */
+export type WorkStatus = "not_started" | "in_progress" | "waiting_client" | "done" | "on_hold" | "not_applicable";
 
 export type EntityType = "corporation" | "sole" | "other";
 export type CompanyDocKind = "bizReg" | "corpReg";
@@ -159,6 +271,12 @@ export interface Project {
   archivedAt?: string;
   /** 담당자가 직접 입력한 다음 예정 — 표준 소요일이 쌓이기 전까지는 이것만 고객에게 보여준다 */
   nextMilestone?: { label: string; date: string };
+  /** 진행 상태(내부용). 없으면 단계에서 짐작한다 — workStatusOf() */
+  workStatus?: WorkStatus;
+  /** 다음에 할 일 한 줄 (내부용) */
+  nextStep?: string;
+  /** 고객 회신을 기다리기 시작한 때 — 7일 넘으면 경고 */
+  waitingSince?: string;
 }
 
 export interface DocumentFile {
@@ -537,7 +655,16 @@ export type ActivityType =
   | "baseline_survey_saved"
   | "notice_published"
   | "notice_updated"
-  | "notice_removed";
+  | "notice_removed"
+  | "profile_updated"
+  | "vault_updated"
+  | "file_uploaded"
+  | "file_removed"
+  | "work_status_changed"
+  | "journal_written"
+  | "payment_added"
+  | "payment_received"
+  | "payment_removed";
 
 export interface Activity {
   id: string;

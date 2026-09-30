@@ -29,6 +29,12 @@ import type {
   Role,
   Schedule,
   Notice,
+  CompanyFile,
+  JournalEntry,
+  JournalType,
+  Payment,
+  VaultSlotState,
+  WorkStatus,
   Session,
   Settings,
   SurveyResponse,
@@ -38,6 +44,9 @@ import type {
 import { nowIso, uid, addDays, iso, daysBetween } from "./format";
 import { stageLabel } from "./stages";
 import { RULE_BY_KEY, ruleDays, ruleOn } from "./rules";
+import { emptyVault, slotLabel } from "./vault";
+import { PAYMENT_KIND_LABEL, WORK_STATUS, won, workStatusOf } from "./work-status";
+import { JOURNAL_TYPE } from "./journal";
 import { OPP_STATUS, SERVICE_BY_KEY } from "./services";
 import { can, type Permission } from "./permissions";
 import { toLegacyBaseline } from "./baseline-survey";
@@ -146,6 +155,23 @@ export interface StoreState extends SeedData {
   updateNotice: (id: string, patch: { title?: string; body?: string; pinned?: boolean; expiresAt?: string | null }, byUserId: string) => void;
   /** 게시 내리기 — 공지는 지워도 "언제 누가 무엇을 공지했는지"는 기록에 남는다 */
   removeNotice: (id: string, byUserId: string) => void;
+
+  // ---- 고객 관리: 서류함 · 진행 상태 · 업무 일기 · 수금 ----
+  setVaultSlot: (companyId: string, key: string, patch: Partial<VaultSlotState>, byUserId: string) => void;
+  addCustomSlot: (companyId: string, data: { label: string; validMonths?: number; sensitive?: boolean }, byUserId: string) => string | null;
+  renameCustomSlot: (companyId: string, key: string, label: string, byUserId: string) => void;
+  removeCustomSlot: (companyId: string, key: string, byUserId: string) => void;
+  /** 파일 여러 개를 한 번에 — 칸이 정해진 파일은 그 칸을 "받음"으로, 읽은 발급일도 반영 */
+  addCompanyFiles: (companyId: string, files: Omit<CompanyFile, "companyId" | "uploadedAt" | "uploadedBy">[], byUserId: string) => number;
+  moveCompanyFile: (id: string, slot: string, byUserId: string) => void;
+  removeCompanyFile: (id: string, byUserId: string) => void;
+  setWorkStatus: (projectId: string, patch: { workStatus?: WorkStatus; nextStep?: string; dueDate?: string }, byUserId: string) => void;
+  addJournal: (data: { companyId: string; type: JournalType; content: string; entryDate: string; pinned?: boolean }, byUserId: string) => string | null;
+  updateJournal: (id: string, patch: { type?: JournalType; content?: string; entryDate?: string; pinned?: boolean }, byUserId: string) => void;
+  removeJournal: (id: string, byUserId: string) => void;
+  addPayment: (data: Omit<Payment, "id" | "createdAt">, byUserId: string) => string | null;
+  updatePayment: (id: string, patch: Partial<Omit<Payment, "id" | "companyId" | "createdAt">>, byUserId: string) => void;
+  removePayment: (id: string, byUserId: string) => void;
   shareResult: (data: Omit<ResultFile, "id" | "sharedAt">, byUserId: string) => void;
   downloadResult: (resultId: string, byUserId: string) => void;
   // opportunity / approval / survey
@@ -254,11 +280,17 @@ function makeNotification(n: Omit<Notification, "id" | "at" | "read">): Notifica
   return { ...n, id: uid("nt"), at: nowIso(), read: false };
 }
 
+/** 백업에 반드시 있어야 하는 목록 (처음부터 있던 것) */
+const BACKUP_KEYS: (keyof SeedData)[] = ["users", "companies", "consultations", "contracts", "projects", "docRequests", "schedules", "tasks", "inquiries", "results", "opportunities", "quotes", "approvals", "surveys", "activities", "notifications"];
+/** 나중에 생긴 목록 — 옛 백업에는 없을 수 있다 */
+const BACKUP_OPTIONAL_KEYS: (keyof SeedData)[] = ["notices", "companyVaults", "companyFiles", "journal", "payments"];
+
 /** 서버 모드로 들어가거나 로그아웃할 때의 빈 상태. 남의 데이터가 화면에 남아 있으면 안 된다. */
 const EMPTY_DATA: SeedData = {
   users: [], companies: [], consultations: [], contracts: [], projects: [], docRequests: [],
   schedules: [], tasks: [], inquiries: [], results: [], opportunities: [], quotes: [],
   approvals: [], surveys: [], notices: [], activities: [], notifications: [],
+  companyVaults: [], companyFiles: [], journal: [], payments: [],
 };
 
 /**
@@ -556,7 +588,7 @@ export const useStore = create<StoreState>()(
         if (deny(st, "company.update", `기업고객 수정 (${before.name})`, set)) return;
         const changed = (Object.keys(patch) as (keyof typeof patch)[]).filter((k) => patch[k] !== undefined && JSON.stringify(patch[k]) !== JSON.stringify(before[k]));
         if (changed.length === 0) return;
-        const LABEL: Record<string, string> = { name: "기업명", ceo: "대표자", industry: "업종", bizNo: "사업자번호", contactName: "담당자", contactTitle: "직책", contactPhone: "연락처", contactEmail: "이메일", address: "주소", employees: "임직원", revenue: "매출", consultantId: "담당 컨설턴트", memo: "메모", firstConsultDate: "최초 상담일", entityType: "사업자 형태", corpNo: "법인등록번호", establishedAt: "설립일", bizCategory: "업태", bizItem: "종목", ceoBirth: "대표자 생년월일", capital: "자본금", region: "지역", employeeBand: "임직원 규모", revenueBand: "매출 규모", companyPhone: "대표번호", website: "홈페이지", interests: "관심 분야", leadSource: "유입 경로", docs: "서류 확인" };
+        const LABEL: Record<string, string> = { name: "기업명", ceo: "대표자", industry: "업종", bizNo: "사업자번호", contactName: "담당자", contactTitle: "직책", contactPhone: "연락처", contactEmail: "이메일", address: "주소", employees: "임직원", revenue: "매출", consultantId: "담당 컨설턴트", memo: "메모", firstConsultDate: "최초 상담일", entityType: "사업자 형태", corpNo: "법인등록번호", establishedAt: "설립일", bizCategory: "업태", bizItem: "종목", ceoBirth: "대표자 생년월일", capital: "자본금", region: "지역", employeeBand: "임직원 규모", revenueBand: "매출 규모", companyPhone: "대표번호", website: "홈페이지", interests: "관심 분야", leadSource: "유입 경로", docs: "서류 확인", ceoGender: "대표자 성별", bizItemsExtra: "종목(그 외)", shareholders: "주주·임원 구성", customFields: "직접 만든 칸" };
         set({
           companies: st.companies.map((c) => (c.id === id ? { ...c, ...patch } : c)),
           activities: [makeActivity({ type: "company_updated", companyId: id, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `기업정보 수정: ${before.name} — ${changed.map((k) => LABEL[k] ?? k).join(", ")}`, meta: { fields: changed.join(",") } }), ...st.activities],
@@ -934,7 +966,7 @@ export const useStore = create<StoreState>()(
         const st = get();
         if (deny(st, "data.manage", "백업 내보내기", set)) return null;
         const now = nowIso();
-        const keys: (keyof SeedData)[] = ["users", "companies", "consultations", "contracts", "projects", "docRequests", "schedules", "tasks", "inquiries", "results", "opportunities", "quotes", "approvals", "surveys", "notices", "activities", "notifications"];
+        const keys: (keyof SeedData)[] = [...BACKUP_KEYS, ...BACKUP_OPTIONAL_KEYS];
         const data: Record<string, unknown> = {};
         for (const k of keys) data[k] = st[k];
         const payload = {
@@ -965,14 +997,19 @@ export const useStore = create<StoreState>()(
         let parsed: { format?: string; version?: number; data?: Record<string, unknown>; settings?: Partial<Settings>; seededAt?: string; exportedAt?: string };
         try { parsed = JSON.parse(json); } catch { return { ok: false, reason: "JSON 파일이 아닙니다." }; }
         if (parsed?.format !== "kpjk-ax-backup" || !parsed.data) return { ok: false, reason: "이 시스템의 백업 파일이 아닙니다." };
-        const keys: (keyof SeedData)[] = ["users", "companies", "consultations", "contracts", "projects", "docRequests", "schedules", "tasks", "inquiries", "results", "opportunities", "quotes", "approvals", "surveys", "notices", "activities", "notifications"];
         const next: Partial<SeedData> = {};
         const counts: Record<string, number> = {};
-        for (const k of keys) {
+        for (const k of BACKUP_KEYS) {
           const v = parsed.data[k];
           if (!Array.isArray(v)) return { ok: false, reason: `백업에 ${k} 목록이 없습니다.` };
           (next as Record<string, unknown>)[k] = v;
           counts[k] = v.length;
+        }
+        // 나중에 생긴 목록은 옛 백업에 없다 — 없으면 빈 목록으로 (예전 백업도 그대로 복원되게)
+        for (const k of BACKUP_OPTIONAL_KEYS) {
+          const v = parsed.data[k];
+          (next as Record<string, unknown>)[k] = Array.isArray(v) ? v : [];
+          counts[k] = Array.isArray(v) ? v.length : 0;
         }
         const users = next.users as User[];
         if (!users.some((u) => u.role === "admin" && u.active !== false)) return { ok: false, reason: "사용 가능한 대표 계정이 없는 백업은 가져올 수 없습니다. 아무도 로그인할 수 없게 됩니다." };
@@ -1238,6 +1275,202 @@ export const useStore = create<StoreState>()(
           activities: [makeActivity({ type: "notice_removed", companyId: cur.companyId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `공지 내림: ${cur.title}` }), ...st.activities],
         });
       },
+      // ---------- 고객 관리 ----------
+      // 서류함·수금·일기·진행 상태의 기록은 내부 전용이다 (INTERNAL_ACTIVITY_TYPES — 서버도 고객에게 주지 않는다)
+      setVaultSlot: (companyId, key, patch, byUserId) => {
+        const st = get();
+        const c = st.companies.find((x) => x.id === companyId);
+        if (!c) return;
+        if (deny(st, "vault.write", `서류함 수정 (${c.name})`, set)) return;
+        const cur = st.companyVaults.find((v) => v.companyId === companyId) ?? emptyVault(companyId);
+        const before = cur.slots[key] ?? { received: false };
+        const after = { ...before, ...patch, updatedAt: nowIso() };
+        const label = slotLabel(cur, key);
+        const what = patch.received !== undefined && patch.received !== before.received
+          ? (patch.received ? `${label} 받음` : `${label} 받음 표시 해제`)
+          : patch.issuedAt !== undefined ? `${label} 발급일 ${patch.issuedAt || "지움"}` : `${label} 메모 수정`;
+        const next = { ...cur, slots: { ...cur.slots, [key]: after }, updatedAt: nowIso() };
+        set({
+          companyVaults: [...st.companyVaults.filter((v) => v.companyId !== companyId), next],
+          activities: [makeActivity({ type: "vault_updated", companyId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `서류함: ${what}` }), ...st.activities],
+        });
+      },
+      addCustomSlot: (companyId, data, byUserId) => {
+        const st = get();
+        const label = data.label.trim();
+        if (!label) return null;
+        if (deny(st, "vault.write", `서류 칸 만들기 (${label})`, set)) return null;
+        const cur = st.companyVaults.find((v) => v.companyId === companyId) ?? emptyVault(companyId);
+        const key = `cd_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+        const next = { ...cur, customSlots: [...cur.customSlots, { key, label, validMonths: data.validMonths && data.validMonths > 0 ? data.validMonths : undefined, sensitive: data.sensitive || undefined }], updatedAt: nowIso() };
+        set({
+          companyVaults: [...st.companyVaults.filter((v) => v.companyId !== companyId), next],
+          activities: [makeActivity({ type: "vault_updated", companyId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `서류함: '${label}' 칸 만듦` }), ...st.activities],
+        });
+        return key;
+      },
+      renameCustomSlot: (companyId, key, label, byUserId) => {
+        const st = get();
+        const cur = st.companyVaults.find((v) => v.companyId === companyId);
+        const slot = cur?.customSlots.find((x) => x.key === key);
+        if (!cur || !slot || !label.trim() || slot.label === label.trim()) return;
+        if (deny(st, "vault.write", `서류 칸 이름 (${slot.label})`, set)) return;
+        const next = { ...cur, customSlots: cur.customSlots.map((x) => (x.key === key ? { ...x, label: label.trim() } : x)), updatedAt: nowIso() };
+        set({
+          companyVaults: st.companyVaults.map((v) => (v.companyId === companyId ? next : v)),
+          activities: [makeActivity({ type: "vault_updated", companyId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `서류함: '${slot.label}' → '${label.trim()}'` }), ...st.activities],
+        });
+      },
+      removeCustomSlot: (companyId, key, byUserId) => {
+        const st = get();
+        const cur = st.companyVaults.find((v) => v.companyId === companyId);
+        const slot = cur?.customSlots.find((x) => x.key === key);
+        if (!cur || !slot) return;
+        if (deny(st, "vault.write", `서류 칸 없애기 (${slot.label})`, set)) return;
+        // 칸만 없앤다. 그 칸의 파일은 "기타 서류"로 옮겨 남긴다 — 칸을 지웠다고 원본이 사라지면 안 된다
+        const next = { ...cur, customSlots: cur.customSlots.filter((x) => x.key !== key), updatedAt: nowIso() };
+        set({
+          companyVaults: st.companyVaults.map((v) => (v.companyId === companyId ? next : v)),
+          companyFiles: st.companyFiles.map((f) => (f.companyId === companyId && f.slot === key ? { ...f, slot: "other" } : f)),
+          activities: [makeActivity({ type: "vault_updated", companyId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `서류함: '${slot.label}' 칸 없앰 (파일은 기타 서류로)` }), ...st.activities],
+        });
+      },
+      addCompanyFiles: (companyId, files, byUserId) => {
+        const st = get();
+        const c = st.companies.find((x) => x.id === companyId);
+        if (!c || !files.length) return 0;
+        if (deny(st, "vault.write", `서류 올리기 (${c.name} ${files.length}건)`, set)) return 0;
+        const now = nowIso();
+        const added: CompanyFile[] = files.map((f) => ({ ...f, companyId, uploadedAt: now, uploadedBy: byUserId }));
+        const cur = st.companyVaults.find((v) => v.companyId === companyId) ?? emptyVault(companyId);
+        const slots = { ...cur.slots };
+        for (const f of added) {
+          if (f.slot === "other") continue;
+          const prev = slots[f.slot] ?? { received: false };
+          slots[f.slot] = { ...prev, received: true, issuedAt: f.issuedAt || prev.issuedAt, updatedAt: now };
+        }
+        const labels = [...new Set(added.map((f) => slotLabel(cur, f.slot)))];
+        set({
+          companyFiles: [...added, ...st.companyFiles],
+          companyVaults: [...st.companyVaults.filter((v) => v.companyId !== companyId), { ...cur, slots, updatedAt: now }],
+          activities: [makeActivity({ type: "file_uploaded", companyId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `서류 ${added.length}건 올림 — ${labels.slice(0, 4).join(", ")}${labels.length > 4 ? ` 외 ${labels.length - 4}` : ""}`, meta: { count: added.length } }), ...st.activities],
+        });
+        return added.length;
+      },
+      moveCompanyFile: (id, slot, byUserId) => {
+        const st = get();
+        const f = st.companyFiles.find((x) => x.id === id);
+        if (!f || f.slot === slot) return;
+        if (deny(st, "vault.write", `서류 칸 옮기기 (${f.fileName})`, set)) return;
+        const cur = st.companyVaults.find((v) => v.companyId === f.companyId) ?? emptyVault(f.companyId);
+        const slots = { ...cur.slots };
+        if (slot !== "other") slots[slot] = { ...(slots[slot] ?? { received: false }), received: true, issuedAt: f.issuedAt || slots[slot]?.issuedAt, updatedAt: nowIso() };
+        set({
+          companyFiles: st.companyFiles.map((x) => (x.id === id ? { ...x, slot } : x)),
+          companyVaults: [...st.companyVaults.filter((v) => v.companyId !== f.companyId), { ...cur, slots, updatedAt: nowIso() }],
+          activities: [makeActivity({ type: "vault_updated", companyId: f.companyId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `서류함: ${f.fileName} → ${slotLabel(cur, slot)}` }), ...st.activities],
+        });
+      },
+      removeCompanyFile: (id, byUserId) => {
+        const st = get();
+        const f = st.companyFiles.find((x) => x.id === id);
+        if (!f) return;
+        if (deny(st, "vault.write", `서류 파일 지우기 (${f.fileName})`, set)) return;
+        set({
+          companyFiles: st.companyFiles.filter((x) => x.id !== id),
+          activities: [makeActivity({ type: "file_removed", companyId: f.companyId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `서류 파일 지움: ${f.fileName}` }), ...st.activities],
+        });
+      },
+      setWorkStatus: (projectId, patch, byUserId) => {
+        const st = get();
+        const p = st.projects.find((x) => x.id === projectId);
+        if (!p) return;
+        if (deny(st, "project.update", `진행 상태 (${p.name})`, set)) return;
+        const before = workStatusOf(p);
+        const status = patch.workStatus ?? p.workStatus;
+        const next: Project = {
+          ...p,
+          ...(patch.workStatus !== undefined ? { workStatus: patch.workStatus } : {}),
+          ...(patch.nextStep !== undefined ? { nextStep: patch.nextStep.trim() || undefined } : {}),
+          ...(patch.dueDate !== undefined && patch.dueDate ? { dueDate: patch.dueDate } : {}),
+          // 고객 회신 대기로 바뀌는 순간부터 센다. 다른 상태로 가면 지운다
+          waitingSince: status === "waiting_client" ? (before === "waiting_client" && p.waitingSince ? p.waitingSince : nowIso()) : undefined,
+        };
+        const parts: string[] = [];
+        if (patch.workStatus !== undefined && patch.workStatus !== before) parts.push(`${WORK_STATUS[before].label} → ${WORK_STATUS[patch.workStatus].label}`);
+        if (patch.nextStep !== undefined && patch.nextStep.trim() !== (p.nextStep ?? "")) parts.push(`다음 할 일: ${patch.nextStep.trim() || "비움"}`);
+        if (patch.dueDate !== undefined && patch.dueDate && patch.dueDate !== p.dueDate) parts.push(`마감 ${patch.dueDate.slice(0, 10)}`);
+        set({
+          projects: st.projects.map((x) => (x.id === projectId ? next : x)),
+          activities: parts.length
+            ? [makeActivity({ type: "work_status_changed", companyId: p.companyId, projectId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `${p.name} · ${parts.join(" · ")}` }), ...st.activities]
+            : st.activities,
+        });
+      },
+      addJournal: (data, byUserId) => {
+        const st = get();
+        const content = data.content.trim();
+        if (!content) return null;
+        if (deny(st, "journal.write", "업무 일기 쓰기", set)) return null;
+        const e: JournalEntry = { id: uid("jn"), companyId: data.companyId, type: data.type, content, entryDate: data.entryDate, pinned: data.pinned || undefined, authorId: byUserId, createdAt: nowIso() };
+        set({
+          journal: [e, ...st.journal],
+          // 일기 내용은 기록에 옮기지 않는다 — 종류만 남긴다
+          activities: [makeActivity({ type: "journal_written", companyId: data.companyId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `업무 일기: ${JOURNAL_TYPE[data.type].label}` }), ...st.activities],
+        });
+        return e.id;
+      },
+      updateJournal: (id, patch, byUserId) => {
+        const st = get();
+        const e = st.journal.find((x) => x.id === id);
+        if (!e) return;
+        if (deny(st, "journal.write", "업무 일기 고치기", set)) return;
+        void byUserId;
+        set({ journal: st.journal.map((x) => (x.id === id ? { ...x, ...patch, ...(patch.content !== undefined ? { content: patch.content.trim() || x.content } : {}), updatedAt: nowIso() } : x)) });
+      },
+      removeJournal: (id, byUserId) => {
+        const st = get();
+        const e = st.journal.find((x) => x.id === id);
+        if (!e) return;
+        if (deny(st, "journal.write", "업무 일기 지우기", set)) return;
+        void byUserId;
+        set({ journal: st.journal.filter((x) => x.id !== id) });
+      },
+      addPayment: (data, byUserId) => {
+        const st = get();
+        if (deny(st, "payment.write", `수금 항목 추가 (${data.label})`, set)) return null;
+        const pay: Payment = { ...data, id: uid("pm"), label: data.label.trim() || PAYMENT_KIND_LABEL[data.kind], createdAt: nowIso() };
+        set({
+          payments: [...st.payments, pay],
+          activities: [makeActivity({ type: "payment_added", companyId: data.companyId, projectId: data.projectId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `수금 항목 추가: ${pay.label} ${won(pay.amount)}` }), ...st.activities],
+        });
+        return pay.id;
+      },
+      updatePayment: (id, patch, byUserId) => {
+        const st = get();
+        const cur = st.payments.find((x) => x.id === id);
+        if (!cur) return;
+        if (deny(st, "payment.write", `수금 수정 (${cur.label})`, set)) return;
+        const next: Payment = { ...cur, ...patch };
+        const received = patch.receivedAt !== undefined && !!patch.receivedAt && !cur.receivedAt;
+        set({
+          payments: st.payments.map((x) => (x.id === id ? next : x)),
+          activities: received
+            ? [makeActivity({ type: "payment_received", companyId: cur.companyId, projectId: cur.projectId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `입금 확인: ${next.label} ${won(next.amount)}` }), ...st.activities]
+            : st.activities,
+        });
+      },
+      removePayment: (id, byUserId) => {
+        const st = get();
+        const cur = st.payments.find((x) => x.id === id);
+        if (!cur) return;
+        if (deny(st, "payment.write", `수금 항목 삭제 (${cur.label})`, set)) return;
+        set({
+          payments: st.payments.filter((x) => x.id !== id),
+          activities: [makeActivity({ type: "payment_removed", companyId: cur.companyId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `수금 항목 삭제: ${cur.label} ${won(cur.amount)}${cur.receivedAt ? " (입금됨)" : ""}` }), ...st.activities],
+        });
+      },
+
       shareResult: (data, byUserId) => {
         const st = get();
         if (deny(st, "result.share", `결과자료 공유 (${data.name})`, set)) return;
@@ -1728,6 +1961,10 @@ export const useStore = create<StoreState>()(
           activities: st.activities.filter((a) => keepC(a) && keepP(a)),
           notifications: st.notifications.filter(keepC),
           notices: st.notices.filter(keepC),
+          companyVaults: st.companyVaults.filter(keepC),
+          companyFiles: st.companyFiles.filter(keepC),
+          journal: st.journal.filter(keepC),
+          payments: st.payments.filter(keepC),
         };
         const after = next.projects.length + next.consultations.length + next.contracts.length + next.docRequests.length + next.schedules.length + next.tasks.length + next.inquiries.length + next.results.length + next.opportunities.length + next.quotes.length + next.approvals.length + next.activities.length + next.notifications.length;
         const counts = { companies: ids.size, projects: pids.size, records: before - after };
@@ -1780,6 +2017,10 @@ export const useStore = create<StoreState>()(
           approvals: [...st.approvals, ...seed.approvals.filter(inC)],
           notifications: [...st.notifications, ...seed.notifications.filter(inC)],
           notices: [...st.notices, ...seed.notices.filter(inC)],
+          companyVaults: [...st.companyVaults, ...seed.companyVaults.filter(inC)],
+          companyFiles: [...st.companyFiles, ...seed.companyFiles.filter(inC)],
+          journal: [...st.journal, ...seed.journal.filter(inC)],
+          payments: [...st.payments, ...seed.payments.filter(inC)],
           activities: [
             makeActivity({ type: "samples_restored", actorId: byUserId, actorRole: "admin", text: `샘플 데이터 다시 보기 — 기업 ${companies.length} · 프로젝트 ${projects.length}` }),
             ...st.activities,
