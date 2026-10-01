@@ -198,7 +198,8 @@ await step('13 완료 + 결과 보고서 → 고객 내려받기', async () => {
   await dlg(ceo).getByRole('button', { name: /결과 자료는 완료자료/ }).click();
   await dlg(ceo).getByRole('button', { name: '단계 바꾸고 보내기' }).click(); await ceo.waitForTimeout(4000);
   ok('13 서버: 완료 + 결과자료(파일)', sql(`select stage from projects where id='${pjId}'`) === 'done' && sql(`select count(*) from results where company_id='${coId}' and storage_path is not null`) === '1');
-  ok('13 고객 홈 100%', (await waitFor(cli, async () => (await body(cli)).includes('100%'))) >= 0);
+  // 기업성장 관리(2026-10-01) 이후 끝난 과제는 진행률(100%)이 아니라 '완료한 성장과제 · 이력'에 날짜와 함께 보인다
+  ok('13 고객 홈: 완료한 성장과제', (await waitFor(cli, async () => /완료한 성장과제[\s\S]*\d+월 \d+일 완료/.test(await body(cli)))) >= 0);
   await cli.goto(`${B}/portal/results`, { waitUntil: 'domcontentloaded' }); await cli.waitForTimeout(2000);
   const [dl] = await Promise.all([cli.waitForEvent('download', { timeout: 10000 }).catch(() => null), cli.waitForEvent('popup', { timeout: 10000 }).catch(() => null), cli.getByRole('button', { name: '열람 / 다운로드' }).first().click()]);
   await cli.waitForTimeout(2500);

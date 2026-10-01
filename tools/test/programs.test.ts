@@ -43,4 +43,7 @@ ok(!!ms && ms.cautions.some((c) => c.includes("소상공인")) && ms.reasons.inc
 const list = matchPrograms([small, a, startup7], factory, { now, strongOnly: true });
 ok(list[0].program.id === a.id && !list.some((x) => x.program.id === "t3"), "근거 많은 순 · 맞지 않는 것 제외");
 ok(profileOfCompany({ region: "경기", industry: "제조업", bizCategory: "제조", establishedAt: "2015-03-02", employeeBand: "10-29", employees: 0 } as never).employees === 10, "기업 → 조건(인원 구간)");
+ok(profileOfCompany({ address: "경기 화성시 봉담읍", industry: "정밀부품 제조" } as never).region === "경기", "지역 칸 없으면 주소에서(경기 화성시 → 경기)");
+ok(profileOfCompany({ region: "서울", address: "경기 화성시" } as never).region === "서울", "지역 칸이 있으면 그대로");
+ok(profileOfCompany({ address: "충청북도 청주시" } as never).region === "충북", "주소 긴 이름(충청북도 → 충북)");
 console.log(fail ? `\nFAIL ${fail}` : "\n전부 통과"); process.exit(fail ? 1 : 0);

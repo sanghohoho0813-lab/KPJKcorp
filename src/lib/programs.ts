@@ -28,7 +28,8 @@ export function profileOfCompany(c: Company): MatchProfile {
   const y = c.establishedAt ? Number(c.establishedAt.slice(0, 4)) : undefined;
   const bandMin = c.employeeBand ? Number(c.employeeBand.split(/[-+]/)[0]) : undefined;
   return {
-    region: c.region,
+    // 지역 칸이 비어 있으면 주소 앞부분(경기 화성시 → 경기)으로 — 주소만 넣은 고객이 많다
+    region: c.region || (c.address ? regionsIn(c.address)[0] : undefined),
     industry: [c.industry, c.bizCategory, c.bizItem].filter(Boolean).join(" "),
     foundedYear: y && y > 1900 ? y : undefined,
     employees: c.employees || bandMin || undefined,
