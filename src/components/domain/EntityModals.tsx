@@ -136,8 +136,8 @@ function ProjectModalInner({ open, projectId, companyId, onClose, onCreated }: {
             {INTERNAL_STAGES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
           </Select>
         </Field>
-        <Field label="시작일"><Input type="date" value={dateInput(f.startDate)} onChange={(e) => set("startDate", new Date(`${e.target.value}T09:00:00`).toISOString())} /></Field>
-        <Field label="마감일" hint={err.dueDate}><Input type="date" value={dateInput(f.dueDate)} onChange={(e) => set("dueDate", new Date(`${e.target.value}T18:00:00`).toISOString())} /></Field>
+        <Field label="시작일"><Input type="date" value={dateInput(f.startDate)} onChange={(e) => e.target.value && set("startDate", new Date(`${e.target.value}T09:00:00`).toISOString())} /></Field>
+        <Field label="마감일" hint={err.dueDate}><Input type="date" value={dateInput(f.dueDate)} onChange={(e) => e.target.value && set("dueDate", new Date(`${e.target.value}T18:00:00`).toISOString())} /></Field>
       </div>
       <div className="mt-3 space-y-3">
         <Field label="설명" hint="고객 Portal에도 표시됩니다."><Textarea value={f.description} onChange={(e) => set("description", e.target.value)} rows={3} /></Field>
@@ -190,7 +190,7 @@ function EditScheduleInner({ open, scheduleId, onClose }: { open: boolean; sched
   const submit = () => {
     if (!title.trim()) { toast("일정 제목을 입력해 주세요.", "error"); return; }
     update(sc.id, {
-      title: title.trim(), type, start: new Date(start).toISOString(),
+      title: title.trim(), type, start: (start && !Number.isNaN(Date.parse(start)) ? new Date(start) : new Date(sc.start)).toISOString(),
       location: location.trim() || undefined, visibleToClient: visible,
     }, me);
     toast("일정을 수정했습니다.");
@@ -278,6 +278,7 @@ function EditTaskInner({ open, taskId, onClose }: { open: boolean; taskId: strin
 
   const submit = () => {
     if (!title.trim()) { toast("업무 제목을 입력해 주세요.", "error"); return; }
+    if (!due) { toast("마감일을 넣어 주세요.", "error"); return; }
     update(t.id, {
       title: title.trim(), type, dueDate: new Date(`${due}T18:00:00`).toISOString(),
       priority, assigneeId: assignee, status, memo: memo.trim() || undefined,
@@ -379,6 +380,7 @@ function EditDocRequestInner({ open, requestId, onClose }: { open: boolean; requ
   const company = st.companies.find((c) => c.id === req.companyId);
   const submit = () => {
     if (!name.trim()) { toast("자료명을 입력해 주세요.", "error"); return; }
+    if (!due) { toast("제출 기한을 넣어 주세요.", "error"); return; }
     update(req.id, { name: name.trim(), description: desc.trim(), dueDate: due === dateInput(req.dueDate) ? undefined : new Date(`${due}T18:00:00`).toISOString() }, me);
     toast("자료요청을 수정했습니다. 고객에게 변경 안내가 전송되었습니다.");
     onClose();

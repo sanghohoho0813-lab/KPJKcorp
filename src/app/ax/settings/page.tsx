@@ -2,8 +2,9 @@
 
 import { Suspense, createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Check, ChevronDown, Database, HelpCircle, Palette, RotateCcw, ShieldCheck, Sparkles, Award, Play, Repeat } from "lucide-react";
+import { Check, ChevronDown, Database, HelpCircle, Palette, RotateCcw, ShieldCheck, Sparkles, Award, Play, Repeat, KeyRound } from "lucide-react";
 import { FontScalePicker } from "@/components/shell/FontScale";
+import { MyPasswordForm } from "@/components/domain/MyPassword";
 import { useStore, useCurrentUser } from "@/lib/store";
 import { useUi, NEXT_FEATURES } from "@/lib/ui-store";
 import { THEMES } from "@/lib/themes";
@@ -58,6 +59,10 @@ function SettingsInner() {
             <div><div className="mb-1.5 text-[0.85rem] font-semibold text-ink-2">모션 줄이기</div><SegmentedControl value={settings.reduceMotion ? "on" : "off"} onChange={(k) => setSettings({ reduceMotion: k === "on" })} options={[{ key: "off", label: "Off" }, { key: "on", label: "On" }]} /></div>
           </div>
           <div className="mt-4 text-[0.78rem] text-ink-3">테마는 Sidebar·CTA·강조색만 바꾸며 본문·표·폼의 가독성은 항상 고정됩니다. 오류/위험 색은 의미상 고정입니다.</div>
+        </Section>
+
+        <Section id="account" icon={<KeyRound size={18} className="text-ink-3" />} title="내 계정 · 비밀번호">
+          <MyPasswordForm />
         </Section>
 
         <Section id="users" icon={<ShieldCheck size={18} className="text-ink-3" />} title="사용자 / 권한">

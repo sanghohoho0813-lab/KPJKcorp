@@ -96,9 +96,22 @@ export interface LoadResult {
  * 로그인 직후 한 번. 내가 볼 수 있는 것만 온다 — 걸러내는 일은 서버가 한다.
  * 화면은 지금까지처럼 통째로 들고 있는 목록을 그대로 쓴다.
  */
-export async function loadAll(): Promise<LoadResult> {
+/** 고객 계정은 이 표들을 고객용 보기로 읽는다 (내부 칸이 빠진 것) — setup.sql 의 client_* 보기 */
+const CLIENT_VIEW: Partial<Record<string, string>> = { companies: "client_companies", projects: "client_projects", opportunities: "client_opportunities" };
+
+export async function loadAll(opts: { client?: boolean } = {}): Promise<LoadResult> {
   const sb = supa();
   if (!sb) return { ok: false, reason: "서버가 설정되지 않았습니다." };
+
+  const read = async (table: string, order?: { column: string; ascending: boolean }) => {
+    const run = (t: string) => { const q = sb.from(t).select("*"); return order ? q.order(order.column, { ascending: order.ascending }) : q; };
+    const view = opts.client ? CLIENT_VIEW[table] : undefined;
+    if (!view) return run(table);
+    const r = await run(view);
+    // 아직 새 setup.sql 을 돌리지 않은 서버 — 보기가 없으면 예전처럼 표에서 읽는다
+    if (r.error && (r.error.code === "42P01" || r.error.code === "PGRST205" || /does not exist|Could not find the table/i.test(r.error.message ?? ""))) return run(table);
+    return r;
+  };
 
   try {
     const [profiles, files, messages, settings, ...rest] = await Promise.all([
@@ -106,11 +119,7 @@ export async function loadAll(): Promise<LoadResult> {
       sb.from("document_files").select("*").order("uploaded_at"),
       sb.from("inquiry_messages").select("*").order("created_at"),
       sb.from("app_settings").select("*").eq("id", 1).maybeSingle(),
-      ...ORDER.map((k) => {
-        const spec = SPEC[k];
-        const q = sb.from(spec.table).select("*");
-        return spec.order ? q.order(spec.order.column, { ascending: spec.order.ascending }) : q;
-      }),
+      ...ORDER.map((k) => read(SPEC[k].table, SPEC[k].order)),
     ]);
 
     const bad = [profiles, files, messages, settings, ...rest].find((r) => r.error);
@@ -283,10 +292,20 @@ export const setSyncErrorHandler = (fn: (msg: string) => void) => { onError = fn
  * 저장이 실패한 줄을 버리지 않는다. 이 브라우저에 계정별로 보관했다가 연결이 돌아오면 다시 보낸다.
  * 보관함이 비기 전에는 서버 내용으로 화면을 덮어쓰지 않는다 — 덮어쓰면 입력한 것이 조용히 사라진다.
  * ---------------------------------------------------------------------------------------------- */
-type Op =
+type Op = (
   | { t: "insert"; table: string; rows: Record<string, unknown>[] }
   | { t: "update"; table: string; patch: Record<string, unknown>; ids: string[] }
-  | { t: "delete"; table: string; ids: string[] };
+  | { t: "delete"; table: string; ids: string[] }
+) & { tries?: number };
+type PgErr = { code?: string; message?: string; status?: number } | null;
+/** 다시 보내면 될 수 있는 실패인가 — 인터넷·서버 일시 장애·로그인 갱신·부모 줄이 아직 없음 */
+function isTransient(e: PgErr) {
+  if (!e) return false;
+  const code = e.code ?? "";
+  if (!code || code === "PGRST301" || code === "23503" || /^5/.test(String(e.status ?? ""))) return true;
+  return /Failed to fetch|NetworkError|fetch failed|Load failed|network|timeout/i.test(e.message ?? "");
+}
+const isNetwork = (e: PgErr) => !!e && (!e.code || /Failed to fetch|NetworkError|fetch failed|Load failed|network/i.test(e.message ?? ""));
 let outbox: Op[] = [];
 let owner: string | null = null;
 let onUnsaved: ((n: number) => void) | null = null;
@@ -312,7 +331,11 @@ export function setOutboxOwner(userId: string | null) {
   }
   onUnsaved?.(unsavedCount());
 }
-function keep(op: Op) { outbox.push(op); saveOutbox(); }
+/**
+ * 다시 보내면 될 실패만 보관한다. 권한·값 오류처럼 다시 보내도 안 되는 것을 쌓아 두면
+ * 보관함이 비지 않아 화면 갱신이 영영 멈춘다 — 그런 것은 바로 알리고(fail) 놓는다.
+ */
+function keep(op: Op, e: PgErr) { if (!isTransient(e)) return; outbox.push(op); saveOutbox(); }
 
 async function runOp(sb: SupabaseClient, o: Op) {
   if (o.t === "insert") return insertRows(sb, o.table, o.rows);
@@ -331,7 +354,12 @@ export function retryOutbox(): Promise<{ left: number; reason?: string }> {
     let reason: string | undefined;
     for (const o of todo) {
       const error = await runOp(sb, o);
-      if (error) { outbox.push(o); reason = explain(error); }
+      if (!error) continue;
+      reason = explain(error);
+      // 인터넷 문제는 연결될 때까지 계속 보관. 그 밖의 실패는 세 번까지만 — 그 뒤엔 알리고 놓는다.
+      const tries = (o.tries ?? 0) + 1;
+      if (isNetwork(error) || (isTransient(error) && tries < 3)) outbox.push({ ...o, tries });
+      else onError?.(`${o.table} 저장 실패(다시 보내도 되지 않음) — ${reason}`);
     }
     saveOutbox();
     return { left: unsavedCount(), reason };
@@ -367,15 +395,22 @@ export function pushChanges(prev: Partial<StoreState>, next: Partial<StoreState>
  * 컨설턴트가 보내는 고객용 알림, 고객이 보내는 담당자 알림은 쓸 수는 있어도 읽을 수 없어서 거절됐다.
  * 이미 있는 행 때문에 묶음 전체가 실패하면(같은 변경이 두 번 간 경우) 한 줄씩 다시 보내고 중복은 넘긴다.
  */
+/** 기업마다 한 줄뿐인 표 — 두 사람이 거의 동시에 처음 만들면 늦은 쪽이 "이미 있음"에 걸린다. 그때는 덮어쓴다(버리지 않는다). */
+const ONE_PER_COMPANY = new Set(["company_vaults"]);
 async function insertRows(sb: SupabaseClient, table: string, rows: Record<string, unknown>[]) {
   const { error } = await sb.from(table).insert(rows);
   if (!error) return null;
   if (error.code !== "23505") return error;
-  if (rows.length === 1) return null;
   let last: typeof error | null = null;
   for (const r of rows) {
-    const { error: e } = await sb.from(table).insert(r);
-    if (e && e.code !== "23505") last = e;
+    const { error: e } = rows.length === 1 ? { error } : await sb.from(table).insert(r);
+    if (!e) continue;
+    if (e.code !== "23505") { last = e; continue; }
+    if (ONE_PER_COMPANY.has(table)) {
+      const { id, ...rest } = r;
+      const { error: u } = await sb.from(table).update(rest).eq("id", id as string);
+      if (u) last = u;
+    }
   }
   return last;
 }
@@ -395,7 +430,7 @@ async function flush(
     const table = SPEC[c.key].table;
     if (c.insert.length) {
       const error = await insertRows(sb, table, c.insert);
-      if (error) { fail(table, error); keep({ t: "insert", table, rows: c.insert }); }
+      if (error) { fail(table, error); keep({ t: "insert", table, rows: c.insert }, error); }
     }
     // 바뀐 칸이 같은 행끼리 묶어 한 번에 (예: 알림 모두 읽음)
     const groups = new Map<string, { patch: Record<string, unknown>; ids: string[] }>();
@@ -405,23 +440,23 @@ async function flush(
     }
     for (const g of groups.values()) {
       const { error } = await sb.from(table).update(g.patch).in("id", g.ids);
-      if (error) { fail(table, error); keep({ t: "update", table, patch: g.patch, ids: g.ids }); }
+      if (error) { fail(table, error); keep({ t: "update", table, patch: g.patch, ids: g.ids }, error); }
     }
   }
   // 2) 접혀 있던 자식들
   if (nested.files.length) {
     const error = await insertRows(sb, "document_files", nested.files);
-    if (error) { fail("제출 파일", error); keep({ t: "insert", table: "document_files", rows: nested.files }); }
+    if (error) { fail("제출 파일", error); keep({ t: "insert", table: "document_files", rows: nested.files }, error); }
   }
   if (nested.msgs.length) {
     const error = await insertRows(sb, "inquiry_messages", nested.msgs);
-    if (error) { fail("문의 메시지", error); keep({ t: "insert", table: "inquiry_messages", rows: nested.msgs }); }
+    if (error) { fail("문의 메시지", error); keep({ t: "insert", table: "inquiry_messages", rows: nested.msgs }, error); }
   }
   // 3) 삭제는 자식 → 부모 역순으로
   for (const c of [...changes].reverse()) {
     if (!c.remove.length) continue;
     const { error } = await sb.from(SPEC[c.key].table).delete().in("id", c.remove);
-    if (error) { fail(`${SPEC[c.key].table} 삭제`, error); keep({ t: "delete", table: SPEC[c.key].table, ids: c.remove }); }
+    if (error) { fail(`${SPEC[c.key].table} 삭제`, error); keep({ t: "delete", table: SPEC[c.key].table, ids: c.remove }, error); }
   }
 }
 

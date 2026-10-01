@@ -117,6 +117,8 @@ export interface StoreState extends SeedData {
   updateUser: (id: string, patch: Partial<Pick<User, "name" | "email" | "title" | "phone" | "companyId">>, byUserId: string) => void;
   setUserActive: (id: string, active: boolean, byUserId: string) => void;
   resetUserPassword: (id: string, passwordHash: string, byUserId: string) => void;
+  /** 본인 비밀번호 변경 (데모 모드). 서버 모드는 Supabase Auth 가 한다. */
+  changeOwnPassword: (passwordHash: string) => boolean;
 
   // ---- 자료요청 수정 / 취소 (제출 전) ----
   updateDocRequest: (id: string, patch: { name?: string; description?: string; dueDate?: string }, byUserId: string) => void;
@@ -192,6 +194,8 @@ export interface StoreState extends SeedData {
   raiseOpportunity: (data: { companyId: string; serviceKey: string; note?: string; reason?: string; source: OpportunitySource }, byUserId: string, byRole: Role) => void;
   /** 담당 컨설턴트가 고객 화면 "함께 검토해볼 것"에 제안을 올린다 (왜 제안하는지 = 고객에게 보이는 글) */
   proposeService: (companyId: string, serviceKey: string, reason: string, byUserId: string) => string | null;
+  /** 고객이 요청했거나 제안한 성장과제를 실제 진행 업무로 시작 — 기회는 "진행 확정", 고객 홈엔 "진행 중"으로 */
+  startProjectFromOpportunity: (opportunityId: string, byUserId: string) => string | null;
   /** 제안 거두기 — 고객 화면에서 사라진다(기록은 남는다) */
   withdrawProposal: (opportunityId: string, byUserId: string) => void;
   advanceOpportunity: (id: string, status: OpportunityStatus, byUserId: string, note?: string) => void;
@@ -353,6 +357,26 @@ function applyServer(
   });
   loadingFromServer = false;
 }
+
+
+/**
+ * 수정 내용 정리. 화면은 "안 바꿈"을 undefined 로 넘기기도 하고 "지움"을 undefined 로 넘기기도 한다.
+ * 지워도 되는 칸(clearable)만 undefined 를 "지움"으로 받고, 나머지는 "안 바꿈"으로 버린다 —
+ * 필수 칸(제출기한 등)이 지워져 서버가 묶음째 거절하는 일을 막는다.
+ */
+function applyPatch<T extends object>(before: T, patch: Partial<T>, clearable: readonly string[] = []) {
+  const out: Partial<T> = {};
+  const changed: (keyof T)[] = [];
+  for (const k of Object.keys(patch) as (keyof T)[]) {
+    const v = patch[k];
+    if (v === undefined && (!clearable.includes(k as string) || before[k] === undefined)) continue;
+    if (JSON.stringify(v) === JSON.stringify(before[k])) continue;
+    out[k] = v;
+    changed.push(k);
+  }
+  return { patch: out, changed };
+}
+const COMPANY_CLEARABLE = ["corpNo", "establishedAt", "bizCategory", "bizItem", "ceoBirth", "capital", "region", "employeeBand", "revenueBand", "companyPhone", "website", "leadSource", "ceoGender", "bizItemsExtra", "shareholders", "entityType", "customFields", "docs"];
 
 export const useStore = create<StoreState>()(
   persist(
@@ -537,7 +561,7 @@ export const useStore = create<StoreState>()(
         const company = st.companies.find((c) => c.id === req.companyId);
         const now = nowIso();
         const updated: DocumentRequest = { ...req, status: outcome, reviewedAt: outcome === "reviewing" ? req.reviewedAt : now, reviewNote: outcome === "revision" ? note : req.reviewNote };
-        const tasks = st.tasks.map((t) => (t.source === "auto" && t.projectId === req.projectId && t.title.includes(req.name) && t.status !== "done" && outcome !== "reviewing" ? { ...t, status: "done" as TaskStatus, completedAt: now } : t));
+        const tasks = st.tasks.map((t) => (t.source === "auto" && t.companyId === req.companyId && (t.projectId ?? "") === (req.projectId ?? "") && t.title.includes(req.name) && t.status !== "done" && outcome !== "reviewing" ? { ...t, status: "done" as TaskStatus, completedAt: now } : t));
 
         const clientNotif =
           outcome === "done"
@@ -663,11 +687,11 @@ export const useStore = create<StoreState>()(
         const before = st.companies.find((c) => c.id === id);
         if (!before) return;
         if (deny(st, "company.update", `기업고객 수정 (${before.name})`, set)) return;
-        const changed = (Object.keys(patch) as (keyof typeof patch)[]).filter((k) => patch[k] !== undefined && JSON.stringify(patch[k]) !== JSON.stringify(before[k]));
+        const { patch: pc, changed } = applyPatch(before, patch, COMPANY_CLEARABLE);
         if (changed.length === 0) return;
         const LABEL: Record<string, string> = { name: "기업명", ceo: "대표자", industry: "업종", bizNo: "사업자번호", contactName: "담당자", contactTitle: "직책", contactPhone: "연락처", contactEmail: "이메일", address: "주소", employees: "임직원", revenue: "매출", consultantId: "담당 컨설턴트", memo: "메모", firstConsultDate: "최초 상담일", entityType: "사업자 형태", corpNo: "법인등록번호", establishedAt: "설립일", bizCategory: "업태", bizItem: "종목", ceoBirth: "대표자 생년월일", capital: "자본금", region: "지역", employeeBand: "임직원 규모", revenueBand: "매출 규모", companyPhone: "대표번호", website: "홈페이지", interests: "관심 분야", leadSource: "유입 경로", docs: "서류 확인", ceoGender: "대표자 성별", bizItemsExtra: "종목(그 외)", shareholders: "주주·임원 구성", customFields: "직접 만든 칸" };
         set({
-          companies: st.companies.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+          companies: st.companies.map((c) => (c.id === id ? { ...c, ...pc } : c)),
           activities: [makeActivity({ type: "company_updated", companyId: id, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `기업정보 수정: ${before.name} — ${changed.map((k) => LABEL[k] ?? k).join(", ")}`, meta: { fields: changed.join(",") } }), ...st.activities],
         });
       },
@@ -783,6 +807,17 @@ export const useStore = create<StoreState>()(
         });
       },
 
+      changeOwnPassword: (passwordHash) => {
+        const st = get();
+        const u = st.users.find((x) => x.id === st.session?.userId);
+        if (!u) return false;
+        set({
+          users: st.users.map((x) => (x.id === u.id ? { ...x, passwordHash } : x)),
+          activities: [makeActivity({ type: "password_reset", companyId: u.companyId, actorId: u.id, actorRole: u.role, text: `비밀번호 변경(본인): ${u.name}` }), ...st.activities],
+        });
+        return true;
+      },
+
       // ---------- 자료요청 수정 · 취소 ----------
       updateDocRequest: (id, patch, byUserId) => {
         const st = get();
@@ -791,12 +826,12 @@ export const useStore = create<StoreState>()(
         if (deny(st, "doc.update", `자료요청 수정 (${before.name})`, set)) return;
         // 제출 이후에는 고칠 수 없다 — 고객이 낸 것과 요청 내용이 어긋나면 기록이 의미를 잃는다.
         if (!["planned", "requested", "revision"].includes(before.status)) return;
-        const changed = (Object.keys(patch) as (keyof typeof patch)[]).filter((k) => patch[k] !== undefined && patch[k] !== before[k]);
+        const { patch: pd, changed } = applyPatch(before, patch);
         if (changed.length === 0) return;
         const LABEL: Record<string, string> = { name: "자료명", description: "설명", dueDate: "제출기한" };
         const dueMoved = patch.dueDate !== undefined && patch.dueDate !== before.dueDate;
         set({
-          docRequests: st.docRequests.map((r) => (r.id === id ? { ...r, ...patch } : r)),
+          docRequests: st.docRequests.map((r) => (r.id === id ? { ...r, ...pd } : r)),
           activities: [makeActivity({ type: "doc_request_updated", companyId: before.companyId, projectId: before.projectId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `자료요청 수정: ${patch.name ?? before.name} — ${changed.map((k) => LABEL[k] ?? k).join(", ")}`, meta: { fields: changed.join(",") } }), ...st.activities],
           notifications: [makeNotification({ audience: "client", companyId: before.companyId, title: dueMoved ? "자료 제출기한이 변경되었습니다" : "요청자료 내용이 변경되었습니다", body: `${patch.name ?? before.name} — 요청자료에서 확인해 주세요.`, href: "/portal/documents" }), ...st.notifications],
         });
@@ -811,7 +846,7 @@ export const useStore = create<StoreState>()(
         set({
           docRequests: st.docRequests.filter((r) => r.id !== id),
           // 요청에 딸려 자동 생성된 검토 업무도 같이 정리한다.
-          tasks: st.tasks.filter((t) => !(t.source === "auto" && t.projectId === req.projectId && t.title.includes(req.name))),
+          tasks: st.tasks.filter((t) => !(t.source === "auto" && t.companyId === req.companyId && (t.projectId ?? "") === (req.projectId ?? "") && t.title.includes(req.name))),
           activities: [makeActivity({ type: "doc_request_canceled", companyId: req.companyId, projectId: req.projectId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `자료요청 취소: ${req.name}` }), ...st.activities],
           notifications: [makeNotification({ audience: "client", companyId: req.companyId, title: "자료 요청이 취소되었습니다", body: `${req.name} 요청이 취소되었습니다. 제출하지 않으셔도 됩니다.`, href: "/portal/documents" }), ...st.notifications],
         });
@@ -884,10 +919,10 @@ export const useStore = create<StoreState>()(
         const before = st.contracts.find((c) => c.id === id);
         if (!before) return;
         if (deny(st, "contract.manage", `계약 수정 (${before.title})`, set)) return;
-        const changed = (Object.keys(patch) as (keyof typeof patch)[]).filter((k) => patch[k] !== undefined && patch[k] !== before[k]);
+        const { patch: pk, changed } = applyPatch(before, patch, ["endDate", "signedAt", "sentAt", "amount", "projectId"]);
         if (changed.length === 0) return;
         const LABEL: Record<string, string> = { title: "계약명", status: "상태", period: "기간", scope: "범위", endDate: "종료일", amount: "금액", projectId: "프로젝트", sentAt: "송부일", signedAt: "서명일" };
-        const next = { ...before, ...patch };
+        const next = { ...before, ...pk };
         const signedNow = patch.status === "signed" && before.status !== "signed";
         if (signedNow && !next.signedAt) next.signedAt = nowIso();
         set({
@@ -1150,9 +1185,9 @@ export const useStore = create<StoreState>()(
         const before = st.schedules.find((x) => x.id === id);
         if (!before) return;
         if (deny(st, "schedule.update", `일정 수정 (${before.title})`, set)) return;
-        const changed = (Object.keys(patch) as (keyof typeof patch)[]).filter((k) => patch[k] !== undefined && patch[k] !== before[k]);
+        const { patch: ps, changed } = applyPatch(before, patch, ["location", "projectId"]);
         if (changed.length === 0) return;
-        const after: Schedule = { ...before, ...patch };
+        const after: Schedule = { ...before, ...ps };
         // 고객에게 공개된 일정의 시간이 바뀌면 고객도 알아야 한다.
         const timeMoved = patch.start !== undefined && patch.start !== before.start;
         set({
@@ -1187,13 +1222,13 @@ export const useStore = create<StoreState>()(
         if (!before) return;
         if (deny(st, "task.update", `업무 수정 (${before.title})`, set)) return;
         const { status, ...rest } = patch;
-        const changed = (Object.keys(rest) as (keyof typeof rest)[]).filter((k) => rest[k] !== undefined && rest[k] !== before[k]);
+        const { patch: pt, changed } = applyPatch(before, rest, ["memo"]);
         if (status && status !== before.status) get().updateTaskStatus(id, status, byUserId);
         if (changed.length === 0) return;
         const LABEL: Record<string, string> = { title: "제목", type: "유형", dueDate: "기한", assigneeId: "담당자", priority: "우선순위", memo: "메모" };
         const after = get();
         set({
-          tasks: after.tasks.map((t) => (t.id === id ? { ...t, ...rest } : t)),
+          tasks: after.tasks.map((t) => (t.id === id ? { ...t, ...pt } : t)),
           activities: [makeActivity({ type: "task_updated", companyId: before.companyId, projectId: before.projectId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `업무 수정: ${before.title} — ${changed.map((k) => LABEL[k] ?? k).join(", ")}`, meta: { fields: changed.join(",") } }), ...after.activities],
         });
       },
@@ -1593,6 +1628,35 @@ export const useStore = create<StoreState>()(
           notifications: [makeNotification({ audience: "client", companyId, title: "담당 컨설턴트가 검토 항목을 제안했습니다", body: `${svc.name} — 왜 제안드리는지 함께 적어 두었습니다.`, href: "/portal/services" }), ...st.notifications],
         });
         return opp.id;
+      },
+
+      startProjectFromOpportunity: (opportunityId, byUserId) => {
+        const st = get();
+        const o = st.opportunities.find((x) => x.id === opportunityId);
+        const company = st.companies.find((c) => c.id === o?.companyId);
+        if (!o || !company) return null;
+        if (deny(st, "project.create", `진행 업무 시작 (${o.serviceName})`, set)) return null;
+        // 같은 분야가 이미 진행 중이면 새로 만들지 않는다
+        const dup = st.projects.find((p) => p.companyId === o.companyId && p.type === o.serviceName && !p.archived && p.stage !== "done" && p.stage !== "aftercare");
+        const now = nowIso();
+        const project: Project = dup ?? {
+          id: uid("pj"), companyId: o.companyId, name: `${o.serviceName} 컨설팅`, type: o.serviceName,
+          consultantId: o.assigneeId || company.consultantId, startDate: now, dueDate: iso(addDays(new Date(), 60, 18)),
+          stage: "doc_request", description: o.reason ?? "", clientVisible: true, stageChangedAt: now,
+        };
+        // 이 분야의 고객 요청·담당자 제안을 모두 "진행 확정"으로 — 고객 화면에서 검토 중 → 진행 중으로 옮겨 간다
+        const sameArea = (x: Opportunity) => x.companyId === o.companyId && x.serviceName === o.serviceName && x.status !== "dropped" && x.status !== "won";
+        set({
+          projects: dup ? st.projects : [...st.projects, project],
+          opportunities: st.opportunities.map((x) => (sameArea(x) ? { ...x, status: "won" as OpportunityStatus, updatedAt: now, history: [...x.history, { at: now, status: "won" as OpportunityStatus, by: byUserId, note: "진행 업무로 시작" }] } : x)),
+          activities: [
+            ...(dup ? [] : [makeActivity({ type: "project_created", companyId: o.companyId, projectId: project.id, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `프로젝트 등록: ${company.name} — ${project.name} (고객 요청·제안에서 시작)` })]),
+            makeActivity({ type: "opportunity_status_changed", companyId: o.companyId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `성장과제 진행 확정: ${o.serviceName}`, meta: { from: o.status, to: "won" } }),
+            ...st.activities,
+          ],
+          notifications: [makeNotification({ audience: "client", companyId: o.companyId, title: `${o.serviceName} 컨설팅을 시작합니다`, body: "진행 중인 성장과제에 올라갔습니다. 필요한 자료는 따로 요청드리겠습니다.", href: "/portal" }), ...st.notifications],
+        });
+        return project.id;
       },
 
       withdrawProposal: (opportunityId, byUserId) => {
@@ -1999,7 +2063,7 @@ export const useStore = create<StoreState>()(
         // 이 계정으로 지난번에 보내지 못한 변경이 있으면 먼저 보낸다
         setOutboxOwner(r.user.id);
         await retryOutbox();
-        const loaded = await loadAll();
+        const loaded = await loadAll({ client: r.user.role === "client" });
         if (!loaded.ok || !loaded.data) return { ok: false, reason: loaded.reason, offline: loaded.offline };
         applyServer(set, get, r.user, loaded.data, loaded.settings);
         // 데모와 같은 기록을 서버에도 남긴다 — 고객 Portal 접속 횟수·실증 기록이 서버 모드에서 0으로 보이면 안 된다.
@@ -2039,7 +2103,7 @@ export const useStore = create<StoreState>()(
           set({ syncError: "서버에 아직 저장되지 않은 변경이 있어 화면을 그대로 둡니다. 인터넷 연결을 확인해 주세요 — 연결되면 자동으로 다시 보냅니다." });
           return false;
         }
-        const loaded = await loadAll();
+        const loaded = await loadAll({ client: me.user.role === "client" });
         if (!loaded.ok || !loaded.data) {
           if (wasServer) set({ syncError: loaded.reason ?? "서버에서 데이터를 가져오지 못했습니다." });
           return false;
@@ -2072,7 +2136,7 @@ export const useStore = create<StoreState>()(
           await get().serverLogout();
           return false;
         }
-        const loaded = await loadAll();
+        const loaded = await loadAll({ client: me.user.role === "client" });
         if (!loaded.ok || !loaded.data) {
           if (loaded.offline) set({ syncError: "서버에 연결하지 못했습니다. 인터넷이 돌아오면 자동으로 다시 불러옵니다 — 그 사이 바꾼 내용은 저장되지 않을 수 있습니다." });
           return false;

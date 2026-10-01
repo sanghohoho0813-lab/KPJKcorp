@@ -1,3 +1,4 @@
+import { isRealDate } from "./format";
 import type { Company, CompanyVault, CustomField, ProfileGroup } from "./types";
 import { ENTITY_TYPES, formatBizNo, formatCorpNo, formatPhone } from "./company-options";
 import { DOC_SOURCE_LABEL } from "./docparse";
@@ -19,7 +20,7 @@ function ymd(s: string): [number, number, number] | null {
   if (!m) m = /^(\d{4})(\d{2})(\d{2})$/.exec(t);
   if (!m) return null;
   const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
-  if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+  if (!isRealDate(y, mo, d)) return null;
   return [y, mo, d];
 }
 

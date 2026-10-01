@@ -9,6 +9,7 @@ import { fmtDateTime, fmtSize } from "@/lib/format";
 import type { ResultFile } from "@/lib/types";
 import { Badge, Button, Card, EmptyState, Field, IconTile, Textarea } from "@/components/ui/ui";
 import { Modal } from "@/components/ui/overlay";
+import { RESULT_BUCKET, removeObject } from "@/lib/server/storage";
 
 /** 고객에게 공유한 결과자료 목록. 자료관리 탭과 /ax/results 양쪽에서 같은 것을 쓴다. */
 export function ResultsGrid() {
@@ -62,7 +63,15 @@ export function ResultsGrid() {
         footer={
           <>
             <Button variant="ghost" onClick={() => setTarget(null)}>취소</Button>
-            <Button variant="danger" icon={<RotateCcw size={15} />} onClick={() => { if (!target) return; withdraw(target.id, reason.trim() || undefined, me); toast("결과자료를 회수했습니다. 고객에게 안내가 전송되었습니다."); setTarget(null); }}>회수</Button>
+            <Button variant="danger" icon={<RotateCcw size={15} />} onClick={async () => {
+              if (!target) return;
+              // 목록에서만 빼면 고객이 파일 주소로 여전히 내려받을 수 있다 — 보관함의 파일도 지운다
+              if (st.serverMode && target.storagePath) {
+                const r = await removeObject(RESULT_BUCKET, target.storagePath);
+                if (!r.ok) { toast(`파일을 지우지 못했습니다 — ${r.reason ?? ""}`, "error"); return; }
+              }
+              withdraw(target.id, reason.trim() || undefined, me); toast("결과자료를 회수했습니다. 고객에게 안내가 전송되었습니다."); setTarget(null);
+            }}>회수</Button>
           </>
         }
       >

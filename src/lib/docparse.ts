@@ -9,6 +9,8 @@
  * - 이 함수는 값을 "제안"할 뿐이다. 화면에서 사람이 확인한 뒤에야 저장된다.
  */
 
+import { isRealDate } from "./format";
+
 export type DocSource = "bizReg" | "corpReg" | "unknown";
 
 export interface ParsedDoc {
@@ -90,7 +92,7 @@ export function parseKoreanDate(input: string): string | undefined {
   }
   if (!m) return undefined;
   const y = Number(m[1]), mo = Number(m[2]), da = Number(m[3]);
-  if (y < 1900 || y > 2200 || mo < 1 || mo > 12 || da < 1 || da > 31) return undefined;
+  if (y < 1900 || y > 2200 || !isRealDate(y, mo, da)) return undefined;
   return `${y}-${pad2(mo)}-${pad2(da)}`;
 }
 
@@ -103,6 +105,7 @@ export function birthFromRrn(prefix6: string, genderCode?: string): string | und
   let century = 1900;
   if (genderCode && "3478".includes(genderCode)) century = 2000;
   else if (genderCode && "90".includes(genderCode)) century = 1800;
+  if (!isRealDate(century + yy, mm, dd)) return undefined;
   return `${century + yy}-${pad2(mm)}-${pad2(dd)}`;
 }
 

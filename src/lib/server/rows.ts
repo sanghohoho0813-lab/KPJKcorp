@@ -4,6 +4,7 @@ import type {
   Inquiry, Message, Notice, Notification, Opportunity, Project, Quote, ResultFile, Schedule,
   SurveyResponse, Task, User,
 } from "../types";
+import { isRealYmd } from "../format";
 
 /**
  * 데이터베이스 행 ↔ 앱 타입 변환.
@@ -23,6 +24,8 @@ type Row = Record<string, unknown>;
 const u = <T>(v: T | null | undefined): T | undefined => (v === null ? undefined : v);
 /** undefined → null (DB 에 "지움"으로 전달) */
 const n = <T>(v: T | undefined): T | null => (v === undefined ? null : v);
+/** 날짜 칸 마지막 안전장치 — 빈 값·달력에 없는 날짜(2월 30일 등)는 비운다. 한 줄 때문에 묶음 전체가 거절되면 안 된다 */
+const ymdOrNull = (v: string | undefined): string | null => (v && isRealYmd(v.slice(0, 10)) ? v.slice(0, 10) : null);
 const s = (v: unknown): string => (typeof v === "string" ? v : "");
 const num = (v: unknown): number => (typeof v === "number" ? v : Number(v) || 0);
 const bool = (v: unknown): boolean => v === true;
@@ -112,10 +115,10 @@ export const companyToRow = (x: Partial<Company> & { id?: string }): Row => ({
   ...(x.archivedAt !== undefined && { archived_at: n(x.archivedAt) }),
   ...(x.entityType !== undefined && { entity_type: n(x.entityType) }),
   ...(x.corpNo !== undefined && { corp_no: n(x.corpNo) }),
-  ...(x.establishedAt !== undefined && { established_at: n(x.establishedAt) }),
+  ...(x.establishedAt !== undefined && { established_at: ymdOrNull(x.establishedAt) }),
   ...(x.bizCategory !== undefined && { biz_category: n(x.bizCategory) }),
   ...(x.bizItem !== undefined && { biz_item: n(x.bizItem) }),
-  ...(x.ceoBirth !== undefined && { ceo_birth: n(x.ceoBirth) }),
+  ...(x.ceoBirth !== undefined && { ceo_birth: ymdOrNull(x.ceoBirth) }),
   ...(x.capital !== undefined && { capital: n(x.capital) }),
   ...(x.region !== undefined && { region: n(x.region) }),
   ...(x.employeeBand !== undefined && { employee_band: n(x.employeeBand) }),
@@ -258,7 +261,9 @@ export const noticeFromRow = (r: Row): Notice => ({
   id: s(r.id), companyId: u(r.company_id as string | null),
   title: s(r.title), body: s(r.body), pinned: bool(r.pinned),
   publishedAt: s(r.published_at), expiresAt: u(r.expires_at as string | null),
-  authorId: s(r.author_id), updatedAt: u(r.updated_at as string | null),
+  authorId: s(r.author_id),
+  // 새로 쓴 공지도 updated_at 이 채워진다 — 처음 쓴 뒤 1분 넘어 고쳤을 때만 "수정됨"
+  updatedAt: r.updated_at && r.created_at && Date.parse(String(r.updated_at)) - Date.parse(String(r.created_at)) > 60_000 ? String(r.updated_at) : undefined,
 });
 
 export const noticeToRow = (x: Partial<Notice> & { id?: string }): Row => ({
@@ -545,7 +550,7 @@ export const companyFileToRow = (x: Partial<CompanyFile> & { id?: string }): Row
   ...(x.size !== undefined && { size: x.size }),
   ...(x.mime !== undefined && { mime: x.mime }),
   ...(x.folder !== undefined && { folder: n(x.folder) }),
-  ...(x.issuedAt !== undefined && { issued_at: n(x.issuedAt) }),
+  ...(x.issuedAt !== undefined && { issued_at: ymdOrNull(x.issuedAt) }),
   ...(x.storagePath !== undefined && { storage_path: n(x.storagePath) }),
   ...(x.uploadedAt !== undefined && { uploaded_at: x.uploadedAt }),
   ...(x.uploadedBy !== undefined && { uploaded_by: personId(x.uploadedBy) }),

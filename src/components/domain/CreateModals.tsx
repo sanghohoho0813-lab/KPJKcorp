@@ -34,6 +34,7 @@ export function NewDocRequestModal({ projectId, open, onClose }: { projectId: st
       toast("자료명을 입력해 주세요.", "error");
       return;
     }
+    if (!due) { toast("제출 기한을 넣어 주세요.", "error"); return; }
     create(projectId, { name: name.trim(), description: desc.trim(), dueDate: new Date(`${due}T18:00:00`).toISOString() }, session?.userId ?? "u_admin");
     toast("자료 요청이 등록되고 고객에게 알림이 전송되었습니다.");
     setName(""); setDesc("");
@@ -61,6 +62,7 @@ export function CompanyDocRequestModal({ companyId, open, onClose }: { companyId
   const [due, setDue] = useState(localDateInput(addDays(new Date(), 7)));
   const submit = () => {
     if (!name.trim()) { toast("자료명을 입력해 주세요.", "error"); return; }
+    if (!due) { toast("제출 기한을 넣어 주세요.", "error"); return; }
     const id = create(companyId, { name: name.trim(), description: desc.trim(), dueDate: new Date(`${due}T18:00:00`).toISOString() }, session?.userId ?? "");
     if (!id) return;
     toast("자료 요청이 등록되고 고객에게 알림이 전송되었습니다.");
@@ -96,6 +98,7 @@ export function NewScheduleModal({ open, onClose, companyId, projectId }: { open
       return;
     }
     const pid = projectId ?? projects.find((p) => p.companyId === cid && !["done", "aftercare"].includes(p.stage))?.id;
+    if (!start || Number.isNaN(Date.parse(start))) { toast("일시를 넣어 주세요.", "error"); return; }
     create({ title: title.trim(), type, start: new Date(start).toISOString(), location: location.trim() || undefined, companyId: cid || undefined, projectId: pid, assigneeId: session?.userId ?? "u_admin", visibleToClient: visible }, session?.userId ?? "u_admin");
     toast(visible && cid ? "일정이 등록되고 고객에게 알림이 전송되었습니다." : "일정이 등록되었습니다.");
     setTitle(""); setLocation("");
@@ -134,6 +137,7 @@ export function NewTaskModal({ open, onClose, companyId, projectId }: { open: bo
       toast("업무 제목을 입력해 주세요.", "error");
       return;
     }
+    if (!due) { toast("마감일을 넣어 주세요.", "error"); return; }
     create({ title: title.trim(), type, dueDate: new Date(`${due}T18:00:00`).toISOString(), priority, assigneeId: assignee, companyId: cid || undefined, projectId }, session?.userId ?? "u_admin");
     toast("업무가 등록되었습니다.");
     setTitle("");

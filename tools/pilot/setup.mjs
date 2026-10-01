@@ -21,14 +21,17 @@ ok('대시보드: DEMO DATA 없음', !/DEMO DATA/.test(t));
 async function createUser(role, a, companyName) {
   await p.goto(B + '/ax/settings', { waitUntil: 'domcontentloaded' }); await p.waitForTimeout(1500);
   await p.getByRole('button', { name: '계정 만들기' }).first().click(); await p.waitForTimeout(600);
-  await p.getByLabel(/^역할/).selectOption(role);
-  if (companyName) await p.getByLabel(/소속 기업/).selectOption({ label: companyName });
-  await p.getByLabel(/이름 \*/).fill(a.name);
-  await p.getByLabel(/직책 \*/).fill(role === 'client' ? '담당자' : '컨설턴트');
-  await p.getByLabel(/아이디 \(이메일\) \*/).fill(a.id);
-  await p.getByLabel(/초기 비밀번호/).fill(a.pw);
-  await p.getByLabel(/비밀번호 확인/).fill(a.pw);
-  await p.getByRole('button', { name: '만들기', exact: true }).click(); await p.waitForTimeout(2500);
+  const d = p.locator('[role=dialog]:visible').last();
+  await d.getByLabel(/^역할/).selectOption(role);
+  if (companyName) await d.getByLabel(/소속 기업/).selectOption({ label: companyName });
+  await d.getByLabel(/이름 \*/).fill(a.name);
+  await d.getByLabel(/직책 \*/).fill(role === 'client' ? '담당자' : '컨설턴트');
+  await d.getByLabel(/아이디 \(이메일\) \*/).fill(a.id);
+  await d.getByLabel(/초기 비밀번호/).fill(a.pw);
+  await d.getByLabel(/비밀번호 확인/).fill(a.pw);
+  await d.getByRole('button', { name: '만들기', exact: true }).click(); await p.waitForTimeout(2500);
+  // 만든 뒤에는 "계정 안내 문구" 창이 뜬다 — 닫는다
+  await p.locator('[role=dialog]:visible').last().getByRole('button', { name: '닫기' }).first().click().catch(() => {});
   const row = sql(`select role, coalesce(company_id,''), active from profiles where email='${a.id}'`);
   L(`계정 생성 ${a.id}`, row ? `OK ${row}` : `FAIL ${await toasts(p)}`);
 }

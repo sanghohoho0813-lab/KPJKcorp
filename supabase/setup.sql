@@ -626,6 +626,14 @@ $$;
  * 컨설턴트 범위를 '전체'에서 '내 담당만'으로 바꾸려면 app_settings 한 줄만 고치면 된다.
  * 정책을 다시 쓰지 않는다.
  */
+-- 고객에게 공개된 프로젝트인가 (고객은 projects 표를 직접 못 읽으므로 정책 안에서는 이 함수로 본다)
+create or replace function public.kpjk_project_client_visible(pid text) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.projects p
+                 where p.id = pid and p.client_visible and not p.archived
+                   and p.company_id = public.kpjk_my_company())
+$$;
+
 create or replace function public.kpjk_can_see_company(cid text) returns boolean
 language sql stable security definer set search_path = public as $$
   select case public.kpjk_role()
@@ -685,8 +693,10 @@ create policy profiles_admin_write on public.profiles for all to authenticated
 -- 4. 기업 · 프로젝트
 -- -----------------------------------------------------------------------------
 drop policy if exists companies_select on public.companies;
+-- 고객은 이 표를 직접 읽지 않는다 — 내부 메모·유입 경로·주주 구성 같은 칸이 함께 따라가기 때문이다.
+-- 고객은 아래 "고객용 보기(client_companies)"로 자기 회사의 고객용 칸만 읽는다.
 create policy companies_select on public.companies for select to authenticated
-  using (public.kpjk_can_see_company(id));
+  using (public.kpjk_is_internal() and public.kpjk_can_see_company(id));
 
 drop policy if exists companies_insert on public.companies;
 create policy companies_insert on public.companies for insert to authenticated
@@ -699,9 +709,9 @@ create policy companies_update on public.companies for update to authenticated
 -- 삭제 정책 없음 — 기업은 지우지 않고 보관한다(archived). 지우면 하위 기록이 전부 고아가 된다.
 
 drop policy if exists projects_select on public.projects;
+-- 고객은 client_projects 로 읽는다 (진행 상태 메모·다음 할 일 같은 내부 칸 제외)
 create policy projects_select on public.projects for select to authenticated
-  using (public.kpjk_can_see_company(company_id)
-         and (public.kpjk_is_internal() or (client_visible and not archived)));
+  using (public.kpjk_is_internal() and public.kpjk_can_see_company(company_id));
 
 drop policy if exists projects_write on public.projects;
 create policy projects_write on public.projects for all to authenticated
@@ -742,9 +752,7 @@ create policy opportunities_client_insert on public.opportunities for insert to 
 drop policy if exists opportunities_client_select on public.opportunities;
 -- 고객은 자기가 남긴 관심·상담 요청과 담당자가 "고객 화면에 올린" 제안만 본다.
 -- 내부 등록·규칙 기회(내부 메모 포함)는 같은 회사라도 보이지 않는다.
-create policy opportunities_client_select on public.opportunities for select to authenticated
-  using (public.kpjk_is_client() and company_id = public.kpjk_my_company()
-         and source in ('portal_interest','portal_request','proposal'));
+-- 고객은 client_opportunities 로 읽는다 (담당자 진행 메모 제외). 고객의 "관심·상담 요청" 쓰기 정책은 위에 그대로.
 
 -- -----------------------------------------------------------------------------
 -- 6. 계약 — 고객은 읽기만
@@ -801,12 +809,12 @@ create policy document_files_internal on public.document_files for delete to aut
 -- -----------------------------------------------------------------------------
 drop policy if exists schedules_select on public.schedules;
 create policy schedules_select on public.schedules for select to authenticated
-  using (public.kpjk_is_internal()
+  using ((public.kpjk_is_internal() and (company_id is null or public.kpjk_can_see_company(company_id)))
          or (visible_to_client and company_id is not null and company_id = public.kpjk_my_company()));
 
 drop policy if exists schedules_write on public.schedules;
 create policy schedules_write on public.schedules for all to authenticated
-  using (public.kpjk_is_internal()) with check (public.kpjk_is_internal());
+  using ((public.kpjk_is_internal() and (company_id is null or public.kpjk_can_see_company(company_id)))) with check ((public.kpjk_is_internal() and (company_id is null or public.kpjk_can_see_company(company_id))));
 
 -- 공지 — 내부는 전부 보고 쓴다. 고객은 자기 회사 공지와 전체 공지 중 "게시 중"인 것만 본다.
 -- 게시 종료일이 지나면 서버가 알아서 내린다. 화면이 거르는 것에 기대지 않는다.
@@ -824,8 +832,9 @@ create policy notices_write on public.notices for all to authenticated
 
 -- 업무는 내부 전용이다. 고객에게는 존재하지 않는 개념이다.
 drop policy if exists tasks_internal on public.tasks;
+-- 컨설턴트 열람 범위(내 담당만)를 업무에도 그대로 — 볼 수 없는 기업의 업무는 보이지도, 처리되지도 않는다
 create policy tasks_internal on public.tasks for all to authenticated
-  using (public.kpjk_is_internal()) with check (public.kpjk_is_internal());
+  using ((public.kpjk_is_internal() and (company_id is null or public.kpjk_can_see_company(company_id)))) with check ((public.kpjk_is_internal() and (company_id is null or public.kpjk_can_see_company(company_id))));
 
 -- -----------------------------------------------------------------------------
 -- 9. 문의 — 고객이 만들고, 양쪽이 답한다
@@ -892,13 +901,18 @@ create policy quotes_client_respond on public.quotes for update to authenticated
 -- 12. 활동 기록 — 추가만 (수정·삭제 정책을 아무에게도 주지 않는다)
 -- -----------------------------------------------------------------------------
 drop policy if exists activities_select on public.activities;
--- 고객은 자기 회사 기록을 보되, 내부 전용 기록(서류함·수금·업무 일기·진행 상태·기본 정보 수정)은 빼고 본다
+-- 고객은 자기 회사 기록 중 "고객 화면에 쓰는 종류"만 본다(허용 목록).
+-- 승인·할인·견적 초안·내부 업무·메모 수정·서류함·수금·업무 일기 같은 내부 기록은 종류를 더해도 기본으로 막힌다.
+-- 고객에게 공개하지 않은 프로젝트의 기록도 빠진다.
 create policy activities_select on public.activities for select to authenticated
-  using (public.kpjk_is_internal()
+  using ((public.kpjk_is_internal() and (company_id is null or public.kpjk_can_see_company(company_id)))
          or (company_id is not null and company_id = public.kpjk_my_company()
-             and type not in ('profile_updated','vault_updated','file_uploaded','file_removed',
-                              'work_status_changed','journal_written',
-                              'payment_added','payment_received','payment_removed')));
+             and type in ('company_created','project_stage_changed','document_requested','document_uploaded',
+                          'document_reviewed','document_revision_requested','result_shared','result_downloaded',
+                          'inquiry_created','inquiry_answered','contract_signed','quote_sent','quote_responded',
+                          'portal_login','sign_in','survey_submitted')
+             and (project_id is null
+                  or public.kpjk_project_client_visible(activities.project_id))));
 
 drop policy if exists activities_insert on public.activities;
 create policy activities_insert on public.activities for insert to authenticated
@@ -928,7 +942,7 @@ end $$;
 -- -----------------------------------------------------------------------------
 drop policy if exists notifications_select on public.notifications;
 create policy notifications_select on public.notifications for select to authenticated
-  using ((audience = 'internal' and public.kpjk_is_internal())
+  using ((audience = 'internal' and (public.kpjk_is_internal() and (company_id is null or public.kpjk_can_see_company(company_id))))
          or (audience = 'client' and company_id is not null and company_id = public.kpjk_my_company()));
 
 drop policy if exists notifications_insert on public.notifications;
@@ -938,7 +952,7 @@ create policy notifications_insert on public.notifications for insert to authent
 
 drop policy if exists notifications_update on public.notifications;
 create policy notifications_update on public.notifications for update to authenticated
-  using ((audience = 'internal' and public.kpjk_is_internal())
+  using ((audience = 'internal' and (public.kpjk_is_internal() and (company_id is null or public.kpjk_can_see_company(company_id))))
          or (audience = 'client' and company_id = public.kpjk_my_company()));
 
 drop policy if exists surveys_insert on public.surveys;
@@ -1235,6 +1249,42 @@ begin
   raise notice '[대표 계정] 연결 완료: % — 이제 앱에서 이 이메일로 로그인하세요.', v_email;
   raise notice '            표시 이름은 로그인 후 설정 → 사용자 관리에서 바꿀 수 있습니다.';
 end $$;
+
+
+-- =============================================================================
+--  고객용 보기 — 고객은 기업·프로젝트·제안을 이 보기로만 읽는다
+--  보기는 만든 사람 권한으로 돌므로 행 조건(자기 회사·공개 프로젝트)을 여기서 직접 건다.
+--  내부 칸(메모·유입 경로·주주 구성·직접 만든 칸·서류 판독 기록·진행 상태 메모·담당자 진행 메모)은 아예 없다.
+-- =============================================================================
+drop view if exists public.client_companies;
+create view public.client_companies with (security_barrier = true) as
+  select id, code, name, ceo, industry, biz_no, contact_name, contact_title, contact_phone, contact_email,
+         address, employees, revenue, first_consult_date, consultant_id, archived, archived_at,
+         entity_type, corp_no, established_at, biz_category, biz_item, ceo_birth, capital, region,
+         employee_band, revenue_band, company_phone, website, interests, sample, created_at, updated_at,
+         ceo_gender, biz_items_extra
+    from public.companies
+   where public.kpjk_is_client() and id = public.kpjk_my_company();
+
+drop view if exists public.client_projects;
+create view public.client_projects with (security_barrier = true) as
+  select id, company_id, name, type, consultant_id, start_date, due_date, stage, description,
+         stage_changed_at, client_visible, archived, archived_at, next_milestone, created_at, updated_at
+    from public.projects
+   where public.kpjk_is_client() and company_id = public.kpjk_my_company() and client_visible and not archived;
+
+drop view if exists public.client_opportunities;
+create view public.client_opportunities with (security_barrier = true) as
+  select id, company_id, service_key, service_name, source, status, assignee_id, created_at, created_by, updated_at,
+         case when source in ('portal_interest','portal_request') then note end as note,
+         reason,
+         coalesce((select jsonb_agg(h - 'note') from jsonb_array_elements(history) h), '[]'::jsonb) as history
+    from public.opportunities
+   where public.kpjk_is_client() and company_id = public.kpjk_my_company()
+     and source in ('portal_interest','portal_request','proposal');
+
+revoke all on public.client_companies, public.client_projects, public.client_opportunities from anon;
+grant select on public.client_companies, public.client_projects, public.client_opportunities to authenticated;
 
 
 -- =============================================================================

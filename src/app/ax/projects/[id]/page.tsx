@@ -220,7 +220,7 @@ export default function ProjectDetailPage() {
             <Input type="file" onChange={(e) => setResFile(e.target.files?.[0] ?? null)} />
           </Field>
           {resFile && <div className="text-[0.8rem] text-ink-3">{resFile.name} · {fmtSize(resFile.size)}</div>}
-          <p className="text-[0.78rem] text-ink-3">이 데모에서는 파일 메타만 기록됩니다.</p>
+          {!st.serverMode && <p className="text-[0.78rem] text-ink-3">이 데모에서는 파일 메타만 기록됩니다.</p>}
         </div>
       </Modal>
 

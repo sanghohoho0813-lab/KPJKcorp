@@ -6,6 +6,7 @@ import { FontScalePicker } from "@/components/shell/FontScale";
 import { useStore, usePortalCompanyId, useCurrentUser } from "@/lib/store";
 import { useUi } from "@/lib/ui-store";
 import { fmtDate } from "@/lib/format";
+import { MyPasswordForm } from "@/components/domain/MyPassword";
 import { Avatar, Button, Card, PageHeader, SegmentedControl, DemoBadge } from "@/components/ui/ui";
 
 export default function PortalMePage() {
@@ -44,6 +45,12 @@ export default function PortalMePage() {
           <div className="mt-3 flex items-center gap-2 text-[0.8rem] text-ink-3"><ShieldCheck size={14} /> 귀사의 프로젝트·자료·일정·문의만 표시됩니다. 다른 기업의 정보는 접근할 수 없습니다.</div>
         </Card>
         <div className="space-y-5">
+          {isClient && (
+            <Card className="p-5">
+              <div className="mb-3 font-bold">비밀번호 바꾸기</div>
+              <MyPasswordForm />
+            </Card>
+          )}
           <Card className="p-5">
             <div className="mb-3 font-bold">화면 설정</div>
             <div className="grid gap-4 md:grid-cols-2">

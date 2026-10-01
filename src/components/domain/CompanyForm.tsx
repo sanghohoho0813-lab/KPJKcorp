@@ -51,7 +51,9 @@ function CompanyModalInner({ open, companyId, onClose, onCreated }: { open: bool
   const toast = useStore((s) => s.toast);
   const me = st.session?.userId ?? "u_admin";
   const editing = st.companies.find((c) => c.id === companyId);
-  const consultants = st.users.filter((u) => u.role !== "client" && u.active !== false);
+  // "내 담당만" 범위의 컨설턴트는 다른 사람에게 맡길 수 없다 — 맡기는 순간 그 기업이 자기 화면에서 사라지고 기록 저장도 거절된다
+  const ownOnly = st.session?.role === "consultant" && st.settings.consultantScope === "own";
+  const consultants = st.users.filter((u) => u.role !== "client" && u.active !== false && (!ownOnly || u.id === st.session?.userId));
   // 쓰는 동안 이 브라우저에 계속 임시 저장한다 — 창이 닫혀도 다시 열면 그대로 이어서 쓴다
   const dKey = draftKey("company", companyId, me);
   const [restored] = useState(() => loadDraft<{ f: CompanyForm; fromDoc: string[] }>(dKey));

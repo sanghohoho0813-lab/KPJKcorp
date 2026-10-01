@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { KeyRound, UserPlus } from "lucide-react";
+import { Copy, KeyRound, UserPlus } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { hashPassword } from "@/lib/auth";
 import { createServerUser, sendPasswordReset, setServerUserActive, updateServerUser } from "@/lib/server/auth";
@@ -15,6 +15,58 @@ function pwIssue(pw: string) {
   if (pw.length < 8) return "8자 이상이어야 합니다.";
   if (!/[a-zA-Z]/.test(pw) || !/[0-9]/.test(pw)) return "영문과 숫자를 함께 사용해 주세요.";
   return null;
+}
+
+/* ---------------- 계정 안내 문구 ---------------- */
+
+export function accountNoticeText(info: { name: string; email: string; pw: string; role: Role; companyName?: string }, origin: string, org?: string) {
+  const who = org || "KPJK";
+  const lines = info.role === "client"
+    ? [
+        `[${who}] ${info.companyName ? `${info.companyName} ` : ""}${info.name}님, 고객 전용 화면 계정 안내드립니다.`,
+        "",
+        `접속 주소: ${origin}/login`,
+        `아이디: ${info.email}`,
+        `처음 비밀번호: ${info.pw}`,
+        "",
+        "로그인하신 뒤 아래 [MY] → 비밀번호 바꾸기에서 꼭 본인만 아는 비밀번호로 바꿔 주세요.",
+        "요청드리는 자료 제출, 진행 상황 확인, 문의를 이 화면에서 바로 하실 수 있습니다. 휴대폰으로도 됩니다.",
+      ]
+    : [
+        `[${who}] ${info.name}님 업무 화면 계정입니다.`,
+        "",
+        `접속 주소: ${origin}/login`,
+        `아이디: ${info.email}`,
+        `처음 비밀번호: ${info.pw}`,
+        "",
+        "첫 로그인 후 설정 → 내 계정에서 비밀번호를 바꿔 주세요.",
+      ];
+  return lines.join("\n");
+}
+
+function AccountNotice({ info, org, onClose }: { info: { name: string; email: string; pw: string; role: Role; companyName?: string; needsConfirm?: boolean }; org?: string; onClose: () => void }) {
+  const toast = useStore((s) => s.toast);
+  const [text, setText] = useState(() => accountNoticeText(info, typeof window !== "undefined" ? window.location.origin : "", org));
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(text); toast("안내 문구를 복사했습니다. 카카오톡·문자에 붙여 넣으세요."); }
+    catch { toast("복사하지 못했습니다. 글을 길게 눌러 직접 복사해 주세요.", "error"); }
+  };
+  return (
+    <Modal open onClose={onClose} size="sm" keepOpen
+      title={<span className="flex items-center gap-2"><UserPlus size={18} /> {info.name} 계정을 만들었습니다</span>}
+      footer={<><Button variant="ghost" onClick={onClose}>닫기</Button><Button variant="accent" icon={<Copy size={15} />} onClick={copy}>안내 문구 복사</Button></>}>
+      {info.needsConfirm && (
+        <div className="mb-3 rounded-xl bg-error-bg px-3.5 py-2.5 text-[0.82rem] text-ink" data-testid="confirm-email-warning">
+          <b className="text-error">이대로는 로그인이 안 됩니다.</b> Supabase 의 <b>Confirm email</b> 이 켜져 있어, 본인이 확인 메일을 누르기 전까지 로그인할 수 없습니다.
+          Supabase → Authentication → Sign In / Providers → Email → <b>Confirm email 끄기</b>. 이 계정은 SQL Editor 에서 한 번 실행하세요:
+          <code className="mt-1 block break-all rounded bg-surface px-2 py-1 text-[0.75rem]">update auth.users set email_confirmed_at = now() where email = &apos;{info.email}&apos;;</code>
+        </div>
+      )}
+      <p className="mb-2 text-[0.85rem] text-ink-2">아래 글을 복사해 {info.role === "client" ? "고객" : "본인"}에게 카카오톡이나 문자로 보내세요. 처음 비밀번호는 이 창을 닫으면 다시 볼 수 없습니다.</p>
+      <textarea aria-label="계정 안내 문구" className="min-h-56 w-full rounded-[10px] border border-line-2 bg-surface px-3.5 py-2.5 text-[0.88rem] leading-relaxed" value={text} onChange={(e) => setText(e.target.value)} data-testid="account-notice" />
+      <p className="mt-2 text-[0.78rem] text-ink-3">본인이 로그인하면 &ldquo;처음 받은 비밀번호&rdquo;라는 안내가 뜨고, 바꾸면 사라집니다.</p>
+    </Modal>
+  );
 }
 
 /* ---------------- 계정 생성 · 수정 ---------------- */
@@ -44,6 +96,8 @@ function UserModalInner({ open, userId, presetCompanyId, onClose, onCreated }: {
   const [pw2, setPw2] = useState("");
   const [err, setErr] = useState<Record<string, string | undefined>>({});
   const [busy, setBusy] = useState(false);
+  // 만든 직후: 본인에게 보낼 안내 문구를 보여 준다 (카카오톡·문자로 붙여 넣기)
+  const [done, setDone] = useState<{ id: string; name: string; email: string; pw: string; role: Role; companyName?: string; needsConfirm?: boolean } | null>(null);
 
   const submit = async () => {
     if (busy) return;
@@ -92,23 +146,28 @@ function UserModalInner({ open, userId, presetCompanyId, onClose, onCreated }: {
           actorRole: st.session?.role ?? "admin",
           text: `계정 생성: ${r.user.name} (${r.user.email}) · ${ROLE_LABEL[r.user.role]}`,
         });
-        toast(`${r.user.name} 계정을 만들었습니다. 정한 비밀번호를 본인에게 전달해 주세요.`);
-        onClose();
-        onCreated?.(r.user.id);
+        toast(`${r.user.name} 계정을 만들었습니다.`);
+        setDone({ id: r.user.id, name: r.user.name, email: r.user.email, pw, role, companyName: st.companies.find((c) => c.id === r.user.companyId)?.name, needsConfirm: r.needsEmailConfirm });
+        setBusy(false);
         return;
       }
 
       const hash = await hashPassword(email.trim(), pw);
       const id = create({ ...patch, role, passwordHash: hash }, me);
       if (!id) { toast("계정을 만들 권한이 없거나 아이디가 중복됩니다.", "error"); setBusy(false); return; }
-      toast(`${name.trim()} 계정을 만들었습니다. 첫 로그인 후 비밀번호를 바꾸도록 안내해 주세요.`);
-      onClose();
-      onCreated?.(id);
+      toast(`${name.trim()} 계정을 만들었습니다.`);
+      setDone({ id, name: name.trim(), email: email.trim().toLowerCase(), pw, role, companyName: role === "client" ? st.companies.find((c) => c.id === companyId)?.name : undefined });
+      setBusy(false);
     } catch {
       toast("처리 중 문제가 발생했습니다.", "error");
       setBusy(false);
     }
   };
+
+  if (done) {
+    const finish = () => { onClose(); onCreated?.(done.id); };
+    return <AccountNotice info={done} org={st.settings.org?.name} onClose={finish} />;
+  }
 
   return (
     <Modal
@@ -141,7 +200,7 @@ function UserModalInner({ open, userId, presetCompanyId, onClose, onCreated }: {
           <Field label="이름 *" hint={err.name}><Input value={name} onChange={(e) => setName(e.target.value)} autoFocus /></Field>
           <Field label="직책 *" hint={err.title}><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="예: 수석 컨설턴트" /></Field>
         </div>
-        <Field label="아이디 (이메일) *" hint={err.email}><Input value={email} onChange={(e) => setEmail(e.target.value)} inputMode="email" placeholder="name@kpjk.co.kr" /></Field>
+        <Field label="아이디 (이메일) *" hint={err.email ?? (editing && onServer ? "로그인 아이디는 여기서 바꿀 수 없습니다 — 바꾸려면 새 계정을 만드세요." : undefined)}><Input value={email} onChange={(e) => setEmail(e.target.value)} inputMode="email" placeholder="name@kpjk.co.kr" disabled={!!editing && onServer} /></Field>
         <Field label="연락처"><Input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="010-0000-0000" /></Field>
         {!editing && (
           <>

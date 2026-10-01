@@ -140,3 +140,15 @@ export function fmtWon(n: number) {
   if (n >= 10000) return `${Math.round(n / 10000).toLocaleString("ko-KR")}만원`;
   return `${n.toLocaleString("ko-KR")}원`;
 }
+
+/** 달력에 실제로 있는 날짜인가 (2월 30일·4월 31일·평년 2월 29일은 아니다) */
+export function isRealDate(y: number, mo: number, d: number): boolean {
+  if (!Number.isInteger(y) || !Number.isInteger(mo) || !Number.isInteger(d)) return false;
+  if (y < 1800 || y > 2300 || mo < 1 || mo > 12 || d < 1) return false;
+  return d <= new Date(Date.UTC(y, mo, 0)).getUTCDate();
+}
+/** "YYYY-MM-DD" 가 실제 날짜인가 */
+export function isRealYmd(v: string): boolean {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+  return !!m && isRealDate(Number(m[1]), Number(m[2]), Number(m[3]));
+}

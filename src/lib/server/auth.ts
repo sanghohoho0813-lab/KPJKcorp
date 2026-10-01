@@ -102,13 +102,14 @@ export async function currentServerUser(): Promise<{ user: User | null; offline?
 export async function createServerUser(input: {
   name: string; email: string; password: string; role: Role; title: string;
   phone?: string; companyId?: string;
-}): Promise<{ ok: true; user: User } | { ok: false; reason: string }> {
+}): Promise<{ ok: true; user: User; needsEmailConfirm?: boolean } | { ok: false; reason: string }> {
   const sb = supa();
   const signer = supaSignUpOnly();
   if (!sb || !signer) return { ok: false, reason: "서버가 설정되지 않았습니다." };
 
   const email = input.email.trim().toLowerCase();
-  const { data, error } = await signer.auth.signUp({ email, password: input.password });
+  // 처음 받은 비밀번호라는 표시 — 본인이 바꾸면 지운다. 로그인 후 "비밀번호를 바꿔 주세요" 안내에 쓴다.
+  const { data, error } = await signer.auth.signUp({ email, password: input.password, options: { data: { must_change_pw: true } } });
   if (error) {
     if (/already registered|already exists/i.test(error.message)) {
       return { ok: false, reason: "이미 등록된 이메일입니다." };
@@ -130,7 +131,8 @@ export async function createServerUser(input: {
     // 아무것도 안 보이는" 계정이 된다. 사람이 손댈 수 있도록 상황을 그대로 알린다.
     return { ok: false, reason: `계정은 생성됐지만 권한 정보를 저장하지 못했습니다 (${explain(pErr)}). Supabase 대시보드에서 ${email} 사용자를 지운 뒤 다시 시도해 주세요.` };
   }
-  return { ok: true, user: userFromRow(saved) };
+  // 세션이 안 생겼고 확인 시각도 없으면 Supabase "Confirm email" 이 켜진 것 — 본인이 메일을 누르기 전엔 로그인 불가
+  return { ok: true, user: userFromRow(saved), needsEmailConfirm: !data.session && !data.user.email_confirmed_at };
 }
 
 /** 비밀번호 재설정 메일. 대표가 남의 비밀번호를 직접 정하지 않는다 — 본인만 바꾼다. */
@@ -147,8 +149,21 @@ export async function sendPasswordReset(email: string): Promise<{ ok: boolean; r
 export async function changeMyPassword(next: string): Promise<{ ok: boolean; reason?: string }> {
   const sb = supa();
   if (!sb) return { ok: false, reason: "서버가 설정되지 않았습니다." };
-  const { error } = await sb.auth.updateUser({ password: next });
-  return error ? { ok: false, reason: error.message } : { ok: true };
+  const { error } = await sb.auth.updateUser({ password: next, data: { must_change_pw: false } });
+  if (!error) return { ok: true };
+  if (/different from the old|same password/i.test(error.message)) return { ok: false, reason: "지금 쓰는 비밀번호와 다른 비밀번호로 정해 주세요." };
+  if (/password/i.test(error.message)) return { ok: false, reason: "비밀번호가 너무 짧거나 쉽습니다. 영문+숫자 8자 이상으로 정해 주세요." };
+  return { ok: false, reason: isNetworkError(error) ? OFFLINE_REASON : error.message };
+}
+
+/** 대표가 정해 준 처음 비밀번호를 아직 쓰고 있는가 (계정 만들 때 표시해 둔다) */
+export async function mustChangePassword(): Promise<boolean> {
+  const sb = supa();
+  if (!sb) return false;
+  try {
+    const { data } = await sb.auth.getSession();
+    return data.session?.user?.user_metadata?.must_change_pw === true;
+  } catch { return false; }
 }
 
 /** 계정 사용 중지·재개 (auth 계정은 남기고 프로필만 끈다 — 기록의 작성자 연결이 끊기면 안 된다) */

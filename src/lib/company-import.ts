@@ -1,3 +1,4 @@
+import { isRealDate } from "./format";
 import type { Company, EntityType, User } from "./types";
 import { REGIONS, bandOfEmployees, formatBizNo, formatCorpNo, formatPhone, regionOfAddress } from "./company-options";
 import { excelSerialToDate, type SheetData } from "./xlsx";
@@ -100,13 +101,13 @@ function toDate(raw: string): string | undefined {
   if (/^\d+(\.\d+)?$/.test(s)) {
     const d = excelSerialToDate(Number(s));
     if (d) return d;
-    if (/^\d{8}$/.test(s)) return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
+    if (/^\d{8}$/.test(s)) return isRealDate(Number(s.slice(0, 4)), Number(s.slice(4, 6)), Number(s.slice(6, 8))) ? `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}` : undefined;
     return undefined;
   }
   const m = s.match(/^(\d{4})\s*[-./년]\s*(\d{1,2})\s*[-./월]\s*(\d{1,2})/);
   if (!m) return undefined;
   const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
-  if (mo < 1 || mo > 12 || d < 1 || d > 31) return undefined;
+  if (!isRealDate(y, mo, d)) return undefined;
   return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 

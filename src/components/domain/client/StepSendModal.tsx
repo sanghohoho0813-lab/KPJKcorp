@@ -5,7 +5,8 @@ import { Check, Plus, Send, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { CUSTOMER_STEPS, STEP_TO_STAGE, stageProgress, stageToCustomerStep } from "@/lib/stages";
 import { DOC_CATALOG, DOCS_BY_TYPE, STEP_MESSAGES } from "@/lib/doc-catalog";
-import { addDays, iso } from "@/lib/format";
+import { addDays, iso, uid } from "@/lib/format";
+import { uploadResult as uploadResultFile } from "@/lib/server/storage";
 import type { Project } from "@/lib/types";
 import { Button, Input, cx } from "@/components/ui/ui";
 import { Modal } from "@/components/ui/overlay";
@@ -29,6 +30,13 @@ export function StepSendModal({ project: p, step, onClose }: { project: Project;
   const [showAll, setShowAll] = useState(false);
   const [due, setDue] = useState(() => iso(addDays(new Date(), 7, 18)).slice(0, 10));
   const askDocs = step === 0;
+  // 완료 단계: 결과 보고서를 같은 창에서 함께 공유
+  const attachResult = step === CUSTOMER_STEPS.length - 1;
+  const serverMode = useStore((s) => s.serverMode);
+  const share = useStore((s) => s.shareResult);
+  const [resFile, setResFile] = useState<File | null>(null);
+  const [resName, setResName] = useState(`${p.name} 결과 보고서`);
+  const [busy, setBusy] = useState(false);
 
   // 이미 받는 중인 서류 — 다시 요청하지 않는다
   const pending = useMemo(() => new Set(docRequests.filter((d) => d.companyId === p.companyId && (d.status === "requested" || d.status === "revision" || d.status === "planned")).map((d) => d.name)), [docRequests, p.companyId]);
@@ -42,11 +50,26 @@ export function StepSendModal({ project: p, step, onClose }: { project: Project;
   };
   const addPreset = (t: string) => setMessage((m) => (m.includes(t) ? m : m.trim() ? `${m.trim()} ${t}` : t));
 
-  const submit = () => {
-    if (!moving && !docs.length && !message.trim()) { toast("보낼 메시지나 요청할 서류를 넣어 주세요.", "error"); return; }
+  const submit = async () => {
+    if (busy) return;
+    if (!moving && !docs.length && !message.trim() && !resFile) { toast("보낼 메시지나 요청할 서류를 넣어 주세요.", "error"); return; }
+    let shared = false;
+    if (attachResult && resFile) {
+      if (!resName.trim()) { toast("결과자료 이름을 넣어 주세요.", "error"); return; }
+      setBusy(true);
+      let storagePath: string | undefined;
+      if (serverMode) {
+        const up = await uploadResultFile(p.companyId, uid("rs"), resFile);
+        if (!up.ok) { toast(up.reason ?? "파일을 올리지 못했습니다.", "error"); setBusy(false); return; }
+        storagePath = up.path;
+      }
+      share({ projectId: p.id, companyId: p.companyId, name: resName.trim(), kind: "보고서", description: "", size: resFile.size, sharedBy: me, storagePath }, me);
+      shared = true;
+      setBusy(false);
+    }
     const r = send(p.id, STEP_TO_STAGE[step], { message, docs: askDocs ? docs : [], dueDate: new Date(`${due}T18:00:00`).toISOString() }, me);
     if (!r) return;
-    const parts = [moving ? `${target.label} 단계로 바꿨습니다` : "보냈습니다", r.docs ? `자료 ${r.docs}건 요청` : ""].filter(Boolean);
+    const parts = [moving ? `${target.label} 단계로 바꿨습니다` : "보냈습니다", r.docs ? `자료 ${r.docs}건 요청` : "", shared ? "결과자료 공유" : ""].filter(Boolean);
     toast(`${p.name} — ${parts.join(" · ")}. 고객 화면에 바로 반영되고 알림이 갑니다.`);
     onClose();
   };
@@ -68,8 +91,8 @@ export function StepSendModal({ project: p, step, onClose }: { project: Project;
       title={<span className="flex flex-wrap items-center gap-2"><Send size={17} className="text-accent" /> {moving ? `${target.label} 단계로` : `${target.label} · 고객에게 보내기`}</span>}
       footer={<>
         <Button variant="ghost" onClick={onClose}>취소</Button>
-        <Button variant="accent" icon={<Send size={15} />} onClick={submit}>
-          {moving ? "단계 바꾸고 보내기" : "보내기"}{askDocs && docs.length ? ` (자료 ${docs.length}건)` : ""}
+        <Button variant="accent" icon={<Send size={15} />} onClick={submit} disabled={busy}>
+          {busy ? "올리는 중…" : moving ? "단계 바꾸고 보내기" : "보내기"}{askDocs && docs.length ? ` (자료 ${docs.length}건)` : ""}
         </Button>
       </>}>
       <div className="rounded-xl bg-surface-2 px-4 py-2.5 text-[0.85rem] text-ink-2">
@@ -128,6 +151,15 @@ export function StepSendModal({ project: p, step, onClose }: { project: Project;
               <Input type="date" className="w-auto" value={due} onChange={(e) => setDue(e.target.value)} />
             </label>
           </div>
+        </div>
+      )}
+
+      {attachResult && (
+        <div className="mt-4 rounded-xl border border-line p-3" data-result-attach>
+          <div className="text-[0.88rem] font-bold">결과자료 함께 보내기 <span className="font-normal text-ink-3">(선택)</span></div>
+          <p className="mt-0.5 text-[0.78rem] text-ink-3">고객 화면 완료자료에 올라가고 바로 내려받을 수 있습니다. 한 번에 50MB 까지.</p>
+          <Input type="file" className="mt-2" aria-label="결과자료 파일" onChange={(e) => setResFile(e.target.files?.[0] ?? null)} />
+          {resFile && <Input className="mt-2" value={resName} onChange={(e) => setResName(e.target.value)} aria-label="결과자료 이름" />}
         </div>
       )}
 

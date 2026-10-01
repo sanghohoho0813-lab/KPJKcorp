@@ -73,7 +73,7 @@ insert into public.projects(id, company_id, name, client_visible, archived) valu
   ('pj_b1','co_b','B 공개 프로젝트', true,  false);
 
 insert into public.consultations(id, company_id, notes) values ('cs_a1','co_a','상담 메모');
-insert into public.tasks(id, company_id, title) values ('tk_a1','co_a','내부 업무');
+insert into public.tasks(id, company_id, title) values ('tk_a1','co_a','내부 업무'), ('tk_b1','co_b','B사 업무'), ('tk_x',null,'회사 없는 내부 업무');
 insert into public.quotes(id, company_id, title, status) values
   ('qt_a1','co_a','A 초안 견적','draft'),
   ('qt_a2','co_a','A 발송 견적','sent');
@@ -109,21 +109,29 @@ insert into public.opportunities(id, company_id, service_key, service_name, sour
   ('op_prop', 'co_a', 'kpjk_가업승계', '가업승계', 'proposal',       'proposed',  null, '고객에게 보이는 제안 이유'),
   ('op_req',  'co_a', 'kpjk_세무조사', '세무조사', 'portal_request', 'interest',  '고객 메모', null),
   ('op_bp',   'co_b', 'kpjk_법인전환', '법인전환', 'proposal',       'proposed',  null, 'B사 제안');
+update public.opportunities set history = '[{"at":"2026-09-01","status":"contacted","by":"x","note":"내부: 대표 성향 보수적"}]'::jsonb where id = 'op_prop';
 insert into public.payments(id, company_id, kind, label, amount) values
   ('pm_a1','co_a','deposit','계약금', 1000000), ('pm_b1','co_b','success','성공보수', 2000000);
 insert into public.activities(id, type, company_id, actor_id, actor_role, message) values
   ('ac_a2','payment_received','co_a','00000000-0000-0000-0000-00000000a001','admin','입금 확인: 계약금'),
   ('ac_a3','journal_written','co_a','00000000-0000-0000-0000-00000000a001','admin','업무 일기: 통화'),
-  ('ac_a4','document_uploaded','co_a','00000000-0000-0000-0000-00000000f001','client','자료 제출');
+  ('ac_a4','document_uploaded','co_a','00000000-0000-0000-0000-00000000f001','client','자료 제출'),
+  ('ac_a5','approval_requested','co_a','00000000-0000-0000-0000-00000000a001','admin','할인 15% 승인 요청'),
+  ('ac_a6','quote_created','co_a','00000000-0000-0000-0000-00000000a001','admin','견적 초안 1,200만원'),
+  ('ac_a7','company_updated','co_a','00000000-0000-0000-0000-00000000a001','admin','메모 수정');
 
 -- =========================== 고객 A =========================================
 set role authenticated;
 set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000f001';
 
-select chk('고객A: 자기 회사만 보인다',        (select count(*) from public.companies), 1::bigint);
-select chk('고객A: 보이는 회사가 A다',          (select name from public.companies), '에이테스트(주)');
-select chk('고객A: 공개·미보관 프로젝트만',      (select count(*) from public.projects), 1::bigint);
-select chk('고객A: 그 프로젝트가 pj_a1',        (select id from public.projects), 'pj_a1');
+select chk('고객A: 기업 표는 직접 못 읽는다(내부 칸 보호)', (select count(*) from public.companies), 0::bigint);
+select chk('고객A: 고객용 보기로 자기 회사만',   (select count(*) from public.client_companies), 1::bigint);
+select chk('고객A: 고객용 보기에 메모 칸 없음',  (select count(*) from information_schema.columns where table_name='client_companies' and column_name in ('memo','lead_source','shareholders','custom_fields','docs')), 0::bigint);
+select chk('고객A: 프로젝트 보기에 진행 메모 없음', (select count(*) from information_schema.columns where table_name='client_projects' and column_name in ('work_status','next_step','waiting_since')), 0::bigint);
+select chk('고객A: 보이는 회사가 A다',          (select name from public.client_companies), '에이테스트(주)');
+select chk('고객A: 프로젝트 표 직접 못 읽는다',    (select count(*) from public.projects), 0::bigint);
+select chk('고객A: 공개·미보관 프로젝트만',      (select count(*) from public.client_projects), 1::bigint);
+select chk('고객A: 그 프로젝트가 pj_a1',        (select id from public.client_projects), 'pj_a1');
 select chk('고객A: 상담기록은 안 보인다',        (select count(*) from public.consultations), 0::bigint);
 select chk('고객A: 업무는 안 보인다',            (select count(*) from public.tasks), 0::bigint);
 select chk('고객A: 발송된 견적만 보인다',        (select count(*) from public.quotes), 1::bigint);
@@ -149,9 +157,11 @@ select chk('고객A: 스스로 대표가 못 된다',
        affected($$update public.profiles set role='admin' where id=auth.uid()$$), 0::bigint);
 
 -- 고객이 해도 되는 것
-select chk('고객A: 제안·내 요청만 보인다',          (select count(*) from public.opportunities), 2::bigint);
-select chk('고객A: 내부 등록 기회(내부 메모) 안 보인다', (select count(*) from public.opportunities where source in ('internal','rule')), 0::bigint);
-select chk('고객A: B사 제안은 안 보인다',          (select count(*) from public.opportunities where id='op_bp'), 0::bigint);
+select chk('고객A: 제안·내 요청만 보인다',          (select count(*) from public.client_opportunities), 2::bigint);
+select chk('고객A: 매출기회 표 직접 못 읽는다',      (select count(*) from public.opportunities), 0::bigint);
+select chk('고객A: 제안 이력에 담당자 메모 없음',    (select count(*) from public.client_opportunities o, jsonb_array_elements(o.history) h where h ? 'note'), 0::bigint);
+select chk('고객A: 내부 등록 기회(내부 메모) 안 보인다', (select count(*) from public.client_opportunities where source in ('internal','rule')), 0::bigint);
+select chk('고객A: B사 제안은 안 보인다',          (select count(*) from public.client_opportunities where id='op_bp'), 0::bigint);
 select chk('고객A: 제안을 직접 못 만든다',
        denied($$insert into public.opportunities(id, company_id, service_key, service_name, source, status) values ('op_evil','co_a','kpjk_x','x','proposal','proposed')$$), true);
 select chk('고객A: 제안 이유를 못 고친다',
@@ -168,6 +178,7 @@ select chk('고객A: 수금 안 보인다',               (select count(*) from 
 select chk('고객A: 수금·일기 기록은 안 보인다',
        (select count(*) from public.activities where type in ('payment_received','journal_written')), 0::bigint);
 select chk('고객A: 일반 기록은 보인다(등록·자료 제출)', (select count(*) from public.activities), 2::bigint);
+select chk('고객A: 승인·견적 초안·메모 수정 기록 안 보인다', (select count(*) from public.activities where type in ('approval_requested','quote_created','company_updated')), 0::bigint);
 select chk('고객A: 서류함 보관함 파일 못 본다',  (select count(*) from storage.objects where bucket_id='vault'), 0::bigint);
 select chk('고객A: 서류함 보관함에 못 올린다',
        denied($$insert into storage.objects(bucket_id, name) values ('vault','co_a/x__file.pdf')$$), true);
@@ -226,6 +237,10 @@ select chk('컨설턴트(내담당): B사 프로젝트 안 보인다',
        (select count(*) from public.projects where company_id='co_b'), 0::bigint);
 select chk('컨설턴트(내담당): B사 수금 안 보인다',   (select count(*) from public.payments where company_id='co_b'), 0::bigint);
 select chk('컨설턴트(내담당): B사 서류 파일 안 보인다', (select count(*) from public.company_files where company_id='co_b'), 0::bigint);
+select chk('컨설턴트(내담당): B사 업무 안 보인다',  (select count(*) from public.tasks where company_id='co_b'), 0::bigint);
+select chk('컨설턴트(내담당): 회사 없는 내부 업무는 보인다', (select count(*) from public.tasks where id='tk_x'), 1::bigint);
+select chk('컨설턴트(내담당): B사 업무 못 바꾼다',
+       affected($$update public.tasks set title='x' where id='tk_b1'$$), 0::bigint);
 select chk('컨설턴트(내담당): B사 보관함 원본 못 연다',
        (select count(*) from storage.objects where bucket_id='vault' and name like 'co_b/%'), 0::bigint);
 reset role; reset request.jwt.claim.sub;
