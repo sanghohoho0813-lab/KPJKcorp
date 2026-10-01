@@ -43,7 +43,7 @@ export default function PortalPrograms() {
         <b>검토해 볼 공고 {matches.length}건</b>{urgent > 0 && <span className="font-semibold text-error">마감 임박 {urgent}건</span>}
       </div>
       <p className="text-[0.78rem] leading-relaxed text-ink-3">{MATCH_NOTE}</p>
-      {missing.length > 0 && <Card className="p-3 text-[0.82rem] text-ink-2">회사 정보에 {missing.join("·")}이(가) 없어 결과가 넓게 나올 수 있습니다. 담당 컨설턴트에게 알려 주시면 더 정확해집니다.</Card>}
+      {missing.length > 0 && <Card className="p-3 text-[0.82rem] text-ink-2">회사 정보의 {missing.join("·")} 칸이 비어 있어 결과가 넓게 나올 수 있습니다. 담당 컨설턴트에게 알려 주시면 더 정확해집니다.</Card>}
       {matches.length === 0 ? (
         <Card><EmptyState icon={<Search size={28} />} title="지금 맞는 공고가 없습니다" desc="새 공고가 나오면 담당 컨설턴트가 이 화면과 알림으로 알려 드립니다." /></Card>
       ) : (

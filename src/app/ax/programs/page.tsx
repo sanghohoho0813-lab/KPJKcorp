@@ -44,7 +44,7 @@ export default function ProgramsPage() {
   const [filter, setFilter] = useState<"matched" | "urgent" | "all">("matched");
   const [q, setQ] = useState("");
 
-  const companies = useMemo(() => st.companies.filter((c) => !c.archived && !c.sample), [st.companies]);
+  const companies = useMemo(() => st.companies.filter((c) => !c.archived), [st.companies]);
   const programs = useMemo(() => openOnly(st.programs), [st.programs]);
   // 공고별 맞는 고객 · 가망고객
   const byProgram = useMemo(() => {
@@ -159,7 +159,7 @@ export default function ProgramsPage() {
                   <Link href={`/ax/clients/${c.id}`} className="font-bold hover:text-accent">{c.name}</Link>
                   <Badge tone={ms.length ? "accent" : "neutral"}>맞는 공고 {ms.length}건</Badge>
                   {ms.some((m) => m.deadline.urgent) && <Badge tone="error">마감 임박 {ms.filter((m) => m.deadline.urgent).length}</Badge>}
-                  {missing.length > 0 && <span className="text-[0.75rem] text-warning">기업정보에 {missing.join("·")}이(가) 없어 덜 정확합니다</span>}
+                  {missing.length > 0 && <span className="text-[0.75rem] text-warning">기업정보의 {missing.join("·")} 칸이 비어 덜 정확합니다</span>}
                 </div>
                 {ms.slice(0, 3).map((m) => <div key={m.program.id} className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[0.82rem]"><span className={cx("shrink-0 rounded px-1.5 text-[0.72rem] font-bold", m.deadline.urgent ? "bg-error-bg text-error" : "bg-surface-2 text-ink-3")}>{m.deadline.label}</span><span className="min-w-0 flex-1 truncate">{m.program.title}</span><span className="text-[0.72rem] text-ink-3">{m.reasons.slice(0, 2).join(" · ")}</span></div>)}
               </div>
