@@ -6,10 +6,10 @@ import { useStore } from "@/lib/store";
 import type { Company, CompanyDocKind, CompanyDocMeta, EntityType } from "@/lib/types";
 import { fmtSize } from "@/lib/format";
 import {
-  BIZ_CATEGORIES, CONSULT_AREAS, CONTACT_TITLES, EMPLOYEE_BANDS, ENTITY_TYPES, INDUSTRY_CHIPS, LEAD_SOURCES, REGIONS, REVENUE_BANDS,
+  CONSULT_AREAS, CONTACT_TITLES, EMPLOYEE_BANDS, ENTITY_TYPES, INDUSTRY_CHIPS, industryOf, LEAD_SOURCES, REGIONS, REVENUE_BANDS,
   bandOfEmployees, formatBizNo, formatCorpNo, formatPhone, regionOfAddress,
 } from "@/lib/company-options";
-import { DOC_SOURCE_LABEL, PARSED_LABEL, PARSED_ORDER, parseBusinessDoc, type ParsedDoc, type ParsedKey } from "@/lib/docparse";
+import { DOC_SOURCE_LABEL, PARSED_LABEL, PARSED_ORDER, bizNoValid, corpNoValid, parseBusinessDoc, parseExtracted, type ParsedDoc, type ParsedKey } from "@/lib/docparse";
 import { ACCEPT_DOC, EXTRACT_METHOD_LABEL, extractTextFromFile, type ExtractMethod } from "@/lib/docextract";
 import { Modal } from "@/components/ui/overlay";
 import { Badge, Button, Input, Textarea, cx } from "@/components/ui/ui";
@@ -145,11 +145,14 @@ function CompanyModalInner({ open, companyId, onClose, onCreated }: { open: bool
             <ChipSelect options={ENTITY_TYPES} value={f.entityType} onChange={(v) => set("entityType", v as EntityType | undefined)} />
           </F>
           <div className="grid gap-3 sm:grid-cols-2">
-            <F label="사업자등록번호" error={err.bizNo} doc={fromDoc.has("bizNo")}>
+            {/* 국세청 번호 끝자리 검증 — 막지는 않고 알려만 준다(서류에서 한 자리 잘못 읽은 경우를 잡는다) */}
+            <F label="사업자등록번호" error={err.bizNo} doc={fromDoc.has("bizNo")}
+              hint={f.bizNo.replace(/\D/g, "").length === 10 && !bizNoValid(f.bizNo) ? "검증번호가 맞지 않습니다 — 한 자리가 틀렸을 수 있으니 서류와 한 번 대조해 주세요." : undefined}>
               <Input value={f.bizNo} onChange={(e) => set("bizNo", formatBizNo(e.target.value))} placeholder="000-00-00000" inputMode="numeric" />
             </F>
             {isCorp && (
-              <F label="법인등록번호" error={err.corpNo} doc={fromDoc.has("corpNo")}>
+              <F label="법인등록번호" error={err.corpNo} doc={fromDoc.has("corpNo")}
+                hint={(f.corpNo ?? "").replace(/\D/g, "").length === 13 && !corpNoValid(f.corpNo) ? "검증번호가 맞지 않습니다 — 서류와 한 번 대조해 주세요." : undefined}>
                 <Input value={f.corpNo ?? ""} onChange={(e) => set("corpNo", formatCorpNo(e.target.value))} placeholder="000000-0000000" inputMode="numeric" />
               </F>
             )}
@@ -160,17 +163,19 @@ function CompanyModalInner({ open, companyId, onClose, onCreated }: { open: bool
               <Input type="date" value={f.ceoBirth ?? ""} onChange={(e) => set("ceoBirth", e.target.value || undefined)} />
             </F>
           </div>
-          <F chips label="업종" doc={fromDoc.has("industry")}>
-            <ChipSelect options={INDUSTRY_CHIPS} value={f.industry || undefined} onChange={(v) => set("industry", v ?? "")} custom customPlaceholder="예: 정밀부품 제조" />
-          </F>
+          {/* 사업자등록증 순서 그대로: 업태 → 종목. 업종(분류)은 업태에서 자동으로 고른다 — 같은 목록을 두 번 고르게 하지 않는다 */}
           <div className="grid gap-3 sm:grid-cols-2">
-            <F chips label="업태 (사업자등록증)" doc={fromDoc.has("bizCategory")}>
-              <ChipSelect options={BIZ_CATEGORIES} value={f.bizCategory} onChange={(v) => set("bizCategory", v)} custom customPlaceholder="업태" />
+            <F label="업태 (사업자등록증)" doc={fromDoc.has("bizCategory")} hint="여러 개면 쉼표로 · 첫 번째가 주업태">
+              <Input value={f.bizCategory ?? ""} onChange={(e) => set("bizCategory", e.target.value || undefined)} placeholder="예: 음식점업, 도매 및 소매업"
+                onBlur={(e) => { const ind = industryOf(e.target.value); if (ind && !f.industry) set("industry", ind); }} />
             </F>
             <F label="종목 (사업자등록증)" doc={fromDoc.has("bizItem")}>
-              <Input value={f.bizItem ?? ""} onChange={(e) => set("bizItem", e.target.value || undefined)} placeholder="예: 자동차부품" />
+              <Input value={f.bizItem ?? ""} onChange={(e) => set("bizItem", e.target.value || undefined)} placeholder="예: 커피 전문점, 상품 종합 도매업" />
             </F>
           </div>
+          <F chips label="업종" doc={fromDoc.has("industry")} hint="목록·현황표에서 묶어 보는 분류입니다. 업태를 넣으면 자동으로 골라집니다.">
+            <ChipSelect options={INDUSTRY_CHIPS} value={f.industry || undefined} onChange={(v) => set("industry", v ?? "")} custom customPlaceholder="예: 정밀부품 제조" />
+          </F>
         </Sec>
 
         {/* 2. 규모 · 지역 */}
@@ -342,7 +347,12 @@ function DocFillPanel({ current, onApply }: { current: CompanyForm; onApply: (pa
       else if (k === "ceoBirth") patch.ceoBirth = String(v);
       else if (k === "establishedAt") patch.establishedAt = String(v);
       else if (k === "address") { patch.address = String(v); const r = regionOfAddress(String(v)); if (r) patch.region = r; }
-      else if (k === "bizCategory") { patch.bizCategory = String(v); if (!current.industry) patch.industry = INDUSTRY_CHIPS.find((c) => String(v).startsWith(c.slice(0, 2))) ?? String(v); }
+      else if (k === "bizCategory") {
+        patch.bizCategory = String(v);
+        // 주업태로 업종 칩을 고른다. 맞는 칩이 없으면 비워 둔다 — 업태 글자를 그대로 업종에 넣지 않는다
+        const ind = industryOf(String(v));
+        if (!current.industry && ind) patch.industry = ind;
+      }
       else if (k === "bizItem") patch.bizItem = String(v);
       else if (k === "capital") patch.capital = Number(v);
     }
@@ -373,8 +383,8 @@ function DocFillPanel({ current, onApply }: { current: CompanyForm; onApply: (pa
     if (!file) return;
     setStage({ kind: "busy", ratio: 0, label: "준비 중" });
     try {
-      const res = await extractTextFromFile(file, (ratio, label) => setStage({ kind: "busy", ratio, label }));
-      finish(parseBusinessDoc(res.text), res.method, file.name, file.size);
+      const res = await extractTextFromFile(file, (ratio, label) => setStage({ kind: "busy", ratio, label }), { namePass: true });
+      finish(parseExtracted(res.text, res.alt), res.method, file.name, file.size);
     } catch (cause) {
       setStage({ kind: "error", message: cause instanceof Error ? cause.message : "파일을 읽지 못했습니다. 글자 붙여넣기로 시도해 보세요." });
     } finally {
@@ -401,7 +411,8 @@ function DocFillPanel({ current, onApply }: { current: CompanyForm; onApply: (pa
           <div className="text-[0.95rem] font-bold">{stage.kind === "done" ? "서류에서 읽어 채웠습니다" : "서류로 빠르게 채우기"}</div>
           <div className="text-[0.78rem] text-ink-2">
             {stage.kind === "done"
-              ? <>{DOC_SOURCE_LABEL[stage.parsed.source]} · {EXTRACT_METHOD_LABEL[stage.method]} · <b>{stage.applied.length}개 항목</b> 반영 — 아래 <Badge tone="success" className="!py-0 !text-[0.68rem]">서류</Badge> 표시를 확인하세요</>
+              ? <>{DOC_SOURCE_LABEL[stage.parsed.source]} · {EXTRACT_METHOD_LABEL[stage.method]} · <b>{stage.applied.length}개 항목</b> 반영 — 아래 <Badge tone="success" className="!py-0 !text-[0.68rem]">서류</Badge> 표시를 확인하세요
+                {stage.method === "ocr" && <span className="mt-0.5 block font-semibold text-warning">그림으로 된 서류라 글자를 인식해 읽었습니다. 숫자는 정확한 편이지만 이름·주소는 한두 글자 틀릴 수 있어 한 번 확인해 주세요.</span>}</>
               : "사업자등록증 · 법인등기부등본 PDF나 사진을 올리면 기업명·사업자번호·대표자·주소·설립일을 읽어 채웁니다."}
           </div>
         </div>

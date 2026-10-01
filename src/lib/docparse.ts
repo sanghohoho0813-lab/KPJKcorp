@@ -65,6 +65,16 @@ function normalize(raw: string) {
 const digits = (s: string) => s.replace(/\D/g, "");
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
+/**
+ * 라벨을 느슨하게 찾는 정규식 조각.
+ * 사업자등록증은 "법 인 명"처럼 글자 사이를 띄우고, 사진 글자 인식은 받침을 자주 헷갈린다("명"→"멍", "태"→"테").
+ * 글자 사이 공백·밑줄·점을 허용하고, 자주 틀리는 글자는 비슷한 글자까지 받는다.
+ */
+const CONFUSE: Record<string, string> = { 명: "명멍몀", 태: "태테", 점: "점절", 업: "업엄언", 표: "표포", 호: "호흐", 재: "재제", 종: "종좀", 목: "목옥" };
+export function fz(word: string): string {
+  return [...word].map((c) => (CONFUSE[c] ? `[${CONFUSE[c]}]` : c.replace(/[()]/g, "\\$&"))).join("[\\s_.·ㆍ]*");
+}
+
 export function parseKoreanDate(input: string): string | undefined {
   const s = input.trim();
   let m: RegExpExecArray | null = /(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/.exec(s);
@@ -94,6 +104,26 @@ export function birthFromRrn(prefix6: string, genderCode?: string): string | und
 export function fmtBizNo10(raw: string) {
   const d = digits(raw);
   return d.length === 10 ? `${d.slice(0, 3)}-${d.slice(3, 5)}-${d.slice(5)}` : undefined;
+}
+
+/** 사업자등록번호 끝자리 검증 (국세청 규칙). 글자 인식이 한 자리 틀리면 대부분 여기서 걸린다 */
+export function bizNoValid(raw: string | undefined): boolean {
+  const d = digits(raw ?? "");
+  if (d.length !== 10) return false;
+  const w = [1, 3, 7, 1, 3, 7, 1, 3, 5];
+  let sum = 0;
+  for (let i = 0; i < 9; i += 1) sum += Number(d[i]) * w[i];
+  sum += Math.floor((Number(d[8]) * 5) / 10);
+  return (10 - (sum % 10)) % 10 === Number(d[9]);
+}
+
+/** 법인등록번호 끝자리 검증 */
+export function corpNoValid(raw: string | undefined): boolean {
+  const d = digits(raw ?? "");
+  if (d.length !== 13) return false;
+  let sum = 0;
+  for (let i = 0; i < 12; i += 1) sum += Number(d[i]) * (i % 2 === 0 ? 1 : 2);
+  return (10 - (sum % 10)) % 10 === Number(d[12]);
 }
 
 export function fmtCorpNo13(raw: string) {
@@ -146,9 +176,11 @@ export function detectDocSource(text: string): DocSource {
 
 function findBizNo(t: string) {
   const labeled = /(?:사업자)?\s*등\s*록\s*번\s*호\s*[:：]?\s*(\d{3}\s*-\s*\d{2}\s*-\s*\d{5})/.exec(t);
-  if (labeled) return fmtBizNo10(labeled[1]);
-  const loose = /(?:^|[^\d])(\d{3}\s*-\s*\d{2}\s*-\s*\d{5})(?!\d)/.exec(t);
-  return loose ? fmtBizNo10(loose[1]) : undefined;
+  const all = [...t.matchAll(/(?:^|[^\d])(\d{3}\s*-\s*\d{2}\s*-\s*\d{5})(?!\d)/g)].map((m) => fmtBizNo10(m[1])).filter((x): x is string => !!x);
+  const first = labeled ? fmtBizNo10(labeled[1]) : all[0];
+  // 검증번호가 맞는 것을 우선한다 — 라벨 옆 번호가 틀리게 읽혔으면 문서 안의 다른 번호(바코드 아래 등)를 쓴다
+  if (first && bizNoValid(first)) return first;
+  return all.find(bizNoValid) ?? first;
 }
 
 function findCorpNo(t: string) {
@@ -158,13 +190,24 @@ function findCorpNo(t: string) {
   return undefined;
 }
 
+/** 회사 형태 낱말 — 라벨을 못 읽었을 때 이 낱말이 있는 줄을 상호로 본다 */
+const COMPANY_FORM = /(주식회사|유한책임회사|유한회사|합자회사|합명회사|농업회사법인|영농조합법인|협동조합|사단법인|재단법인|\(주\)|㈜)/;
+
 function findName(t: string, source: DocSource) {
+  const BRACKET = `[\\s_.·ㆍ]*\\(?[\\s_.·ㆍ]*${fz("단체명")}?[\\s_.·ㆍ]*\\)?`;
   const patterns = source === "corpReg"
-    ? ["상\\s*호", "법인명\\s*\\(?단체명\\)?", "법인명", "회사명"]
-    : ["법인명\\s*\\(?단체명\\)?", "상\\s*호\\s*\\(?법인명\\)?", "상\\s*호", "법인명", "회사명"];
+    ? [fz("상호"), fz("법인명") + BRACKET, fz("회사명")]
+    : [fz("법인명") + BRACKET, fz("상호") + `[\\s_.·ㆍ]*\\(?[\\s_.·ㆍ]*${fz("법인명")}?[\\s_.·ㆍ]*\\)?`, fz("회사명")];
   for (const p of patterns) {
     const v = valueAfter(t, p);
-    if (v && v.length >= 2 && v.length <= 60) return v;
+    if (v && v.length >= 2 && v.length <= 60 && /[가-힣A-Za-z]/.test(v)) return v;
+  }
+  // 라벨이 뭉개졌으면 "주식회사 …" 가 든 줄을 쓴다 (세무서·발급기관 줄은 제외)
+  for (const line of t.split("\n")) {
+    if (!COMPANY_FORM.test(line) || /세무서|등기소|법원|국세청/.test(line)) continue;
+    const after = line.includes(":") || line.includes("：") ? line.split(/[:：]/).slice(1).join(":") : line;
+    const v = cutAtNextLabel(after).replace(/^[^가-힣A-Za-z(㈜]+/, "").trim();
+    if (v.length >= 4 && v.length <= 60 && COMPANY_FORM.test(v)) return v;
   }
   return undefined;
 }
@@ -172,11 +215,12 @@ function findName(t: string, source: DocSource) {
 function findCeo(t: string, source: DocSource) {
   const patterns = source === "corpReg"
     ? ["대\\s*표\\s*이\\s*사", "사내이사", "대\\s*표\\s*자"]
-    : ["성\\s*명\\s*\\(대표자\\)", "대\\s*표\\s*자\\s*\\(성명\\)", "성\\s*명", "대\\s*표\\s*자"];
+    : ["성\\s*명\\s*\\(대표자\\)", "대\\s*표\\s*자\\s*\\(성명\\)", fz("성명"), fz("대표자")];
   for (const p of patterns) {
     const v = valueAfter(t, p);
     if (!v) continue;
-    const name = /^([가-힣]{2,6}|[A-Za-z][A-Za-z .]{1,40})/.exec(v.trim());
+    // 영문 이름은 "이름 성" 처럼 두 낱말일 때만 — 글자 인식이 한글을 "dss" 같은 영문으로 잘못 읽는 경우를 거른다
+    const name = /^([가-힣]{2,6}|[A-Za-z]{2,}(?: [A-Za-z.]{1,20}){1,3})/.exec(v.trim());
     if (name) return name[1].trim();
   }
   return undefined;
@@ -226,6 +270,56 @@ function findCapital(t: string) {
   return Number.isFinite(n) && n > 0 ? n : undefined;
 }
 
+/**
+ * 사업자등록증 "사업의 종류" — 업태 | 종목 두 칸, 여러 줄.
+ *
+ *   사업의 종류 : [업태] 음식점업          [종목] 커피 전문점
+ *                       도매 및 소매업          상품 종합 도매업
+ *
+ * 칸 사이 넓은 공백이 유일한 단서라 공백을 줄이기 전의 원문으로 읽는다.
+ * 첫 번째 업태가 주업태다(업종 자동 선택에 쓴다).
+ */
+const KIND_END = /발\s*급|사업자\s*단위|공\s*동\s*사\s*업\s*자|전자\s*세금|주류\s*판매|과세\s*유형|교\s*부/;
+export function findBizKinds(raw: string): { category?: string; item?: string } {
+  const lines = raw.replace(/\r\n?/g, "\n").split("\n");
+  const CAT = new RegExp(`[\\[(|]?\\s*${fz("업태")}\\s*[\\])|]?\\s*[:：]?`, "g");
+  const ITEM = new RegExp(`[\\[(|]?\\s*${fz("종목")}\\s*[\\])|]?\\s*[:：]?`);
+  const start = lines.findIndex((l) => new RegExp(`${fz("종류")}|${fz("업태")}|${fz("종목")}|${fz("사업의")}`).test(l));
+  if (start < 0) return {};
+  const cats: string[] = [];
+  const items: string[] = [];
+  const clean = (x: string) => x
+    .replace(CAT, " ")
+    .replace(/\[[^\]\s]{0,4}[\]|]?/g, " ")            // 뭉개진 [업태] 상자 조각: "[=H", "[얼테|"
+    .replace(/[|[\]{}_:：]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const ok = (x: string) => (x.match(/[가-힣]/g) ?? []).length >= 2 && x.length <= 30;
+  for (let i = start; i < Math.min(lines.length, start + 6); i += 1) {
+    let l = lines[i];
+    if (l.trim() === "") continue;
+    if (i > start && KIND_END.test(l)) break;
+    if (i > start && /[:：]/.test(l) && !CAT.test(l) && !ITEM.test(l)) break;     // 다른 항목 줄
+    CAT.lastIndex = 0;
+    // 앞의 "사업의 종류 :" 라벨 (글자가 뭉개져도 "사업의 … :" 까지)
+    l = l.replace(new RegExp(`^.*?(?:${fz("종류")}|${fz("사업의")}[^:：\\[]*)\\s*[:：]?`), "");
+    let left = l;
+    let right = "";
+    const m = ITEM.exec(l);
+    if (m) { left = l.slice(0, m.index); right = l.slice(m.index + m[0].length); }
+    else {
+      const parts = l.trim().split(/\s{3,}/);
+      left = parts[0] ?? "";
+      right = parts.slice(1).join(" ");
+    }
+    const c = clean(left);
+    const it = clean(right);
+    if (ok(c)) cats.push(c);
+    if (ok(it)) items.push(it);
+  }
+  return { category: cats.length ? cats.join(", ") : undefined, item: items.length ? items.join(", ") : undefined };
+}
+
 /* ---------------- 본체 ---------------- */
 
 export function parseBusinessDoc(raw: string): ParsedDoc {
@@ -240,8 +334,11 @@ export function parseBusinessDoc(raw: string): ParsedDoc {
   put("ceoBirth", findCeoBirth(t));
   put("establishedAt", findEstablished(t, source));
   put("address", findAddress(t, source));
-  put("bizCategory", valueAfter(t, "업\\s*태"));
-  put("bizItem", valueAfter(t, "종\\s*목"));
+  if (source !== "corpReg") {
+    const kinds = findBizKinds(raw);
+    put("bizCategory", kinds.category ?? valueAfter(t, "업\\s*태"));
+    put("bizItem", kinds.item ?? valueAfter(t, "종\\s*목"));
+  }
   if (source === "corpReg") put("capital", findCapital(t));
   return out;
 }
@@ -249,4 +346,26 @@ export function parseBusinessDoc(raw: string): ParsedDoc {
 /** 읽힌 항목 수 */
 export function parsedCount(p: ParsedDoc) {
   return PARSED_ORDER.filter((k) => p[k] !== undefined).length;
+}
+
+/**
+ * 사진 글자 인식을 두 번 한 경우 합친다 (docextract 참고).
+ * 숫자·날짜는 첫 번째(한글+영문)만 믿는다 — 두 번째가 숫자를 틀려도 끼어들지 못한다. 비면 비운다.
+ * 이름·상호·주소·업태·종목은 두 번째(한글 전용)를 우선한다.
+ */
+const NAME_KEYS: ParsedKey[] = ["name", "ceo", "address", "bizCategory", "bizItem"];
+export function parseExtracted(text: string, alt?: string): ParsedDoc {
+  const a = parseBusinessDoc(text);
+  if (!alt) return a;
+  const b = parseBusinessDoc(alt);
+  const out: ParsedDoc = { ...a, source: a.source !== "unknown" ? a.source : b.source };
+  const put = (k: ParsedKey, v: unknown) => { if (v !== undefined) (out as unknown as Record<string, unknown>)[k] = v; };
+  for (const k of NAME_KEYS) put(k, b[k] ?? a[k]);
+  // 번호: 검증번호가 맞는 쪽. 둘 다 틀리면 첫 번째(사람이 확인한다)
+  put("bizNo", bizNoValid(a.bizNo) ? a.bizNo : bizNoValid(b.bizNo) ? b.bizNo : a.bizNo);
+  put("corpNo", corpNoValid(a.corpNo) ? a.corpNo : corpNoValid(b.corpNo) ? b.corpNo : a.corpNo);
+  // 날짜: 첫 번째가 못 읽었으면 두 번째 (날짜 꼴인지 이미 검사된 값만 온다)
+  put("establishedAt", a.establishedAt ?? b.establishedAt);
+  put("ceoBirth", a.ceoBirth ?? b.ceoBirth);
+  return out;
 }
