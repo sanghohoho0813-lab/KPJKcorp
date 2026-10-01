@@ -22,15 +22,19 @@ export interface ParsedDoc {
   /** 개업연월일 / 회사성립연월일 — YYYY-MM-DD */
   establishedAt?: string;
   address?: string;
+  /** 주업태 (사업의 종류 첫 줄 왼쪽 칸) */
   bizCategory?: string;
+  /** 주종목 (첫 줄 오른쪽 칸) */
   bizItem?: string;
+  /** 그 외 업태·종목 — 줄마다 "업태 — 종목" */
+  bizItemsExtra?: string;
   /** 등기부에서 읽은 자본금(원) — 참고용 표시만 한다 */
   capital?: number;
 }
 
 export type ParsedKey = keyof Omit<ParsedDoc, "source">;
 
-export const PARSED_ORDER: ParsedKey[] = ["name", "bizNo", "corpNo", "ceo", "ceoBirth", "establishedAt", "address", "bizCategory", "bizItem", "capital"];
+export const PARSED_ORDER: ParsedKey[] = ["name", "bizNo", "corpNo", "ceo", "ceoBirth", "establishedAt", "address", "bizCategory", "bizItem", "bizItemsExtra", "capital"];
 
 export const PARSED_LABEL: Record<ParsedKey, string> = {
   name: "기업명",
@@ -40,8 +44,9 @@ export const PARSED_LABEL: Record<ParsedKey, string> = {
   ceoBirth: "대표자 생년월일",
   establishedAt: "설립일 · 개업일",
   address: "주소",
-  bizCategory: "업태",
-  bizItem: "종목",
+  bizCategory: "주업태",
+  bizItem: "주종목",
+  bizItemsExtra: "그 외 업태·종목",
   capital: "자본금",
 };
 
@@ -280,12 +285,23 @@ function findCapital(t: string) {
  * 첫 번째 업태가 주업태다(업종 자동 선택에 쓴다).
  */
 const KIND_END = /발\s*급|사업자\s*단위|공\s*동\s*사\s*업\s*자|전자\s*세금|주류\s*판매|과세\s*유형|교\s*부/;
-export function findBizKinds(raw: string): { category?: string; item?: string } {
+export interface BizKind { category?: string; item?: string }
+/** 그 외 업태·종목 한 줄 표기 — 저장도 이 모양으로 한다(줄바꿈으로 구분) */
+export const kindLine = (k: BizKind) => [k.category, k.item].filter(Boolean).join(" — ");
+export function parseKindLines(text: string | undefined): BizKind[] {
+  return (text ?? "").split("\n").map((l) => l.trim()).filter(Boolean).map((l) => {
+    const [c, ...rest] = l.split(/\s+—\s+/);
+    return rest.length ? { category: c.trim() || undefined, item: rest.join(" — ").trim() || undefined } : { category: c.trim() || undefined };
+  });
+}
+
+export function findBizKinds(raw: string): { category?: string; item?: string; pairs: BizKind[] } {
   const lines = raw.replace(/\r\n?/g, "\n").split("\n");
   const CAT = new RegExp(`[\\[(|]?\\s*${fz("업태")}\\s*[\\])|]?\\s*[:：]?`, "g");
   const ITEM = new RegExp(`[\\[(|]?\\s*${fz("종목")}\\s*[\\])|]?\\s*[:：]?`);
   const start = lines.findIndex((l) => new RegExp(`${fz("종류")}|${fz("업태")}|${fz("종목")}|${fz("사업의")}`).test(l));
-  if (start < 0) return {};
+  if (start < 0) return { pairs: [] };
+  const pairs: BizKind[] = [];
   const cats: string[] = [];
   const items: string[] = [];
   const clean = (x: string) => x
@@ -316,8 +332,9 @@ export function findBizKinds(raw: string): { category?: string; item?: string } 
     const it = clean(right);
     if (ok(c)) cats.push(c);
     if (ok(it)) items.push(it);
+    if (ok(c) || ok(it)) pairs.push({ category: ok(c) ? c : undefined, item: ok(it) ? it : undefined });
   }
-  return { category: cats.length ? cats.join(", ") : undefined, item: items.length ? items.join(", ") : undefined };
+  return { category: cats.length ? cats.join(", ") : undefined, item: items.length ? items.join(", ") : undefined, pairs };
 }
 
 /* ---------------- 본체 ---------------- */
@@ -335,9 +352,12 @@ export function parseBusinessDoc(raw: string): ParsedDoc {
   put("establishedAt", findEstablished(t, source));
   put("address", findAddress(t, source));
   if (source !== "corpReg") {
-    const kinds = findBizKinds(raw);
-    put("bizCategory", kinds.category ?? valueAfter(t, "업\\s*태"));
-    put("bizItem", kinds.item ?? valueAfter(t, "종\\s*목"));
+    // 첫 줄이 주업태·주종목, 나머지 줄은 "그 외"로 (줄마다 "업태 — 종목")
+    const { pairs } = findBizKinds(raw);
+    const [main, ...rest] = pairs;
+    put("bizCategory", main?.category ?? (main ? undefined : valueAfter(t, "업\\s*태")));
+    put("bizItem", main?.item ?? (main ? undefined : valueAfter(t, "종\\s*목")));
+    if (rest.length) put("bizItemsExtra", rest.map(kindLine).join("\n"));
   }
   if (source === "corpReg") put("capital", findCapital(t));
   return out;
@@ -353,7 +373,7 @@ export function parsedCount(p: ParsedDoc) {
  * 숫자·날짜는 첫 번째(한글+영문)만 믿는다 — 두 번째가 숫자를 틀려도 끼어들지 못한다. 비면 비운다.
  * 이름·상호·주소·업태·종목은 두 번째(한글 전용)를 우선한다.
  */
-const NAME_KEYS: ParsedKey[] = ["name", "ceo", "address", "bizCategory", "bizItem"];
+const NAME_KEYS: ParsedKey[] = ["name", "ceo", "address", "bizCategory", "bizItem", "bizItemsExtra"];
 export function parseExtracted(text: string, alt?: string): ParsedDoc {
   const a = parseBusinessDoc(text);
   if (!alt) return a;

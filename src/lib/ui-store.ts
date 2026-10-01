@@ -13,6 +13,9 @@ interface UiState {
   nextSheet: string | null; // NEXT feature key
   aiModal: { title: string; key: string } | null;
   draftModal: { kind: string; ctx: Record<string, string | undefined> } | null;
+  /** 기업 등록·수정 창이 열려 있는가 — 열려 있으면 "이어서 쓰기" 단추를 숨긴다 */
+  companyFormOpen: boolean;
+  setCompanyFormOpen: (v: boolean) => void;
 
   openTutorial: (which: "ax" | "portal") => void;
   closeTutorial: () => void;
@@ -38,6 +41,8 @@ export const useUi = create<UiState>()((set) => ({
   searchOpen: false,
   nextSheet: null,
   aiModal: null,
+  companyFormOpen: false,
+  setCompanyFormOpen: (v) => set({ companyFormOpen: v }),
   draftModal: null,
   openTutorial: (which) => set({ tutorial: which, presentation: false, moreSheet: false }),
   closeTutorial: () => set({ tutorial: null }),

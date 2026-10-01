@@ -60,9 +60,9 @@ export function buildExportSheets(ctx: ExportCtx): SheetData[] {
     {
       name: "기업고객",
       rows: [
-        ["코드", "기업명", "대표자", "사업자번호", "법인등록번호", "사업자 형태", "업종", "업태", "종목", "설립일", "주소", "지역", "대표번호", "담당자", "직책", "연락처", "이메일", "임직원 수", "매출", "홈페이지", "관심 분야", "유입 경로", "최초 상담일", "담당 컨설턴트", "메모", "상태"],
+        ["코드", "기업명", "대표자", "사업자번호", "법인등록번호", "사업자 형태", "업종", "업태", "종목", "그 외 업태·종목", "설립일", "주소", "지역", "대표번호", "담당자", "직책", "연락처", "이메일", "임직원 수", "매출", "홈페이지", "관심 분야", "유입 경로", "최초 상담일", "담당 컨설턴트", "메모", "상태"],
         ...ctx.companies.map((c) => [
-          c.code, c.name, c.ceo, c.bizNo, c.corpNo, entity(c.entityType), c.industry, c.bizCategory, c.bizItem, c.establishedAt, c.address, c.region, c.companyPhone,
+          c.code, c.name, c.ceo, c.bizNo, c.corpNo, entity(c.entityType), c.industry, c.bizCategory, c.bizItem, c.bizItemsExtra, c.establishedAt, c.address, c.region, c.companyPhone,
           c.contactName, c.contactTitle, c.contactPhone, c.contactEmail, c.employees || null, c.revenue, c.website,
           (c.interests ?? []).map((k) => CONSULT_AREA_LABEL[k] ?? k).join(", "), c.leadSource, ymd(c.firstConsultDate), who(c.consultantId), c.memo,
           c.archived ? "보관됨" : c.sample ? "샘플" : "",

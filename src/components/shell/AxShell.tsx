@@ -41,6 +41,7 @@ import { NextSheet } from "./NextSheet";
 import { AiReadyModal, DraftModal } from "@/components/ai/AiModals";
 import { Toaster } from "@/components/ui/Toaster";
 import { ServerBanner } from "./ServerBanner";
+import { DraftDock } from "./DraftDock";
 import { Modal, Sheet, Confirm } from "@/components/ui/overlay";
 import { Avatar, Badge, Button, DemoBadge, NextBadge, PageSkeleton, cx } from "@/components/ui/ui";
 
@@ -477,6 +478,7 @@ export function AxShell({ children }: { children: ReactNode }) {
         </main>
       </div>
       <QuickApproveBar />
+      {ready && !inFrame && <DraftDock />}
       <MobileNav />
       <MoreSheet />
       <GlobalSearch />

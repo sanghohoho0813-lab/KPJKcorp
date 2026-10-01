@@ -1,6 +1,6 @@
 // 사업자등록증 · 등기부 글자에서 기업 정보 읽기. 값은 전부 지어낸 시험용이다(실제 고객 서류를 저장소에 두지 않는다).
 // 글자 모양은 2026-10-01 실제 그림 PDF 를 글자 인식했을 때 나온 깨짐을 그대로 흉내 냈다.
-import { parseBusinessDoc, parseExtracted, findBizKinds, bizNoValid, corpNoValid } from "../../src/lib/docparse";
+import { parseBusinessDoc, parseExtracted, findBizKinds, bizNoValid, corpNoValid, parseKindLines } from "../../src/lib/docparse";
 import { industryOf } from "../../src/lib/company-options";
 
 let fail = 0;
@@ -32,8 +32,9 @@ eq("사업자번호", a.bizNo, "123-86-45677");
 eq("법인번호", a.corpNo, "110111-7654323");
 eq("개업일", a.establishedAt, "2021-03-15");
 eq("대표자: '대 _표 . 자'", a.ceo, "홍걸동");
-eq("업태: 두 줄, 깨진 상자 라벨 제거", a.bizCategory, "음식점업, 도매 및 소매업");
-eq("종목: 오른쪽 칸 두 줄", a.bizItem, "커피 전문점, 상품 종합 도매업");
+eq("주업태: 깨진 상자 라벨 제거", a.bizCategory, "음식점업");
+eq("주종목", a.bizItem, "커피 전문점");
+eq("그 외 업태·종목: 둘째 줄", a.bizItemsExtra, "도매 및 소매업 — 상품 종합 도매업");
 eq("주소", a.address, "경기도 테스트시 가나읍 다라로12번길 3-4");
 
 // 2) 같은 그림을 한글 전용으로 다시 읽은 결과 — 이름은 맞고 숫자 한 자리가 틀렸다
@@ -61,11 +62,12 @@ eq("대표자: 영문 두 낱말은 받음", parseBusinessDoc(OCR_A.replace("홍
 // 5) 텍스트 PDF (홈택스) — 칸 사이를 넓은 공백으로 남긴다
 const PDF_TEXT = `사업자등록증\n(법인사업자)\n등록번호 : 123-86-45677\n법인명(단체명) : 주식회사 테스트상사\n대 표 자 : 홍길동\n개업연월일 : 2021 년 03 월 15 일\n사업의 종류 : 업태 제조업     종목 자동차부품\n도매 및 소매업     부품 도매\n발급사유 : 신규발급`;
 const p = parseBusinessDoc(PDF_TEXT);
-eq("텍스트 PDF: 업태", p.bizCategory, "제조업, 도매 및 소매업");
-eq("텍스트 PDF: 종목", p.bizItem, "자동차부품, 부품 도매");
+eq("텍스트 PDF: 주업태·주종목", [p.bizCategory, p.bizItem], ["제조업", "자동차부품"]);
+eq("텍스트 PDF: 그 외", p.bizItemsExtra, "도매 및 소매업 — 부품 도매");
 
 // 6) 옛 양식 (개인) — 줄마다 "업태 : … 종목 : …"
-eq("옛 양식", findBizKinds("업 태 : 서비스 종 목 : 소프트웨어 개발\n업 태 : 도매 종 목 : 전자상거래\n발급사유 : 정정"), { category: "서비스, 도매", item: "소프트웨어 개발, 전자상거래" });
+eq("옛 양식", (({ category, item }) => ({ category, item }))(findBizKinds("업 태 : 서비스 종 목 : 소프트웨어 개발\n업 태 : 도매 종 목 : 전자상거래\n발급사유 : 정정")), { category: "서비스, 도매", item: "소프트웨어 개발, 전자상거래" });
+eq("그 외 줄 되읽기", parseKindLines("도매 및 소매업 — 상품 종합 도매업\n서비스"), [{ category: "도매 및 소매업", item: "상품 종합 도매업" }, { category: "서비스" }]);
 
 // 7) 등기부는 업태를 읽지 않는다(그런 칸이 없다)
 const REG = `등기사항전부증명서(말소사항 포함)\n등기번호 000123\n상 호 주식회사 테스트상사\n본 점 서울특별시 테스트구 가나로 1\n회사성립연월일 2015 년 05 월 01 일\n목 적 1. 소프트웨어 개발\n대표이사 홍길동 800101-1******`;

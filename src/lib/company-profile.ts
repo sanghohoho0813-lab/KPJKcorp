@@ -135,7 +135,7 @@ export function profileRows(c: Company, vault: CompanyVault | undefined, today =
   add({ key: "corpNo", group: "identity", label: "법인등록번호", value: formatNumberOf("corporate", c.corpNo ?? ""), numberKind: "corporate", copyable: true, field: "corpNo", edit: "text", raw: c.corpNo ?? "", placeholder: "000000-0000000" });
   add({ key: "bizCategory", group: "identity", label: "업태", value: c.bizCategory ?? "", copyable: true, field: "bizCategory", edit: "text", raw: c.bizCategory ?? "", placeholder: "예: 제조업" });
   add({ key: "bizItem", group: "identity", label: "종목", value: c.bizItem ?? "", copyable: true, field: "bizItem", edit: "text", raw: c.bizItem ?? "", placeholder: "예: 금속가공" });
-  if (c.bizItemsExtra) add({ key: "bizItemsExtra", group: "identity", label: "종목(그 외)", value: c.bizItemsExtra, copyable: true, wide: true, field: "bizItemsExtra", edit: "text", raw: c.bizItemsExtra });
+  if (c.bizItemsExtra) add({ key: "bizItemsExtra", group: "identity", label: "그 외 업태·종목", value: c.bizItemsExtra, copyable: true, wide: true, field: "bizItemsExtra", edit: "text", raw: c.bizItemsExtra });
   add({ key: "industry", group: "identity", label: "업종", value: c.industry ?? "", copyable: true, field: "industry", edit: "text", raw: c.industry ?? "" });
   add({ key: "address", group: "identity", label: "본점 주소", value: c.address ?? "", copyable: true, wide: true, field: "address", edit: "text", raw: c.address ?? "" });
   add({ key: "capital", group: "identity", label: "자본금", value: c.capital ? `${c.capital.toLocaleString("ko-KR")}원` : "", copyable: true, field: "capital", edit: "number", raw: c.capital ? String(c.capital) : "", placeholder: "원 단위 숫자" });

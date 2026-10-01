@@ -1,7 +1,10 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
-import { AlertTriangle, Building2, Check, ClipboardPaste, FileUp, Loader2, RotateCcw, ScanLine, UserRound } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { AlertTriangle, Building2, Check, ClipboardPaste, FileUp, History, Loader2, Minimize2, Plus, RotateCcw, ScanLine, UserRound, X } from "lucide-react";
+import { clearDraft, draftKey, loadDraft, saveDraft } from "@/lib/drafts";
+import { useUi } from "@/lib/ui-store";
+import { fmtDateTime } from "@/lib/format";
 import { useStore } from "@/lib/store";
 import type { Company, CompanyDocKind, CompanyDocMeta, EntityType } from "@/lib/types";
 import { fmtSize } from "@/lib/format";
@@ -9,7 +12,7 @@ import {
   CONSULT_AREAS, CONTACT_TITLES, EMPLOYEE_BANDS, ENTITY_TYPES, INDUSTRY_CHIPS, industryOf, LEAD_SOURCES, REGIONS, REVENUE_BANDS,
   bandOfEmployees, formatBizNo, formatCorpNo, formatPhone, regionOfAddress,
 } from "@/lib/company-options";
-import { DOC_SOURCE_LABEL, PARSED_LABEL, PARSED_ORDER, bizNoValid, corpNoValid, parseBusinessDoc, parseExtracted, type ParsedDoc, type ParsedKey } from "@/lib/docparse";
+import { DOC_SOURCE_LABEL, PARSED_LABEL, PARSED_ORDER, bizNoValid, corpNoValid, kindLine, parseBusinessDoc, parseExtracted, parseKindLines, type BizKind, type ParsedDoc, type ParsedKey } from "@/lib/docparse";
 import { ACCEPT_DOC, EXTRACT_METHOD_LABEL, extractTextFromFile, type ExtractMethod } from "@/lib/docextract";
 import { Modal } from "@/components/ui/overlay";
 import { Badge, Button, Input, Textarea, cx } from "@/components/ui/ui";
@@ -49,10 +52,41 @@ function CompanyModalInner({ open, companyId, onClose, onCreated }: { open: bool
   const me = st.session?.userId ?? "u_admin";
   const editing = st.companies.find((c) => c.id === companyId);
   const consultants = st.users.filter((u) => u.role !== "client" && u.active !== false);
-  const [f, setF] = useState<CompanyForm>(() => (editing ? { ...editing, interests: editing.interests ?? [] } : EMPTY(me)));
+  // 쓰는 동안 이 브라우저에 계속 임시 저장한다 — 창이 닫혀도 다시 열면 그대로 이어서 쓴다
+  const dKey = draftKey("company", companyId, me);
+  const [restored] = useState(() => loadDraft<{ f: CompanyForm; fromDoc: string[] }>(dKey));
+  const fresh = () => (editing ? { ...editing, interests: editing.interests ?? [] } : EMPTY(me));
+  const [initial, setInitial] = useState<CompanyForm>(fresh);
+  const [f, setF] = useState<CompanyForm>(() => restored?.data.f ?? initial);
   const [err, setErr] = useState<Partial<Record<keyof CompanyForm, string>>>({});
   /** 서류에서 읽어 채운 항목 — 라벨 옆에 "서류" 표시 */
-  const [fromDoc, setFromDoc] = useState<Set<string>>(() => new Set());
+  const [fromDoc, setFromDoc] = useState<Set<string>>(() => new Set(restored?.data.fromDoc ?? []));
+  const [showRestored, setShowRestored] = useState(!!restored);
+  /** 그 외 업태·종목 줄 — 빈 줄도 화면에는 남겨 둬야 새 줄을 쓸 수 있어 따로 들고 있다. 저장은 f.bizItemsExtra(줄마다 "업태 — 종목") */
+  const [extra, setExtra] = useState<BizKind[]>(() => parseKindLines((restored?.data.f ?? initial).bizItemsExtra));
+  const setExtraRows = (rows: BizKind[]) => {
+    setExtra(rows);
+    const text = rows.filter((r) => r.category?.trim() || r.item?.trim()).map((r) => kindLine({ category: r.category?.trim(), item: r.item?.trim() })).join("\n");
+    set("bizItemsExtra", text || undefined);
+  };
+  const dirty = JSON.stringify(f) !== JSON.stringify(initial);
+  const setFormOpen = useUi((s) => s.setCompanyFormOpen);
+  useEffect(() => { setFormOpen(true); return () => setFormOpen(false); }, [setFormOpen]);
+  useEffect(() => {
+    if (!dirty) return;
+    const t = setTimeout(() => saveDraft(dKey, { f, fromDoc: [...fromDoc] }, f.name.trim() || (editing ? editing.name : "이름 없는 기업")), 300);
+    return () => clearTimeout(t);
+  }, [f, fromDoc, dirty, dKey, editing]);
+  const startOver = () => {
+    clearDraft(dKey);
+    const base = fresh();
+    setInitial(base); setF(base); setFromDoc(new Set()); setErr({}); setShowRestored(false); setExtra(parseKindLines(base.bizItemsExtra));
+  };
+  /** 닫기(X)·취소 — 쓰던 내용이 있으면 지우지 않고 남겨 둔다고 알린다 */
+  const close = () => {
+    if (dirty) toast("작성 중인 내용은 임시 저장했습니다. 다시 열거나 화면 아래 '이어서 쓰기'로 계속 쓸 수 있습니다.", "info");
+    onClose();
+  };
 
   const set = <K extends keyof CompanyForm>(k: K, v: CompanyForm[K]) => {
     setF((x) => ({ ...x, [k]: v }));
@@ -61,6 +95,7 @@ function CompanyModalInner({ open, companyId, onClose, onCreated }: { open: bool
 
   const applyDoc = (patch: Partial<CompanyForm>, kind: CompanyDocKind, meta: CompanyDocMeta) => {
     setF((x) => ({ ...x, ...patch, docs: { ...(x.docs ?? {}), [kind]: meta } }));
+    if (patch.bizItemsExtra !== undefined) setExtra(parseKindLines(patch.bizItemsExtra));
     setFromDoc((s) => new Set([...s, ...Object.keys(patch)]));
     setErr({});
   };
@@ -95,11 +130,13 @@ function CompanyModalInner({ open, companyId, onClose, onCreated }: { open: bool
     };
     if (editing) {
       update(editing.id, data, me);
+      clearDraft(dKey);
       toast("기업정보를 수정했습니다. 변경 항목이 활동 기록에 남았습니다.");
       onClose();
     } else {
       const id = create(data, me);
       if (!id) { toast("기업고객을 등록할 권한이 없습니다.", "error"); return; }
+      clearDraft(dKey);
       toast(`${data.name}을(를) 등록했습니다.`);
       onClose();
       onCreated?.(id);
@@ -117,18 +154,32 @@ function CompanyModalInner({ open, companyId, onClose, onCreated }: { open: bool
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={close}
+      keepOpen
       size="lg"
       title={<span className="flex items-center gap-2"><Building2 size={18} /> {editing ? "기업정보 수정" : "기업고객 등록"}</span>}
+      headerActions={
+        <button type="button" onClick={() => { saveDraft(dKey, { f, fromDoc: [...fromDoc] }, f.name.trim() || (editing ? editing.name : "이름 없는 기업")); toast("잠시 내려뒀습니다. 화면 아래 '이어서 쓰기'를 누르면 그대로 이어집니다.", "info"); onClose(); }}
+          className="pressable inline-flex min-h-9 items-center gap-1 rounded-lg px-2 text-[0.82rem] font-semibold text-ink-2 hover:bg-surface-2 hover:text-ink" title="쓰던 내용은 그대로 두고 창만 내립니다">
+          <Minimize2 size={16} /> <span className="hidden sm:inline">잠시 내려두기</span>
+        </button>
+      }
       footer={
         <>
-          <span className="mr-auto text-[0.8rem] text-ink-3">입력 {filled}개 · 필수는 <b className="text-ink-2">기업명·대표자</b>뿐</span>
-          <Button variant="ghost" onClick={onClose}>취소</Button>
+          <span className="mr-auto text-[0.8rem] text-ink-3">입력 {filled}개 · 필수는 <b className="text-ink-2">기업명·대표자</b>뿐{dirty && <span className="ml-1.5 text-success">· 자동 임시저장 중</span>}</span>
+          <Button variant="ghost" onClick={close}>취소</Button>
           <Button variant="accent" onClick={submit}>{editing ? "저장" : "등록"}</Button>
         </>
       }
     >
       <div className="space-y-6">
+        {showRestored && restored && (
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-info/30 bg-info-bg/60 px-3 py-2.5 text-[0.85rem]" data-testid="draft-restored">
+            <History size={16} className="shrink-0 text-info" />
+            <span className="min-w-0 flex-1">작성 중이던 내용을 불러왔습니다 <span className="text-ink-3">({fmtDateTime(restored.savedAt)} 저장)</span></span>
+            <Button size="sm" variant="ghost" onClick={startOver}>처음부터 다시</Button>
+          </div>
+        )}
         <DocFillPanel current={f} onApply={applyDoc} />
 
         {/* 1. 기본 정보 */}
@@ -163,15 +214,34 @@ function CompanyModalInner({ open, companyId, onClose, onCreated }: { open: bool
               <Input type="date" value={f.ceoBirth ?? ""} onChange={(e) => set("ceoBirth", e.target.value || undefined)} />
             </F>
           </div>
-          {/* 사업자등록증 순서 그대로: 업태 → 종목. 업종(분류)은 업태에서 자동으로 고른다 — 같은 목록을 두 번 고르게 하지 않는다 */}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <F label="업태 (사업자등록증)" doc={fromDoc.has("bizCategory")} hint="여러 개면 쉼표로 · 첫 번째가 주업태">
-              <Input value={f.bizCategory ?? ""} onChange={(e) => set("bizCategory", e.target.value || undefined)} placeholder="예: 음식점업, 도매 및 소매업"
-                onBlur={(e) => { const ind = industryOf(e.target.value); if (ind && !f.industry) set("industry", ind); }} />
-            </F>
-            <F label="종목 (사업자등록증)" doc={fromDoc.has("bizItem")}>
-              <Input value={f.bizItem ?? ""} onChange={(e) => set("bizItem", e.target.value || undefined)} placeholder="예: 커피 전문점, 상품 종합 도매업" />
-            </F>
+          {/* 사업자등록증 순서 그대로: 업태 → 종목. 첫 줄이 주업태·주종목, 그 아래는 몇 줄이든 추가.
+              업종(분류)은 주업태에서 자동으로 고른다 — 같은 목록을 두 번 고르게 하지 않는다 */}
+          <div role="group" aria-label="업태 · 종목">
+            <span className="mb-1.5 flex items-center gap-1.5 text-[0.85rem] font-semibold text-ink-2">
+              업태 · 종목 <span className="font-normal text-ink-3">(사업자등록증)</span>
+              {(fromDoc.has("bizCategory") || fromDoc.has("bizItem") || fromDoc.has("bizItemsExtra")) && <Badge tone="success" className="!py-0 !text-[0.68rem]"><ScanLine size={10} /> 서류</Badge>}
+            </span>
+            <div className="space-y-2">
+              <div className="grid grid-cols-[2.6rem_1fr_1fr] items-center gap-2 sm:grid-cols-[3rem_1fr_1fr_2.25rem]">
+                <span className="rounded-md bg-accent/10 py-1 text-center text-[0.72rem] font-bold text-accent">주</span>
+                <Input aria-label="주업태" value={f.bizCategory ?? ""} onChange={(e) => set("bizCategory", e.target.value || undefined)} placeholder="업태 예: 음식점업"
+                  onBlur={(e) => { const ind = industryOf(e.target.value); if (ind && !f.industry) set("industry", ind); }} />
+                <Input aria-label="주종목" value={f.bizItem ?? ""} onChange={(e) => set("bizItem", e.target.value || undefined)} placeholder="종목 예: 커피 전문점" />
+              </div>
+              {extra.map((r, i) => (
+                <div key={i} className="grid grid-cols-[2.6rem_1fr_1fr] items-center gap-2 sm:grid-cols-[3rem_1fr_1fr_2.25rem]">
+                  <button type="button" onClick={() => setExtraRows(extra.filter((_, j) => j !== i))} aria-label={`${i + 2}번째 업태·종목 지우기`}
+                    className="pressable flex h-9 items-center justify-center rounded-md text-ink-3 hover:bg-surface-2 hover:text-error sm:order-last"><X size={15} /></button>
+                  <Input aria-label={`${i + 2}번째 업태`} value={r.category ?? ""} onChange={(e) => setExtraRows(extra.map((x, j) => (j === i ? { ...x, category: e.target.value } : x)))} placeholder="업태" />
+                  <Input aria-label={`${i + 2}번째 종목`} value={r.item ?? ""} onChange={(e) => setExtraRows(extra.map((x, j) => (j === i ? { ...x, item: e.target.value } : x)))} placeholder="종목" />
+                </div>
+              ))}
+              <button type="button" onClick={() => setExtra([...extra, {}])}
+                className="pressable inline-flex min-h-9 items-center gap-1 rounded-lg px-2 text-[0.82rem] font-semibold text-accent hover:bg-soft/50">
+                <Plus size={15} /> 업태·종목 추가
+              </button>
+            </div>
+            <span className="mt-1 block text-[0.78rem] text-ink-3">첫 줄이 주업태·주종목입니다. 사업자등록증에 여러 줄이면 아래에 이어서 넣으세요.</span>
           </div>
           <F chips label="업종" doc={fromDoc.has("industry")} hint="목록·현황표에서 묶어 보는 분류입니다. 업태를 넣으면 자동으로 골라집니다.">
             <ChipSelect options={INDUSTRY_CHIPS} value={f.industry || undefined} onChange={(v) => set("industry", v ?? "")} custom customPlaceholder="예: 정밀부품 제조" />
@@ -331,6 +401,7 @@ function DocFillPanel({ current, onApply }: { current: CompanyForm; onApply: (pa
       case "address": return current.address;
       case "bizCategory": return current.bizCategory ?? "";
       case "bizItem": return current.bizItem ?? "";
+      case "bizItemsExtra": return current.bizItemsExtra ?? "";
       case "capital": return current.capital ? String(current.capital) : "";
     }
   };
@@ -354,6 +425,7 @@ function DocFillPanel({ current, onApply }: { current: CompanyForm; onApply: (pa
         if (!current.industry && ind) patch.industry = ind;
       }
       else if (k === "bizItem") patch.bizItem = String(v);
+      else if (k === "bizItemsExtra") patch.bizItemsExtra = String(v);
       else if (k === "capital") patch.capital = Number(v);
     }
     if (p.source === "corpReg" && !patch.entityType) patch.entityType = "corporation";

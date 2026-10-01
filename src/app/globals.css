@@ -262,6 +262,9 @@ h1, h2, h3, h4 { letter-spacing: -0.01em; line-height: 1.25; }
 /* 상태 변화가 눈에 이해되도록 하는 짧은 모션. 장식용 애니메이션은 두지 않는다. */
 @keyframes popIn { from { opacity: 0; transform: scale(0.94); } 60% { transform: scale(1.02); } to { opacity: 1; transform: scale(1); } }
 .anim-pop-in { animation: popIn 220ms ease-out both; }
+/* 입력 중인 창 바깥을 눌렀을 때 — 닫히지 않는다는 것을 살짝 흔들어 알린다 */
+@keyframes nudge { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+.anim-nudge { animation: nudge 240ms ease-in-out 1; }
 @keyframes riseIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 .anim-rise { animation: riseIn var(--motion-base) ease-out both; }
 /* 목록이 순서대로 나타나게 — 어디가 새로 생겼는지 눈이 따라간다 */
