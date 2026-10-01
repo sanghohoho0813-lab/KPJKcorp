@@ -6,6 +6,7 @@ import { useStore, usePortalCompanyId, useCurrentUser, quoteGross, quoteNet } fr
 import { useNow } from "@/lib/hooks";
 import { KPJK_SERVICES, OPP_STATUS, SERVICE_BY_KEY, type ServiceDef } from "@/lib/services";
 import { KPJK_CONSULTING } from "@/lib/company-options";
+import { NextGrowth, useGrowth } from "@/components/domain/portal/GrowthBoard";
 import { daysBetween, fmtDate, fmtRelative, fmtWon } from "@/lib/format";
 import { Badge, Button, Card, EmptyState, SectionTitle, Textarea, cx } from "@/components/ui/ui";
 import type { Quote } from "@/lib/types";
@@ -24,6 +25,7 @@ export default function PortalServicesPage() {
   const [replyNote, setReplyNote] = useState("");
 
   const c = st.companies.find((x) => x.id === companyId);
+  const board = useGrowth(c);
   const tick = useNow(60000);
   const nowIso = (tick ?? new Date(0)).toISOString();
   // 담당 컨설턴트가 고객 화면에 올린 제안 — 거둔 것은 보이지 않는다
@@ -190,6 +192,9 @@ export default function PortalServicesPage() {
       ) : (
         <EmptyState icon={<Check size={28} />} title="아직 담당 컨설턴트가 올린 제안이 없습니다." desc={`궁금한 분야가 있으면 아래에서 상담을 요청하시거나 ${consultant?.name ?? "담당 컨설턴트"} ${consultant?.title ?? ""}에게 문의해 주세요.`} />
       )}
+
+      {/* 기업정보·진행 이력으로 고른 검토 과제 — 근거를 함께 */}
+      {board && <NextGrowth board={board} companyId={c.id} only={["suggested"]} title="우리 회사 기준으로 검토해 볼 과제" />}
 
       {/* KPJK 컨설팅 분야 전체 — 눌러서 내용 보고 바로 상담 요청 */}
       <Card className="p-5" id="portal-kpjk-areas">

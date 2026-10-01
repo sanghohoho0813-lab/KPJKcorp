@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ArrowRight, Building2, Check, Percent, ShieldCheck, TrendingUp, X } from "lucide-react";
+import { ArrowRight, Building2, Check, Percent, ShieldCheck, TrendingUp, X, Play } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { OPP_PIPELINE, OPP_STATUS, oppNextStatus } from "@/lib/services";
 import { fmtDateTime, fmtRelative, fmtWon } from "@/lib/format";
@@ -120,6 +120,7 @@ const SOURCE_LABEL: Record<Opportunity["source"], string> = {
 function OppRow({ o, onPropose }: { o: Opportunity; onPropose: (o: Opportunity) => void }) {
   const st = useStore();
   const advance = useStore((s) => s.advanceOpportunity);
+  const start = useStore((s) => s.startProjectFromOpportunity);
   const toast = useStore((s) => s.toast);
   const me = st.session?.userId ?? "u_admin";
   const company = st.companies.find((c) => c.id === o.companyId);
@@ -147,6 +148,9 @@ function OppRow({ o, onPropose }: { o: Opportunity; onPropose: (o: Opportunity) 
             {OPP_STATUS[next].label}
           </Button>
         ) : null}
+        {o.status !== "dropped" && !st.projects.some((p) => p.companyId === o.companyId && p.type === o.serviceName && !p.archived) && (
+          <Button size="sm" variant={o.status === "won" ? "accent" : "outline"} icon={<Play size={15} />} onClick={() => { if (start(o.id, me)) toast(`${o.serviceName} — 진행 업무로 시작했습니다. 고객 홈에 '진행 중'으로 보입니다.`); }}>진행 업무로 시작</Button>
+        )}
         {o.status !== "won" && o.status !== "dropped" && (
           <Button size="sm" variant="ghost" onClick={() => { advance(o.id, "dropped", me); toast("기회를 종료했습니다."); }}>종료</Button>
         )}
