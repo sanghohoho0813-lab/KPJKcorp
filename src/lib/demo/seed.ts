@@ -255,23 +255,23 @@ export function buildSeed(now = new Date()): SeedData {
   /* ---------- 매출기회 (고객 관심 → 내부 기회) ---------- */
   const opportunities: Opportunity[] = [
     {
-      id: "op_1", companyId: "co_b", serviceKey: "venture", serviceName: "벤처기업확인", source: "portal_interest", status: "interest",
+      id: "op_1", companyId: "co_b", serviceKey: "kpjk_특허자본", serviceName: "특허자본", source: "portal_interest", status: "interest",
       assigneeId: "u_lee", createdAt: d(-1, 14), createdBy: "c_b", updatedAt: d(-1, 14),
       note: "연구소 설립 마무리되면 이어서 검토하고 싶습니다.",
-      reason: "기업부설연구소 관련 진행 이력이 있어 연구개발 유형 요건을 함께 검토할 수 있습니다.",
+      reason: "고객이 컨설팅 분야에서 직접 선택",
       history: [{ at: d(-1, 14), status: "interest", by: "c_b" }],
     },
     {
-      id: "op_2", companyId: "co_a", serviceKey: "cert", serviceName: "기업인증 (메인비즈 · 이노비즈)", source: "portal_request", status: "contacted",
+      id: "op_2", companyId: "co_a", serviceKey: "kpjk_가지급금", serviceName: "가지급금", source: "portal_request", status: "contacted",
       assigneeId: "u_park", createdAt: d(-5, 10), createdBy: "c_a", updatedAt: d(-3, 11),
-      note: "이노비즈도 가능한지 궁금합니다.",
-      reason: "진행 중인 과제가 마무리 단계에 있어, 다음 단계로 인증 요건을 검토하기 좋은 시점입니다.",
-      history: [{ at: d(-5, 10), status: "interest", by: "c_a" }, { at: d(-3, 11), status: "contacted", by: "u_park", note: "전화 통화 완료. 요건 비교표 준비 중." }],
+      note: "정리 방법이 어떤 것들이 있는지 궁금합니다.",
+      reason: "고객이 컨설팅 분야에서 직접 선택",
+      history: [{ at: d(-5, 10), status: "interest", by: "c_a" }, { at: d(-3, 11), status: "contacted", by: "u_park", note: "전화 통화 완료. 잔액·발생 경위 자료 요청 예정." }],
     },
     {
-      id: "op_3", companyId: "co_f", serviceKey: "hr_subsidy", serviceName: "고용지원금 진단", source: "rule", status: "interest",
+      id: "op_3", companyId: "co_f", serviceKey: "kpjk_인사노무", serviceName: "인사노무", source: "rule", status: "interest",
       assigneeId: "u_jung", createdAt: d(-2, 9), createdBy: "system", updatedAt: d(-2, 9),
-      reason: "상시 인력 54명 규모로, 인력 기준 지원금 해당 여부를 진단해볼 수 있습니다.",
+      reason: "상시 인력 54명 규모로, 근로계약·취업규칙 현황을 점검해볼 수 있습니다.",
       history: [{ at: d(-2, 9), status: "interest", by: "system" }],
     },
     {

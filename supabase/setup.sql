@@ -740,8 +740,11 @@ create policy opportunities_client_insert on public.opportunities for insert to 
   );
 
 drop policy if exists opportunities_client_select on public.opportunities;
+-- 고객은 자기가 남긴 관심·상담 요청과 담당자가 "고객 화면에 올린" 제안만 본다.
+-- 내부 등록·규칙 기회(내부 메모 포함)는 같은 회사라도 보이지 않는다.
 create policy opportunities_client_select on public.opportunities for select to authenticated
-  using (public.kpjk_is_client() and company_id = public.kpjk_my_company());
+  using (public.kpjk_is_client() and company_id = public.kpjk_my_company()
+         and source in ('portal_interest','portal_request','proposal'));
 
 -- -----------------------------------------------------------------------------
 -- 6. 계약 — 고객은 읽기만

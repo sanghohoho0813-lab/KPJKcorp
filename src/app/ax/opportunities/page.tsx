@@ -114,6 +114,7 @@ const SOURCE_LABEL: Record<Opportunity["source"], string> = {
   portal_request: "고객 상담요청",
   internal: "내부 등록",
   rule: "규칙 발견",
+  proposal: "담당자 제안",
 };
 
 function OppRow({ o, onPropose }: { o: Opportunity; onPropose: (o: Opportunity) => void }) {

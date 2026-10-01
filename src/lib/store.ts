@@ -44,7 +44,7 @@ import type {
 import { nowIso, uid, addDays, iso, daysBetween } from "./format";
 import { stageLabel } from "./stages";
 import { RULE_BY_KEY, ruleDays, ruleOn } from "./rules";
-import { emptyVault, slotLabel } from "./vault";
+import { emptyVault, slotLabel, slotsOf } from "./vault";
 import { PAYMENT_KIND_LABEL, WORK_STATUS, won, workStatusOf } from "./work-status";
 import { JOURNAL_TYPE } from "./journal";
 import { OPP_STATUS, SERVICE_BY_KEY } from "./services";
@@ -96,6 +96,8 @@ export interface StoreState extends SeedData {
   reviewDocument: (requestId: string, outcome: "done" | "revision" | "reviewing", note: string | undefined, byUserId: string) => void;
   changeProjectStage: (projectId: string, stage: InternalStage, byUserId: string) => void;
   createDocRequest: (projectId: string, data: { name: string; description: string; dueDate: string }, byUserId: string) => void;
+  /** 기업에 바로 자료 요청 (서류함 칸에서) — 진행 중인 프로젝트가 있으면 거기에 붙이고, 없으면 기업에만 붙인다 */
+  requestCompanyDoc: (companyId: string, data: { name: string; description: string; dueDate: string }, byUserId: string) => string | null;
 
   // ---- 기업고객 / 프로젝트 등록·수정 ----
   createCompany: (data: Omit<Company, "id" | "code">, byUserId: string) => string | null;
@@ -181,6 +183,10 @@ export interface StoreState extends SeedData {
   downloadResult: (resultId: string, byUserId: string) => void;
   // opportunity / approval / survey
   raiseOpportunity: (data: { companyId: string; serviceKey: string; note?: string; reason?: string; source: OpportunitySource }, byUserId: string, byRole: Role) => void;
+  /** 담당 컨설턴트가 고객 화면 "함께 검토해볼 것"에 제안을 올린다 (왜 제안하는지 = 고객에게 보이는 글) */
+  proposeService: (companyId: string, serviceKey: string, reason: string, byUserId: string) => string | null;
+  /** 제안 거두기 — 고객 화면에서 사라진다(기록은 남는다) */
+  withdrawProposal: (opportunityId: string, byUserId: string) => void;
   advanceOpportunity: (id: string, status: OpportunityStatus, byUserId: string, note?: string) => void;
   requestApproval: (data: { kind: ApprovalKind; title: string; summary: string; companyId?: string; projectId?: string; opportunityId?: string; quoteId?: string; baseAmount?: number; discountPct?: number }, byUserId: string) => void;
   decideApproval: (id: string, decision: "approved" | "rejected", byUserId: string, note?: string) => void;
@@ -536,9 +542,20 @@ export const useStore = create<StoreState>()(
         const actType: ActivityType = outcome === "revision" ? "document_revision_requested" : "document_reviewed";
         const text = outcome === "revision" ? `보완 요청: ${req.name}` : outcome === "done" ? `검토 완료: ${req.name}` : `검토 시작: ${req.name}`;
 
+        // 서류함에 같은 이름의 칸이 있으면(사업자등록증·법인등기부등본 …) 검토 완료와 함께 "받음"으로 — 고객이 Portal 로 낸 서류가 서류함에도 보인다
+        let companyVaults = st.companyVaults;
+        if (outcome === "done") {
+          const v = st.companyVaults.find((x) => x.companyId === req.companyId) ?? emptyVault(req.companyId);
+          const slot = slotsOf(v).find((m) => m.label === req.name && !m.noFile);
+          if (slot && !v.slots[slot.key]?.received) {
+            const nv = { ...v, slots: { ...v.slots, [slot.key]: { ...(v.slots[slot.key] ?? {}), received: true, note: v.slots[slot.key]?.note ?? "고객 Portal 로 제출", updatedAt: now } }, updatedAt: now };
+            companyVaults = [...st.companyVaults.filter((x) => x.companyId !== req.companyId), nv];
+          }
+        }
         set({
           docRequests: st.docRequests.map((r) => (r.id === requestId ? updated : r)),
           tasks,
+          companyVaults,
           activities: [makeActivity({ type: actType, companyId: req.companyId, projectId: req.projectId, actorId: byUserId, actorRole: "consultant", text: `${text}${company ? ` (${company.name})` : ""}` }), ...st.activities],
           notifications: [clientNotif, ...st.notifications],
         });
@@ -555,6 +572,21 @@ export const useStore = create<StoreState>()(
           activities: [makeActivity({ type: "project_stage_changed", companyId: p.companyId, projectId, actorId: byUserId, actorRole: "consultant", text: `단계 변경: ${stageLabel(p.stage)} → ${stageLabel(stage)}`, meta: { from: p.stage, to: stage } }), ...st.activities],
           notifications: [makeNotification({ audience: "client", companyId: p.companyId, title: "프로젝트 진행 단계가 변경되었습니다", body: `${p.name}: ${stageLabel(stage)} 단계로 진행됩니다.`, href: "/portal/projects" }), ...st.notifications],
         });
+      },
+
+      requestCompanyDoc: (companyId, data, byUserId) => {
+        const st = get();
+        const c = st.companies.find((x) => x.id === companyId);
+        if (!c) return null;
+        if (deny(st, "doc.request", `자료 요청 (${data.name})`, set)) return null;
+        const p = st.projects.find((x) => x.companyId === companyId && !x.archived && x.clientVisible && x.stage !== "done" && x.stage !== "aftercare");
+        const req: DocumentRequest = { id: uid("dr"), projectId: p?.id ?? "", companyId, name: data.name, description: data.description, requestedAt: nowIso(), dueDate: data.dueDate, status: "requested", assigneeId: p?.consultantId ?? c.consultantId, files: [] };
+        set({
+          docRequests: [req, ...st.docRequests],
+          activities: [makeActivity({ type: "document_requested", companyId, projectId: p?.id, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `자료 요청: ${data.name}` }), ...st.activities],
+          notifications: [makeNotification({ audience: "client", companyId, title: "새 자료 요청이 등록되었습니다", body: `${data.name} — 요청자료에서 바로 올려 주세요. 카카오톡으로 보내셔도 됩니다.`, href: "/portal/documents" }), ...st.notifications],
+        });
+        return req.id;
       },
 
       createDocRequest: (projectId, data, byUserId) => {
@@ -1086,7 +1118,10 @@ export const useStore = create<StoreState>()(
         set({
           schedules: st.schedules.map((x) => (x.id === id ? after : x)),
           activities: [makeActivity({ type: "schedule_updated", companyId: before.companyId, projectId: before.projectId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `일정 수정: ${after.title}${timeMoved ? " (시간 변경)" : ""}`, meta: { fields: changed.join(",") } }), ...st.activities],
-          notifications: timeMoved && after.visibleToClient && after.companyId
+          // 내부 일정을 고객에게 보이게 바꾸면 새 일정이 생긴 것과 같다
+          notifications: after.visibleToClient && after.companyId && !before.visibleToClient
+            ? [makeNotification({ audience: "client", companyId: after.companyId, title: "새 일정이 등록되었습니다", body: after.title, href: "/portal/schedule" }), ...st.notifications]
+            : timeMoved && after.visibleToClient && after.companyId
             ? [makeNotification({ audience: "client", companyId: after.companyId, title: "일정이 변경되었습니다", body: `${after.title} 일정이 조정되었습니다. 일정 화면에서 확인해 주세요.`, href: "/portal/schedule" }), ...st.notifications]
             : st.notifications,
         });
@@ -1494,6 +1529,44 @@ export const useStore = create<StoreState>()(
       },
 
       // ---------- OPPORTUNITY LOOP (고객 관심 → 내부 기회 → 대표 승인 → 추가계약) ----------
+      proposeService: (companyId, serviceKey, reason, byUserId) => {
+        const st = get();
+        const company = st.companies.find((c) => c.id === companyId);
+        const svc = SERVICE_BY_KEY[serviceKey];
+        if (!company || !svc) return null;
+        if (deny(st, "opportunity.advance", `제안 (${svc.name})`, set)) return null;
+        // 같은 분야를 이미 제안해 둔 상태면 이유만 고친다
+        const dup = st.opportunities.find((o) => o.companyId === companyId && o.serviceKey === serviceKey && o.source === "proposal" && o.status !== "dropped");
+        const now = nowIso();
+        if (dup) {
+          set({ opportunities: st.opportunities.map((o) => (o.id === dup.id ? { ...o, reason, updatedAt: now } : o)) });
+          return dup.id;
+        }
+        const opp: Opportunity = {
+          id: uid("op"), companyId, serviceKey, serviceName: svc.name, source: "proposal", status: "proposed",
+          assigneeId: company.consultantId, createdAt: now, createdBy: byUserId, updatedAt: now, reason,
+          history: [{ at: now, status: "proposed", by: byUserId, note: "담당자 제안" }],
+        };
+        set({
+          opportunities: [opp, ...st.opportunities],
+          activities: [makeActivity({ type: "opportunity_created", companyId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `고객에게 제안: ${svc.name}`, meta: { serviceKey, source: "proposal" } }), ...st.activities],
+          notifications: [makeNotification({ audience: "client", companyId, title: "담당 컨설턴트가 검토 항목을 제안했습니다", body: `${svc.name} — 왜 제안드리는지 함께 적어 두었습니다.`, href: "/portal/services" }), ...st.notifications],
+        });
+        return opp.id;
+      },
+
+      withdrawProposal: (opportunityId, byUserId) => {
+        const st = get();
+        const o = st.opportunities.find((x) => x.id === opportunityId);
+        if (!o || o.source !== "proposal") return;
+        if (deny(st, "opportunity.advance", `제안 거두기 (${o.serviceName})`, set)) return;
+        const now = nowIso();
+        set({
+          opportunities: st.opportunities.map((x) => (x.id === opportunityId ? { ...x, status: "dropped" as OpportunityStatus, updatedAt: now, history: [...x.history, { at: now, status: "dropped" as OpportunityStatus, by: byUserId, note: "제안 거둠" }] } : x)),
+          activities: [makeActivity({ type: "opportunity_status_changed", companyId: o.companyId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `제안 거둠: ${o.serviceName}` }), ...st.activities],
+        });
+      },
+
       raiseOpportunity: (data, byUserId, byRole) => {
         const st = get();
         const company = st.companies.find((c) => c.id === data.companyId);

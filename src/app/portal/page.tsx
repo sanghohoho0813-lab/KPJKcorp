@@ -5,7 +5,7 @@ import { useState } from "react";
 import { ArrowRight, Bell, CalendarDays, FileCheck2, FolderUp, MessageSquare, Briefcase, Pin, Sparkles } from "lucide-react";
 import { useStore, usePortalCompanyId, useCurrentUser } from "@/lib/store";
 import { CUSTOMER_STEPS, customerStageMessage, stageProgress, stageToCustomerStep } from "@/lib/stages";
-import { OPP_STATUS, recommendServices } from "@/lib/services";
+import { OPP_STATUS } from "@/lib/services";
 import { daysBetween, fmtDate, fmtRelative, fmtTime, relativeDay } from "@/lib/format";
 import type { DocumentRequest } from "@/lib/types";
 import { Badge, Button, Card, IconTile, Progress, cx } from "@/components/ui/ui";
@@ -37,13 +37,10 @@ export default function PortalHome() {
   const results = st.results.filter((r) => r.companyId === c.id).length;
   const step = main ? stageToCustomerStep(main.stage) : 0;
   const consultant = st.users.find((u) => u.id === c.consultantId);
-  const myOpps = st.opportunities.filter((o) => o.companyId === c.id && o.status !== "dropped");
-  const recos = recommendServices({
-    company: c,
-    projects: st.projects.filter((p) => p.companyId === c.id),
-    contracts: st.contracts.filter((x) => x.companyId === c.id),
-    existing: new Set(st.opportunities.filter((o) => o.companyId === c.id).map((o) => o.serviceKey)),
-  }, 2);
+  // 담당 컨설턴트가 올린 제안과 고객이 직접 남긴 요청을 나눠 보여준다
+  const proposals = st.opportunities.filter((o) => o.companyId === c.id && o.source === "proposal" && o.status !== "dropped");
+  const myOpps = st.opportunities.filter((o) => o.companyId === c.id && (o.source === "portal_interest" || o.source === "portal_request") && o.status !== "dropped");
+  const askedKeys = new Set(myOpps.map((o) => o.serviceKey));
 
   return (
     <div className="space-y-5">
@@ -125,31 +122,31 @@ export default function PortalHome() {
         </Card>
       </div>
 
-      {/* 추가서비스 — 강매가 아니라 "지금 상황에서 검토 대상" 수준으로만 */}
-      {(recos.length > 0 || myOpps.length > 0) && (
-        <Card className="p-5">
+      {/* 담당 컨설턴트가 올린 제안 — 강매가 아니라 "함께 검토" 수준으로만 */}
+      {(proposals.length > 0 || myOpps.length > 0) && (
+        <Card className="p-5" id="portal-home-proposals">
           <div className="mb-3 flex items-center justify-between gap-3">
             <h2 className="flex items-center gap-2 text-[1.1rem] font-bold"><Sparkles size={18} className="text-accent" /> 함께 검토해볼 수 있는 것</h2>
             <Link href="/portal/services" className="link-more whitespace-nowrap">전체 보기 →</Link>
           </div>
+          {proposals.length > 0 && (
+            <div className="grid gap-2 md:grid-cols-2">
+              {proposals.slice(0, 4).map((o) => (
+                <Link key={o.id} href="/portal/services" className="card card-hover block p-4">
+                  <div className="flex items-center gap-2"><span className="font-bold">{o.serviceName}</span><Badge tone="accent">담당자 제안</Badge></div>
+                  {o.reason && <div className="mt-1 line-clamp-2 text-[0.82rem] leading-relaxed text-ink-2">{o.reason}</div>}
+                  <div className="mt-2 text-[0.82rem] font-semibold text-accent">{askedKeys.has(o.serviceKey) ? "요청하셨습니다 ✓" : "자세히 보기 →"}</div>
+                </Link>
+              ))}
+            </div>
+          )}
           {myOpps.length > 0 && (
-            <div className="mb-3 space-y-1.5">
+            <div className={proposals.length > 0 ? "mt-3 space-y-1.5" : "space-y-1.5"}>
               {myOpps.slice(0, 2).map((o) => (
                 <div key={o.id} className="flex items-center gap-2 rounded-xl bg-surface-2 px-4 py-2.5 text-[0.88rem]">
                   <span className="min-w-0 flex-1 truncate font-semibold">{o.serviceName}</span>
                   <Badge tone={OPP_STATUS[o.status].tone}>{OPP_STATUS[o.status].clientLabel}</Badge>
                 </div>
-              ))}
-            </div>
-          )}
-          {recos.length > 0 && (
-            <div className="grid gap-2 md:grid-cols-2">
-              {recos.map(({ service, reason }) => (
-                <Link key={service.key} href="/portal/services" className="card card-hover block p-4">
-                  <div className="font-bold">{service.name}</div>
-                  <div className="mt-1 text-[0.82rem] leading-relaxed text-ink-2">{reason}</div>
-                  <div className="mt-2 text-[0.82rem] font-semibold text-accent">관심 표시하기 →</div>
-                </Link>
               ))}
             </div>
           )}

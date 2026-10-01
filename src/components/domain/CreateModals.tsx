@@ -51,6 +51,33 @@ export function NewDocRequestModal({ projectId, open, onClose }: { projectId: st
   );
 }
 
+/** 진행 업무가 아직 없어도 기업 단위로 자료를 요청한다 (고객 Portal 요청자료 + 알림) */
+export function CompanyDocRequestModal({ companyId, open, onClose }: { companyId: string; open: boolean; onClose: () => void }) {
+  const session = useStore((s) => s.session);
+  const create = useStore((s) => s.requestCompanyDoc);
+  const toast = useStore((s) => s.toast);
+  const [name, setName] = useState("");
+  const [desc, setDesc] = useState("카카오톡으로 보내셔도 되고, 이 화면에서 바로 올리셔도 됩니다.");
+  const [due, setDue] = useState(localDateInput(addDays(new Date(), 7)));
+  const submit = () => {
+    if (!name.trim()) { toast("자료명을 입력해 주세요.", "error"); return; }
+    const id = create(companyId, { name: name.trim(), description: desc.trim(), dueDate: new Date(`${due}T18:00:00`).toISOString() }, session?.userId ?? "");
+    if (!id) return;
+    toast("자료 요청이 등록되고 고객에게 알림이 전송되었습니다.");
+    setName("");
+    onClose();
+  };
+  return (
+    <Modal open={open} onClose={onClose} title="자료 요청" size="sm" footer={<><Button variant="ghost" onClick={onClose}>취소</Button><Button variant="accent" onClick={submit}>고객에게 요청</Button></>}>
+      <div className="space-y-3">
+        <Field label="자료명"><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 법인등기부등본" autoFocus /></Field>
+        <Field label="고객에게 보일 안내"><Textarea rows={3} value={desc} onChange={(e) => setDesc(e.target.value)} /></Field>
+        <Field label="제출 기한"><Input type="date" value={due} onChange={(e) => setDue(e.target.value)} /></Field>
+      </div>
+    </Modal>
+  );
+}
+
 export function NewScheduleModal({ open, onClose, companyId, projectId }: { open: boolean; onClose: () => void; companyId?: string; projectId?: string }) {
   const session = useStore((s) => s.session);
   const create = useStore((s) => s.createSchedule);

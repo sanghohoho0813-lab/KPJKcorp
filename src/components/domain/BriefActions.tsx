@@ -8,7 +8,7 @@ import type { InternalStage } from "@/lib/types";
 import { useStore } from "@/lib/store";
 import { useUi } from "@/lib/ui-store";
 import { INTERNAL_STAGES, stageLabel } from "@/lib/stages";
-import { recommendServices, SERVICES } from "@/lib/services";
+import { KPJK_SERVICES, recommendServices } from "@/lib/services";
 import { Button, Card, cx } from "@/components/ui/ui";
 import { Modal } from "@/components/ui/overlay";
 import { NewScheduleModal, NewTaskModal } from "./CreateModals";
@@ -66,7 +66,7 @@ function RaiseOppModal({ companyId, onClose }: { companyId: string | null; onClo
 
   const existing = new Set(st.opportunities.filter((o) => o.companyId === c.id).map((o) => o.serviceKey));
   const recos = recommendServices({ company: c, projects: st.projects.filter((p) => p.companyId === c.id), contracts: st.contracts.filter((x) => x.companyId === c.id), existing }, 4);
-  const rest = SERVICES.filter((s) => !existing.has(s.key) && !recos.some((r) => r.service.key === s.key));
+  const rest = KPJK_SERVICES.filter((s) => !existing.has(s.key) && !recos.some((r) => r.service.key === s.key));
   const reasonOf = (key: string) => recos.find((r) => r.service.key === key)?.reason;
 
   return (

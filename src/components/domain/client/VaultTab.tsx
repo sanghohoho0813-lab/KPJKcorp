@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Download, ExternalLink, Eye, FileText, FolderOpen, Lock, Plus, Trash2, Upload } from "lucide-react";
+import { CheckCircle2, Download, ExternalLink, Eye, FileText, FolderOpen, Lock, Plus, Send, Trash2, Upload } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { can } from "@/lib/permissions";
-import type { Company, CompanyFile } from "@/lib/types";
+import type { Company, CompanyFile, DocumentRequest } from "@/lib/types";
+import { addDays, iso } from "@/lib/format";
+import { ReviewDocModal } from "@/components/domain/DocActions";
 import { OTHER_LABEL, OTHER_SLOT, dueText, previewKind, slotStatus, slotsOf, todayYmd, type SlotMeta, type SlotStatus } from "@/lib/vault";
 import { fmtBytes, loadFileData, removeFileData, saveBlob } from "@/lib/vault-files";
-import { fmtDate } from "@/lib/format";
+import { fmtDate, relativeDay } from "@/lib/format";
 import { Badge, Button, Card, EmptyState, Input, Select, cx } from "@/components/ui/ui";
 import { Confirm, Modal } from "@/components/ui/overlay";
 import { BulkUploadModal } from "./BulkUpload";
@@ -15,7 +17,15 @@ import { BulkUploadModal } from "./BulkUpload";
 /**
  * 기업 서류함 — 어떤 서류를 받았고 언제 만료되는지. 올린 파일은 바로 열어 보고 내려받는다.
  * 파일은 내부 전용이다: 고객 Portal 에는 보이지 않는다(요청자료와 다르다).
+ * 대신 칸마다 "고객에게 요청"을 누르면 고객 Portal 요청자료로 가고(알림 포함), 고객이 올리면 이 칸에 "고객이 올림"으로 보인다.
+ * 검토 완료하면 칸이 "받음"이 된다(store.reviewDocument).
  */
+
+/** 이 칸과 이어진 요청자료 — 같은 이름으로 요청한 가장 최근 것 */
+function linkedRequest(reqs: DocumentRequest[], companyId: string, label: string) {
+  return reqs.filter((d) => d.companyId === companyId && d.name === label).sort((a, b) => b.requestedAt.localeCompare(a.requestedAt))[0];
+}
+const OPEN_REQ = ["requested", "revision", "submitted", "reviewing"];
 export function VaultTab({ company }: { company: Company }) {
   const vault = useStore((s) => s.companyVaults.find((v) => v.companyId === company.id));
   const allFiles = useStore((s) => s.companyFiles);
@@ -33,6 +43,14 @@ export function VaultTab({ company }: { company: Company }) {
   const sorted = [...statuses].sort((a, b) => rank(a) - rank(b));
   const others = files.filter((f) => f.slot === OTHER_SLOT || !statuses.some((s) => s.meta.key === f.slot));
   const usable = statuses.filter((s) => s.usable).length;
+  const reqs = useStore((s) => s.docRequests);
+  const askMany = useStore((s) => s.requestCompanyDoc);
+  const toast = useStore((s) => s.toast);
+  const me = useStore((s) => s.session?.userId) ?? "";
+  const mayRequest = can(role, "doc.request");
+  // 아직 없거나 만료(임박)인데 고객에게 요청하지 않은 칸 — 파일 없이 받는 공동인증서는 제외
+  const missing = statuses.filter((s) => !s.meta.noFile && (!s.received || s.expired || s.expiringSoon) && !OPEN_REQ.includes(linkedRequest(reqs, company.id, s.meta.label)?.status ?? ""));
+  const [confirmMany, setConfirmMany] = useState(false);
 
   return (
     <div className="space-y-4" id="vault-tab">
@@ -40,8 +58,9 @@ export function VaultTab({ company }: { company: Company }) {
         <div className="flex flex-wrap items-center gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2"><span className="text-[1.05rem] font-bold">서류함</span><Badge tone={usable === statuses.length ? "success" : "neutral"}>확보 {usable}/{statuses.length}</Badge><Badge>파일 {files.length}</Badge></div>
-            <p className="mt-0.5 text-[0.8rem] text-ink-3">발급일을 넣으면 유효기간이 지났는지 먼저 알려 드립니다. 이 서류함은 내부 전용 — 고객 화면에는 보이지 않습니다.</p>
+            <p className="mt-0.5 text-[0.8rem] text-ink-3">발급일을 넣으면 유효기간이 지났는지 먼저 알려 드립니다. 서류함 자체는 내부 전용이고, <b className="text-ink-2">고객에게 요청</b>한 서류만 고객 화면 요청자료에 나타납니다.</p>
           </div>
+          {mayRequest && missing.length > 0 && <Button variant="outline" icon={<Send size={16} />} onClick={() => setConfirmMany(true)}>빈 서류 {missing.length}개 고객에게 요청</Button>}
           {may && <Button variant="accent" icon={<Upload size={16} />} onClick={() => setBulk({})}>한꺼번에 올리기</Button>}
         </div>
         {!serverMode && <p className="mt-2 rounded-lg bg-surface-2 px-3 py-1.5 text-[0.75rem] text-ink-3">서버 연결 전: 원본 파일은 이 브라우저에만 보관됩니다.</p>}
@@ -68,6 +87,15 @@ export function VaultTab({ company }: { company: Company }) {
 
       {may && <AddSlotForm companyId={company.id} />}
 
+      <Confirm open={confirmMany} onClose={() => setConfirmMany(false)} confirmText="고객에게 요청"
+        title={`빈 서류 ${missing.length}개를 고객에게 요청할까요?`}
+        desc={`${missing.map((x) => x.meta.label).join(", ")} — 고객 화면 '요청자료'에 올라가고 알림이 갑니다. 기한은 7일 뒤로 잡습니다.`}
+        onConfirm={() => {
+          const due = iso(addDays(new Date(), 7, 18));
+          let n = 0;
+          for (const x of missing) if (askMany(company.id, { name: x.meta.label, description: requestText(x.meta), dueDate: due }, me)) n += 1;
+          toast(`${n}개 서류를 고객에게 요청했습니다. 고객 화면에 알림이 갑니다.`);
+        }} />
       <BulkUploadModal company={company} vault={vault} open={!!bulk} initialSlot={bulk?.slot} onClose={() => setBulk(null)} />
       <PreviewModal file={preview} onClose={() => setPreview(null)} />
     </div>
@@ -82,7 +110,14 @@ function SlotCard({ s, company, may, onUpload, onPreview }: { s: SlotStatus; com
   const me = useStore((x) => x.session?.userId) ?? "";
   const [open, setOpen] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [asking, setAsking] = useState(false);
+  const [review, setReview] = useState(false);
+  const role = useStore((x) => x.session?.role);
+  const reqs = useStore((x) => x.docRequests);
   const m: SlotMeta = s.meta;
+  const req = linkedRequest(reqs, company.id, m.label);
+  const reqOpen = !!req && OPEN_REQ.includes(req.status);
+  const canAsk = can(role, "doc.request") && !m.noFile && !reqOpen && (!s.received || s.expired || s.expiringSoon);
   const tone = s.expired ? "border-error/40 bg-error-bg/30" : s.expiringSoon ? "border-warning/40 bg-warning-bg/30" : "border-line";
 
   return (
@@ -109,6 +144,24 @@ function SlotCard({ s, company, may, onUpload, onPreview }: { s: SlotStatus; com
         </div>
         {may && !m.noFile && <button type="button" onClick={onUpload} className="pressable icon-btn shrink-0 text-ink-3 hover:text-accent" aria-label={`${m.label} 파일 올리기`}><Upload size={16} /></button>}
       </div>
+
+      {/* 고객 Portal 요청과 이어진 상태 */}
+      {req && (req.status !== "done" || req.files.length > 0) && (
+        <div className={cx("mt-2 flex flex-wrap items-center gap-2 rounded-xl px-3 py-2 text-[0.8rem]", req.status === "submitted" || req.status === "reviewing" ? "bg-success-bg/60" : "bg-surface-2")} data-req={req.status}>
+          {req.status === "requested" && <><Send size={14} className="text-info" /><span className="min-w-0 flex-1">고객에게 요청함 · 기한 {fmtDate(req.dueDate)} ({relativeDay(req.dueDate)})</span></>}
+          {req.status === "revision" && <><Send size={14} className="text-warning" /><span className="min-w-0 flex-1">보완 요청함 — 고객이 다시 올리면 여기 표시됩니다</span></>}
+          {(req.status === "submitted" || req.status === "reviewing") && <><CheckCircle2 size={14} className="text-success" /><span className="min-w-0 flex-1 font-semibold">고객이 Portal 로 올렸습니다{req.files.length ? ` · ${req.files[req.files.length - 1].fileName}` : ""}</span>
+            <Button size="sm" variant="accent" onClick={() => setReview(true)}>확인하기</Button></>}
+          {req.status === "done" && <><FileText size={14} className="text-ink-3" /><span className="min-w-0 flex-1">고객 제출본 · {req.files[req.files.length - 1]?.fileName}</span><Button size="sm" variant="ghost" onClick={() => setReview(true)}>보기</Button></>}
+        </div>
+      )}
+      {canAsk && (
+        <button type="button" onClick={() => setAsking(true)} className="pressable mr-3 mt-2 inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-accent/40 px-3 text-[0.8rem] font-semibold text-accent hover:bg-soft/50">
+          <Send size={14} /> 고객에게 요청
+        </button>
+      )}
+      {asking && <AskModal company={company} meta={m} onClose={() => setAsking(false)} />}
+      <ReviewDocModal req={review ? req ?? null : null} open={review} onClose={() => setReview(false)} />
 
       {s.files.length > 0 && (
         <div className="mt-2 divide-y divide-line rounded-xl border border-line">
@@ -244,5 +297,36 @@ function AddSlotForm({ companyId }: { companyId: string }) {
         <Button variant="outline" onClick={submit} disabled={!label.trim()}>서류 칸 추가</Button>
       </div>
     </Card>
+  );
+}
+
+/** 고객에게 보이는 요청 안내 — 어디서 떼는지 + 카톡도 된다 */
+function requestText(m: SlotMeta) {
+  return [m.whereToGet, m.hint, "카카오톡으로 보내셔도 되고, 이 화면에서 바로 올리셔도 됩니다."].filter(Boolean).join("\n");
+}
+
+function AskModal({ company, meta, onClose }: { company: Company; meta: SlotMeta; onClose: () => void }) {
+  const ask = useStore((s) => s.requestCompanyDoc);
+  const toast = useStore((s) => s.toast);
+  const me = useStore((s) => s.session?.userId) ?? "";
+  const [due, setDue] = useState(() => iso(addDays(new Date(), 7, 18)).slice(0, 10));
+  const [desc, setDesc] = useState(() => requestText(meta));
+  const send = () => {
+    const id = ask(company.id, { name: meta.label, description: desc.trim(), dueDate: new Date(`${due}T18:00:00`).toISOString() }, me);
+    if (!id) { toast("자료를 요청할 권한이 없습니다.", "error"); return; }
+    toast(`${meta.label}을(를) 고객에게 요청했습니다. 고객 화면에 알림이 갑니다.`);
+    onClose();
+  };
+  return (
+    <Modal open onClose={onClose} size="sm" title={<span className="flex items-center gap-2"><Send size={17} /> {meta.label} 요청</span>}
+      footer={<><Button variant="ghost" onClick={onClose}>취소</Button><Button variant="accent" icon={<Send size={15} />} onClick={send}>고객에게 요청</Button></>}>
+      <p className="mb-3 text-[0.85rem] text-ink-2">{company.name} 고객 화면의 <b>요청자료</b>에 올라가고 알림이 갑니다. 고객이 올리면 이 서류함 칸에 바로 표시됩니다.</p>
+      <label className="block text-[0.85rem] font-semibold text-ink-2">제출 기한
+        <Input type="date" className="mt-1" value={due} onChange={(e) => setDue(e.target.value)} />
+      </label>
+      <label className="mt-3 block text-[0.85rem] font-semibold text-ink-2">고객에게 보일 안내
+        <textarea className="mt-1 min-h-24 w-full rounded-[10px] border border-line-2 bg-surface px-3.5 py-2.5 text-[0.9rem]" value={desc} onChange={(e) => setDesc(e.target.value)} />
+      </label>
+    </Modal>
   );
 }

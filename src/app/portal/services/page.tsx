@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, MessageSquarePlus, Receipt, Sparkles, ThumbsUp } from "lucide-react";
+import { Check, ChevronRight, MessageSquarePlus, Receipt, Sparkles, ThumbsUp } from "lucide-react";
 import { useStore, usePortalCompanyId, useCurrentUser, quoteGross, quoteNet } from "@/lib/store";
 import { useNow } from "@/lib/hooks";
-import { OPP_STATUS, recommendServices, type ServiceDef } from "@/lib/services";
+import { KPJK_SERVICES, OPP_STATUS, SERVICE_BY_KEY, type ServiceDef } from "@/lib/services";
+import { KPJK_CONSULTING } from "@/lib/company-options";
 import { daysBetween, fmtDate, fmtRelative, fmtWon } from "@/lib/format";
 import { Badge, Button, Card, EmptyState, SectionTitle, Textarea, cx } from "@/components/ui/ui";
 import type { Quote } from "@/lib/types";
@@ -25,19 +26,14 @@ export default function PortalServicesPage() {
   const c = st.companies.find((x) => x.id === companyId);
   const tick = useNow(60000);
   const nowIso = (tick ?? new Date(0)).toISOString();
-  const mine = useMemo(() => st.opportunities.filter((o) => o.companyId === companyId && o.status !== "dropped").sort((a, b) => b.createdAt.localeCompare(a.createdAt)), [st.opportunities, companyId]);
-  // 고객에게는 발송된 견적만 보인다. 작성 중·승인 대기는 내부 상태다.
+  // 담당 컨설턴트가 고객 화면에 올린 제안 — 거둔 것은 보이지 않는다
+  const proposals = useMemo(() => st.opportunities.filter((o) => o.companyId === companyId && o.source === "proposal" && o.status !== "dropped").sort((a, b) => b.createdAt.localeCompare(a.createdAt)), [st.opportunities, companyId]);
+  // 고객이 직접 남긴 관심 · 상담 요청만 — 내부 등록 기회(내부 메모 포함)는 고객에게 보이지 않는다
+  const mine = useMemo(() => st.opportunities.filter((o) => o.companyId === companyId && (o.source === "portal_interest" || o.source === "portal_request") && o.status !== "dropped").sort((a, b) => b.createdAt.localeCompare(a.createdAt)), [st.opportunities, companyId]);
+  const askedKeys = useMemo(() => new Map(mine.map((o) => [o.serviceKey, o])), [mine]);
+  const [peek, setPeek] = useState<ServiceDef | null>(null);
+  // 고객이 받은 견적
   const myQuotes = useMemo(() => st.quotes.filter((q) => q.companyId === companyId && ["sent", "accepted", "declined", "converted"].includes(q.status)).sort((a, b) => (b.sentAt ?? b.createdAt).localeCompare(a.sentAt ?? a.createdAt)), [st.quotes, companyId]);
-
-  const recos = useMemo(() => {
-    if (!c) return [];
-    return recommendServices({
-      company: c,
-      projects: st.projects.filter((p) => p.companyId === c.id),
-      contracts: st.contracts.filter((x) => x.companyId === c.id),
-      existing: new Set(st.opportunities.filter((o) => o.companyId === c.id).map((o) => o.serviceKey)),
-    });
-  }, [c, st.projects, st.contracts, st.opportunities]);
 
   if (!c) return null;
   const consultant = st.users.find((u) => u.id === c.consultantId);
@@ -64,7 +60,7 @@ export default function PortalServicesPage() {
       <div id="tut-p-services">
         <h1 className="text-[1.5rem] font-bold md:text-[1.8rem]">함께 검토해볼 수 있는 것</h1>
         <p className="mt-1 text-[0.92rem] text-ink-2">
-          {c.name}의 현재 상황에서 검토 대상이 되는 항목입니다. 관심을 표시하면 담당 컨설턴트가 확인 후 연락드립니다.
+          담당 컨설턴트가 {c.name}에 맞춰 골라 드린 항목과 KPJK가 함께하는 컨설팅 분야입니다. 상담을 요청하시면 담당 컨설턴트가 확인 후 연락드립니다.
         </p>
       </div>
 
@@ -145,36 +141,84 @@ export default function PortalServicesPage() {
         </Card>
       )}
 
-      {recos.length === 0 ? (
-        <EmptyState icon={<Check size={28} />} title="지금 추가로 안내드릴 항목이 없습니다." desc={`궁금한 점은 ${consultant?.name} ${consultant?.title}에게 문의해 주세요.`} />
+      {/* 담당 컨설턴트 제안 — 왜 제안하는지는 컨설턴트가 직접 쓴 글 그대로 */}
+      {proposals.length > 0 ? (
+        <div id="portal-proposals" className="space-y-3">
+          <SectionTitle>담당 컨설턴트 제안</SectionTitle>
+          <div className="grid gap-4 lg:grid-cols-2">
+            {proposals.map((o) => {
+              const service = SERVICE_BY_KEY[o.serviceKey];
+              const asked = askedKeys.get(o.serviceKey);
+              const by = st.users.find((u) => u.id === o.createdBy) ?? consultant;
+              return (
+                <div key={o.id} className="card flex flex-col p-5" data-proposal={o.serviceName}>
+                  <div className="flex items-start gap-2">
+                    <h2 className="flex-1 text-[1.15rem] font-bold">{o.serviceName}</h2>
+                    {asked && <Badge tone={OPP_STATUS[asked.status].tone}>{OPP_STATUS[asked.status].clientLabel}</Badge>}
+                  </div>
+                  {service?.blurb && <p className="mt-1 text-[0.92rem] text-ink-2">{service.blurb}</p>}
+
+                  {o.reason && (
+                    <div className="mt-3 flex items-start gap-2 rounded-xl bg-soft px-4 py-3 text-[0.88rem]">
+                      <Sparkles size={15} className="mt-0.5 shrink-0 text-accent" />
+                      <span><b className="text-ink">왜 제안드리나요</b><br /><span className="whitespace-pre-line">{o.reason}</span></span>
+                    </div>
+                  )}
+
+                  {service?.points && service.points.length > 0 && (
+                    <ul className="mt-3 flex-1 space-y-1 text-[0.88rem] text-ink-2">
+                      {service.points.map((p) => (
+                        <li key={p} className="flex items-start gap-2"><Check size={15} className="mt-0.5 shrink-0 text-success" />{p}</li>
+                      ))}
+                    </ul>
+                  )}
+                  <div className="mt-2 text-[0.78rem] text-ink-3">{by ? `${by.name} ${by.title ?? ""} · ` : ""}{fmtRelative(o.createdAt)}</div>
+
+                  {asked ? (
+                    <div className="mt-3 rounded-xl bg-success-bg px-4 py-2.5 text-[0.85rem] text-success">{asked.source === "portal_request" ? "상담을 요청하셨습니다." : "관심을 남기셨습니다."} 담당 컨설턴트가 연락드립니다.</div>
+                  ) : service ? (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Button variant="outline" size="sm" icon={<ThumbsUp size={15} />} onClick={() => { setAsk({ svc: service, reason: o.reason ?? "담당 컨설턴트 제안", kind: "interest" }); setNote(""); }}>관심 있어요</Button>
+                      <Button variant="accent" size="sm" icon={<MessageSquarePlus size={15} />} onClick={() => { setAsk({ svc: service, reason: o.reason ?? "담당 컨설턴트 제안", kind: "request" }); setNote(""); }}>상담 요청</Button>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {recos.map(({ service, reason }) => (
-            <Card key={service.key} className="flex flex-col p-5">
-              <div className="flex items-start gap-2">
-                <h2 className="flex-1 text-[1.15rem] font-bold">{service.name}</h2>
-              </div>
-              <p className="mt-1 text-[0.92rem] text-ink-2">{service.blurb}</p>
+        <EmptyState icon={<Check size={28} />} title="아직 담당 컨설턴트가 올린 제안이 없습니다." desc={`궁금한 분야가 있으면 아래에서 상담을 요청하시거나 ${consultant?.name ?? "담당 컨설턴트"} ${consultant?.title ?? ""}에게 문의해 주세요.`} />
+      )}
 
-              <div className="mt-3 flex items-start gap-2 rounded-xl bg-surface-2 px-4 py-3 text-[0.85rem]">
-                <Sparkles size={15} className="mt-0.5 shrink-0 text-accent" />
-                <span><b className="text-ink">이 항목을 보여드리는 이유</b><br />{reason}</span>
+      {/* KPJK 컨설팅 분야 전체 — 눌러서 내용 보고 바로 상담 요청 */}
+      <Card className="p-5" id="portal-kpjk-areas">
+        <SectionTitle>KPJK 컨설팅 분야</SectionTitle>
+        <div className="space-y-3">
+          {KPJK_CONSULTING.map((g) => (
+            <div key={g.group}>
+              <div className="mb-1.5 text-[0.8rem] font-semibold text-ink-3">{g.group}</div>
+              <div className="flex flex-wrap gap-2">
+                {g.items.map((name) => {
+                  const svc = KPJK_SERVICES.find((x) => x.name === name);
+                  if (!svc) return null;
+                  const asked = askedKeys.has(svc.key);
+                  return (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() => setPeek(svc)}
+                      className={cx("inline-flex min-h-[40px] items-center gap-1 rounded-full border px-3.5 text-[0.88rem] font-medium transition-colors", asked ? "border-success bg-success-bg text-success" : "border-line bg-surface hover:border-accent hover:text-accent")}
+                    >
+                      {asked && <Check size={14} />}{name}<ChevronRight size={14} className="opacity-50" />
+                    </button>
+                  );
+                })}
               </div>
-
-              <ul className="mt-3 flex-1 space-y-1 text-[0.88rem] text-ink-2">
-                {service.points.map((p) => (
-                  <li key={p} className="flex items-start gap-2"><Check size={15} className="mt-0.5 shrink-0 text-success" />{p}</li>
-                ))}
-              </ul>
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" icon={<ThumbsUp size={15} />} onClick={() => { setAsk({ svc: service, reason, kind: "interest" }); setNote(""); }}>관심 있어요</Button>
-                <Button variant="accent" size="sm" icon={<MessageSquarePlus size={15} />} onClick={() => { setAsk({ svc: service, reason, kind: "request" }); setNote(""); }}>상담 요청</Button>
-              </div>
-            </Card>
+            </div>
           ))}
         </div>
-      )}
+      </Card>
 
       <p className="text-[0.8rem] leading-relaxed text-ink-3">
         관심 표시는 계약이나 비용 발생과 무관합니다. 담당 컨설턴트가 현재 상황을 먼저 확인한 뒤 안내드립니다.
@@ -235,6 +279,30 @@ export default function PortalServicesPage() {
         <p className="mt-2 text-[0.8rem] text-ink-3">
           {ask?.kind === "request" ? "담당 컨설턴트에게 바로 전달되며, 영업일 기준 1일 내 연락드립니다." : "담당 컨설턴트가 확인한 뒤 필요한 경우에만 연락드립니다."}
         </p>
+      </Modal>
+      <Modal
+        open={!!peek}
+        onClose={() => setPeek(null)}
+        title={peek?.name ?? ""}
+        size="sm"
+        footer={
+          peek && askedKeys.has(peek.key) ? (
+            <Button variant="ghost" onClick={() => setPeek(null)}>닫기</Button>
+          ) : (
+            <>
+              <Button variant="outline" icon={<ThumbsUp size={15} />} onClick={() => { if (!peek) return; setAsk({ svc: peek, reason: "고객이 컨설팅 분야에서 직접 선택", kind: "interest" }); setNote(""); setPeek(null); }}>관심 있어요</Button>
+              <Button variant="accent" icon={<MessageSquarePlus size={15} />} onClick={() => { if (!peek) return; setAsk({ svc: peek, reason: "고객이 컨설팅 분야에서 직접 선택", kind: "request" }); setNote(""); setPeek(null); }}>상담 요청</Button>
+            </>
+          )
+        }
+      >
+        <p className="text-[0.92rem] text-ink-2">{peek?.blurb}</p>
+        <ul className="mt-3 space-y-1 text-[0.88rem] text-ink-2">
+          {peek?.points.map((p) => (
+            <li key={p} className="flex items-start gap-2"><Check size={15} className="mt-0.5 shrink-0 text-success" />{p}</li>
+          ))}
+        </ul>
+        {peek && askedKeys.has(peek.key) && <div className="mt-3 rounded-xl bg-success-bg px-4 py-2.5 text-[0.85rem] text-success">이미 요청하셨습니다. 담당 컨설턴트가 연락드립니다.</div>}
       </Modal>
     </div>
   );

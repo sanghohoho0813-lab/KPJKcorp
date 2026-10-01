@@ -103,6 +103,12 @@ insert into public.company_files(id, company_id, slot, file_name, storage_path) 
   ('cf_b1','co_b','bizReg','사업자등록증.pdf','co_b/cf_b1__file.pdf');
 insert into public.journal_entries(id, company_id, type, content) values
   ('jn_a1','co_a','call','대표 통화 — 내부 메모'), ('jn_b1','co_b','note','B사 메모');
+insert into public.opportunities(id, company_id, service_key, service_name, source, status, note, reason) values
+  ('op_int',  'co_a', 'kpjk_가지급금', '가지급금', 'internal',       'contacted', '내부 메모: 대표 성향 보수적', null),
+  ('op_rule', 'co_a', 'kpjk_인사노무', '인사노무', 'rule',           'interest',  null, '규칙 근거'),
+  ('op_prop', 'co_a', 'kpjk_가업승계', '가업승계', 'proposal',       'proposed',  null, '고객에게 보이는 제안 이유'),
+  ('op_req',  'co_a', 'kpjk_세무조사', '세무조사', 'portal_request', 'interest',  '고객 메모', null),
+  ('op_bp',   'co_b', 'kpjk_법인전환', '법인전환', 'proposal',       'proposed',  null, 'B사 제안');
 insert into public.payments(id, company_id, kind, label, amount) values
   ('pm_a1','co_a','deposit','계약금', 1000000), ('pm_b1','co_b','success','성공보수', 2000000);
 insert into public.activities(id, type, company_id, actor_id, actor_role, message) values
@@ -143,6 +149,13 @@ select chk('고객A: 스스로 대표가 못 된다',
        affected($$update public.profiles set role='admin' where id=auth.uid()$$), 0::bigint);
 
 -- 고객이 해도 되는 것
+select chk('고객A: 제안·내 요청만 보인다',          (select count(*) from public.opportunities), 2::bigint);
+select chk('고객A: 내부 등록 기회(내부 메모) 안 보인다', (select count(*) from public.opportunities where source in ('internal','rule')), 0::bigint);
+select chk('고객A: B사 제안은 안 보인다',          (select count(*) from public.opportunities where id='op_bp'), 0::bigint);
+select chk('고객A: 제안을 직접 못 만든다',
+       denied($$insert into public.opportunities(id, company_id, service_key, service_name, source, status) values ('op_evil','co_a','kpjk_x','x','proposal','proposed')$$), true);
+select chk('고객A: 제안 이유를 못 고친다',
+       affected($$update public.opportunities set reason='변조' where id='op_prop'$$), 0::bigint);
 select chk('고객A: 공지는 자기 회사 + 전체 공지만',  (select count(*) from public.notices), 2::bigint);
 select chk('고객A: B사 공지는 안 보인다',       (select count(*) from public.notices where id='nc_b'), 0::bigint);
 select chk('고객A: 게시 기한 지난 공지는 안 보인다', (select count(*) from public.notices where id='nc_old'), 0::bigint);

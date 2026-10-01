@@ -3,17 +3,18 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Building2, CalendarDays, ChevronRight, Eye, FileCheck2, FileText, FolderOpen, Mail, MapPin, MessageSquare, MessageSquareText, Phone, Plus, Sparkles, UserRound, Pencil, Archive, ArchiveRestore, UserPlus } from "lucide-react";
+import { ArrowLeft, Building2, EyeOff, Lock, CalendarDays, ChevronRight, Eye, FileCheck2, FileText, FolderOpen, Mail, MapPin, MessageSquare, MessageSquareText, Phone, Plus, Sparkles, UserRound, Pencil, Archive, ArchiveRestore, UserPlus } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useUi } from "@/lib/ui-store";
 import { daysBetween, fmtDate, fmtDateTime, fmtSize, relativeDay, fmtRelative, fmtTime } from "@/lib/format";
 import { stageLabel } from "@/lib/stages";
 import { OPP_STATUS } from "@/lib/services";
-import type { DocumentRequest } from "@/lib/types";
-import { Badge, Button, Card, EmptyState, IconTile, KpiCard, SectionTitle, Stat, Tabs, AiReadyBadge } from "@/components/ui/ui";
+import type { DocumentRequest, Schedule } from "@/lib/types";
+import { Badge, Button, Card, EmptyState, IconTile, KpiCard, SectionTitle, Stat, Tabs, AiReadyBadge, cx } from "@/components/ui/ui";
 import { ActivityFeed, DocStatusBadge, InquiryStatusBadge, ScheduleItem, StageBadge, StageProgressBar, DueText } from "@/components/domain/domain";
 import { ReviewDocModal } from "@/components/domain/DocActions";
-import { NewDocRequestModal, NewScheduleModal } from "@/components/domain/CreateModals";
+import { CompanyDocRequestModal, NewDocRequestModal, NewScheduleModal } from "@/components/domain/CreateModals";
+import { ProposalPanel } from "@/components/domain/client/ProposalPanel";
 import { CompanyModal, ProjectModal, useMay } from "@/components/domain/EntityModals";
 import { UserModal } from "@/components/domain/UserModals";
 import { Confirm } from "@/components/ui/overlay";
@@ -55,6 +56,7 @@ export default function ClientCardPage() {
   const may = useMay();
   const [newConsult, setNewConsult] = useState(false);
   const [newSchedule, setNewSchedule] = useState(false);
+  const [companyDoc, setCompanyDoc] = useState(false);
 
   const c = st.companies.find((x) => x.id === id);
   const now = new Date();
@@ -282,6 +284,7 @@ export default function ClientCardPage() {
 
       {tab === "consult" && (
         <div className="space-y-3">
+          <InternalOnly />
           <div className="flex justify-end">
             <Button variant="accent" icon={<Plus size={15} />} onClick={() => setNewConsult(true)}>상담 기록 작성</Button>
           </div>
@@ -307,10 +310,11 @@ export default function ClientCardPage() {
 
       {tab === "work" && <WorkTab company={c} />}
       {tab === "vault" && <VaultTab company={c} />}
-      {tab === "journal" && <JournalTab company={c} />}
+      {tab === "journal" && <><InternalOnly /><JournalTab company={c} /></>}
 
       {tab === "contract" && (
         <>
+        <InternalOnly />
         <MoneySection company={c} />
         <div className="mt-4 mb-2 text-[0.95rem] font-bold">계약</div>
         <div className="space-y-2 lg:hidden">
@@ -348,7 +352,7 @@ export default function ClientCardPage() {
         <Card className="overflow-hidden">
           <div className="flex items-center justify-between border-b border-line px-5 py-3">
             <span className="font-bold">요청자료 {docs.length}건</span>
-            {active[0] && <Button size="sm" variant="accent" icon={<Plus size={15} />} onClick={() => setNewDoc(active[0].id)}>자료 요청</Button>}
+            <Button size="sm" variant="accent" icon={<Plus size={15} />} onClick={() => (active[0] ? setNewDoc(active[0].id) : setCompanyDoc(true))}>자료 요청</Button>
           </div>
           <div className="divide-y divide-line lg:hidden">
             {docs.map((d) => (
@@ -387,10 +391,11 @@ export default function ClientCardPage() {
       {tab === "schedule" && (
         <Card className="p-5">
           <SectionTitle action={<Button size="sm" variant="outline" icon={<Plus size={15} />} onClick={() => setNewSchedule(true)}>일정 등록</Button>}>일정</SectionTitle>
+          <p className="-mt-1 mb-3 text-[0.82rem] text-ink-3"><b className="text-ink-2">고객에게 보이기</b>를 누르면 고객 화면 일정에 &ldquo;미팅 예정&rdquo;으로 바로 올라가고 알림이 갑니다.</p>
           {schedules.length === 0 ? <div className="text-ink-3">등록된 일정이 없습니다.</div> : (
             <>
               <div className="mb-1 text-[0.78rem] font-bold text-ink-3">예정</div>
-              <div className="divide-y divide-line">{upcoming.map((s) => <ScheduleItem key={s.id} s={s} />)}</div>
+              <div className="divide-y divide-line">{upcoming.map((s) => <div key={s.id} className="flex items-center gap-2"><div className="min-w-0 flex-1"><ScheduleItem s={s} /></div><PortalVisibleToggle s={s} /></div>)}</div>
               {schedules.filter((s) => s.start < nowIso).length > 0 && (
                 <>
                   <div className="mb-1 mt-5 text-[0.78rem] font-bold text-ink-3">지난 일정</div>
@@ -403,6 +408,7 @@ export default function ClientCardPage() {
       )}
 
       {tab === "portal" && <PortalStatus company={c} onMakeAccount={may("user.manage") ? () => setNewAccount(true) : undefined} />}
+      {tab === "portal" && <div className="mt-4"><ProposalPanel company={c} /></div>}
       {tab === "portal" && (
         <div className="mt-4 space-y-3">
           <div className="text-[0.95rem] font-bold">고객 문의 {inquiries.length}</div>
@@ -456,7 +462,37 @@ export default function ClientCardPage() {
       <NewDocRequestModal projectId={newDoc} open={!!newDoc} onClose={() => setNewDoc(null)} />
       <NewConsultationModal open={newConsult} onClose={() => setNewConsult(false)} companyId={c.id} />
       <NewScheduleModal open={newSchedule} onClose={() => setNewSchedule(false)} companyId={c.id} projectId={active[0]?.id} />
+      <CompanyDocRequestModal companyId={c.id} open={companyDoc} onClose={() => setCompanyDoc(false)} />
     </div>
+  );
+}
+
+/** 고객에게 보이지 않는 탭임을 늘 같은 자리에서 알린다 */
+function InternalOnly() {
+  return (
+    <div className="mb-3 flex items-center gap-2 rounded-xl bg-surface-2 px-4 py-2.5 text-[0.82rem] text-ink-2">
+      <Lock size={14} className="shrink-0 text-ink-3" /> 내부용입니다 — 고객 화면에는 보이지 않습니다.
+    </div>
+  );
+}
+
+/** 일정 한 번 눌러 고객 화면에 올리기 / 내리기 */
+function PortalVisibleToggle({ s }: { s: Schedule }) {
+  const update = useStore((x) => x.updateSchedule);
+  const toast = useStore((x) => x.toast);
+  const me = useStore((x) => x.session?.userId) ?? "";
+  if (!s.companyId) return null;
+  const on = s.visibleToClient;
+  return (
+    <button
+      type="button"
+      data-portal-toggle={s.title}
+      aria-pressed={on}
+      onClick={() => { update(s.id, { visibleToClient: !on }, me); toast(on ? "고객 화면에서 내렸습니다." : "고객 화면 일정에 올렸습니다. 고객에게 알림이 갑니다."); }}
+      className={cx("pressable inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[0.8rem] font-semibold", on ? "border-success bg-success-bg text-success" : "border-line-2 text-ink-2 hover:border-accent hover:text-accent")}
+    >
+      {on ? <><Eye size={14} /> 고객 화면에 보임</> : <><EyeOff size={14} /> 고객에게 보이기</>}
+    </button>
   );
 }
 

@@ -404,7 +404,8 @@ export type OpportunityStatus =
   | "won"               // 추가계약
   | "dropped";          // 종료
 
-export type OpportunitySource = "portal_interest" | "portal_request" | "internal" | "rule";
+/** proposal: 담당 컨설턴트가 고객 화면에 "함께 검토해볼 것"으로 올린 제안 */
+export type OpportunitySource = "portal_interest" | "portal_request" | "internal" | "rule" | "proposal";
 
 export interface Opportunity {
   id: string;

@@ -2,14 +2,16 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Check, ChevronDown, ClipboardCopy, Send } from "lucide-react";
+import { Check, ChevronDown, ClipboardCopy, Eye, Plus, Send } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { can } from "@/lib/permissions";
 import type { Company, Project, WorkStatus } from "@/lib/types";
 import { OVERDUE_CLS, WORK_STATUS, WORK_STATUS_ORDER, isOpen, workCell } from "@/lib/work-status";
 import { dueText, todayYmd } from "@/lib/vault";
 import { documentRequestMessage, progressReportMessage } from "@/lib/ops-messages";
-import { stageLabel } from "@/lib/stages";
+import { CUSTOMER_STEPS, stageLabel, stageToCustomerStep } from "@/lib/stages";
+import type { InternalStage } from "@/lib/types";
+import { ProjectModal } from "@/components/domain/EntityModals";
 import { addDays, iso } from "@/lib/format";
 import { Badge, Button, Card, EmptyState, Input, Textarea, cx } from "@/components/ui/ui";
 import { Modal } from "@/components/ui/overlay";
@@ -73,6 +75,8 @@ export function WorkTab({ company }: { company: Company }) {
   const role = useStore((s) => s.session?.role);
   const may = can(role, "project.update");
   const [msg, setMsg] = useState<{ title: string; desc: string; text: string } | null>(null);
+  const [adding, setAdding] = useState(false);
+  const mayCreate = can(role, "project.create");
   const today = todayYmd();
   const mine = projects.filter((p) => p.companyId === company.id && !p.archived);
   const cells = mine.map((p) => workCell(p, today))
@@ -81,18 +85,20 @@ export function WorkTab({ company }: { company: Company }) {
   return (
     <div className="space-y-3" id="work-tab">
       <div className="flex flex-wrap items-center gap-2">
-        <p className="min-w-0 flex-1 text-[0.82rem] text-ink-3">단계는 &ldquo;어디까지 왔나&rdquo;, 진행 상태는 &ldquo;지금 공이 누구에게 있나&rdquo;입니다. 고객 회신을 7일 넘게 기다리면 먼저 알려 드립니다.</p>
-        <Button size="sm" variant="accent" icon={<Send size={14} />} onClick={() => setMsg({ title: "서류 요청 문구", desc: "서류함에서 아직 없거나 만료된 서류와, 고객이 아직 내지 않은 요청자료만 골랐습니다.", text: documentRequestMessage(company, vault, files.filter((f) => f.companyId === company.id), docRequests) })}>서류 요청 문구</Button>
+        <p className="min-w-0 flex-1 text-[0.82rem] text-ink-3">단계는 &ldquo;어디까지 왔나&rdquo; — 누르는 대로 <b className="text-ink-2">고객 화면 진행률</b>이 바뀝니다. 진행 상태는 &ldquo;지금 공이 누구에게 있나&rdquo;(내부용)입니다.</p>
+        {mayCreate && <Button size="sm" variant="accent" icon={<Plus size={14} />} onClick={() => setAdding(true)}>진행 업무 추가</Button>}
+        <Button size="sm" variant="outline" icon={<Send size={14} />} onClick={() => setMsg({ title: "서류 요청 문구", desc: "서류함에서 아직 없거나 만료된 서류와, 고객이 아직 내지 않은 요청자료만 골랐습니다.", text: documentRequestMessage(company, vault, files.filter((f) => f.companyId === company.id), docRequests) })}>서류 요청 문구</Button>
         <Button size="sm" variant="outline" icon={<ClipboardCopy size={14} />} onClick={() => setMsg({ title: "진행 상황 보고 문구", desc: "고객에게 공개한 프로젝트의 현재 상태와 다음 단계를 정리했습니다.", text: progressReportMessage(company, projects) })}>진행 상황 보고 문구</Button>
       </div>
       {cells.length === 0 ? (
-        <Card><EmptyState title="진행 중인 업무가 없습니다" desc="프로젝트를 등록하면 여기서 상태·마감·다음 할 일을 관리합니다." /></Card>
+        <Card><EmptyState title="진행 중인 업무가 없습니다" desc="컨설팅 분야를 골라 진행 업무를 추가하면, 여기서 단계를 누르는 대로 고객 화면 진행률이 바뀝니다." action={mayCreate ? <Button size="sm" variant="accent" icon={<Plus size={14} />} onClick={() => setAdding(true)}>진행 업무 추가</Button> : undefined} /></Card>
       ) : (
         <div className="grid gap-3 xl:grid-cols-2">
           {cells.map((c) => <WorkCard key={c.project.id} project={c.project} may={may} />)}
         </div>
       )}
       <MessageModal msg={msg} onClose={() => setMsg(null)} />
+      <ProjectModal open={adding} companyId={company.id} onClose={() => setAdding(false)} />
     </div>
   );
 }
@@ -130,6 +136,7 @@ function WorkCard({ project: p, may }: { project: Project; may: boolean }) {
         ) : <WorkChip project={p} />}
         {isOpen(c.status) && c.daysLeft !== null && (c.overdue || c.dueSoon) && <Badge tone={c.overdue ? "error" : "warning"}>{dueText(c.daysLeft)}</Badge>}
       </div>
+      <StageStepper project={p} may={may} />
       {open && (
         <div className="space-y-2.5 border-t border-line py-3 pl-4 pr-3">
           <div className="flex flex-wrap items-center gap-2 text-[0.8rem]">
@@ -152,6 +159,34 @@ function WorkCard({ project: p, may }: { project: Project; may: boolean }) {
           <Link href={`/ax/projects/${p.id}`} className="link-more text-[0.8rem]">프로젝트 자세히 →</Link>
         </div>
       )}
+    </div>
+  );
+}
+
+/** 고객 화면과 같은 7단계 — 누르면 그 단계로 바뀌고 고객 Portal 진행률·알림이 따라간다 */
+const STEP_TO_STAGE: InternalStage[] = ["consult", "contract", "doc_request", "review", "in_progress", "ceo_meeting", "done"];
+function StageStepper({ project: p, may }: { project: Project; may: boolean }) {
+  const change = useStore((s) => s.changeProjectStage);
+  const toast = useStore((s) => s.toast);
+  const me = useStore((s) => s.session?.userId) ?? "";
+  const cur = stageToCustomerStep(p.stage);
+  const pct = Math.round(((cur + 1) / CUSTOMER_STEPS.length) * 100);
+  return (
+    <div className="border-t border-line px-3 pb-3 pt-2.5 sm:pl-4" data-stepper={p.id}>
+      <div className="mb-1.5 flex flex-wrap items-center gap-x-2 text-[0.75rem] text-ink-3">
+        <Eye size={12} /> 고객 화면: <b className="text-ink-2">{cur + 1}/{CUSTOMER_STEPS.length}단계 · {CUSTOMER_STEPS[cur].label}</b> · 진행률 {pct}%
+        {!p.clientVisible && <span className="font-semibold text-warning">· 이 업무는 고객에게 공개 안 함</span>}
+      </div>
+      <div className="grid grid-cols-7 gap-1" role="radiogroup" aria-label={`${p.name} 단계`}>
+        {CUSTOMER_STEPS.map((st, i) => (
+          <button key={st.key} type="button" role="radio" aria-checked={i === cur} aria-label={`${i + 1}단계 ${st.label}`} disabled={!may || i === cur}
+            onClick={() => { change(p.id, STEP_TO_STAGE[i], me); toast(`${p.name} — ${st.label} 단계로 바꿨습니다. 고객 화면에 바로 반영됩니다.`); }}
+            className={cx("pressable flex min-h-9 flex-col items-center justify-center rounded-lg px-0.5 text-center text-[0.68rem] font-semibold leading-tight sm:text-[0.72rem]",
+              i < cur ? "bg-accent/15 text-accent" : i === cur ? "bg-accent text-accent-ink" : "bg-surface-2 text-ink-3 hover:bg-soft/60", !may && "cursor-default")}>
+            <span className="tnum">{i + 1}</span><span className="hidden sm:block">{st.label}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

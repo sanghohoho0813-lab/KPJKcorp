@@ -16,6 +16,8 @@ export interface ServiceDef {
   points: string[];
   /** 이 서비스가 검토 대상인지 판단하는 규칙. 해당하면 근거 문장을 돌려준다. */
   match: (ctx: RecoContext) => string | null;
+  /** 예전 카탈로그 — 이미 등록된 기회를 읽기 위해 남겨 두고, 고객 화면 목록에는 내놓지 않는다 */
+  legacy?: boolean;
 }
 
 export interface RecoContext {
@@ -110,7 +112,33 @@ export const SERVICES: ServiceDef[] = [
   },
 ];
 
-export const SERVICE_BY_KEY = Object.fromEntries(SERVICES.map((s) => [s.key, s]));
+for (const sv of SERVICES) sv.legacy = true;
+
+/**
+ * KPJK 맞춤컨설팅 분야 — kpjkcorporation.com 의 분야 그대로(2026-10-01).
+ * 고객 화면 "함께 검토해볼 수 있는 것"에는 이 분야만 나온다. 설명은 "무엇을 함께 보는지"까지만 쓴다 —
+ * 효과·금액·성공 여부는 쓰지 않는다. 왜 이 회사에 제안하는지는 담당 컨설턴트가 직접 적는다.
+ */
+const K = (name: string, blurb: string, points: string[]): ServiceDef => ({ key: `kpjk_${name}`, name, blurb, points, match: () => null });
+export const KPJK_SERVICES: ServiceDef[] = [
+  K("가지급금", "대표이사 가지급금이 생긴 원인과 잔액을 확인하고 정리 방법을 함께 검토합니다.", ["발생 원인·잔액 확인", "인정이자 등 세무 부담 점검", "정리 방법별 장단점 비교"]),
+  K("가수금", "대표가 회사에 넣은 돈(가수금)의 처리 방법과 재무제표에 주는 영향을 점검합니다.", ["잔액·발생 경위 확인", "상환·자본 전환 등 처리 방법 비교", "재무비율 영향 점검"]),
+  K("이익잉여금", "쌓여 있는 이익잉여금(미처분이익잉여금)의 활용·정리 방향을 검토합니다.", ["잉여금 규모·구성 확인", "배당·이익소각 등 활용 방법 비교", "주식가치·승계와의 관계 점검"]),
+  K("이익소각", "이익으로 자기주식을 소각하는 절차와 요건을 검토합니다.", ["상법·정관 요건 확인", "절차·일정 정리", "세무 검토가 필요한 부분 구분"]),
+  K("자사주매입", "회사가 자기주식을 취득하는 방법과 요건을 점검합니다.", ["배당가능이익 등 요건 확인", "취득 절차·서류 정리", "취득 후 처리 방향 검토"]),
+  K("주식명의신탁", "다른 사람 명의로 되어 있는 주식을 실제 소유자에게 되돌리는 방법을 검토합니다.", ["명의신탁 경위·증빙 확인", "환원 방법별 절차 비교", "세무 위험 점검"]),
+  K("가업승계", "회사와 지분을 다음 세대로 넘기는 순서와 준비 항목을 정리합니다.", ["현재 지분·주식가치 확인", "승계 방법·시점 검토", "관련 제도 요건 점검"]),
+  K("상속증여", "상속·증여에 앞서 미리 준비할 항목과 순서를 정리합니다.", ["재산·지분 현황 정리", "증여·상속 방법 비교", "세무 검토가 필요한 부분 구분"]),
+  K("법인전환", "개인사업자의 법인 전환 방법과 준비 순서를 검토합니다.", ["전환 방법별 비교", "절차·일정·서류 정리", "전환 전후 세무 점검"]),
+  K("세무조사", "세무조사에 대비해 미리 점검할 항목과 자료를 정리합니다.", ["취약 항목 사전 점검", "증빙·자료 정리", "대응 순서 안내"]),
+  K("재무세무", "재무제표와 세무 신고 현황을 함께 점검합니다.", ["재무제표 주요 항목 점검", "세무 이슈 정리", "개선 순서 제안"]),
+  K("인사노무", "근로계약·취업규칙 등 인사노무 기본 항목을 점검합니다.", ["근로계약·규정 현황 확인", "보완이 필요한 항목 정리", "개선 순서 안내"]),
+  K("기업부설연구소", "기업부설연구소(연구개발전담부서) 설립 요건과 설립 후 관리를 검토합니다.", ["인력·공간 요건 확인", "신고 서류 정리", "설립 후 관리 항목 안내"]),
+  K("특허자본", "보유 특허를 자본으로 활용하는 방법(현물출자 등)을 검토합니다.", ["보유 특허 현황 확인", "활용 방법·절차 검토", "평가·법무가 필요한 부분 구분"]),
+  K("기업신용평가등급", "기업신용평가 등급에 영향을 주는 항목을 점검합니다.", ["현재 등급·평가 항목 확인", "재무 항목 개선 포인트 정리", "개선 순서 제안"]),
+];
+
+export const SERVICE_BY_KEY = Object.fromEntries([...SERVICES, ...KPJK_SERVICES].map((s) => [s.key, s]));
 
 export interface Reco {
   service: ServiceDef;
@@ -121,7 +149,7 @@ export interface Reco {
 export function recommendServices(ctx: RecoContext, limit = 3): Reco[] {
   const out: Reco[] = [];
   for (const s of SERVICES) {
-    if (ctx.existing.has(s.key)) continue;
+    if (s.legacy || ctx.existing.has(s.key)) continue;
     const reason = s.match(ctx);
     if (reason) out.push({ service: s, reason });
     if (out.length >= limit) break;

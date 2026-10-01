@@ -19,15 +19,16 @@ L('고객1 오류', c1.errs.filter((e) => !/ERR_CERT/.test(e)).join(' || ') || '
 
 // --- 고객1: 상담 요청 (Portal 서비스)
 await c1.goto(B + '/portal/services', { waitUntil: 'domcontentloaded' }); await c1.waitForTimeout(1500);
-const reqBtn = c1.getByRole('button', { name: '상담 요청' }).first();
-if (await reqBtn.count()) {
-  await reqBtn.click(); await c1.waitForTimeout(600);
-  await c1.locator('[role=dialog] textarea').fill(`파일럿 상담요청 ${TAG}`).catch(() => {});
-  await c1.locator('[role=dialog]').getByRole('button', { name: '상담 요청' }).click(); await c1.waitForTimeout(3000);
-  ok('상담요청: 서버 저장', sql(`select count(*) from opportunities where note='파일럿 상담요청 ${TAG}' and source='portal_request'`) === '1');
-  ok('상담요청: 상담 연락 업무(서버)', sql(`select count(*) from tasks where source='auto' and memo='파일럿 상담요청 ${TAG}'`) === '1');
-  ok('상담요청: 고객 접수 알림(서버)', Number(sql(`select count(*) from notifications where audience='client' and title='요청이 접수되었습니다'`)) >= 1);
-} else L('상담요청', 'SKIP (추천 서비스 카드 없음)');
+// KPJK 컨설팅 분야 칩 → 내용 확인 → 상담 요청
+const chip = c1.locator('#portal-kpjk-areas').getByRole('button', { name: /^재무세무/ });
+ok('상담요청: KPJK 분야 칩 노출', (await chip.count()) === 1);
+await chip.click(); await c1.waitForTimeout(600);
+await c1.locator('[role=dialog]:visible').last().getByRole('button', { name: '상담 요청' }).click(); await c1.waitForTimeout(600);
+await c1.locator('[role=dialog]:visible textarea').last().fill(`파일럿 상담요청 ${TAG}`);
+await c1.locator('[role=dialog]:visible').last().getByRole('button', { name: '상담 요청' }).click(); await c1.waitForTimeout(3000);
+ok('상담요청: 서버 저장', sql(`select count(*) from opportunities where note='파일럿 상담요청 ${TAG}' and source='portal_request'`) === '1');
+ok('상담요청: 상담 연락 업무(서버)', sql(`select count(*) from tasks where source='auto' and memo='파일럿 상담요청 ${TAG}'`) === '1');
+ok('상담요청: 고객 접수 알림(서버)', Number(sql(`select count(*) from notifications where audience='client' and title='요청이 접수되었습니다'`)) >= 1);
 L('고객1 오류(2)', c1.errs.filter((e) => !/ERR_CERT/.test(e)).join(' || ') || 'OK 0');
 
 // --- 컨설턴트(모바일): 답변
