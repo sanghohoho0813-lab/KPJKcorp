@@ -52,7 +52,7 @@ import { can, type Permission } from "./permissions";
 import { toLegacyBaseline } from "./baseline-survey";
 import { serverConfigured, setDemoForced } from "./server/client";
 import { currentServerUser, serverSignIn as authSignIn, serverSignOut } from "./server/auth";
-import { loadAll, ORG_SETTING_KEYS, pendingWrites, pushChanges, pushSettings, writeSeq, type ServerSettings } from "./server/sync";
+import { loadAll, ORG_SETTING_KEYS, pendingWrites, pushChanges, pushSettings, retryOutbox, setOutboxOwner, unsavedCount, writeSeq, type ServerSettings } from "./server/sync";
 
 export interface StoreState extends SeedData {
   hydrated: boolean;
@@ -78,6 +78,8 @@ export interface StoreState extends SeedData {
   serverMode: boolean;
   /** 서버 저장이 실패했을 때 사용자에게 보일 마지막 사유 */
   syncError?: string;
+  /** 서버에 아직 저장되지 않은 줄 수 (보관했다가 다시 보낸다) */
+  unsaved?: number;
   /** 서버 로그인 → 볼 수 있는 데이터 전부 읽기 → 세션 설정까지 한 번에 */
   serverSignIn: (email: string, password: string) => Promise<{ ok: boolean; reason?: string; offline?: boolean }>;
   /** 새로고침 후에도 로그인이 살아 있으면 서버에서 새로 읽어 다시 연결한다 */
@@ -1991,6 +1993,9 @@ export const useStore = create<StoreState>()(
       serverSignIn: async (email, password) => {
         const r = await authSignIn(email, password);
         if (!r.ok || !r.user) return { ok: false, reason: r.reason, offline: r.offline };
+        // 이 계정으로 지난번에 보내지 못한 변경이 있으면 먼저 보낸다
+        setOutboxOwner(r.user.id);
+        await retryOutbox();
         const loaded = await loadAll();
         if (!loaded.ok || !loaded.data) return { ok: false, reason: loaded.reason, offline: loaded.offline };
         applyServer(set, get, r.user, loaded.data, loaded.settings);
@@ -2025,6 +2030,12 @@ export const useStore = create<StoreState>()(
           return false;
         }
         if (!me.user) { clearLocal(); return false; }
+        setOutboxOwner(me.user.id);
+        if (unsavedCount() > 0 && (await retryOutbox()).left > 0 && wasServer) {
+          // 아직 못 보낸 변경이 있다 — 서버 내용으로 덮으면 사라진다. 이 브라우저에 남은 화면을 지킨다.
+          set({ syncError: "서버에 아직 저장되지 않은 변경이 있어 화면을 그대로 둡니다. 인터넷 연결을 확인해 주세요 — 연결되면 자동으로 다시 보냅니다." });
+          return false;
+        }
         const loaded = await loadAll();
         if (!loaded.ok || !loaded.data) {
           if (wasServer) set({ syncError: loaded.reason ?? "서버에서 데이터를 가져오지 못했습니다." });
@@ -2042,6 +2053,11 @@ export const useStore = create<StoreState>()(
         if (!st.serverMode || !st.session || !serverConfigured()) return false;
         // 내가 보낸 변경이 아직 서버로 가는 중이면 건너뛴다 — 옛 내용으로 화면이 잠깐 되돌아가는 것을 막는다
         if (pendingWrites() > 0) return false;
+        // 보내지 못한 변경이 있으면 먼저 다시 보낸다. 그래도 남으면 덮어쓰지 않는다(덮으면 입력한 것이 사라진다).
+        if (unsavedCount() > 0) {
+          const r = await retryOutbox();
+          if (r.left > 0) { set({ syncError: "서버에 아직 저장되지 않은 변경이 있어 화면을 그대로 둡니다. 인터넷 연결을 확인해 주세요 — 연결되면 자동으로 다시 보냅니다." }); return false; }
+        }
         const before = writeSeq();
         const me = await currentServerUser();
         if (me.offline) {
@@ -2081,6 +2097,8 @@ export const useStore = create<StoreState>()(
       },
 
       serverLogout: async () => {
+        // 못 보낸 변경은 이 브라우저에 계정별로 남는다 — 같은 계정으로 다시 로그인하면 이어서 보낸다
+        setOutboxOwner(null);
         try { await serverSignOut(); } catch { /* 서버에 닿지 못해도 이 브라우저에서는 로그아웃한다 */ }
         loadingFromServer = true;
         // 공용 PC 에서 다음 사람에게 앞사람 데이터가 보이면 안 된다 — 목록을 비운다.

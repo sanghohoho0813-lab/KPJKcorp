@@ -277,6 +277,70 @@ let pending = 0;
 let seq = 0;
 
 export const setSyncErrorHandler = (fn: (msg: string) => void) => { onError = fn; };
+
+/* ------------------------------------------------------------------------------------------------
+ * 보내지 못한 변경 보관함 (outbox)
+ * 저장이 실패한 줄을 버리지 않는다. 이 브라우저에 계정별로 보관했다가 연결이 돌아오면 다시 보낸다.
+ * 보관함이 비기 전에는 서버 내용으로 화면을 덮어쓰지 않는다 — 덮어쓰면 입력한 것이 조용히 사라진다.
+ * ---------------------------------------------------------------------------------------------- */
+type Op =
+  | { t: "insert"; table: string; rows: Record<string, unknown>[] }
+  | { t: "update"; table: string; patch: Record<string, unknown>; ids: string[] }
+  | { t: "delete"; table: string; ids: string[] };
+let outbox: Op[] = [];
+let owner: string | null = null;
+let onUnsaved: ((n: number) => void) | null = null;
+const OUTBOX_KEY = (u: string) => `kpjk-outbox:${u}`;
+const opSize = (o: Op) => (o.t === "insert" ? o.rows.length : o.ids.length);
+export const unsavedCount = () => outbox.reduce((n, o) => n + opSize(o), 0);
+export const setUnsavedHandler = (fn: (n: number) => void) => { onUnsaved = fn; fn(unsavedCount()); };
+function saveOutbox() {
+  if (owner) {
+    try {
+      if (outbox.length) window.localStorage.setItem(OUTBOX_KEY(owner), JSON.stringify(outbox));
+      else window.localStorage.removeItem(OUTBOX_KEY(owner));
+    } catch { /* 저장소 막힘 — 이 화면이 열려 있는 동안만 보관 */ }
+  }
+  onUnsaved?.(unsavedCount());
+}
+/** 로그인한 계정의 보관함을 연다. 다른 계정의 보관함은 절대 보내지 않는다. */
+export function setOutboxOwner(userId: string | null) {
+  owner = userId;
+  outbox = [];
+  if (userId) {
+    try { outbox = JSON.parse(window.localStorage.getItem(OUTBOX_KEY(userId)) ?? "[]") as Op[]; } catch { outbox = []; }
+  }
+  onUnsaved?.(unsavedCount());
+}
+function keep(op: Op) { outbox.push(op); saveOutbox(); }
+
+async function runOp(sb: SupabaseClient, o: Op) {
+  if (o.t === "insert") return insertRows(sb, o.table, o.rows);
+  if (o.t === "update") return (await sb.from(o.table).update(o.patch).in("id", o.ids)).error;
+  return (await sb.from(o.table).delete().in("id", o.ids)).error;
+}
+
+/** 보관함을 순서대로 다시 보낸다. 남은 건수를 돌려준다. 보내는 중인 변경 뒤에 줄을 선다. */
+export function retryOutbox(): Promise<{ left: number; reason?: string }> {
+  const sb = supa();
+  if (!sb || !outbox.length) return Promise.resolve({ left: unsavedCount() });
+  pending += 1;
+  const run = queue.then(async () => {
+    const todo = outbox;
+    outbox = [];
+    let reason: string | undefined;
+    for (const o of todo) {
+      const error = await runOp(sb, o);
+      if (error) { outbox.push(o); reason = explain(error); }
+    }
+    saveOutbox();
+    return { left: unsavedCount(), reason };
+  });
+  queue = run.then(() => undefined, () => undefined).finally(() => { pending -= 1; });
+  return run;
+}
+/** 사용자가 "버리기"를 골랐을 때만 */
+export function discardOutbox() { outbox = []; saveOutbox(); }
 export const pendingWrites = () => pending;
 /** 보낸 변경의 누적 번호 — 다시 읽어오는 동안 내가 뭔가 바꿨는지 알아보는 데 쓴다 */
 export const writeSeq = () => seq;
@@ -331,7 +395,7 @@ async function flush(
     const table = SPEC[c.key].table;
     if (c.insert.length) {
       const error = await insertRows(sb, table, c.insert);
-      if (error) fail(table, error);
+      if (error) { fail(table, error); keep({ t: "insert", table, rows: c.insert }); }
     }
     // 바뀐 칸이 같은 행끼리 묶어 한 번에 (예: 알림 모두 읽음)
     const groups = new Map<string, { patch: Record<string, unknown>; ids: string[] }>();
@@ -341,23 +405,23 @@ async function flush(
     }
     for (const g of groups.values()) {
       const { error } = await sb.from(table).update(g.patch).in("id", g.ids);
-      if (error) fail(table, error);
+      if (error) { fail(table, error); keep({ t: "update", table, patch: g.patch, ids: g.ids }); }
     }
   }
   // 2) 접혀 있던 자식들
   if (nested.files.length) {
     const error = await insertRows(sb, "document_files", nested.files);
-    if (error) fail("제출 파일", error);
+    if (error) { fail("제출 파일", error); keep({ t: "insert", table: "document_files", rows: nested.files }); }
   }
   if (nested.msgs.length) {
     const error = await insertRows(sb, "inquiry_messages", nested.msgs);
-    if (error) fail("문의 메시지", error);
+    if (error) { fail("문의 메시지", error); keep({ t: "insert", table: "inquiry_messages", rows: nested.msgs }); }
   }
   // 3) 삭제는 자식 → 부모 역순으로
   for (const c of [...changes].reverse()) {
     if (!c.remove.length) continue;
     const { error } = await sb.from(SPEC[c.key].table).delete().in("id", c.remove);
-    if (error) fail(`${SPEC[c.key].table} 삭제`, error);
+    if (error) { fail(`${SPEC[c.key].table} 삭제`, error); keep({ t: "delete", table: SPEC[c.key].table, ids: c.remove }); }
   }
 }
 

@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useStore } from "@/lib/store";
 import { normalizeTheme } from "@/lib/themes";
 import { serverConfigured } from "@/lib/server/client";
-import { setSyncErrorHandler } from "@/lib/server/sync";
+import { setSyncErrorHandler, setUnsavedHandler } from "@/lib/server/sync";
 import type { FontScale } from "@/lib/types";
 
 /** 이전 버전에서 저장된 값("small"/"base"/"large")은 최소 단계로 본다. */
@@ -30,6 +30,7 @@ export function ThemeBoot() {
       useStore.setState({ syncError: msg });
       useStore.getState().toast(msg, "error");
     });
+    setUnsavedHandler((n) => useStore.setState({ unsaved: n }));
   }, []);
 
   // 새로고침해도 로그인이 유지되게 한다. 이 브라우저에 남은 지난 화면을 그대로 믿지 않고
