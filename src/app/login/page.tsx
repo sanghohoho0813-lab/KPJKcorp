@@ -261,6 +261,10 @@ export default function LoginPage() {
             )}
           </div>
 
+          <a href="/match" className="mt-5 flex items-center justify-between gap-2 rounded-xl border border-line px-4 py-3 text-[0.88rem] hover:border-accent" data-testid="match-link">
+            <span><b>로그인 없이</b> 우리 회사에 맞는 지원사업 찾기</span><ArrowRight size={16} className="shrink-0 text-accent" />
+          </a>
+
           {onServer && serverDown && (
             <div className="mt-6 rounded-xl border border-warning/40 bg-warning-bg/50 p-4" data-testid="server-down">
               <div className="flex items-center gap-2 text-[0.85rem] font-bold"><WifiOff size={16} className="text-warning" /> 서버에 연결되지 않습니다</div>

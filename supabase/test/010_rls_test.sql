@@ -31,6 +31,17 @@ exception when insufficient_privilege or check_violation then
   return true;
 end $$;
 
+/** 몇 행이 보이나. 권한 자체가 없으면 0 (안 보이는 것과 같다) */
+create or replace function visible(p_sql text) returns bigint
+language plpgsql as $$
+declare n bigint;
+begin
+  execute 'select count(*) from (' || p_sql || ') x' into n;
+  return n;
+exception when insufficient_privilege then
+  return 0::bigint;
+end $$;
+
 /** 실제로 몇 행이 바뀌었나. 정책 예외로 막히면 -1 */
 create or replace function affected(p_sql text) returns bigint
 language plpgsql as $$
@@ -319,6 +330,38 @@ select chk('고객A: 추가 질문',
        affected($$insert into public.inquiry_messages(id, inquiry_id, author_id, author_role, body) values ('m_f1','iq_t1','00000000-0000-0000-0000-00000000f001','client','추가 질문')$$), 1::bigint);
 reset role; reset request.jwt.claim.sub;
 select chk('서버: 고객 추가 질문 → 문의가 다시 답변 대기', (select status from public.inquiries where id='iq_t1'), 'open');
+
+-- =========================== 지원사업 공고 · 가망고객 =========================
+insert into public.support_programs(id, title, regions) values ('bz_t1', '시험 공고', '{경기}');
+set role anon;
+select chk('비로그인: 공고는 읽는다',            (select count(*) from public.support_programs), 1::bigint);
+select chk('비로그인: 동의하면 상담 남김',
+       affected($$insert into public.leads(id, company_name, contact_name, phone, consent) values ('ld_t1','가망(주)','홍','010-1234-5678', true)$$), 1::bigint);
+select chk('비로그인: 동의 없으면 못 남김',
+       denied($$insert into public.leads(id, company_name, contact_name, phone, consent) values ('ld_t2','가망(주)','홍','010-1234-5678', false)$$), true);
+select chk('비로그인: 상태를 미리 정할 수 없다',
+       denied($$insert into public.leads(id, company_name, contact_name, phone, consent, status) values ('ld_t3','가망(주)','홍','010-1234-5678', true, 'converted')$$), true);
+select chk('비로그인: 가망고객 목록 못 본다',     visible($$select * from public.leads$$), 0::bigint);
+select chk('비로그인: 공고를 못 만든다',
+       denied($$insert into public.support_programs(id, title) values ('x','x')$$), true);
+reset role;
+select chk('서버: 가망고객 → 연락 업무 자동', (select count(*) from public.tasks where title like '가망(주) 가망고객 연락%'), 1::bigint);
+select chk('서버: 가망고객 → 담당자 알림', (select count(*) from public.notifications where audience='internal' and title = '새 가망고객: 가망(주)'), 1::bigint);
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000f001';   -- 고객 A
+select chk('고객A: 가망고객 목록 못 본다',      (select count(*) from public.leads), 0::bigint);
+select chk('고객A: 공고는 읽는다',              (select count(*) from public.support_programs), 1::bigint);
+select chk('고객A: 공고를 못 고친다',
+       affected($$update public.support_programs set title='x' where id='bz_t1'$$), 0::bigint);
+reset role; reset request.jwt.claim.sub;
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000c001';   -- 컨설턴트
+select chk('컨설턴트: 가망고객 본다',           (select count(*) from public.leads), 1::bigint);
+select chk('컨설턴트: 공고 추가',
+       affected($$insert into public.support_programs(id, title) values ('mp_t2','직접 추가 공고')$$), 1::bigint);
+select chk('컨설턴트: 가망고객 상태 변경',
+       affected($$update public.leads set status='contacted' where id='ld_t1'$$), 1::bigint);
+reset role; reset request.jwt.claim.sub;
 
 -- =========================== 결과 ===========================================
 select n, case when pass then '통과' else '실패' end as 결과, label as 검증, detail as 비고

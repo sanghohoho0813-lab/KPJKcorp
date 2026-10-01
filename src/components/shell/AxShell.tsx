@@ -25,6 +25,7 @@ import {
   ShieldCheck,
   MessageSquarePlus,
   Compass,
+  Megaphone,
 } from "lucide-react";
 import { useStore, useCurrentUser } from "@/lib/store";
 import { NEXT_FEATURES, useUi } from "@/lib/ui-store";
@@ -55,7 +56,7 @@ interface NavItem {
   hint?: string;
   id?: string;
   /** live count key — resolved in NavLink so the sidebar shows what needs attention */
-  badge?: "approvals" | "tasks";
+  badge?: "approvals" | "tasks" | "leads";
 }
 
 interface NavGroup {
@@ -94,6 +95,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/ax/consultations", label: "상담 · 견적 · 계약", icon: <ClipboardList size={18} /> },
       { href: "/ax/projects", label: "프로젝트", icon: <Briefcase size={18} />, id: "tut-nav-projects" },
       { href: "/ax/documents", label: "자료관리", icon: <FolderOpen size={18} />, hint: "요청자료 · 결과자료", id: "tut-nav-documents" },
+      { href: "/ax/programs", label: "지원사업 매칭", icon: <Megaphone size={18} />, hint: "공고 · 고객 알림 · 가망고객", badge: "leads" },
     ],
   },
   {
@@ -122,6 +124,7 @@ function NavLink({ item, color, onClick, mobile, utility }: { item: NavItem; col
   const pathname = usePathname();
   const badgeCount = useStore((s) => {
     if (item.badge === "approvals") return s.approvals.filter((a) => a.status === "pending").length;
+    if (item.badge === "leads") return s.leads.filter((l) => l.status === "new").length;
     if (item.badge === "tasks") {
       const me = s.session?.role === "consultant" ? s.session.userId : undefined;
       const open = s.tasks.filter((t) => (t.status === "todo" || t.status === "doing") && (!me || t.assigneeId === me)).length;

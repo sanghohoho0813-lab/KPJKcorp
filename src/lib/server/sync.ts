@@ -25,7 +25,7 @@ import * as M from "./rows";
 
 /** 부모 먼저. 프로젝트를 기업보다 먼저 보내면 외래키에 걸린다. */
 const ORDER = [
-  "companies", "projects",
+  "companies", "projects", "programs", "leads",
   "consultations", "contracts", "docRequests", "schedules", "notices", "tasks",
   "companyVaults", "companyFiles", "journal", "payments",
   "inquiries", "results", "opportunities",
@@ -50,6 +50,9 @@ interface Spec {
 const SPEC: Record<Key, Spec> = {
   companies:     { table: "companies",         toRow: M.companyToRow as Spec["toRow"],      fromRow: M.companyFromRow,      deletable: true },
   projects:      { table: "projects",          toRow: M.projectToRow as Spec["toRow"],      fromRow: M.projectFromRow,      deletable: true },
+  programs:      { table: "support_programs",  toRow: M.programToRow as Spec["toRow"],      fromRow: M.programFromRow,      deletable: true,  order: { column: "apply_end", ascending: true } },
+  // 가망고객은 지우지 않는다(종료로 표시) — 서버에도 지우는 정책이 없다
+  leads:         { table: "leads",             toRow: M.leadToRow as Spec["toRow"],         fromRow: M.leadFromRow,         deletable: false, order: { column: "created_at", ascending: false } },
   consultations: { table: "consultations",     toRow: M.consultationToRow as Spec["toRow"], fromRow: M.consultationFromRow, deletable: true,  order: { column: "date", ascending: false } },
   contracts:     { table: "contracts",         toRow: M.contractToRow as Spec["toRow"],     fromRow: M.contractFromRow,     deletable: true },
   docRequests:   { table: "document_requests", toRow: M.docRequestToRow as Spec["toRow"],   fromRow: M.docRequestFromRow,   deletable: true,  order: { column: "requested_at", ascending: false } },

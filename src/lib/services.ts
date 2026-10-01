@@ -138,7 +138,10 @@ export const KPJK_SERVICES: ServiceDef[] = [
   K("기업신용평가등급", "기업신용평가 등급에 영향을 주는 항목을 점검합니다.", ["현재 등급·평가 항목 확인", "재무 항목 개선 포인트 정리", "개선 순서 제안"]),
 ];
 
-export const SERVICE_BY_KEY = Object.fromEntries([...SERVICES, ...KPJK_SERVICES].map((s) => [s.key, s]));
+/** 지원사업 공고 문의 — 고객이 "이 공고 물어보기"를 누를 때 매출기회로 들어가는 이름. 추천 목록에는 나오지 않는다 */
+export const PROGRAM_SERVICE: ServiceDef = { key: "support_program", name: "지원사업 검토", blurb: "공고 내용과 회사 조건을 담당 컨설턴트가 함께 확인합니다.", points: ["공고 대상·자격 확인", "준비 서류·일정 정리"], match: () => null };
+
+export const SERVICE_BY_KEY = Object.fromEntries([...SERVICES, ...KPJK_SERVICES, PROGRAM_SERVICE].map((s) => [s.key, s]));
 
 export interface Reco {
   service: ServiceDef;

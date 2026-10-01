@@ -22,7 +22,7 @@ export interface CheckItem {
 export const EXPECTED_TABLES = [
   "profiles", "companies", "projects", "consultations", "contracts", "document_requests", "document_files", "schedules", "notices", "tasks",
   "inquiries", "inquiry_messages", "results", "opportunities", "quotes", "approvals", "activities", "notifications", "surveys", "app_settings",
-  "company_vaults", "company_files", "journal_entries", "payments",
+  "company_vaults", "company_files", "journal_entries", "payments", "support_programs", "leads",
 ] as const;
 export const EXPECTED_BUCKETS = ["documents", "results", "vault"] as const;
 

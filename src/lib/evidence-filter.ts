@@ -25,7 +25,7 @@ export const EVIDENCE_GROUPS: { key: EvidenceGroup; label: string }[] = [
 export const GROUP_OF: Record<ActivityType, EvidenceGroup> = {
   company_created: "company", company_updated: "company", company_archived: "company", companies_imported: "company", company_doc_read: "company",
   consultation_logged: "sales", consultation_updated: "sales", consultation_deleted: "sales",
-  opportunity_created: "sales", opportunity_status_changed: "sales", approval_requested: "sales", approval_decided: "sales",
+  opportunity_created: "sales", program_shared: "sales", lead_created: "sales", lead_updated: "sales", opportunity_status_changed: "sales", approval_requested: "sales", approval_decided: "sales",
   quote_created: "sales", quote_sent: "sales", quote_responded: "sales", quote_converted: "sales", quote_updated: "sales",
   contract_sent: "sales", contract_signed: "sales", contract_created: "sales", contract_updated: "sales",
   project_created: "project", project_stage_changed: "project", project_updated: "project", project_archived: "project",

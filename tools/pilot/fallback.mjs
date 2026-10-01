@@ -57,7 +57,7 @@ ok('복구 후 새로고침: 로그인·데이터 유지', /\/ax\//.test(p.url()
 await p.goto(B + '/ax/settings#data', { waitUntil: 'domcontentloaded' }); await p.waitForTimeout(2000);
 await p.getByRole('button', { name: '연결 점검' }).first().click(); await p.waitForTimeout(6000);
 const t5 = await p.evaluate(() => { const el = document.querySelector('#data') || document.body; return el.innerText; });
-const lines = t5.split('\n').filter((x) => /연결 정보|서버 응답|서버 로그인|표 24|최신 설정|권한 함수|내 역할|파일 보관함|점검|통과|확인 필요|실패/.test(x)).slice(0, 20);
+const lines = t5.split('\n').filter((x) => /연결 정보|서버 응답|서버 로그인|표 \d+|최신 설정|권한 함수|내 역할|파일 보관함|점검|통과|확인 필요|실패/.test(x)).slice(0, 20);
 L('연결 점검 결과', '\n  ' + lines.join('\n  '));
 ok('연결 점검: 실패 항목 없음', !/실패|막힘/.test(lines.join(' ')) );
 

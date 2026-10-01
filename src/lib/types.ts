@@ -394,6 +394,61 @@ export interface ResultFile {
   storagePath?: string;
 }
 
+/* ---------- 정부지원사업 공고 · 가망고객 (매칭 베타) ---------- */
+
+export type ProgramCategory = "금융" | "기술" | "인력" | "수출" | "내수" | "창업" | "경영" | "기타";
+
+/** 지원사업 공고 — 기업마당에서 불러오거나 담당자가 직접 추가한 것. 지어낸 공고는 없다. */
+export interface SupportProgram {
+  id: string;
+  title: string;
+  agency: string;
+  operator?: string;
+  category: ProgramCategory;
+  /** 시·도 (짧은 이름). 비어 있으면 전국 또는 표기 없음 */
+  regions: string[];
+  target?: string;
+  summary?: string;
+  applyStart?: string;
+  /** 접수 마감일 YYYY-MM-DD. 없으면 상시·예산 소진 시 */
+  applyEnd?: string;
+  periodText?: string;
+  url?: string;
+  tags: string[];
+  source: "bizinfo" | "manual";
+  /** 알림을 보낸 고객 기업 */
+  notified: string[];
+  fetchedAt: string;
+  createdBy?: string;
+}
+
+export type LeadStatus = "new" | "contacted" | "converted" | "dropped";
+
+/** 가망고객 — 로그인 없이 지원사업 매칭 화면에서 상담을 남긴 사람 */
+export interface Lead {
+  id: string;
+  companyName: string;
+  contactName: string;
+  phone: string;
+  email?: string;
+  region?: string;
+  industry?: string;
+  foundedYear?: number;
+  employees?: number;
+  entityType?: EntityType;
+  interests: ProgramCategory[];
+  programIds: string[];
+  message?: string;
+  consent: boolean;
+  status: LeadStatus;
+  /** 매칭 링크를 보낸 담당자 */
+  refUserId?: string;
+  /** 고객으로 전환한 기업 */
+  companyId?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 /* ---------- Opportunity (추가서비스 관심 → 매출) ---------- */
 
 export type OpportunityStatus =
@@ -606,6 +661,9 @@ export type ActivityType =
   | "portal_login"
   | "result_downloaded"
   | "opportunity_created"
+  | "program_shared"
+  | "lead_created"
+  | "lead_updated"
   | "opportunity_status_changed"
   | "approval_requested"
   | "approval_decided"

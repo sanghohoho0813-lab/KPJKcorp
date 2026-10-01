@@ -5,6 +5,7 @@ import { ArrowRight, Bell, FileCheck2, Pin } from "lucide-react";
 import { useStore, usePortalCompanyId, useCurrentUser } from "@/lib/store";
 import { fmtDate, fmtRelative, fmtTime } from "@/lib/format";
 import { Card } from "@/components/ui/ui";
+import { ProgramTeaser } from "@/components/domain/programs/ProgramTeaser";
 import { ActiveGrowth, CompanyStatusCard, GrowthHistory, NextGrowth, NowActions, useGrowth } from "@/components/domain/portal/GrowthBoard";
 import { NoticeList, liveNoticesFor } from "@/components/domain/Notices";
 
@@ -62,6 +63,7 @@ export default function PortalHome() {
         </Card>
       </div>
 
+      <ProgramTeaser company={c} />
       <ActiveGrowth items={board.active} />
       <NextGrowth board={board} companyId={c.id} />
       <GrowthHistory board={board} companyId={c.id} />

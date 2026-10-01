@@ -81,7 +81,7 @@ export function growthBoard(ctx: GrowthCtx) {
   const { company: c, now } = ctx;
   const nowIso = now.toISOString();
   const projects = ctx.projects.filter((p) => p.companyId === c.id && p.clientVisible && !p.archived);
-  const opps = ctx.opportunities.filter((o) => o.companyId === c.id && o.status !== "dropped" && (o.source === "proposal" || o.source === "portal_interest" || o.source === "portal_request"));
+  const opps = ctx.opportunities.filter((o) => o.companyId === c.id && o.status !== "dropped" && o.serviceKey !== "support_program" && (o.source === "proposal" || o.source === "portal_interest" || o.source === "portal_request"));
   const taken = new Set<string>();
 
   // 완료 · 진행 중 — 프로젝트 기준. 분야가 KPJK 목록에 없는 옛 프로젝트도 이름 그대로 보인다

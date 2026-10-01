@@ -18,6 +18,9 @@ import type {
   InternalStage,
   Inquiry,
   Notification,
+  SupportProgram,
+  Lead,
+  LeadStatus,
   Opportunity,
   OpportunitySource,
   Quote,
@@ -196,6 +199,20 @@ export interface StoreState extends SeedData {
   proposeService: (companyId: string, serviceKey: string, reason: string, byUserId: string) => string | null;
   /** 고객이 요청했거나 제안한 성장과제를 실제 진행 업무로 시작 — 기회는 "진행 확정", 고객 홈엔 "진행 중"으로 */
   startProjectFromOpportunity: (opportunityId: string, byUserId: string) => string | null;
+  // ---- 지원사업 공고 매칭 (베타) ----
+  /** 기업마당 등에서 받은 공고를 합친다(같은 id 는 내용만 갱신, 알림 보낸 기록은 유지) */
+  upsertPrograms: (items: SupportProgram[], byUserId: string) => { added: number; updated: number };
+  addProgram: (data: Omit<SupportProgram, "id" | "source" | "notified" | "fetchedAt" | "createdBy">, byUserId: string) => string | null;
+  removeProgram: (id: string, byUserId: string) => void;
+  /** 공고를 고객 기업들에게 알림으로 보낸다 */
+  shareProgram: (programId: string, companyIds: string[], byUserId: string) => number;
+  /** 고객: 이 공고 담당 컨설턴트에게 물어보기 → 매출기회·상담 연락 업무·담당자 알림 */
+  askProgram: (programId: string, companyId: string, byUserId: string, note?: string) => boolean;
+  /** 가망고객 남기기 (데모 모드. 서버 모드는 화면이 서버에 바로 넣고 서버가 후속을 만든다) */
+  submitLeadLocal: (lead: Lead) => void;
+  updateLeadStatus: (id: string, status: LeadStatus, byUserId: string) => void;
+  /** 가망고객 → 기업고객 */
+  convertLead: (id: string, byUserId: string) => string | null;
   /** 제안 거두기 — 고객 화면에서 사라진다(기록은 남는다) */
   withdrawProposal: (opportunityId: string, byUserId: string) => void;
   advanceOpportunity: (id: string, status: OpportunityStatus, byUserId: string, note?: string) => void;
@@ -312,7 +329,7 @@ const EMPTY_DATA: SeedData = {
   users: [], companies: [], consultations: [], contracts: [], projects: [], docRequests: [],
   schedules: [], tasks: [], inquiries: [], results: [], opportunities: [], quotes: [],
   approvals: [], surveys: [], notices: [], activities: [], notifications: [],
-  companyVaults: [], companyFiles: [], journal: [], payments: [],
+  companyVaults: [], companyFiles: [], journal: [], payments: [], programs: [], leads: [],
 };
 
 /**
@@ -1657,6 +1674,131 @@ export const useStore = create<StoreState>()(
           notifications: [makeNotification({ audience: "client", companyId: o.companyId, title: `${o.serviceName} 컨설팅을 시작합니다`, body: "진행 중인 성장과제에 올라갔습니다. 필요한 자료는 따로 요청드리겠습니다.", href: "/portal" }), ...st.notifications],
         });
         return project.id;
+      },
+
+      upsertPrograms: (items, byUserId) => {
+        const st = get();
+        if (deny(st, "program.manage", "지원사업 공고 불러오기", set)) return { added: 0, updated: 0 };
+        const byId = new Map(st.programs.map((p) => [p.id, p]));
+        let added = 0, updated = 0;
+        const next = [...st.programs];
+        for (const it of items) {
+          const old = byId.get(it.id);
+          if (!old) { next.push({ ...it, notified: [] }); added++; continue; }
+          const merged = { ...old, ...it, notified: old.notified, createdBy: old.createdBy, fetchedAt: old.fetchedAt };
+          if (JSON.stringify(merged) !== JSON.stringify(old)) { next[next.indexOf(old)] = merged; updated++; }
+        }
+        if (added || updated) set({ programs: next });
+        void byUserId;
+        return { added, updated };
+      },
+
+      addProgram: (data, byUserId) => {
+        const st = get();
+        if (deny(st, "program.manage", `지원사업 공고 추가 (${data.title})`, set)) return null;
+        const p: SupportProgram = { ...data, id: uid("mp"), source: "manual", notified: [], fetchedAt: nowIso(), createdBy: byUserId };
+        set({ programs: [...st.programs, p] });
+        return p.id;
+      },
+
+      removeProgram: (id, byUserId) => {
+        const st = get();
+        const p = st.programs.find((x) => x.id === id);
+        if (!p) return;
+        if (deny(st, "program.manage", `지원사업 공고 삭제 (${p.title})`, set)) return;
+        void byUserId;
+        set({ programs: st.programs.filter((x) => x.id !== id) });
+      },
+
+      shareProgram: (programId, companyIds, byUserId) => {
+        const st = get();
+        const p = st.programs.find((x) => x.id === programId);
+        if (!p) return 0;
+        if (deny(st, "program.manage", `지원사업 알림 (${p.title})`, set)) return 0;
+        const targets = companyIds.filter((id) => !p.notified.includes(id) && st.companies.some((c) => c.id === id));
+        if (!targets.length) return 0;
+        set({
+          programs: st.programs.map((x) => (x.id === programId ? { ...x, notified: [...x.notified, ...targets] } : x)),
+          notifications: [...targets.map((cid) => makeNotification({ audience: "client", companyId: cid, title: "우리 회사에 맞는 지원사업 공고가 있습니다", body: p.title, href: "/portal/programs" })), ...st.notifications],
+          activities: [...targets.map((cid) => makeActivity({ type: "program_shared", companyId: cid, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `지원사업 공고 안내: ${p.title}` })), ...st.activities],
+        });
+        return targets.length;
+      },
+
+      askProgram: (programId, companyId, byUserId, note) => {
+        const st = get();
+        const p = st.programs.find((x) => x.id === programId);
+        const company = st.companies.find((c) => c.id === companyId);
+        if (!p || !company) return false;
+        if (deny(st, "opportunity.create", `지원사업 문의 (${p.title})`, set)) return false;
+        const now = nowIso();
+        const name = `지원사업: ${p.title}`.slice(0, 120);
+        if (st.opportunities.some((o) => o.companyId === companyId && o.serviceKey === "support_program" && o.serviceName === name && o.status !== "dropped")) return true;
+        const fromClient = st.session?.role === "client";
+        const opp: Opportunity = {
+          id: uid("op"), companyId, serviceKey: "support_program", serviceName: name, source: "portal_request", status: "interest",
+          assigneeId: company.consultantId, createdAt: now, createdBy: byUserId, updatedAt: now, note: note?.trim() || undefined,
+          reason: [p.agency, p.applyEnd ? `마감 ${p.applyEnd}` : p.periodText, p.url].filter(Boolean).join(" · "),
+          history: [{ at: now, status: "interest", by: byUserId }],
+        };
+        const task: Task = { id: uid("tk"), companyId, title: `${company.name} 지원사업 문의 — ${p.title}`.slice(0, 160), type: "후속연락", dueDate: iso(addDays(new Date(), 1, 18)), assigneeId: company.consultantId, status: "todo", priority: "urgent", createdAt: now, source: "auto", memo: note?.trim() || p.url };
+        set({
+          opportunities: [opp, ...st.opportunities],
+          tasks: [task, ...st.tasks],
+          activities: [makeActivity({ type: "opportunity_created", companyId, actorId: byUserId, actorRole: fromClient ? "client" : (st.session?.role ?? "consultant"), text: `고객 상담요청: ${name}`, meta: { serviceKey: "support_program", source: "portal_request" } }), ...st.activities],
+          notifications: [
+            makeNotification({ audience: "internal", companyId, title: `지원사업 문의: ${company.name}`, body: p.title, href: "/ax/opportunities" }),
+            ...(fromClient ? [makeNotification({ audience: "client", companyId, title: "문의가 접수되었습니다", body: `${p.title} — 담당 컨설턴트가 확인 후 연락드립니다.`, href: "/portal/programs" })] : []),
+            ...st.notifications,
+          ],
+        });
+        return true;
+      },
+
+      submitLeadLocal: (lead) => {
+        const st = get();
+        const owner = st.users.find((u) => u.id === lead.refUserId && u.role !== "client") ?? st.users.find((u) => u.role === "admin");
+        const now = nowIso();
+        set({
+          leads: [lead, ...st.leads],
+          tasks: [{ id: uid("tk"), title: `${lead.companyName} 가망고객 연락 (지원사업 매칭)`, type: "후속연락", dueDate: iso(addDays(new Date(), 1, 18)), assigneeId: owner?.id ?? "", status: "todo", priority: "urgent", createdAt: now, source: "auto", memo: `${lead.contactName} ${lead.phone}${lead.message ? ` · ${lead.message}` : ""}` } as Task, ...st.tasks],
+          notifications: [makeNotification({ audience: "internal", title: `새 가망고객: ${lead.companyName}`, body: `지원사업 매칭에서 상담을 요청했습니다 — ${lead.contactName}`, href: "/ax/programs?tab=leads" }), ...st.notifications],
+          activities: [makeActivity({ type: "lead_created", actorId: "system", actorRole: "system", text: `가망고객 접수: ${lead.companyName} (지원사업 매칭)` }), ...st.activities],
+        });
+      },
+
+      updateLeadStatus: (id, status, byUserId) => {
+        const st = get();
+        const l = st.leads.find((x) => x.id === id);
+        if (!l || l.status === status) return;
+        if (deny(st, "lead.manage", `가망고객 상태 (${l.companyName})`, set)) return;
+        const LABEL: Record<LeadStatus, string> = { new: "새 요청", contacted: "연락함", converted: "고객 전환", dropped: "종료" };
+        set({
+          leads: st.leads.map((x) => (x.id === id ? { ...x, status, updatedAt: nowIso() } : x)),
+          activities: [makeActivity({ type: "lead_updated", actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `가망고객 ${l.companyName}: ${LABEL[l.status]} → ${LABEL[status]}` }), ...st.activities],
+        });
+      },
+
+      convertLead: (id, byUserId) => {
+        const st = get();
+        const l = st.leads.find((x) => x.id === id);
+        if (!l) return null;
+        if (l.companyId) return l.companyId;
+        if (deny(st, "lead.manage", `가망고객 전환 (${l.companyName})`, set)) return null;
+        const me = st.users.find((u) => u.id === byUserId);
+        const companyId = get().createCompany({
+          name: l.companyName, ceo: "", industry: l.industry ?? "", bizNo: "", contactName: l.contactName, contactTitle: "",
+          contactPhone: l.phone, contactEmail: l.email ?? "", address: "", employees: l.employees ?? 0, revenue: "",
+          firstConsultDate: nowIso(), consultantId: me && me.role !== "client" ? me.id : (l.refUserId ?? byUserId), memo: l.message ? `가망고객 문의: ${l.message}` : "",
+          region: l.region, entityType: l.entityType, leadSource: "지원사업 매칭", interests: [],
+        }, byUserId);
+        if (!companyId) return null;
+        const after = get();
+        set({
+          leads: after.leads.map((x) => (x.id === id ? { ...x, status: "converted" as LeadStatus, companyId, updatedAt: nowIso() } : x)),
+          activities: [makeActivity({ type: "lead_updated", companyId, actorId: byUserId, actorRole: after.session?.role ?? "consultant", text: `가망고객 → 기업고객 전환: ${l.companyName}` }), ...after.activities],
+        });
+        return companyId;
       },
 
       withdrawProposal: (opportunityId, byUserId) => {

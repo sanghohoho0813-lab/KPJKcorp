@@ -26,7 +26,7 @@
 --    - 맨 마지막에 설치 결과 표가 한 줄 나옵니다. 그것으로 성공을 확인하세요.
 --
 --  이 파일이 만드는 것
---    1부. 표 24개          — 기업·프로젝트·상담·계약·자료·일정·공지·업무·문의·견적·기록·서류함·업무 일기·수금
+--    1부. 표 26개          — 기업·프로젝트·상담·계약·자료·일정·공지·업무·문의·견적·기록·서류함·업무 일기·수금·지원사업 공고·가망고객
 --    2부. 접근 권한        — 누가 무엇을 볼 수 있는지. 데이터베이스가 직접 막습니다
 --    3부. 파일 보관함 3개  — 고객 제출자료 / 결과자료 / 기업 서류함(내부 전용)
 --    4부. 대표 계정 연결
@@ -1252,6 +1252,110 @@ end $$;
 
 
 -- =============================================================================
+--  정부지원사업 매칭 (베타)
+--  support_programs : 공고 — 기업마당에서 불러오거나 직접 추가. 누구나 읽는다(로그인 없는 가망고객 화면 포함)
+--  leads            : 가망고객 — 로그인 없이 "상담 받기"를 남긴 사람. 쓰기만 열고(동의 필수) 읽기는 내부만
+--  가망고객이 남기면 서버가 담당자 알림·연락 업무를 만든다(아래 트리거).
+-- =============================================================================
+create table if not exists public.support_programs (
+  id           text primary key,
+  title        text not null,
+  agency       text not null default '',
+  operator     text,
+  category     text not null default '기타',
+  regions      text[] not null default '{}',
+  target       text,
+  summary      text,
+  apply_start  date,
+  apply_end    date,
+  period_text  text,
+  url          text,
+  tags         text[] not null default '{}',
+  source       text not null default 'manual' check (source in ('bizinfo','manual')),
+  notified     text[] not null default '{}',   -- 알림을 보낸 고객 기업 id
+  fetched_at   timestamptz not null default now(),
+  created_by   uuid references public.profiles(id) on delete set null,
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
+);
+create index if not exists support_programs_end_idx on public.support_programs(apply_end);
+
+create table if not exists public.leads (
+  id            text primary key,
+  company_name  text not null,
+  contact_name  text not null,
+  phone         text not null,
+  email         text,
+  region        text,
+  industry      text,
+  founded_year  integer,
+  employees     integer,
+  entity_type   text,
+  interests     text[] not null default '{}',
+  program_ids   text[] not null default '{}',
+  message       text,
+  consent       boolean not null default false,
+  status        text not null default 'new' check (status in ('new','contacted','converted','dropped')),
+  ref_user      uuid references public.profiles(id) on delete set null,
+  company_id    text references public.companies(id) on delete set null,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+create index if not exists leads_created_idx on public.leads(created_at desc);
+
+alter table public.support_programs enable row level security;
+alter table public.leads enable row level security;
+grant select on public.support_programs to anon, authenticated;
+grant insert, update, delete on public.support_programs to authenticated;
+grant insert on public.leads to anon, authenticated;
+grant select, update on public.leads to authenticated;
+
+drop policy if exists support_programs_read on public.support_programs;
+create policy support_programs_read on public.support_programs for select to anon, authenticated using (true);
+drop policy if exists support_programs_write on public.support_programs;
+create policy support_programs_write on public.support_programs for all to authenticated
+  using (public.kpjk_is_internal()) with check (public.kpjk_is_internal());
+
+-- 누구나 남길 수 있다 — 단, 개인정보 수집 동의가 있어야 하고, 처음 상태로만, 길이 제한
+drop policy if exists leads_insert on public.leads;
+create policy leads_insert on public.leads for insert to anon, authenticated
+  with check (consent and status = 'new' and company_id is null
+              and char_length(company_name) between 1 and 80 and char_length(contact_name) between 1 and 40
+              and char_length(phone) between 7 and 20 and coalesce(char_length(message), 0) <= 1000
+              and coalesce(array_length(program_ids, 1), 0) <= 50);
+drop policy if exists leads_internal on public.leads;
+create policy leads_internal on public.leads for select to authenticated using (public.kpjk_is_internal());
+drop policy if exists leads_update on public.leads;
+create policy leads_update on public.leads for update to authenticated
+  using (public.kpjk_is_internal()) with check (public.kpjk_is_internal());
+
+drop trigger if exists touch_support_programs on public.support_programs;
+create trigger touch_support_programs before update on public.support_programs for each row execute function public.touch_updated_at();
+drop trigger if exists touch_leads on public.leads;
+create trigger touch_leads before update on public.leads for each row execute function public.touch_updated_at();
+
+create or replace function public.kpjk_after_lead() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare v_owner uuid;
+begin
+  -- 링크를 보낸 담당자, 없으면 대표
+  select id into v_owner from public.profiles where id = new.ref_user and active;
+  if v_owner is null then select id into v_owner from public.profiles where role = 'admin' and active order by created_at limit 1; end if;
+  insert into public.tasks (id, company_id, title, type, due_date, assignee_id, status, priority, created_at, source, memo)
+  values (public.kpjk_new_id('tk'), null, new.company_name || ' 가망고객 연락 (지원사업 매칭)', '후속연락', public.kpjk_due(1),
+          v_owner, 'todo', 'urgent', now(), 'auto', new.contact_name || ' ' || new.phone || coalesce(' · ' || new.message, ''));
+  insert into public.notifications (id, audience, company_id, title, body, at, read, href)
+  values (public.kpjk_new_id('nt'), 'internal', null, '새 가망고객: ' || new.company_name,
+          '지원사업 매칭에서 상담을 요청했습니다 — ' || new.contact_name, now(), false, '/ax/programs?tab=leads');
+  insert into public.activities (id, type, company_id, actor_id, actor_role, at, message)
+  values (public.kpjk_new_id('ac'), 'lead_created', null, null, 'system', now(), '가망고객 접수: ' || new.company_name || ' (지원사업 매칭)');
+  return new;
+end $$;
+drop trigger if exists kpjk_lead_created on public.leads;
+create trigger kpjk_lead_created after insert on public.leads for each row execute function public.kpjk_after_lead();
+
+
+-- =============================================================================
 --  고객용 보기 — 고객은 기업·프로젝트·제안을 이 보기로만 읽는다
 --  보기는 만든 사람 권한으로 돌므로 행 조건(자기 회사·공개 프로젝트)을 여기서 직접 건다.
 --  내부 칸(메모·유입 경로·주주 구성·직접 만든 칸·서류 판독 기록·진행 상태 메모·담당자 진행 메모)은 아예 없다.
@@ -1312,7 +1416,7 @@ end $$;
 -- =============================================================================
 --  설치 결과 — 아래 한 줄로 확인하세요
 -- =============================================================================
---  표 24 · 권한정책 57 · 파일보관함 3 · 실시간 12 가 나오면 설치는 끝난 것입니다.
+--  표 26 · 권한정책 61 · 파일보관함 3 · 실시간 12 가 나오면 설치는 끝난 것입니다.
 --  "다음 할 일" 칸에 적힌 대로 하시면 됩니다.
 
 select

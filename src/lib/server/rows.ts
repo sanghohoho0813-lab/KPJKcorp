@@ -2,7 +2,7 @@ import type {
   CompanyVault, CompanyFile, JournalEntry, Payment,
   Activity, Approval, Company, Consultation, Contract, DocumentFile, DocumentRequest,
   Inquiry, Message, Notice, Notification, Opportunity, Project, Quote, ResultFile, Schedule,
-  SurveyResponse, Task, User,
+  SurveyResponse, Task, User, SupportProgram, Lead,
 } from "../types";
 import { isRealYmd } from "../format";
 
@@ -592,5 +592,67 @@ export const paymentToRow = (x: Partial<Payment> & { id?: string }): Row => ({
   ...(x.agentFee !== undefined && { agent_fee: n(x.agentFee) }),
   ...(x.agentName !== undefined && { agent_name: n(x.agentName) }),
   ...(x.note !== undefined && { note: n(x.note) }),
+  ...(x.createdAt !== undefined && { created_at: x.createdAt }),
+});
+
+/* ------------------------------ 지원사업 공고 · 가망고객 ------------------------------ */
+
+const strs = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : []);
+
+export const programFromRow = (r: Row): SupportProgram => ({
+  id: s(r.id), title: s(r.title), agency: s(r.agency), operator: u(r.operator as string | null),
+  category: (s(r.category) || "기타") as SupportProgram["category"], regions: strs(r.regions),
+  target: u(r.target as string | null), summary: u(r.summary as string | null),
+  applyStart: u(r.apply_start as string | null), applyEnd: u(r.apply_end as string | null), periodText: u(r.period_text as string | null),
+  url: u(r.url as string | null), tags: strs(r.tags), source: (s(r.source) || "manual") as SupportProgram["source"],
+  notified: strs(r.notified), fetchedAt: s(r.fetched_at), createdBy: u(r.created_by as string | null),
+});
+export const programToRow = (x: Partial<SupportProgram> & { id?: string }): Row => ({
+  ...(x.id !== undefined && { id: x.id }),
+  ...(x.title !== undefined && { title: x.title }),
+  ...(x.agency !== undefined && { agency: x.agency }),
+  ...(x.operator !== undefined && { operator: n(x.operator) }),
+  ...(x.category !== undefined && { category: x.category }),
+  ...(x.regions !== undefined && { regions: x.regions ?? [] }),
+  ...(x.target !== undefined && { target: n(x.target) }),
+  ...(x.summary !== undefined && { summary: n(x.summary) }),
+  ...(x.applyStart !== undefined && { apply_start: ymdOrNull(x.applyStart) }),
+  ...(x.applyEnd !== undefined && { apply_end: ymdOrNull(x.applyEnd) }),
+  ...(x.periodText !== undefined && { period_text: n(x.periodText) }),
+  ...(x.url !== undefined && { url: n(x.url) }),
+  ...(x.tags !== undefined && { tags: x.tags ?? [] }),
+  ...(x.source !== undefined && { source: x.source }),
+  ...(x.notified !== undefined && { notified: x.notified ?? [] }),
+  ...(x.fetchedAt !== undefined && { fetched_at: x.fetchedAt }),
+  ...(x.createdBy !== undefined && { created_by: personId(x.createdBy) }),
+});
+
+export const leadFromRow = (r: Row): Lead => ({
+  id: s(r.id), companyName: s(r.company_name), contactName: s(r.contact_name), phone: s(r.phone), email: u(r.email as string | null),
+  region: u(r.region as string | null), industry: u(r.industry as string | null),
+  foundedYear: u(r.founded_year as number | null), employees: u(r.employees as number | null),
+  entityType: u(r.entity_type as Lead["entityType"] | null), interests: strs(r.interests) as Lead["interests"], programIds: strs(r.program_ids),
+  message: u(r.message as string | null), consent: bool(r.consent), status: (s(r.status) || "new") as Lead["status"],
+  refUserId: u(r.ref_user as string | null), companyId: u(r.company_id as string | null),
+  createdAt: s(r.created_at), updatedAt: u(r.updated_at as string | null),
+});
+export const leadToRow = (x: Partial<Lead> & { id?: string }): Row => ({
+  ...(x.id !== undefined && { id: x.id }),
+  ...(x.companyName !== undefined && { company_name: x.companyName }),
+  ...(x.contactName !== undefined && { contact_name: x.contactName }),
+  ...(x.phone !== undefined && { phone: x.phone }),
+  ...(x.email !== undefined && { email: n(x.email) }),
+  ...(x.region !== undefined && { region: n(x.region) }),
+  ...(x.industry !== undefined && { industry: n(x.industry) }),
+  ...(x.foundedYear !== undefined && { founded_year: n(x.foundedYear) }),
+  ...(x.employees !== undefined && { employees: n(x.employees) }),
+  ...(x.entityType !== undefined && { entity_type: n(x.entityType) }),
+  ...(x.interests !== undefined && { interests: x.interests ?? [] }),
+  ...(x.programIds !== undefined && { program_ids: x.programIds ?? [] }),
+  ...(x.message !== undefined && { message: n(x.message) }),
+  ...(x.consent !== undefined && { consent: !!x.consent }),
+  ...(x.status !== undefined && { status: x.status }),
+  ...(x.refUserId !== undefined && { ref_user: personId(x.refUserId) }),
+  ...(x.companyId !== undefined && { company_id: x.companyId || null }),
   ...(x.createdAt !== undefined && { created_at: x.createdAt }),
 });

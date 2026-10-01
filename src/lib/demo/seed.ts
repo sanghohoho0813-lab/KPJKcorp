@@ -1,4 +1,4 @@
-import type { Activity, Approval, Company, Consultation, Contract, DocumentRequest, Inquiry, Notification, Opportunity, Project, Quote, ResultFile, Schedule, SurveyResponse, Task, User, Notice, CompanyVault, CompanyFile, JournalEntry, Payment } from "../types";
+import type { Activity, Approval, Company, Consultation, Contract, DocumentRequest, Inquiry, Notification, Opportunity, Project, Quote, ResultFile, Schedule, SurveyResponse, Task, User, Notice, CompanyVault, CompanyFile, JournalEntry, Payment, SupportProgram, Lead } from "../types";
 import { addDays, iso } from "../format";
 
 /**
@@ -28,6 +28,9 @@ export interface SeedData {
   payments: Payment[];
   activities: Activity[];
   notifications: Notification[];
+  /** 지원사업 공고 — 데모에도 지어낸 공고는 넣지 않는다(빈 목록에서 시작) */
+  programs: SupportProgram[];
+  leads: Lead[];
 }
 
 export function buildSeed(now = new Date()): SeedData {
@@ -380,5 +383,5 @@ export function buildSeed(now = new Date()): SeedData {
     if (p.id === "pj_a1") { p.workStatus = "in_progress"; p.nextStep = "원가구조 진단 결과 1차 정리"; }
   }
 
-  return { users, companies, consultations, contracts, projects, docRequests, schedules, tasks, inquiries, results, opportunities, quotes, approvals, surveys, notices, companyVaults, companyFiles, journal, payments, activities: allActivities, notifications: allNotifications };
+  return { users, companies, consultations, contracts, projects, docRequests, schedules, tasks, inquiries, results, opportunities, quotes, approvals, surveys, notices, companyVaults, companyFiles, journal, payments, activities: allActivities, notifications: allNotifications, programs: [], leads: [] };
 }

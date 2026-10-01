@@ -38,6 +38,8 @@ export type Permission =
   | "inquiry.create"
   | "inquiry.answer"
   | "settings.write"
+  | "program.manage"
+  | "lead.manage"
   | "baseline.write"
   | "sprint.manage"
   | "portal.preview"
@@ -103,6 +105,9 @@ const POLICY: Record<Permission, Role[]> = {
   "vault.write": ["admin", "consultant"],
   "journal.write": ["admin", "consultant"],
   "payment.write": ["admin", "consultant"],
+  // 지원사업 공고 불러오기·추가·고객 알림 / 가망고객 관리
+  "program.manage": ["admin", "consultant"],
+  "lead.manage": ["admin", "consultant"],
 };
 
 export function can(role: Role | undefined | null, p: Permission): boolean {
@@ -128,6 +133,8 @@ export const PERMISSION_ROWS: { label: string; perms: Permission[] }[] = [
   { label: "결과자료 공유", perms: ["result.share"] },
   { label: "고객 공지 작성 · 수정", perms: ["notice.write"] },
   { label: "기업 서류함 올리기 · 정리", perms: ["vault.write"] },
+  { label: "지원사업 공고 · 고객 알림", perms: ["program.manage"] },
+  { label: "가망고객 관리", perms: ["lead.manage"] },
   { label: "업무 일기 쓰기", perms: ["journal.write"] },
   { label: "수금 항목 · 입금 확인", perms: ["payment.write"] },
   { label: "문의 작성", perms: ["inquiry.create"] },
