@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Download, FileText, MessageSquareText, RefreshCw, Search, Upload } from "lucide-react";
+import { CheckCircle2, Download, FileText, MessageSquareText, RefreshCw, Search, Upload, Camera } from "lucide-react";
 import type { DocumentRequest } from "@/lib/types";
 import { useStore } from "@/lib/store";
 import { useUi } from "@/lib/ui-store";
@@ -117,6 +117,14 @@ export function UploadModal({ req, open, onClose }: { req: DocumentRequest | nul
     if (f.size > MAX_UPLOAD_BYTES) { toast("50MB 를 넘는 파일은 올릴 수 없습니다.", "error"); return; }
     setFile({ name: f.name, size: f.size, blob: f });
   };
+  // 카메라 사진은 이름이 "image.jpg" 라 담당자가 알아보기 어렵다 — 서류 이름으로 바꿔 둔다
+  const pickPhoto = (f: File | undefined) => {
+    if (!f) return;
+    const ext = (f.name.match(/\.[a-z0-9]+$/i)?.[0] ?? ".jpg").toLowerCase();
+    const d = new Date();
+    const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}_${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}`;
+    pick(new File([f], `${req.name.replace(/[\\/:*?"<>|\s]+/g, "_")}_사진_${stamp}${ext}`, { type: f.type || "image/jpeg" }));
+  };
   const useSample = () => setFile({ name: `${req.name.replace(/\s+/g, "_")}.xlsx`, size: 240_000 + Math.floor(Math.random() * 400_000) });
   const submit = async () => {
     if (busy) return;
@@ -183,6 +191,11 @@ export function UploadModal({ req, open, onClose }: { req: DocumentRequest | nul
           <div className="text-[0.88rem] text-ink-2">파일을 끌어다 놓거나 <span className="font-semibold text-accent">클릭하여 선택</span></div>
         )}
         <Input type="file" className="hidden" onChange={(e) => pick(e.target.files?.[0])} />
+      </label>
+      {/* 휴대폰: 서류를 바로 사진으로 — 뒤쪽 카메라가 열린다 */}
+      <label className="pressable mt-2 flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-line-2 text-[0.9rem] font-semibold text-ink-2 hover:bg-surface-2 md:hidden" data-testid="camera-upload">
+        <Camera size={18} /> 사진 찍어 올리기
+        <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => pickPhoto(e.target.files?.[0])} />
       </label>
       {!onServer && <button onClick={useSample} className="mt-2 text-[0.8rem] font-semibold text-ink-3 underline-offset-2 hover:text-ink hover:underline">데모용 샘플 파일 사용</button>}
       <p className="mt-3 text-[0.75rem] leading-relaxed text-ink-3">

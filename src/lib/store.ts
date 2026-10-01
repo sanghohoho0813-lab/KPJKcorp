@@ -80,6 +80,9 @@ export interface StoreState extends SeedData {
   syncError?: string;
   /** 서버에 아직 저장되지 않은 줄 수 (보관했다가 다시 보낸다) */
   unsaved?: number;
+  /** 다른 기기·다른 사람이 만들어 방금 서버에서 도착한 알림 — 화면 구석에 잠깐 띄운다 */
+  live?: Notification[];
+  dismissLive: (id: string) => void;
   /** 서버 로그인 → 볼 수 있는 데이터 전부 읽기 → 세션 설정까지 한 번에 */
   serverSignIn: (email: string, password: string) => Promise<{ ok: boolean; reason?: string; offline?: boolean }>;
   /** 새로고침 후에도 로그인이 살아 있으면 서버에서 새로 읽어 다시 연결한다 */
@@ -2076,9 +2079,14 @@ export const useStore = create<StoreState>()(
         }
         if (pendingWrites() > 0 || writeSeq() !== before || !get().serverMode) return false;
         const cur = get();
+        // 이번에 처음 도착한 알림(내가 만든 것은 이미 화면에 있다) — 최근 10분 것만 띄운다
+        const seen = new Set(cur.notifications.map((n) => n.id));
+        const mine = cur.session?.role === "client" ? "client" : "internal";
+        const arrived = (loaded.data.notifications ?? []).filter((n) => !seen.has(n.id) && n.audience === mine && !n.read && Date.now() - Date.parse(n.at) < 10 * 60 * 1000);
         loadingFromServer = true;
         set({
           ...loaded.data,
+          live: arrived.length ? [...arrived, ...(cur.live ?? [])].slice(0, 4) : cur.live,
           syncError: undefined,
           // 역할이 바뀌었으면 따라간다. 미리보기·로그인 시각은 그대로 둔다
           session: cur.session ? { ...cur.session, role: me.user.role, companyId: me.user.companyId } : cur.session,
@@ -2095,6 +2103,8 @@ export const useStore = create<StoreState>()(
         loadingFromServer = false;
         return true;
       },
+
+      dismissLive: (id) => set({ live: (get().live ?? []).filter((n) => n.id !== id) }),
 
       serverLogout: async () => {
         // 못 보낸 변경은 이 브라우저에 계정별로 남는다 — 같은 계정으로 다시 로그인하면 이어서 보낸다
@@ -2258,9 +2268,10 @@ export const useStore = create<StoreState>()(
       // SSR safety: first client render must equal the server render (skeleton). ThemeBoot calls rehydrate() after mount.
       skipHydration: true,
       partialize: (s) => {
-        const { hydrated: _h, toasts: _t, ...rest } = s;
+        const { hydrated: _h, toasts: _t, live: _l, ...rest } = s;
         void _h;
         void _t;
+        void _l;
         return rest as StoreState;
       },
       // NOTE: `initial` is the pre-hydration state whose actions close over set/get — safe to call

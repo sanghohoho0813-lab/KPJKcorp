@@ -3,8 +3,11 @@
 import { useEffect } from "react";
 import { useStore } from "@/lib/store";
 import { normalizeTheme } from "@/lib/themes";
-import { serverConfigured } from "@/lib/server/client";
-import { setSyncErrorHandler, setUnsavedHandler } from "@/lib/server/sync";
+import { serverConfigured, supa } from "@/lib/server/client";
+
+/** 바뀌면 곧바로 다시 읽을 표 — setup.sql 의 실시간 목록과 같다 */
+const LIVE_TABLES = ["notifications", "document_requests", "document_files", "inquiries", "inquiry_messages", "opportunities", "quotes", "schedules", "projects", "tasks", "companies", "notices"];
+import { pendingWrites, setSyncErrorHandler, setUnsavedHandler } from "@/lib/server/sync";
 import type { FontScale } from "@/lib/types";
 
 /** 이전 버전에서 저장된 값("small"/"base"/"large")은 최소 단계로 본다. */
@@ -50,16 +53,40 @@ export function ThemeBoot() {
   useEffect(() => {
     if (!hydrated || !serverMode) return;
     let busy = false;
+    let again = false;
+    let retry: ReturnType<typeof setTimeout> | undefined;
     const run = async () => {
-      if (busy || document.visibilityState !== "visible") return;
+      if (document.visibilityState !== "visible") return;
+      if (busy) { again = true; return; }   // 읽는 중에 또 신호가 오면 끝나고 한 번 더
       busy = true;
-      try { await refresh(); } finally { busy = false; }
+      try {
+        const ok = await refresh();
+        // 내 변경을 보내는 중이라 건너뛰었으면 잠시 뒤 다시
+        if (!ok && pendingWrites() > 0) { clearTimeout(retry); retry = setTimeout(() => void run(), 1200); }
+      } finally {
+        busy = false;
+        if (again) { again = false; void run(); }
+      }
     };
     const onVisible = () => { if (document.visibilityState === "visible") void run(); };
     const t = setInterval(run, 15000);
     window.addEventListener("focus", onVisible);
     document.addEventListener("visibilitychange", onVisible);
-    return () => { clearInterval(t); window.removeEventListener("focus", onVisible); document.removeEventListener("visibilitychange", onVisible); };
+    // 실시간: 서버에서 줄이 바뀌었다는 신호가 오면 곧바로 다시 읽는다(1~2초). 받을 수 있는 줄은 권한(RLS)이 정한다.
+    // 신호가 안 와도(실시간 꺼짐·끊김) 위의 15초 주기가 그대로 돈다.
+    let poke: ReturnType<typeof setTimeout> | undefined;
+    const soon = () => { clearTimeout(poke); poke = setTimeout(() => void run(), 700); };
+    const sb = supa();
+    const ch = sb?.channel("kpjk-live");
+    if (sb && ch) {
+      for (const table of LIVE_TABLES) ch.on("postgres_changes", { event: "*", schema: "public", table }, soon);
+      ch.subscribe();
+    }
+    return () => {
+      clearInterval(t); clearTimeout(poke); clearTimeout(retry);
+      window.removeEventListener("focus", onVisible); document.removeEventListener("visibilitychange", onVisible);
+      if (sb && ch) void sb.removeChannel(ch);
+    };
   }, [hydrated, serverMode, refresh]);
 
   // 없어진 테마·옛 글자크기 값이 저장돼 있으면 한 번 정리한다.

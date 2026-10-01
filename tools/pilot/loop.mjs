@@ -33,7 +33,7 @@ ok(`${T} Portal DEMO DATA 없음`, !/DEMO DATA/.test(t));
 // 3) 제출 (실제 파일)
 const row = cli.locator('li,tr,div').filter({ hasText: REQ }).filter({ has: cli.getByRole('button', { name: /업로드|재제출/ }) }).last();
 await row.getByRole('button', { name: /업로드|재제출/ }).first().click(); await cli.waitForTimeout(700);
-await cli.locator('[role=dialog] input[type=file]').setInputFiles(FILE);
+await cli.locator('[role=dialog] input[type=file]:not([capture])').setInputFiles(FILE);
 await cli.waitForTimeout(300);
 await cli.getByRole('button', { name: '제출하기' }).click();
 await cli.waitForTimeout(3500);
@@ -91,7 +91,7 @@ await cli.goto(B + '/portal/documents', { waitUntil: 'domcontentloaded' }); awai
 ok(`${T} 고객 Portal 보완 사유 표시`, (await body(cli)).includes('보완'));
 const row2 = cli.locator('li,tr,div').filter({ hasText: REQ }).filter({ has: cli.getByRole('button', { name: /재제출/ }) }).last();
 await row2.getByRole('button', { name: /재제출/ }).first().click(); await cli.waitForTimeout(700);
-await cli.locator('[role=dialog] input[type=file]').setInputFiles(FILE);
+await cli.locator('[role=dialog] input[type=file]:not([capture])').setInputFiles(FILE);
 await cli.getByRole('button', { name: '제출하기' }).click(); await cli.waitForTimeout(3500);
 ok(`${T} 서버: 재제출 v2`, sql(`select count(*) from document_files where request_id='${reqId}'`) === '2' && sql(`select status from document_requests where id='${reqId}'`) === 'submitted');
 

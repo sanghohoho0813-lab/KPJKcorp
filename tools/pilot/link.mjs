@@ -101,7 +101,7 @@ ok('서버: 담당 업무 자동 생성', sql(`select count(*) from tasks where 
 await cli.goto(`${B}/portal/documents`, { waitUntil: 'domcontentloaded' }); await cli.waitForTimeout(2000);
 const row = cli.locator('div').filter({ hasText: '법인등기부등본' }).filter({ has: cli.getByRole('button', { name: '업로드' }) }).last();
 await row.getByRole('button', { name: '업로드' }).click(); await cli.waitForTimeout(700);
-await cli.locator('[role=dialog] input[type=file]').setInputFiles(FILES + 'pilot-a1.txt');
+await cli.locator('[role=dialog] input[type=file]:not([capture])').setInputFiles(FILES + 'pilot-a1.txt');
 await cli.getByRole('button', { name: '제출하기' }).click(); await cli.waitForTimeout(3500);
 ok('서버: 고객 제출', sql(`select status from document_requests where id='${reqId}'`) === 'submitted');
 await ceo.goto(`${B}/ax/clients/${coId}?tab=vault`, { waitUntil: 'domcontentloaded' }); await ceo.waitForTimeout(1000);

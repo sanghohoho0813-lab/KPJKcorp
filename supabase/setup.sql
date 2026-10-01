@@ -1238,9 +1238,31 @@ end $$;
 
 
 -- =============================================================================
+--  실시간 반영 (Realtime)
+--  고객이 폰에서 올리면 대표 PC 화면이 1~2초 안에 바뀌도록, 바뀐 줄을 알려 주는 목록에 표를 올린다.
+--  누가 무엇을 받는지는 위의 권한(RLS)이 그대로 정한다 — 고객은 자기 회사 것만, 내부 알림은 받지 못한다.
+--  이 기능이 꺼져 있어도 앱은 15초마다 다시 읽으므로 동작은 같다(조금 늦을 뿐).
+-- =============================================================================
+do $$
+declare t text;
+begin
+  if not exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    raise notice '[실시간] supabase_realtime 이 없어 건너뜁니다 (15초 자동 갱신으로 동작).';
+    return;
+  end if;
+  foreach t in array array['notifications','document_requests','document_files','inquiries','inquiry_messages',
+                           'opportunities','quotes','schedules','projects','tasks','companies','notices'] loop
+    if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t) then
+      execute format('alter publication supabase_realtime add table public.%I', t);
+    end if;
+  end loop;
+end $$;
+
+
+-- =============================================================================
 --  설치 결과 — 아래 한 줄로 확인하세요
 -- =============================================================================
---  표 24 · 권한정책 57 · 파일보관함 3 이 나오면 설치는 끝난 것입니다.
+--  표 24 · 권한정책 57 · 파일보관함 3 · 실시간 12 가 나오면 설치는 끝난 것입니다.
 --  "다음 할 일" 칸에 적힌 대로 하시면 됩니다.
 
 select
@@ -1248,6 +1270,8 @@ select
     where table_schema = 'public' and table_type = 'BASE TABLE')                as "표",
   (select count(*) from pg_policies where schemaname in ('public', 'storage'))  as "권한정책",
   (select count(*) from storage.buckets where id in ('documents', 'results', 'vault')) as "파일보관함",
+  (select count(*) from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public')             as "실시간",
   (select coalesce(string_agg(email, ', '), '아직 없음')
      from public.profiles where role = 'admin')                                 as "대표계정",
   case
