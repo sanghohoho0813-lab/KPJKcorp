@@ -75,7 +75,7 @@ const pad2 = (n: number) => String(n).padStart(2, "0");
  * 사업자등록증은 "법 인 명"처럼 글자 사이를 띄우고, 사진 글자 인식은 받침을 자주 헷갈린다("명"→"멍", "태"→"테").
  * 글자 사이 공백·밑줄·점을 허용하고, 자주 틀리는 글자는 비슷한 글자까지 받는다.
  */
-const CONFUSE: Record<string, string> = { 명: "명멍몀", 태: "태테", 점: "점절", 업: "업엄언", 표: "표포", 호: "호흐", 재: "재제", 종: "종좀", 목: "목옥" };
+const CONFUSE: Record<string, string> = { 명: "명멍몀", 태: "태테래", 점: "점절", 업: "업엄언얼협", 표: "표포", 호: "호흐", 재: "재제", 종: "종좀총", 목: "목옥" };
 export function fz(word: string): string {
   return [...word].map((c) => (CONFUSE[c] ? `[${CONFUSE[c]}]` : c.replace(/[()]/g, "\\$&"))).join("[\\s_.·ㆍ]*");
 }
@@ -199,10 +199,11 @@ function findCorpNo(t: string) {
 const COMPANY_FORM = /(주식회사|유한책임회사|유한회사|합자회사|합명회사|농업회사법인|영농조합법인|협동조합|사단법인|재단법인|\(주\)|㈜)/;
 
 function findName(t: string, source: DocSource) {
-  const BRACKET = `[\\s_.·ㆍ]*\\(?[\\s_.·ㆍ]*${fz("단체명")}?[\\s_.·ㆍ]*\\)?`;
+  // "(단체명)" "(법인명)" 괄호는 있어도 없어도 된다 — 통째로 선택(?:…)? 으로 묶는다
+  const opt = (w: string) => `(?:[\\s_.·ㆍ]*\\(?[\\s_.·ㆍ]*${fz(w)}[\\s_.·ㆍ]*\\)?)?`;
   const patterns = source === "corpReg"
-    ? [fz("상호"), fz("법인명") + BRACKET, fz("회사명")]
-    : [fz("법인명") + BRACKET, fz("상호") + `[\\s_.·ㆍ]*\\(?[\\s_.·ㆍ]*${fz("법인명")}?[\\s_.·ㆍ]*\\)?`, fz("회사명")];
+    ? [fz("상호"), fz("법인명") + opt("단체명"), fz("회사명")]
+    : [fz("법인명") + opt("단체명"), fz("상호") + opt("법인명"), fz("회사명")];
   for (const p of patterns) {
     const v = valueAfter(t, p);
     if (v && v.length >= 2 && v.length <= 60 && /[가-힣A-Za-z]/.test(v)) return v;
@@ -222,8 +223,15 @@ function findCeo(t: string, source: DocSource) {
     ? ["대\\s*표\\s*이\\s*사", "사내이사", "대\\s*표\\s*자"]
     : ["성\\s*명\\s*\\(대표자\\)", "대\\s*표\\s*자\\s*\\(성명\\)", fz("성명"), fz("대표자")];
   for (const p of patterns) {
-    const v = valueAfter(t, p);
+    let v = valueAfter(t, p);
     if (!v) continue;
+    // 글자 인식이 이름 낱자 사이를 띄우는 경우("정 수빈", "강서 연") — 앞쪽 짧은 한글 조각을 4자까지 붙인다
+    const toks = v.trim().split(/\s+/);
+    if (toks.length > 1 && /^[가-힣]{1,2}$/.test(toks[0])) {
+      let name = "";
+      for (const tk of toks) { if (!/^[가-힣]{1,3}$/.test(tk) || (name + tk).length > 4) break; name += tk; }
+      if (name.length >= 2) v = name + " " + toks.slice(name.length ? toks.findIndex((_, i) => toks.slice(0, i + 1).join("") === name) + 1 : 0).join(" ");
+    }
     // 영문 이름은 "이름 성" 처럼 두 낱말일 때만 — 글자 인식이 한글을 "dss" 같은 영문으로 잘못 읽는 경우를 거른다
     const name = /^([가-힣]{2,6}|[A-Za-z]{2,}(?: [A-Za-z.]{1,20}){1,3})/.exec(v.trim());
     if (name) return name[1].trim();
@@ -257,12 +265,22 @@ function findEstablished(t: string, source: DocSource) {
   return undefined;
 }
 
+/** 주소 손질 — 앞에 붙은 부호 떼기, "도/시/군/구" 뒤 띄어쓰기, 행정구역 끝 글자 흔한 오인식("음"→"읍") */
+export function tidyAddress(v: string): string {
+  let a = v.replace(/^[^가-힣0-9]+/, "").trim();
+  a = a.replace(/(특별시|광역시|특별자치시|특별자치도|도)(?=[가-힣]{2,}(시|군))/, "$1 ");
+  a = a.replace(/([가-힣]{1,4}시)(?=[가-힣]{1,4}(구|군|읍|면|동)\b)/, "$1 ");
+  a = a.replace(/((?:시|군|구)\s+(?:[가-힣]{1,5}구\s+)?[가-힣]{1,4})음(?=\s)/, "$1읍");
+  return a;
+}
+
 function findAddress(t: string, source: DocSource) {
   const keys = source === "corpReg"
     ? ["본\\s*점\\s*소\\s*재\\s*지", "본\\s*점", "주\\s*사\\s*무\\s*소", "소\\s*재\\s*지"]
     : ["사\\s*업\\s*장\\s*소\\s*재\\s*지", "사\\s*업\\s*장\\s*\\(주소\\)", "소\\s*재\\s*지", "주\\s*소"];
   for (const k of keys) {
-    const v = valueAfter(t, k);
+    const raw = valueAfter(t, k);
+    const v = raw ? tidyAddress(raw) : undefined;
     if (v && v.length >= 5 && /[가-힣]/.test(v)) return v;
   }
   return undefined;
@@ -324,12 +342,20 @@ export function findBizKinds(raw: string): { category?: string; item?: string; p
     const m = ITEM.exec(l);
     if (m) { left = l.slice(0, m.index); right = l.slice(m.index + m[0].length); }
     else {
-      const parts = l.trim().split(/\s{3,}/);
+      const parts = l.trim().split(/\s{2,}/);
       left = parts[0] ?? "";
       right = parts.slice(1).join(" ");
     }
     const c = clean(left);
     const it = clean(right);
+    // 긴 종목이 줄바꿈된 경우("… 개발 및 공" + "급업"): 앞 줄 끝 낱말이 한 글자로 끊겼고 이 줄이 한 칸뿐이면 이어 붙인다
+    const prev = pairs[pairs.length - 1];
+    const lone = !right.trim() ? c : !left.trim() ? it : "";
+    if (prev && lone && /(^|\s)[가-힣]$/.test(prev.item ?? "") && /^[가-힣]{1,4}$/.test(lone)) {
+      prev.item = `${prev.item}${lone}`;
+      if (items.length) items[items.length - 1] = prev.item;
+      continue;
+    }
     if (ok(c)) cats.push(c);
     if (ok(it)) items.push(it);
     if (ok(c) || ok(it)) pairs.push({ category: ok(c) ? c : undefined, item: ok(it) ? it : undefined });

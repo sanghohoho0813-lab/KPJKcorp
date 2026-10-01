@@ -9,6 +9,8 @@ import { addDays } from "@/lib/format";
 import type { Contract, InternalStage, Project, ScheduleType, Task } from "@/lib/types";
 import { Confirm, Modal } from "@/components/ui/overlay";
 import { Button, Field, Input, Select, Textarea } from "@/components/ui/ui";
+import { Chip } from "@/components/ui/chips";
+import { KPJK_CONSULTING, KPJK_CONSULTING_ALL, projectNameOf } from "@/lib/company-options";
 
 function dateTimeInput(iso?: string) {
   const d = iso ? new Date(iso) : new Date();
@@ -20,7 +22,8 @@ function dateInput(iso?: string) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export const PROJECT_TYPES = ["경영진단", "정책자금", "연구소", "기업인증", "법인자문", "운영개선", "기타"];
+/** 프로젝트 유형 = KPJK 맞춤컨설팅 분야 (company-options). 예전 유형으로 만든 프로젝트는 그 이름 그대로 남는다 */
+export const PROJECT_TYPES = KPJK_CONSULTING_ALL;
 
 /* ---------------- 기업고객 등록 · 수정 ---------------- */
 // 클릭 위주 폼 + 서류 자동 채우기로 커져서 CompanyForm.tsx로 옮겼다. 기존 import 경로는 그대로 쓴다.
@@ -31,7 +34,7 @@ export { CompanyModal } from "./CompanyForm";
 type ProjectForm = Omit<Project, "id" | "stageChangedAt">;
 
 const EMPTY_PROJECT = (companyId: string, consultantId: string): ProjectForm => ({
-  companyId, name: "", type: PROJECT_TYPES[0], consultantId,
+  companyId, name: "", type: "", consultantId,
   startDate: new Date().toISOString(), dueDate: addDays(new Date(), 60).toISOString(),
   stage: "consult", description: "", clientVisible: true,
 });
@@ -65,7 +68,8 @@ function ProjectModalInner({ open, projectId, companyId, onClose, onCreated }: {
   const validate = () => {
     const e: Partial<Record<keyof ProjectForm, string>> = {};
     if (!f.companyId) e.companyId = "기업을 선택해 주세요.";
-    if (!f.name.trim()) e.name = "프로젝트명은 필수입니다.";
+    if (!f.type.trim()) e.type = "컨설팅 분야를 골라 주세요.";
+    else if (!f.name.trim() && !projectNameOf(f.type).trim()) e.name = "프로젝트명은 필수입니다.";
     if (new Date(f.dueDate) < new Date(f.startDate)) e.dueDate = "마감일이 시작일보다 빠릅니다.";
     setErr(e);
     return Object.keys(e).length === 0;
@@ -74,7 +78,8 @@ function ProjectModalInner({ open, projectId, companyId, onClose, onCreated }: {
   const submit = () => {
     if (!validate()) { toast("입력값을 확인해 주세요.", "error"); return; }
     const nm = f.nextMilestone && f.nextMilestone.label.trim() && f.nextMilestone.date ? { label: f.nextMilestone.label.trim(), date: f.nextMilestone.date } : undefined;
-    const data = { ...f, name: f.name.trim(), description: f.description.trim(), nextMilestone: nm };
+    // 이름을 비워 두면 고른 분야로 채운다 ("가지급금 컨설팅")
+    const data = { ...f, type: f.type.trim(), name: f.name.trim() || projectNameOf(f.type.trim()), description: f.description.trim(), nextMilestone: nm };
     if (editing) {
       update(editing.id, data, me);
       toast("프로젝트를 수정했습니다.");
@@ -111,13 +116,15 @@ function ProjectModalInner({ open, projectId, companyId, onClose, onCreated }: {
             </Select>
           )}
         </Field>
-        <Field label="유형">
-          <Select value={f.type} onChange={(e) => set("type", e.target.value)}>
-            {PROJECT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-          </Select>
-        </Field>
         <div className="sm:col-span-2">
-          <Field label="프로젝트명 *" hint={err.name}><Input value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="예: 경영진단 컨설팅" autoFocus /></Field>
+          <ConsultingPicker value={f.type} error={err.type} onChange={(t) => {
+            // 이름을 아직 안 고쳤으면(비었거나 자동으로 넣은 이름이면) 고른 분야로 바꿔 준다
+            setF((x) => ({ ...x, type: t, name: !x.name.trim() || x.name === projectNameOf(x.type) ? (t ? projectNameOf(t) : "") : x.name }));
+            setErr((e) => ({ ...e, type: undefined, name: undefined }));
+          }} />
+        </div>
+        <div className="sm:col-span-2">
+          <Field label="프로젝트명" hint={err.name ?? "분야를 고르면 자동으로 채워집니다. 필요하면 고치세요."}><Input value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="예: 가지급금 컨설팅" /></Field>
         </div>
         <Field label="담당 컨설턴트">
           <Select value={f.consultantId} onChange={(e) => set("consultantId", e.target.value)}>
@@ -531,5 +538,40 @@ function ContractModalInner({ open, contractId, companyId, onClose }: { open: bo
         <Field label="범위" hint="고객 Portal 계약 상태에도 표시됩니다."><Textarea rows={2} value={scope} onChange={(e) => setScope(e.target.value)} /></Field>
       </div>
     </Modal>
+  );
+}
+
+/**
+ * 컨설팅 분야 고르기 — KPJK 홈페이지의 맞춤컨설팅 분야를 묶음별 칩으로.
+ * 목록에 없는 일은 "직접 입력". 예전 유형(경영진단 등)으로 만든 프로젝트는 그 값이 그대로 보인다.
+ */
+function ConsultingPicker({ value, onChange, error }: { value: string; onChange: (v: string) => void; error?: string }) {
+  const known = KPJK_CONSULTING_ALL.includes(value);
+  const [custom, setCustom] = useState(!!value && !known);
+  return (
+    <div role="group" aria-label="컨설팅 분야">
+      <div className="mb-1.5 text-[0.85rem] font-semibold text-ink-2">컨설팅 분야 <span className="text-error">*</span></div>
+      <div className="space-y-2">
+        {KPJK_CONSULTING.map((g) => (
+          <div key={g.group} className="flex flex-col gap-1.5 sm:flex-row sm:items-start">
+            <span className="text-[0.72rem] font-semibold text-ink-3 sm:w-24 sm:shrink-0 sm:pt-2.5">{g.group}</span>
+            <div className="flex flex-1 flex-wrap gap-1.5">
+              {g.items.map((t) => (
+                <Chip key={t} selected={value === t} onClick={() => { setCustom(false); onChange(value === t ? "" : t); }}>{t}</Chip>
+              ))}
+            </div>
+          </div>
+        ))}
+        <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center">
+          <span className="text-[0.72rem] font-semibold text-ink-3 sm:w-24 sm:shrink-0">그 외</span>
+          {custom ? (
+            <Input aria-label="컨설팅 분야 직접 입력" value={known ? "" : value} onChange={(e) => onChange(e.target.value)} placeholder="예: 경영진단" className="!h-9 !w-56 !rounded-full !text-[0.85rem]" autoFocus />
+          ) : (
+            <Chip selected={!!value && !known} onClick={() => { setCustom(true); if (known) onChange(""); }} className="border-dashed">직접 입력{value && !known ? `: ${value}` : ""}</Chip>
+          )}
+        </div>
+      </div>
+      {error && <span className="mt-1 block text-[0.78rem] font-semibold text-error">{error}</span>}
+    </div>
   );
 }

@@ -162,7 +162,7 @@ export default function PortalHome() {
           <div className="divide-y divide-line">
             {projects.map((p) => (
               <Link key={p.id} href={`/portal/projects?p=${p.id}`} className="flex items-center gap-3 py-3">
-                <div className="min-w-0 flex-1"><div className="font-semibold">{p.name}</div><div className="text-[0.8rem] text-ink-3">{fmtDate(p.startDate, { year: true })} 시작</div></div>
+                <div className="min-w-0 flex-1"><div className="font-semibold">{p.name}</div><div className="text-[0.8rem] text-ink-3">{p.type && !p.name.includes(p.type) ? `${p.type} · ` : ""}{fmtDate(p.startDate, { year: true })} 시작</div></div>
                 <Badge tone={["done", "aftercare"].includes(p.stage) ? "success" : "accent"}>{CUSTOMER_STEPS[stageToCustomerStep(p.stage)].label}</Badge>
               </Link>
             ))}

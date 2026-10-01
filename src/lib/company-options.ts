@@ -85,6 +85,22 @@ export const CONSULT_AREAS: { key: string; label: string; group: string }[] = [
 ];
 export const CONSULT_AREA_LABEL: Record<string, string> = Object.fromEntries(CONSULT_AREAS.map((a) => [a.key, a.label]));
 
+/**
+ * KPJK 맞춤컨설팅 분야 — kpjkcorporation.com 의 컨설팅 분야(2026-10-01 대표님 제공 화면) 그대로.
+ * 프로젝트를 등록할 때 클릭으로 고르고, 고객 Portal 에도 이 이름으로 보인다.
+ * 홈페이지 상담신청의 분야(미처분이익잉여금정리·기업승계전략·가지급금정리·법인설립전환·재무세무·상속증여·기타분야)도 여기 묶었다.
+ */
+export const KPJK_CONSULTING: { group: string; items: string[] }[] = [
+  { group: "법인 자금 정리", items: ["가지급금", "가수금", "이익잉여금", "이익소각", "자사주매입", "주식명의신탁"] },
+  { group: "승계 · 상속", items: ["가업승계", "상속증여"] },
+  { group: "법인 전환", items: ["법인전환"] },
+  { group: "세무 · 노무", items: ["세무조사", "재무세무", "인사노무"] },
+  { group: "인증 · 평가", items: ["기업부설연구소", "특허자본", "기업신용평가등급"] },
+];
+export const KPJK_CONSULTING_ALL = KPJK_CONSULTING.flatMap((g) => g.items);
+/** 고른 분야로 프로젝트 이름을 자동으로 — 직접 고칠 수 있다 */
+export const projectNameOf = (type: string) => `${type} 컨설팅`;
+
 export const LEAD_SOURCES = ["홈페이지 문의", "지인·고객 소개", "세미나·교육", "광고", "기존 고객", "제휴(세무사·회계사)", "기타"];
 
 export const CONTACT_TITLES = ["대표이사", "이사", "경영지원팀장", "재무팀장", "회계담당", "총무", "기타"];

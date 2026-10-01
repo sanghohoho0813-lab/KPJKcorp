@@ -50,6 +50,7 @@ async function createProject(companyName, pname) {
   await p.goto(B + '/ax/projects', { waitUntil: 'domcontentloaded' }); await p.waitForTimeout(1500);
   await p.getByRole('button', { name: '프로젝트 등록' }).first().click(); await p.waitForTimeout(600);
   await p.getByLabel(/^기업 \*/).selectOption({ label: companyName });
+  await p.getByRole('group', { name: '컨설팅 분야' }).getByRole('button', { name: '기업부설연구소', exact: true }).click();
   await p.getByLabel(/프로젝트명/).fill(pname);
   await p.getByLabel('진행 단계').selectOption('doc_request');
   await p.getByLabel('담당 컨설턴트').selectOption({ label: `${ACC.con.name} 컨설턴트` }).catch(() => {});

@@ -32,7 +32,7 @@ function Inner() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="프로젝트 진행 Timeline" desc={`${c.name} ${p.name} 프로젝트의 현재 위치를 한눈에 확인합니다.`} badge={<Badge tone="accent">현재 단계: {CUSTOMER_STEPS[step].label}</Badge>} actions={projects.length > 1 ? <SegmentedControl size="sm" value={p.id} onChange={setSel} options={projects.map((x) => ({ key: x.id, label: x.name }))} /> : undefined} />
+      <PageHeader title="프로젝트 진행 Timeline" desc={`${c.name} ${p.name}${p.type && !p.name.includes(p.type) ? ` (${p.type})` : ""} 프로젝트의 현재 위치를 한눈에 확인합니다.`} badge={<Badge tone="accent">현재 단계: {CUSTOMER_STEPS[step].label}</Badge>} actions={projects.length > 1 ? <SegmentedControl size="sm" value={p.id} onChange={setSel} options={projects.map((x) => ({ key: x.id, label: x.name }))} /> : undefined} />
 
       {/* SIGNATURE 04 — Client Journey Timeline */}
       <Card className="p-5 md:p-8" id="tut-p-timeline">
@@ -90,6 +90,7 @@ function Inner() {
           <h2 className="mb-3 text-[1.05rem] font-bold">프로젝트 정보</h2>
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-[0.9rem]">
             <dt className="text-ink-3">프로젝트</dt><dd className="font-semibold">{p.name}</dd>
+            {p.type && <><dt className="text-ink-3">컨설팅 분야</dt><dd className="font-semibold">{p.type}</dd></>}
             <dt className="text-ink-3">시작일</dt><dd className="tnum">{fmtDate(p.startDate, { year: true })}</dd>
             <dt className="text-ink-3">예상 완료</dt><dd className="tnum">{fmtDate(p.dueDate, { year: true })}</dd>
             <dt className="text-ink-3">요청자료</dt><dd>{docs.length - todo.length} / {docs.length} 제출</dd>

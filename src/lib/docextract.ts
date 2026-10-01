@@ -168,20 +168,45 @@ async function ocrImage(raw: Blob, onProgress?: ProgressFn, opts: ExtractOptions
     throw new Error("사진 글자 인식 모듈을 내려받지 못했습니다. 인터넷 연결을 확인하거나, PDF 파일 또는 글자 붙여넣기로 시도해 보세요.");
   }
   try {
-    const { data } = await worker.recognize(input);
-    const text = data.text ?? "";
+    const { data } = await worker.recognize(input, {}, { text: true, blocks: true });
+    const text = textFromBlocks(data as OcrData);
     if (!opts.namePass) return { text };
     try {
       label = "이름·주소 한 번 더 확인 중";
       await worker.reinitialize("kor");
-      const second = await worker.recognize(input);
-      return { text, alt: second.data.text ?? "" };
+      const second = await worker.recognize(input, {}, { text: true, blocks: true });
+      return { text, alt: textFromBlocks(second.data as OcrData) };
     } catch {
       return { text };   // 두 번째가 실패해도 첫 번째 결과는 쓴다
     }
   } finally {
     await worker.terminate();
   }
+}
+
+type OcrData = { text?: string; blocks?: { paragraphs: { lines: { words: { text: string; bbox: { x0: number; x1: number; y0: number; y1: number } }[] }[] }[] }[] | null };
+
+/**
+ * 글자 인식 결과를 낱말 위치로 다시 줄 세운다.
+ * 인식기가 돌려주는 글자는 두 칸 사이(업태 | 종목) 넓은 공백을 한 칸으로 줄여 버려 칸을 나눌 수 없었다.
+ * 낱말 사이가 글자 높이의 1.6배보다 넓으면 공백 다섯 개로 남긴다 — 칸을 나누는 근거다.
+ */
+function textFromBlocks(data: OcrData): string {
+  if (!data.blocks?.length) return data.text ?? "";
+  const out: string[] = [];
+  for (const b of data.blocks) for (const para of b.paragraphs) for (const line of para.lines) {
+    let s = "";
+    let prevEnd: number | null = null;
+    for (const w of line.words) {
+      const h = Math.max(8, w.bbox.y1 - w.bbox.y0);
+      // 거의 붙어 있으면(한글 낱자끼리) 띄우지 않는다 — "정 수 빈"이 아니라 "정수빈"
+      if (prevEnd !== null) { const gap = w.bbox.x0 - prevEnd; s += gap > h * 1.6 ? "     " : gap > h * 0.28 ? " " : ""; }
+      s += w.text;
+      prevEnd = w.bbox.x1;
+    }
+    out.push(s);
+  }
+  return out.join("\n");
 }
 
 /** 한글이 20자 이상이면 텍스트 PDF로 본다 */
