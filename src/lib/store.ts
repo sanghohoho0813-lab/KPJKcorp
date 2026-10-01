@@ -42,7 +42,7 @@ import type {
   TaskStatus,
 } from "./types";
 import { nowIso, uid, addDays, iso, daysBetween } from "./format";
-import { stageLabel } from "./stages";
+import { CUSTOMER_STEPS, stageLabel, stageToCustomerStep } from "./stages";
 import { RULE_BY_KEY, ruleDays, ruleOn } from "./rules";
 import { emptyVault, slotLabel, slotsOf } from "./vault";
 import { PAYMENT_KIND_LABEL, WORK_STATUS, won, workStatusOf } from "./work-status";
@@ -95,6 +95,8 @@ export interface StoreState extends SeedData {
   uploadDocument: (requestId: string, file: { fileName: string; size: number; storagePath?: string }, byUserId: string) => void;
   reviewDocument: (requestId: string, outcome: "done" | "revision" | "reviewing", note: string | undefined, byUserId: string) => void;
   changeProjectStage: (projectId: string, stage: InternalStage, byUserId: string) => void;
+  /** 고객 단계(자료 요청·검토·진행·완료)로 바꾸면서 고객에게 메시지와 요청 서류를 한 번에 보낸다. 알림은 1건. */
+  sendProjectStep: (projectId: string, stage: InternalStage, opts: { message?: string; docs?: string[]; dueDate?: string }, byUserId: string) => { docs: number } | null;
   createDocRequest: (projectId: string, data: { name: string; description: string; dueDate: string }, byUserId: string) => void;
   /** 기업에 바로 자료 요청 (서류함 칸에서) — 진행 중인 프로젝트가 있으면 거기에 붙이고, 없으면 기업에만 붙인다 */
   requestCompanyDoc: (companyId: string, data: { name: string; description: string; dueDate: string }, byUserId: string) => string | null;
@@ -570,8 +572,41 @@ export const useStore = create<StoreState>()(
         set({
           projects: st.projects.map((x) => (x.id === projectId ? { ...x, stage, stageChangedAt: now } : x)),
           activities: [makeActivity({ type: "project_stage_changed", companyId: p.companyId, projectId, actorId: byUserId, actorRole: "consultant", text: `단계 변경: ${stageLabel(p.stage)} → ${stageLabel(stage)}`, meta: { from: p.stage, to: stage } }), ...st.activities],
-          notifications: [makeNotification({ audience: "client", companyId: p.companyId, title: "프로젝트 진행 단계가 변경되었습니다", body: `${p.name}: ${stageLabel(stage)} 단계로 진행됩니다.`, href: "/portal/projects" }), ...st.notifications],
+          notifications: [makeNotification({ audience: "client", companyId: p.companyId, title: "프로젝트 진행 단계가 변경되었습니다", body: `${p.name}: ${CUSTOMER_STEPS[stageToCustomerStep(stage)].label} 단계로 진행됩니다.`, href: "/portal/projects" }), ...st.notifications],
         });
+      },
+
+      sendProjectStep: (projectId, stage, opts, byUserId) => {
+        const st = get();
+        const p = st.projects.find((x) => x.id === projectId);
+        if (!p) return null;
+        if (deny(st, "project.update", `단계 변경 (${p.name})`, set)) return null;
+        const names = [...new Set((opts.docs ?? []).map((d) => d.trim()).filter(Boolean))];
+        if (names.length && deny(st, "doc.request", `자료 요청 (${names.length}건)`, set)) return null;
+        const now = nowIso();
+        const step = CUSTOMER_STEPS[stageToCustomerStep(stage)];
+        const message = opts.message?.trim();
+        // 이미 받는 중인(미제출·보완) 같은 이름 요청은 다시 만들지 않는다
+        const open = new Set(st.docRequests.filter((d) => d.companyId === p.companyId && (d.status === "requested" || d.status === "revision" || d.status === "planned")).map((d) => d.name));
+        const due = opts.dueDate ?? iso(addDays(new Date(), 7, 18));
+        const reqs: DocumentRequest[] = names.filter((n) => !open.has(n)).map((name) => ({
+          id: uid("dr"), projectId, companyId: p.companyId, name, description: "카카오톡으로 보내셔도 되고, 이 화면에서 바로 올리셔도 됩니다.", requestedAt: now, dueDate: due, status: "requested", assigneeId: p.consultantId, files: [],
+        }));
+        const moved = p.stage !== stage;
+        const acts = [
+          ...(moved ? [makeActivity({ type: "project_stage_changed", companyId: p.companyId, projectId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `단계 변경: ${stageLabel(p.stage)} → ${stageLabel(stage)}`, meta: { from: p.stage, to: stage } })] : []),
+          ...reqs.map((r) => makeActivity({ type: "document_requested", companyId: p.companyId, projectId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `자료 요청: ${r.name}` })),
+        ];
+        if (!moved && !reqs.length && !message) return { docs: 0 };
+        const title = reqs.length ? `자료 ${reqs.length}건을 요청드립니다` : moved ? `${p.name} — ${step.label}` : `${p.name} 담당자 메시지`;
+        const body = [reqs.length ? reqs.map((r) => r.name).join(", ") : "", message || (moved ? `${step.label} 단계로 진행됩니다.` : "")].filter(Boolean).join(" — ");
+        set({
+          projects: moved ? st.projects.map((x) => (x.id === projectId ? { ...x, stage, stageChangedAt: now } : x)) : st.projects,
+          docRequests: reqs.length ? [...reqs, ...st.docRequests] : st.docRequests,
+          activities: [...acts, ...st.activities],
+          notifications: [makeNotification({ audience: "client", companyId: p.companyId, title, body, href: reqs.length ? "/portal/documents" : "/portal/projects" }), ...st.notifications],
+        });
+        return { docs: reqs.length };
       },
 
       requestCompanyDoc: (companyId, data, byUserId) => {

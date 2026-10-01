@@ -131,7 +131,7 @@ export default function ProjectDetailPage() {
               <div key={s.key} className={cx("flex h-8 min-w-[64px] flex-1 items-center justify-center rounded-md text-[0.72rem] font-bold", i < stageIdx ? "bg-primary/85 text-white" : i === stageIdx ? "bg-accent text-accent-ink" : "bg-surface-2 text-ink-3")}>{s.short}</div>
             ))}
           </div>
-          <div className="mt-3 mb-2 text-[0.8rem] font-bold text-ink-3">고객이 보는 단계 (7) — 같은 데이터에서 자동 매핑</div>
+          <div className="mt-3 mb-2 text-[0.8rem] font-bold text-ink-3">고객이 보는 단계 ({CUSTOMER_STEPS.length}) — 같은 데이터에서 자동 매핑</div>
           <div className="flex gap-1">
             {CUSTOMER_STEPS.map((s) => (
               <div key={s.key} className={cx("flex h-8 flex-1 items-center justify-center rounded-md text-[0.72rem] font-bold", s.idx < customerStep ? "bg-success-bg text-success" : s.idx === customerStep ? "bg-accent text-accent-ink" : "bg-surface-2 text-ink-3")}>{s.label}</div>

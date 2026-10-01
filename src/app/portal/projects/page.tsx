@@ -38,16 +38,16 @@ function Inner() {
       <Card className="p-5 md:p-8" id="tut-p-timeline">
         <div className="hidden md:block">
           <div className="relative flex items-start justify-between">
-            <div className="absolute left-[7%] right-[7%] top-6 h-1 bg-surface-2" />
-            <div className="absolute left-[7%] top-6 h-1 bg-accent transition-all" style={{ width: `${(step / (CUSTOMER_STEPS.length - 1)) * 86}%` }} />
+            <div className="absolute top-6 h-1 bg-surface-2" style={{ left: `${50 / CUSTOMER_STEPS.length}%`, right: `${50 / CUSTOMER_STEPS.length}%` }} />
+            <div className="absolute top-6 h-1 bg-accent transition-all" style={{ left: `${50 / CUSTOMER_STEPS.length}%`, width: `${(step / (CUSTOMER_STEPS.length - 1)) * (100 - 100 / CUSTOMER_STEPS.length)}%` }} />
             {CUSTOMER_STEPS.map((s) => {
               const done = s.idx < step;
               const cur = s.idx === step;
               return (
-                <div key={s.key} className="relative flex w-[14%] flex-col items-center text-center">
+                <div key={s.key} className="relative flex flex-col items-center text-center" style={{ width: `${100 / CUSTOMER_STEPS.length}%` }}>
                   <span className={cx("flex h-12 w-12 items-center justify-center rounded-full border-4 border-surface text-[1rem] font-bold shadow-sm", done ? "bg-primary text-white" : cur ? "bg-accent text-accent-ink ring-4 ring-soft" : "bg-surface-2 text-ink-3")}>{done ? <Check size={20} /> : s.idx + 1}</span>
                   <span className={cx("mt-3 text-[0.95rem] font-bold", cur ? "text-accent" : done ? "text-ink" : "text-ink-3")}>{s.label}</span>
-                  <span className="mt-0.5 text-[0.78rem] text-ink-3">{done ? "완료" : cur ? "진행 중" : "예정"}</span>
+                  <span className="mt-0.5 text-[0.78rem] text-ink-3">{done ? "완료" : cur ? "지금 단계" : "예정"}</span>
                 </div>
               );
             })}
@@ -61,7 +61,7 @@ function Inner() {
               <li key={s.key} className="relative flex gap-3 pb-5 last:pb-0">
                 {i < CUSTOMER_STEPS.length - 1 && <span className={cx("absolute left-[15px] top-8 h-full w-0.5", done ? "bg-accent" : "bg-surface-2")} />}
                 <span className={cx("relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[0.85rem] font-bold", done ? "bg-primary text-white" : cur ? "bg-accent text-accent-ink" : "bg-surface-2 text-ink-3")}>{done ? <Check size={16} /> : s.idx + 1}</span>
-                <div><div className={cx("font-bold", cur ? "text-accent" : done ? "" : "text-ink-3")}>{s.label} <span className="text-[0.78rem] font-normal text-ink-3">{done ? "완료" : cur ? "진행 중" : "예정"}</span></div>{(cur || done) && <div className="text-[0.82rem] text-ink-2">{cur ? customerStageMessage(p.stage) : s.desc}</div>}</div>
+                <div><div className={cx("font-bold", cur ? "text-accent" : done ? "" : "text-ink-3")}>{s.label} <span className="text-[0.78rem] font-normal text-ink-3">{done ? "완료" : cur ? "지금 단계" : "예정"}</span></div>{(cur || done) && <div className="text-[0.82rem] text-ink-2">{cur ? customerStageMessage(p.stage) : s.desc}</div>}</div>
               </li>
             );
           })}

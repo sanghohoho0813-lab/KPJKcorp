@@ -61,7 +61,7 @@ export default function PortalHome() {
             <div>
               <Badge tone="accent">{main.name}</Badge>
               <h1 className="mt-2 text-[1.6rem] font-bold md:text-[2rem]">현재 프로젝트 진행률</h1>
-              <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1"><span className="tnum whitespace-nowrap text-[3rem] font-bold leading-none text-accent md:text-[3.6rem]">{stageProgress(main.stage)}%</span><span className="text-[1rem] font-semibold text-ink-2">{CUSTOMER_STEPS[step].label} 단계 진행 중</span></div>
+              <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1"><span className="tnum whitespace-nowrap text-[3rem] font-bold leading-none text-accent md:text-[3.6rem]">{stageProgress(main.stage)}%</span><span className="text-[1rem] font-semibold text-ink-2">지금 {CUSTOMER_STEPS[step].label} 단계</span></div>
               <Progress value={stageProgress(main.stage)} className="mt-4" height={12} />
               <div className="mt-2 flex justify-between gap-3 text-[0.8rem] font-semibold text-ink-2"><span className="whitespace-nowrap">{CUSTOMER_STEPS[0].label} 완료</span><span>{next ? `${next.title.replace(c.name, "").trim()} 예정` : "완료 예정"}</span></div>
             </div>

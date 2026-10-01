@@ -29,16 +29,42 @@ let ms = await waitFor(cli, async () => (await body(cli)).includes('법인등기
 ok('고객 휴대폰: 요청자료에 도착', ms >= 0, `${ms}ms`);
 ok('고객 휴대폰: 카톡 안내 문구', (await body(cli)).includes('카카오톡'));
 
-// 2) 진행 단계 클릭
+// 2) 진행 단계 (고객 4단계) — 자료 요청 단계에서 서류를 클릭으로 담아 한 번에 요청 + 메시지
 await ceo.goto(`${B}/ax/clients/${coId}?tab=work`, { waitUntil: 'domcontentloaded' }); await ceo.waitForTimeout(1500);
-await ceo.locator(`[data-stepper="${pjId}"]`).getByRole('radio', { name: '2단계 계약' }).click(); await ceo.waitForTimeout(3000);
-ok('서버: 프로젝트 단계 contract', sql(`select stage from projects where id='${pjId}'`) === 'contract');
+const stepper = ceo.locator(`[data-stepper="${pjId}"]`);
+ok('대표 PC: 고객 단계 4칸', (await stepper.getByRole('radio').count()) === 4);
+await stepper.getByRole('radio', { name: '1단계 자료 요청' }).click(); await ceo.waitForTimeout(600);
+const picker = dialog(ceo);
+ok('대표 PC: 분야별 자주 받는 서류', (await picker.innerText()).includes('기업부설연구소에서 자주 받는 서류'));
+await picker.getByRole('button', { name: /연구인력 학위·경력증명서/ }).click();
+await picker.getByRole('button', { name: '전체 목록에서 고르기' }).click();
+await picker.getByRole('button', { name: /^주식등변동상황명세서/ }).click();
+await picker.getByLabel('서류 직접 입력').fill('연구개발 과제 계획서');
+await picker.getByRole('button', { name: '추가', exact: true }).click();
+ok('대표 PC: 담은 서류 3건', (await picker.locator('[data-picked] > span').count()) === 3);
+await picker.getByRole('button', { name: /준비가 어려운 자료는/ }).click();
+await picker.getByRole('button', { name: /보내기 \(자료 3건\)/ }).click(); await ceo.waitForTimeout(3500);
+ok('서버: 서류 3건 한 번에 요청', sql(`select count(*) from document_requests where company_id='${coId}' and name in ('연구인력 학위·경력증명서','주식등변동상황명세서','연구개발 과제 계획서') and status='requested'`) === '3');
+ok('서버: 알림 1건(묶음)', sql(`select count(*) from notifications where audience='client' and company_id='${coId}' and title='자료 3건을 요청드립니다'`) === '1');
+await cli.goto(`${B}/portal/documents`, { waitUntil: 'domcontentloaded' });
+ms = await waitFor(cli, async () => { const t = await body(cli); return t.includes('주식등변동상황명세서') && t.includes('연구개발 과제 계획서'); });
+ok('고객 휴대폰: 요청 서류 3건 도착', ms >= 0, `${ms}ms`);
+await cli.goto(`${B}/portal/notifications`, { waitUntil: 'domcontentloaded' }); await cli.waitForTimeout(1500);
+ok('고객 휴대폰: 메시지 도착', (await body(cli)).includes('준비가 어려운 자료는'));
+
+await stepper.getByRole('radio', { name: '2단계 자료 검토 중' }).click(); await ceo.waitForTimeout(600);
+ok('대표 PC: 검토 단계엔 서류 고르기 없음', (await dialog(ceo).locator('[data-doc-picker]').count()) === 0);
+await dialog(ceo).getByRole('button', { name: '단계 바꾸고 보내기' }).click(); await ceo.waitForTimeout(3000);
+ok('서버: 프로젝트 단계 review', sql(`select stage from projects where id='${pjId}'`) === 'review');
 await cli.goto(`${B}/portal`, { waitUntil: 'domcontentloaded' });
-ms = await waitFor(cli, async () => /계약 단계/.test(await body(cli)));
-ok('고객 휴대폰: 진행률 "계약 단계"', ms >= 0, `${ms}ms`);
-await ceo.locator(`[data-stepper="${pjId}"]`).getByRole('radio', { name: '4단계 자료검토' }).click(); await ceo.waitForTimeout(500);
-ms = await waitFor(cli, async () => /자료검토 단계/.test(await body(cli)));
-ok('고객 휴대폰: 새로고침 없이 "자료검토 단계"', ms >= 0, `${ms}ms`);
+ms = await waitFor(cli, async () => /자료 검토 중 단계/.test(await body(cli)));
+ok('고객 휴대폰: "자료 검토 중" · 50%', ms >= 0 && (await body(cli)).includes('50%'), `${ms}ms`);
+await stepper.getByRole('radio', { name: '3단계 진행 중' }).click(); await ceo.waitForTimeout(500);
+await dialog(ceo).getByRole('button', { name: /곧 결과를 정리해/ }).click();
+await dialog(ceo).getByRole('button', { name: '단계 바꾸고 보내기' }).click(); await ceo.waitForTimeout(500);
+ms = await waitFor(cli, async () => /진행 중 단계/.test(await body(cli)));
+ok('고객 휴대폰: 새로고침 없이 "진행 중" · 75%', ms >= 0 && (await body(cli)).includes('75%'), `${ms}ms`);
+ok('서버: 진행 중 메시지 알림', sql(`select count(*) from notifications where audience='client' and company_id='${coId}' and body like '%곧 결과를 정리해%'`) === '1');
 
 // 3) 일정: 내부로 → 한 번 눌러 공개
 await ceo.goto(`${B}/ax/clients/${coId}?tab=schedule`, { waitUntil: 'domcontentloaded' }); await ceo.waitForTimeout(1500);

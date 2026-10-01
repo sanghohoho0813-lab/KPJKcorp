@@ -9,8 +9,8 @@ import type { Company, Project, WorkStatus } from "@/lib/types";
 import { OVERDUE_CLS, WORK_STATUS, WORK_STATUS_ORDER, isOpen, workCell } from "@/lib/work-status";
 import { dueText, todayYmd } from "@/lib/vault";
 import { documentRequestMessage, progressReportMessage } from "@/lib/ops-messages";
-import { CUSTOMER_STEPS, stageLabel, stageToCustomerStep } from "@/lib/stages";
-import type { InternalStage } from "@/lib/types";
+import { CUSTOMER_STEPS, stageLabel, stageProgress, stageToCustomerStep } from "@/lib/stages";
+import { StepSendModal } from "@/components/domain/client/StepSendModal";
 import { ProjectModal } from "@/components/domain/EntityModals";
 import { addDays, iso } from "@/lib/format";
 import { Badge, Button, Card, EmptyState, Input, Textarea, cx } from "@/components/ui/ui";
@@ -163,30 +163,29 @@ function WorkCard({ project: p, may }: { project: Project; may: boolean }) {
   );
 }
 
-/** 고객 화면과 같은 7단계 — 누르면 그 단계로 바뀌고 고객 Portal 진행률·알림이 따라간다 */
-const STEP_TO_STAGE: InternalStage[] = ["consult", "contract", "doc_request", "review", "in_progress", "ceo_meeting", "done"];
+/** 고객 화면과 같은 4단계 — 누르면 단계 변경 + 고객에게 보낼 메시지·요청 서류를 한 창에서 */
 function StageStepper({ project: p, may }: { project: Project; may: boolean }) {
-  const change = useStore((s) => s.changeProjectStage);
-  const toast = useStore((s) => s.toast);
-  const me = useStore((s) => s.session?.userId) ?? "";
+  const [open, setOpen] = useState<number | null>(null);
   const cur = stageToCustomerStep(p.stage);
-  const pct = Math.round(((cur + 1) / CUSTOMER_STEPS.length) * 100);
+  const pct = stageProgress(p.stage);
   return (
     <div className="border-t border-line px-3 pb-3 pt-2.5 sm:pl-4" data-stepper={p.id}>
       <div className="mb-1.5 flex flex-wrap items-center gap-x-2 text-[0.75rem] text-ink-3">
         <Eye size={12} /> 고객 화면: <b className="text-ink-2">{cur + 1}/{CUSTOMER_STEPS.length}단계 · {CUSTOMER_STEPS[cur].label}</b> · 진행률 {pct}%
         {!p.clientVisible && <span className="font-semibold text-warning">· 이 업무는 고객에게 공개 안 함</span>}
       </div>
-      <div className="grid grid-cols-7 gap-1" role="radiogroup" aria-label={`${p.name} 단계`}>
+      <div className="grid grid-cols-4 gap-1.5" role="radiogroup" aria-label={`${p.name} 단계`}>
         {CUSTOMER_STEPS.map((st, i) => (
-          <button key={st.key} type="button" role="radio" aria-checked={i === cur} aria-label={`${i + 1}단계 ${st.label}`} disabled={!may || i === cur}
-            onClick={() => { change(p.id, STEP_TO_STAGE[i], me); toast(`${p.name} — ${st.label} 단계로 바꿨습니다. 고객 화면에 바로 반영됩니다.`); }}
-            className={cx("pressable flex min-h-9 flex-col items-center justify-center rounded-lg px-0.5 text-center text-[0.68rem] font-semibold leading-tight sm:text-[0.72rem]",
+          <button key={st.key} type="button" role="radio" aria-checked={i === cur} aria-label={`${i + 1}단계 ${st.label}`} disabled={!may}
+            title={i === cur ? "지금 단계 — 눌러서 고객에게 메시지·자료 요청 보내기" : `${st.label} 단계로 바꾸기`}
+            onClick={() => setOpen(i)}
+            className={cx("pressable flex min-h-11 items-center justify-center gap-1 rounded-lg px-1 text-center text-[0.78rem] font-semibold leading-tight sm:text-[0.82rem]",
               i < cur ? "bg-accent/15 text-accent" : i === cur ? "bg-accent text-accent-ink" : "bg-surface-2 text-ink-3 hover:bg-soft/60", !may && "cursor-default")}>
-            <span className="tnum">{i + 1}</span><span className="hidden sm:block">{st.label}</span>
+            {i < cur ? <Check size={13} className="shrink-0" /> : <span className="tnum">{i + 1}</span>}<span>{st.label}</span>
           </button>
         ))}
       </div>
+      {open !== null && <StepSendModal project={p} step={open} onClose={() => setOpen(null)} />}
     </div>
   );
 }
