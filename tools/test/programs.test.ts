@@ -46,4 +46,15 @@ ok(profileOfCompany({ region: "경기", industry: "제조업", bizCategory: "제
 ok(profileOfCompany({ address: "경기 화성시 봉담읍", industry: "정밀부품 제조" } as never).region === "경기", "지역 칸 없으면 주소에서(경기 화성시 → 경기)");
 ok(profileOfCompany({ region: "서울", address: "경기 화성시" } as never).region === "서울", "지역 칸이 있으면 그대로");
 ok(profileOfCompany({ address: "충청북도 청주시" } as never).region === "충북", "주소 긴 이름(충청북도 → 충북)");
+// 기업마당 공식 문서(지원사업정보 API)의 응답 예시 모양 — 접수기간 숫자 8자리, 해시태그 칸 hashTags(대문자 T), 주소 전체. 값은 시험용
+{
+  const off = normalizeBizinfo({ pblancId: "PBLN_TEST09", pblancNm: "시험용 기술개발 지원 공고", jrsdInsttNm: "시험부", excInsttNm: "시험원",
+    reqstBeginEndDe: "20261001 ~ 20261020", hashTags: "2026,기술,경기,중소기업", pldirSportRealmLclasCodeNm: "기술",
+    pblancUrl: "https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_TEST09", trgetNm: "중소기업" }, at);
+  ok(off?.applyStart === "2026-10-01" && off?.applyEnd === "2026-10-20", "공식 형식: 접수기간 20261001 ~ 20261020");
+  ok(!!off && off.regions.includes("경기"), "공식 형식: hashTags(대문자) 의 지역 읽음");
+  ok(off?.url === "https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_TEST09", "공식 형식: 공고 주소 그대로");
+  const alt = normalizeBizinfo({ seq: "PBLN_TEST10", title: "시험용 다른 이름 공고", link: "https://www.bizinfo.go.kr/x", author: "시험부", reqstDt: "20261101 ~ 20261130", lcategory: "금융" }, at);
+  ok(alt?.id === "bz_PBLN_TEST10" && alt.agency === "시험부" && alt.applyEnd === "2026-11-30" && alt.category === "금융", "공식 형식: 다른 이름(seq·title·link·author·reqstDt·lcategory)도 읽음");
+}
 console.log(fail ? `\nFAIL ${fail}` : "\n전부 통과"); process.exit(fail ? 1 : 0);

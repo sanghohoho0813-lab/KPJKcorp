@@ -162,13 +162,15 @@ function dateOf(raw: string): string | undefined {
 
 /** 기업마당 지원사업 API 한 건 → 공고. 필수 값(id·제목)이 없으면 null */
 export function normalizeBizinfo(item: Record<string, unknown>, fetchedAt: string): SupportProgram | null {
-  const id = clean(item.pblancId);
-  const title = clean(item.pblancNm);
+  // 기업마당 공식 응답은 같은 값을 두 이름으로 주기도 한다(pblancNm/title, pblancUrl/link, hashTags …). 앞의 것이 우선
+  const pick = (...keys: string[]) => { for (const k of keys) { const v = clean(item[k]); if (v) return v; } return ""; };
+  const id = pick("pblancId", "seq");
+  const title = pick("pblancNm", "title");
   if (!id || !title) return null;
-  const period = clean(item.reqstBeginEndDe);
+  const period = pick("reqstBeginEndDe", "reqstDt");
   const [startRaw, endRaw] = period.split(/~/);
-  const tags = clean(item.hashtags).split(",").map((t) => t.trim()).filter(Boolean);
-  const rawUrl = clean(item.pblancUrl);
+  const tags = pick("hashTags", "hashtags").split(",").map((t) => t.trim()).filter(Boolean);
+  const rawUrl = pick("pblancUrl", "link");
   const url = rawUrl ? (/^https?:/.test(rawUrl) ? rawUrl : `https://www.bizinfo.go.kr${rawUrl.startsWith("/") ? "" : "/"}${rawUrl}`) : undefined;
   const target = clean(item.trgetNm);
   const applyStart = startRaw ? dateOf(startRaw) : undefined;
@@ -176,12 +178,12 @@ export function normalizeBizinfo(item: Record<string, unknown>, fetchedAt: strin
   return {
     id: `bz_${id}`,
     title,
-    agency: clean(item.jrsdInsttNm),
+    agency: pick("jrsdInsttNm", "author"),
     operator: clean(item.excInsttNm) || undefined,
-    category: categoryOf(clean(item.pldirSportRealmLclasCodeNm) || title),
+    category: categoryOf(pick("pldirSportRealmLclasCodeNm", "lcategory") || title),
     regions: regionsIn(`${title} ${tags.join(" ")}`),
     target: target || undefined,
-    summary: clean(item.bsnsSumryCn).slice(0, 600) || undefined,
+    summary: pick("bsnsSumryCn", "description").slice(0, 600) || undefined,
     applyStart,
     applyEnd,
     periodText: applyEnd ? undefined : period || undefined,
