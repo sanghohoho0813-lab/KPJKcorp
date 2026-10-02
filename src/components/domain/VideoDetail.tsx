@@ -151,7 +151,7 @@ export function VideoDetail({ src, poster, eyebrow, title, desc, duration, chapt
 
             <div className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap lg:mt-auto lg:pt-5">
               <button type="button" onClick={fullscreen} className="pressable inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-[0.9rem] font-bold text-accent-ink hover:brightness-110">
-                <Maximize2 size={16} /> 전체 화면<span className="hidden sm:inline">으로 보기</span>
+                <Maximize2 size={16} /> <span>전체 화면<span className="hidden sm:inline">으로 보기</span></span>
               </button>
               <a href={src} download={downloadName} className="pressable inline-flex items-center justify-center gap-2 rounded-xl bg-white/[0.07] px-4 py-2.5 text-[0.9rem] font-bold text-shell-text-2 ring-1 ring-white/10 hover:bg-white/[0.12] hover:text-white">
                 <Download size={16} /> <span className="sm:hidden">내려받기</span><span className="hidden sm:inline">영상 내려받기</span>

@@ -412,11 +412,13 @@
 
   // 원본 음성 시각 → 영상 시각 (쉼 단축 · 1.1배속 반영)
   function M(t) {
+    if (t <= KNOTS[0][0]) return OFFSET + (KNOTS[0][1] + (t - KNOTS[0][0])) / 1.1;
     for (let i = 0; i < KNOTS.length - 1; i++) {
       const [a, ta] = KNOTS[i], [b, tb] = KNOTS[i + 1];
       if (t >= a && t <= b) return OFFSET + (ta + (tb - ta) * (b > a ? (t - a) / (b - a) : 0)) / 1.1;
     }
-    return OFFSET + KNOTS[KNOTS.length - 1][1] / 1.1 + (t - KNOTS[KNOTS.length - 1][0]) / 1.1;
+    const [a, ta] = KNOTS[KNOTS.length - 1];
+    return OFFSET + (ta + (t - a)) / 1.1;
   }
   const isV = (el) => el.dataset.v === '1';
   const conv = (el, x) => (isV(el) ? x : M(x));

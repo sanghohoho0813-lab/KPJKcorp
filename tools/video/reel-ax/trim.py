@@ -21,6 +21,7 @@ for (s, e) in sil:
     take(s, s + h); take(e - h, e)
     knots.append((e, t_new)); pos = e
 take(pos, dur); knots.append((dur, t_new))
+if knots[0][0] > 0: knots.insert(0, (0.0, 0.0))  # 맨 앞에 무음이 없을 때도 0초부터 대응
 o = wave.open('trimmed.wav', 'wb'); o.setnchannels(1); o.setsampwidth(2); o.setframerate(sr); o.writeframes(bytes(out)); o.close()
 json.dump(knots, open('knots.json', 'w'))
 print('raw', round(dur, 2), '→ trimmed', round(t_new, 2), '→ 1.1x', round(t_new / 1.1, 2))
