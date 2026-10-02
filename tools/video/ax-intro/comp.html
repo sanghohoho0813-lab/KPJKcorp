@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<style>
+  :root { --bg:#0f1216; --shell:#171b20; --shell2:#22272e; --acc:#d47a4a; --acc2:#b75b2a; --hi:#e8b89a; --ink:#f4f1ec; --ink2:rgba(244,241,236,.72); --ink3:rgba(244,241,236,.46); --line:rgba(255,255,255,.09); }
+  * { box-sizing:border-box; margin:0; padding:0; animation:none !important; transition:none !important; }
+  html,body { width:1920px; height:1080px; overflow:hidden; background:var(--bg); font-family:'Pretendard Variable','Pretendard',sans-serif; color:var(--ink); -webkit-font-smoothing:antialiased; }
+  #stage { position:absolute; inset:0; overflow:hidden; }
+  .bg { position:absolute; inset:-10%; background:
+      radial-gradient(60% 50% at 82% 12%, rgba(212,122,74,.22), transparent 60%),
+      radial-gradient(50% 45% at 10% 90%, rgba(232,184,154,.10), transparent 60%),
+      linear-gradient(160deg, #12161b 0%, #171b20 45%, #0d1014 100%); }
+  .grid { position:absolute; inset:0; background-image:linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px); background-size:96px 96px; mask-image:radial-gradient(70% 60% at 50% 45%, #000 30%, transparent 85%); opacity:.55; }
+  .scene { position:absolute; inset:0; opacity:0; }
+  .abs { position:absolute; }
+  .eyebrow { font-size:22px; font-weight:700; letter-spacing:.32em; color:var(--hi); text-transform:uppercase; }
+  .h1 { font-size:92px; font-weight:800; letter-spacing:-.025em; line-height:1.08; }
+  .h2 { font-size:64px; font-weight:800; letter-spacing:-.02em; line-height:1.15; }
+  .h3 { font-size:40px; font-weight:700; letter-spacing:-.01em; line-height:1.3; }
+  .p  { font-size:30px; font-weight:500; color:var(--ink2); line-height:1.5; }
+  .acc { color:var(--hi); }
+  .pill { display:inline-flex; align-items:center; gap:12px; padding:14px 26px; border-radius:999px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); font-size:28px; font-weight:600; color:var(--ink); white-space:nowrap; }
+  .glass { background:linear-gradient(160deg, rgba(255,255,255,.075), rgba(255,255,255,.025)); border:1px solid rgba(255,255,255,.12); border-radius:28px; box-shadow:0 40px 80px -30px rgba(0,0,0,.7); }
+  /* 기기 틀 */
+  .browser { position:absolute; border-radius:18px; overflow:hidden; background:#fff; box-shadow:0 50px 120px -30px rgba(0,0,0,.75), 0 0 0 1px rgba(255,255,255,.08); }
+  .browser .bar { height:38px; background:#eef0f3; display:flex; align-items:center; gap:8px; padding:0 16px; border-bottom:1px solid #dfe2e6; }
+  .browser .bar i { width:12px; height:12px; border-radius:50%; background:#d6d9de; display:block; }
+  .browser .bar b { margin-left:18px; height:22px; flex:0 0 40%; border-radius:6px; background:#fff; font-size:13px; font-weight:600; color:#7a828c; display:flex; align-items:center; padding-left:12px; }
+  .browser .view { position:relative; overflow:hidden; }
+  .browser img, .phone img { display:block; width:100%; transform-origin:0 0; }
+  .phone { position:absolute; border-radius:54px; padding:14px; background:#0b0d10; box-shadow:0 60px 120px -30px rgba(0,0,0,.8), 0 0 0 2px rgba(255,255,255,.14) inset; }
+  .phone .view { border-radius:40px; overflow:hidden; position:relative; background:#fff; }
+  .phone .notch { position:absolute; top:22px; left:50%; width:120px; height:30px; margin-left:-60px; background:#0b0d10; border-radius:20px; z-index:3; }
+  .tag { position:absolute; padding:12px 22px; border-radius:16px; background:rgba(15,18,22,.86); border:1px solid rgba(232,184,154,.45); font-size:26px; font-weight:700; color:var(--ink); white-space:nowrap; box-shadow:0 20px 40px -15px rgba(0,0,0,.6); }
+  .tag .n { display:inline-flex; width:38px; height:38px; border-radius:50%; background:var(--acc); color:#fff; font-size:22px; align-items:center; justify-content:center; margin-right:12px; }
+  .note { position:absolute; right:48px; bottom:34px; font-size:18px; color:var(--ink3); font-weight:500; }
+  .chip { position:absolute; padding:18px 30px; border-radius:20px; font-size:32px; font-weight:700; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.14); white-space:nowrap; }
+  /* 순환 도식 */
+  .node { position:absolute; width:290px; height:132px; margin:-66px 0 0 -145px; border-radius:26px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; background:rgba(255,255,255,.05); border:1.5px solid rgba(255,255,255,.14); }
+  .node .t { font-size:34px; font-weight:800; }
+  .node .s { font-size:20px; color:var(--ink3); margin-top:6px; font-weight:600; }
+  .tl-dot { position:absolute; width:22px; height:22px; border-radius:50%; margin:-11px 0 0 -11px; background:#2a3038; border:3px solid rgba(255,255,255,.25); }
+  .tl-label { position:absolute; width:250px; margin-left:-125px; text-align:center; font-size:27px; font-weight:700; line-height:1.3; }
+  .tl-label small { display:block; font-size:20px; color:var(--hi); font-weight:700; margin-bottom:6px; letter-spacing:.06em; }
+  .road { position:absolute; width:370px; height:210px; border-radius:28px; padding:30px; }
+  .road .k { font-size:22px; font-weight:800; color:var(--hi); letter-spacing:.1em; }
+  .road .v { font-size:32px; font-weight:800; margin-top:14px; line-height:1.3; }
+  .check { display:flex; align-items:center; gap:18px; font-size:36px; font-weight:700; margin-bottom:26px; }
+  .check i { width:46px; height:46px; border-radius:50%; background:var(--acc); display:inline-flex; align-items:center; justify-content:center; font-style:normal; font-size:26px; color:#fff; flex:none; }
+  .col { position:absolute; top:330px; width:780px; height:470px; padding:52px; }
+  .col .k { font-size:24px; font-weight:800; letter-spacing:.14em; }
+  .col .big { font-size:52px; font-weight:800; margin-top:14px; letter-spacing:-.02em; }
+  .col ul { list-style:none; margin-top:34px; }
+  .col li { font-size:34px; font-weight:700; padding:12px 0; display:flex; align-items:center; gap:16px; }
+  .col li:before { content:""; width:12px; height:12px; border-radius:50%; background:var(--hi); flex:none; }
+  .logo { display:inline-flex; align-items:center; justify-content:center; width:132px; height:132px; border-radius:34px; background:#fff; color:var(--shell); font-weight:900; font-size:40px; letter-spacing:.04em; }
+  .bar-under { position:absolute; height:6px; border-radius:6px; background:linear-gradient(90deg, var(--acc), var(--hi)); }
+</style></head>
+<body><div id="stage">
+  <div class="bg" id="bg"></div><div class="grid"></div>
+
+  <!-- S0 인트로 · S1 문제의 출발점 (0 – 19.4) -->
+  <div class="scene" data-in="0" data-out="19.4" data-fi="0">
+    <div class="abs" style="left:0;right:0;top:330px;text-align:center" data-in="0.1" data-out="3.6" data-a="scale">
+      <div class="logo">KPJK</div>
+      <div class="eyebrow" style="margin-top:44px">Consulting · Business AX</div>
+    </div>
+    <div class="abs" style="left:150px;top:300px" data-in="3.6" data-out="8.4" data-a="up">
+      <div class="eyebrow">KPJK Consulting</div>
+      <div class="h1" style="margin-top:28px">경영컨설팅 현장<br><span class="acc">약 8년</span></div>
+      <div class="p" style="margin-top:30px">기업 · 법인 경영컨설팅</div>
+    </div>
+    <!-- 흩어진 정보 -->
+    <div data-in="8.4" data-out="13.8" data-a="fade">
+      <div class="abs h2" style="left:150px;top:150px;font-size:54px" data-in="8.6" data-out="13.8" data-a="up">고객이 늘수록, 정보는 <span class="acc">흩어졌습니다</span></div>
+      <div class="chip" data-drift="0" style="left:760px;top:520px">카카오톡</div>
+      <div class="chip" data-drift="1" style="left:760px;top:520px">엑셀</div>
+      <div class="chip" data-drift="2" style="left:760px;top:520px">문서</div>
+      <div class="chip" data-drift="3" style="left:760px;top:520px">일정</div>
+      <div class="chip" data-drift="4" style="left:760px;top:520px">담당자의 기억</div>
+    </div>
+    <!-- 질문 -->
+    <div class="abs" style="left:150px;top:300px" data-in="13.9" data-out="19.4" data-a="fade">
+      <div class="h2" data-in="13.9" data-out="19.4" data-a="up">이 기업은 지금 <span class="acc">어디까지</span> 왔는가?</div>
+      <div class="h2" style="margin-top:28px" data-in="15.8" data-out="19.4" data-a="up">다음에 <span class="acc">무엇을</span> 해야 하는가?</div>
+      <div class="p" style="margin-top:56px" data-in="17.0" data-out="19.4" data-a="up">확인하는 데 점점 더 많은 시간이 들었습니다.</div>
+    </div>
+  </div>
+
+  <!-- S2 핵심 구조 (19.4 – 39.6) -->
+  <div class="scene" data-in="19.4" data-out="39.6">
+    <div class="abs" style="left:150px;top:330px" data-in="19.5" data-out="25.6" data-a="up">
+      <div class="h2" style="color:var(--ink3)"><span id="strike" style="position:relative">고객 명단 관리 도구<span class="bar-under" id="strikeBar" style="left:0;top:50%;height:6px;width:0"></span></span>가 아니라</div>
+      <div class="h1" style="margin-top:26px" data-in="22.7" data-out="25.6" data-a="up">업무의 <span class="acc">흐름 자체</span>를 구조로</div>
+    </div>
+    <div data-in="25.6" data-out="39.6" data-a="fade">
+      <div class="abs eyebrow" style="left:150px;top:96px">State-based Workflow</div>
+      <div class="abs h3" style="left:150px;top:140px;font-size:46px;font-weight:800">이벤트 → 기업 상태 → 다음 행동 → 실행 → 상태 갱신</div>
+      <svg class="abs" width="1920" height="1080" style="left:0;top:0" viewBox="0 0 1920 1080">
+        <ellipse id="ring" cx="960" cy="640" rx="560" ry="290" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="3" stroke-dasharray="6 14"/>
+        <path id="ringOn" d="M 960 350 A 560 290 0 1 1 960 930 A 560 290 0 1 1 960 350" fill="none" stroke="#d47a4a" stroke-width="5" stroke-linecap="round" pathLength="1000" stroke-dasharray="0 1000"/>
+        <circle id="spark" r="11" fill="#e8b89a"/>
+      </svg>
+      <div class="node" data-node="0" style="left:960px;top:350px"><div class="t">업무 이벤트</div><div class="s">상담 · 계약 · 자료 제출</div></div>
+      <div class="node" data-node="1" style="left:1440px;top:500px"><div class="t">기업 상태</div><div class="s">지금 어디까지 왔나</div></div>
+      <div class="node" data-node="2" style="left:1440px;top:780px"><div class="t">다음 행동</div><div class="s">상태에 맞는 할 일</div></div>
+      <div class="node" data-node="3" style="left:960px;top:930px"><div class="t">담당자 · 고객</div><div class="s">각각에게 제시 · 실행</div></div>
+      <div class="node" data-node="4" style="left:480px;top:780px"><div class="t">실행 결과</div><div class="s">내부 처리 · 고객 행동</div></div>
+      <div class="node" data-node="5" style="left:480px;top:500px"><div class="t">상태 갱신</div><div class="s">다시 반영</div></div>
+      <div class="abs" style="left:0;right:0;top:600px;text-align:center" data-in="37.0" data-out="39.6" data-a="scale">
+        <div class="h3" style="font-size:44px;font-weight:800">이 <span class="acc">순환 구조</span>가 핵심입니다</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- S3 실제 구현 (39.6 – 50.0) -->
+  <div class="scene" data-in="39.6" data-out="50.0">
+    <div class="abs" style="left:150px;top:96px" data-in="39.7" data-out="50" data-a="up">
+      <div class="eyebrow">Working System</div>
+      <div class="h2" style="margin-top:16px;font-size:58px">이미 <span class="acc">작동하는 시스템</span>으로 구현</div>
+    </div>
+    <div class="abs pill" style="right:150px;top:126px;border-color:rgba(232,184,154,.5)" data-in="47.0" data-out="50" data-a="scale"><span style="width:12px;height:12px;border-radius:50%;background:#6fd39a;display:inline-block"></span>실시간 서버 연동</div>
+    <div id="cards"></div>
+    <div class="note" data-in="40" data-out="50" data-a="fade">화면 속 기업 · 인물은 예시 데이터입니다</div>
+  </div>
+
+  <!-- S4 Closed Loop (50.0 – 61.8) -->
+  <div class="scene" data-in="50.0" data-out="61.8">
+    <div class="abs" style="left:150px;top:80px" data-in="50.1" data-out="61.8" data-a="up">
+      <div class="eyebrow">Closed Loop</div>
+      <div class="h2" style="margin-top:14px;font-size:54px">고객 휴대폰 ↔ KPJK 내부 시스템</div>
+    </div>
+    <div class="phone" id="loopPhone" style="left:190px;top:250px;width:390px"><div class="notch"></div><div class="view" style="height:760px">
+      <img data-shot="phone-upload.png" data-in="50" data-out="52.9" style="position:absolute;left:0;top:0">
+      <img data-shot="phone-docs-after.png" data-in="52.8" data-out="58.0" style="position:absolute;left:0;top:0">
+      <img data-shot="phone-docs-done.png" data-in="57.9" data-out="61.8" style="position:absolute;left:0;top:0">
+    </div></div>
+    <div class="browser" id="loopPc" style="left:720px;top:250px;width:1050px"><div class="bar"><i></i><i></i><i></i><b>KPJK Business AX</b></div><div class="view" style="height:656px">
+      <img data-shot="pc-client-docs.png" data-in="50" data-out="55.4" style="position:absolute;left:0;top:0">
+      <img data-shot="pc-review.png" data-in="55.3" data-out="58.0" style="position:absolute;left:0;top:0">
+      <img data-shot="pc-review-done.png" data-in="57.9" data-out="61.8" style="position:absolute;left:0;top:0">
+    </div></div>
+    <svg class="abs" width="1920" height="1080" style="left:0;top:0"><path id="loopArrow" d="M 600 520 C 640 420, 680 420, 712 470" fill="none" stroke="#d47a4a" stroke-width="5" stroke-linecap="round" pathLength="100" stroke-dasharray="0 100"/><path id="loopBack" d="M 712 780 C 680 840, 640 840, 600 780" fill="none" stroke="#e8b89a" stroke-width="5" stroke-linecap="round" pathLength="100" stroke-dasharray="0 100"/></svg>
+    <div class="tag" style="left:150px;top:960px" data-in="50.4" data-out="61.8" data-a="up"><span class="n">1</span>고객이 휴대폰으로 제출</div>
+    <div class="tag" style="left:560px;top:960px" data-in="52.8" data-out="61.8" data-a="up"><span class="n">2</span>검토 업무 자동 생성</div>
+    <div class="tag" style="left:950px;top:960px" data-in="55.3" data-out="61.8" data-a="up"><span class="n">3</span>담당자 검토 · 상태 변경</div>
+    <div class="tag" style="left:1380px;top:960px" data-in="57.9" data-out="61.8" data-a="up"><span class="n">4</span>고객 화면에 반영</div>
+    <div class="note" style="bottom:110px" data-in="50" data-out="61.8" data-a="fade">화면 속 기업 · 인물은 예시 데이터입니다</div>
+  </div>
+
+  <!-- S5 고객 Portal (61.8 – 79.4) -->
+  <div class="scene" data-in="61.8" data-out="79.4">
+    <div class="abs" style="left:150px;top:80px" data-in="61.9" data-out="74.6" data-a="up">
+      <div class="eyebrow">Customer Portal</div>
+      <div class="h2" style="margin-top:14px;font-size:54px">진행 조회를 넘어, <span class="acc">기업성장 관리 플랫폼</span>으로</div>
+    </div>
+    <div class="browser" id="portalPc" style="left:150px;top:250px;width:1080px" data-in="62.0" data-out="74.6" data-a="left"><div class="bar"><i></i><i></i><i></i><b>KPJK 성장 플랫폼</b></div><div class="view" style="height:690px">
+      <img data-shot="pc-portal-home.png" data-in="61.8" data-out="67.6" data-kb="62,67.6,1,0,0,1.1,-30,-20" style="position:absolute;left:0;top:0">
+      <img data-shot="pc-portal-home-2.png" data-in="67.3" data-out="74.6" data-kb="67.3,74.6,1,0,0,1.07,-20,-30" style="position:absolute;left:0;top:0">
+    </div></div>
+    <div class="phone" style="left:1060px;top:420px;width:300px" data-in="63.0" data-out="74.6" data-a="up"><div class="notch" style="width:90px;margin-left:-45px;top:18px;height:24px"></div><div class="view" style="height:600px">
+      <img data-shot="phone-portal-home-2.png" style="position:absolute;left:0;top:0">
+    </div></div>
+    <div class="abs" style="left:1440px;top:270px;width:400px" data-in="62.4" data-out="74.6" data-a="fade">
+      <div class="flow" data-flow="62.6" style="font-size:30px;font-weight:700">
+        <div class="fl">우리 회사 현재 상태</div>
+        <div class="fl">지금 해야 할 일</div>
+        <div class="fl">진행 중인 성장과제</div>
+        <div class="fl">다음으로 검토할 과제</div>
+        <div class="fl">고객이 직접 요청</div>
+        <div class="fl acc">→ 내부 업무로 바로 연결</div>
+      </div>
+    </div>
+    <!-- 지원사업 (보조) -->
+    <div data-in="74.6" data-out="79.4" data-a="fade">
+      <div class="phone" style="left:240px;top:150px;width:360px" data-in="74.7" data-out="79.4" data-a="up"><div class="notch" style="width:100px;margin-left:-50px;top:18px;height:26px"></div><div class="view" style="height:760px">
+        <img data-shot="phone-programs.png" style="position:absolute;left:0;top:0">
+      </div></div>
+      <div class="abs" style="left:780px;top:360px" data-in="75.0" data-out="79.4" data-a="up">
+        <div class="eyebrow">기업성장 관리 기능 중 하나</div>
+        <div class="h2" style="margin-top:20px;font-size:56px">조건에 맞는<br><span class="acc">정부지원사업 공고</span> 선별</div>
+        <div class="p" style="margin-top:26px">지역 · 업종 · 업력 기준으로 검토할 만한 공고를 골라 근거와 함께 보여줍니다</div>
+      </div>
+    </div>
+    <div class="note" data-in="62" data-out="79.4" data-a="fade">화면 속 기업 · 인물 · 공고는 예시 데이터입니다</div>
+  </div>
+
+  <!-- S6 개발 주체 · 경과 · 특허 (79.4 – 95.4) -->
+  <div class="scene" data-in="79.4" data-out="95.4">
+    <div data-in="79.4" data-out="87.9" data-a="fade">
+      <div class="abs" style="left:150px;top:120px" data-in="79.5" data-out="87.9" data-a="up">
+        <div class="eyebrow">Who Built What</div>
+        <div class="h2" style="margin-top:14px;font-size:54px">현장의 노하우가 제품의 뼈대입니다</div>
+      </div>
+      <div class="col glass" style="left:150px;border-color:rgba(232,184,154,.5)" data-in="79.9" data-out="87.9" data-a="up">
+        <div class="k acc">KPJK 주도</div>
+        <div class="big">설계 · 검증</div>
+        <ul><li>현장의 문제 정의</li><li>업무 규칙</li><li>제품 방향</li><li>실제 사용 검증</li></ul>
+      </div>
+      <div class="col glass" style="left:990px" data-in="84.6" data-out="87.9" data-a="up">
+        <div class="k" style="color:var(--ink3)">외부 전문 개발사 협력</div>
+        <div class="big">구현</div>
+        <ul><li>소프트웨어 구현</li></ul>
+      </div>
+    </div>
+    <div data-in="87.9" data-out="95.4" data-a="fade">
+      <div class="abs" style="left:150px;top:120px" data-in="88.0" data-out="95.4" data-a="up">
+        <div class="eyebrow">Development</div>
+        <div class="h2" style="margin-top:14px;font-size:54px">문제 인식에서 실사용 검증까지</div>
+      </div>
+      <div class="abs" style="left:240px;top:520px;height:4px;width:1440px;background:rgba(255,255,255,.12);border-radius:4px"></div>
+      <div class="abs" id="tlFill" style="left:240px;top:520px;height:4px;width:0;background:linear-gradient(90deg,#d47a4a,#e8b89a);border-radius:4px"></div>
+      <div id="tl"></div>
+      <div class="abs glass" id="patent" style="left:610px;top:760px;width:700px;padding:30px 40px;text-align:center;border-color:rgba(232,184,154,.6)" data-in="91.2" data-out="95.4" data-a="scale">
+        <div class="eyebrow" style="font-size:20px">Patent Application</div>
+        <div style="font-size:44px;font-weight:800;margin-top:10px">특허 출원 완료</div>
+        <div style="font-size:26px;font-weight:600;color:var(--ink2);margin-top:8px">핵심 구조 · 출원번호 10-2026-0177079</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- S7 현재 단계 · 사업화 (95.4 – 114.4) -->
+  <div class="scene" data-in="95.4" data-out="114.4">
+    <div data-in="95.4" data-out="105.1" data-a="fade">
+      <div class="abs" style="left:150px;top:150px" data-in="95.5" data-out="105.1" data-a="up">
+        <div class="eyebrow">Current Stage</div>
+        <div class="h1" style="margin-top:20px;font-size:84px">초기 <span class="acc">실증</span> 단계</div>
+      </div>
+      <div class="abs" style="left:150px;top:520px">
+        <div class="check" data-in="96.0" data-out="105.1" data-a="left"><i>✓</i>실사용 가능한 시스템 구현 완료</div>
+        <div class="check" data-in="98.6" data-out="105.1" data-a="left"><i>✓</i>실제 고객 적용</div>
+        <div class="check" data-in="100.4" data-out="105.1" data-a="left"><i>✓</i>운영 안정화 · 고도화 진행 중</div>
+      </div>
+      <div class="browser" style="left:1010px;top:300px;width:760px" data-in="96.4" data-out="105.1" data-a="up"><div class="bar"><i></i><i></i><i></i><b>KPJK Business AX</b></div><div class="view" style="height:475px">
+        <img data-shot="pc-dashboard.png" data-kb="96.4,105.1,1,0,0,1.08,-20,-10" style="position:absolute;left:0;top:0">
+      </div></div>
+      <div class="note" data-in="96.4" data-out="105.1" data-a="fade">화면 속 기업 · 인물은 예시 데이터입니다</div>
+    </div>
+    <div data-in="105.1" data-out="114.4" data-a="fade">
+      <div class="abs" style="left:150px;top:150px" data-in="105.2" data-out="114.4" data-a="up">
+        <div class="eyebrow">Business Roadmap</div>
+        <div class="h2" style="margin-top:14px;font-size:56px">현장에서 검증하고, 업계로 넓힙니다</div>
+      </div>
+      <div class="road glass" style="left:150px;top:470px" data-in="105.4" data-out="114.4" data-a="up"><div class="k">STEP 1</div><div class="v">기존 컨설팅 고객<br>먼저 적용</div></div>
+      <div class="abs" style="left:527px;top:548px;font-size:40px;color:var(--hi);font-weight:800" data-in="106.6" data-out="114.4" data-a="left">›</div><div class="abs" style="left:937px;top:548px;font-size:40px;color:var(--hi);font-weight:800" data-in="108.2" data-out="114.4" data-a="left">›</div><div class="abs" style="left:1347px;top:548px;font-size:40px;color:var(--hi);font-weight:800" data-in="110.2" data-out="114.4" data-a="left">›</div>
+      <div class="road glass" style="left:560px;top:470px" data-in="106.8" data-out="114.4" data-a="up"><div class="k">STEP 2</div><div class="v">사용 데이터<br>축적</div></div>
+      <div class="road glass" style="left:970px;top:470px" data-in="108.4" data-out="114.4" data-a="up"><div class="k">STEP 3</div><div class="v">업무 규칙 표준화<br>지속 관리 서비스</div></div>
+      <div class="road glass" style="left:1380px;top:470px;border-color:rgba(232,184,154,.55)" data-in="110.4" data-out="114.4" data-a="up"><div class="k">STEP 4</div><div class="v">동종 컨설팅 업계<br><span class="acc">구독형 서비스</span></div></div>
+    </div>
+  </div>
+
+  <!-- S8 마무리 (114.4 – 121) -->
+  <div class="scene" data-in="114.4" data-out="121.5">
+    <div class="abs" style="left:0;right:0;top:300px;text-align:center" data-in="114.5" data-out="121.5" data-a="scale">
+      <div class="logo">KPJK</div>
+      <div class="h2" style="margin-top:56px;font-size:62px">현장의 노하우를, <span class="acc">실제로 작동하는 기술</span>로</div>
+      <div class="eyebrow" style="margin-top:34px">KPJK Consulting · Business AX</div>
+    </div>
+  </div>
+</div>
+<script>
+const SHOT = window.SHOT_DIR || 'shots/';
+document.querySelectorAll('img[data-shot]').forEach((im) => { im.src = SHOT + im.dataset.shot; });
+
+// S3 화면 카드 6장
+const CARDS = [
+  ['pc-dashboard.png', '대표 대시보드'], ['pc-clients.png', '기업고객 · 프로젝트'], ['pc-documents.png', '자료 요청 · 검토'],
+  ['pc-tasks.png', '일정 · 후속 업무'], ['pc-brief.png', '업무 브리핑'], ['pc-permissions.png', '권한 관리'],
+];
+const cardsEl = document.getElementById('cards');
+CARDS.forEach(([f, label], i) => {
+  const col = i % 3, row = Math.floor(i / 3);
+  const d = document.createElement('div');
+  d.className = 'browser'; d.dataset.in = (40.2 + i * 0.85).toFixed(2); d.dataset.out = '50'; d.dataset.a = 'card';
+  d.style.cssText = `left:${150 + col * 548}px;top:${270 + row * 370}px;width:520px`;
+  d.innerHTML = `<div class="bar" style="height:28px"><i style="width:9px;height:9px"></i><i style="width:9px;height:9px"></i><i style="width:9px;height:9px"></i></div><div class="view" style="height:300px"><img src="${SHOT + f}" style="position:absolute;left:0;top:0"></div>`;
+  const t = document.createElement('div'); t.className = 'tag'; t.style.cssText = 'left:18px;bottom:16px;font-size:22px;padding:8px 16px'; t.textContent = label; d.appendChild(t);
+  cardsEl.appendChild(d);
+});
+
+// S6 타임라인 6단계 (월은 확인된 6월만)
+const TL = [['6월', '문제 인식'], ['', '업무 흐름 구조화'], ['', '상태 · 행동 구조 설계'], ['', '시스템 구현'], ['', '특허 출원'], ['', '실사용 검증']];
+const tlEl = document.getElementById('tl');
+TL.forEach(([m, l], i) => {
+  const x = 240 + i * 288;
+  const dot = document.createElement('div'); dot.className = 'tl-dot'; dot.style.left = x + 'px'; dot.style.top = '522px'; dot.dataset.tl = i; tlEl.appendChild(dot);
+  const lb = document.createElement('div'); lb.className = 'tl-label'; lb.style.left = x + 'px'; lb.style.top = (i % 2 ? 580 : 380) + 'px'; lb.dataset.in = (88.4 + i * 0.75).toFixed(2); lb.dataset.out = '95.4'; lb.dataset.a = 'up';
+  lb.innerHTML = (m ? `<small>${m}</small>` : `<small>&nbsp;</small>`) + l; tlEl.appendChild(lb);
+});
+
+// ---------------- 시간 → 화면 ----------------
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const eo = (x) => 1 - Math.pow(1 - x, 3);
+const eio = (x) => (x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+const lerp = (a, b, x) => a + (b - a) * x;
+function vis(t, tin, tout, d = 0.6) { const a = eo(clamp((t - tin) / d)); const b = 1 - eio(clamp((t - (tout - d * 0.8)) / (d * 0.8))); return Math.min(a, b); }
+
+const animated = [...document.querySelectorAll('[data-in]')];
+function render(t) {
+  // 배경 아주 천천히
+  document.getElementById('bg').style.transform = `translate(${Math.sin(t / 9) * 30}px, ${Math.cos(t / 11) * 20}px) scale(1.04)`;
+  for (const el of animated) {
+    const tin = +el.dataset.in, tout = +el.dataset.out, a = el.dataset.a || 'fade';
+    const isScene = el.classList.contains('scene');
+    const v = vis(t, tin, tout, isScene ? 0.55 : 0.7);
+    const p = eo(clamp((t - tin) / 0.8));
+    let tr = '';
+    if (a === 'up') tr = `translateY(${(1 - p) * 34}px)`;
+    else if (a === 'left') tr = `translateX(${(1 - p) * -60}px)`;
+    else if (a === 'scale') tr = `scale(${lerp(0.94, 1, p)})`;
+    else if (a === 'card') tr = `translateY(${(1 - p) * 60}px) scale(${lerp(0.92, 1, p)})`;
+    el.style.opacity = v;
+    if (tr) el.style.transform = tr;
+    if (el.tagName === 'IMG') el.style.opacity = vis(t, tin, tout, 0.35);
+  }
+  // 화면 천천히 이동(켄 번즈)
+  document.querySelectorAll('[data-kb]').forEach((im) => {
+    const [a, b, s0, x0, y0, s1, x1, y1] = im.dataset.kb.split(',').map(Number);
+    const k = eio(clamp((t - a) / (b - a)));
+    im.style.transform = `translate(${lerp(x0, x1, k)}px, ${lerp(y0, y1, k)}px) scale(${lerp(s0, s1, k)})`;
+  });
+  // S1 흩어지는 조각
+  const drift = clamp((t - 8.8) / 4.6);
+  const D = [[-520, -150], [380, -170], [-430, 170], [460, 150], [-30, 250]];
+  document.querySelectorAll('[data-drift]').forEach((c) => {
+    const i = +c.dataset.drift, [dx, dy] = D[i];
+    const k = eo(drift);
+    c.style.transform = `translate(${dx * k}px, ${dy * k}px) rotate(${(i % 2 ? 1 : -1) * 4 * k}deg)`;
+    c.style.opacity = vis(t, 8.6 + i * 0.25, 13.8, 0.6) * lerp(1, 0.75, k);
+  });
+  // S2 줄 긋기 · 순환 도식
+  document.getElementById('strikeBar').style.width = `${eio(clamp((t - 21.2) / 0.8)) * 100}%`;
+  const nodeT = [25.9, 27.6, 30.4, 32.4, 34.8, 35.9];
+  document.querySelectorAll('[data-node]').forEach((n) => {
+    const i = +n.dataset.node, on = eo(clamp((t - nodeT[i]) / 0.6));
+    n.style.opacity = lerp(0, 1, eo(clamp((t - (25.7 + i * 0.12)) / 0.6)));
+    n.style.borderColor = `rgba(232,184,154,${lerp(0.14, 0.75, on)})`;
+    n.style.background = `linear-gradient(rgba(212,122,74,${lerp(0.04, 0.2, on)}), rgba(212,122,74,${lerp(0.04, 0.2, on)})), #1c2026`;
+    n.style.transform = `scale(${lerp(0.96, 1, on)})`;
+  });
+  const RK = [0, .168, .332, .5, .668, .832, 1], RT = [...nodeT, 36.9];
+  let ringK = t <= RT[0] ? 0 : 1;
+  for (let i = 0; i < 6; i++) if (t >= RT[i] && t < RT[i + 1]) ringK = lerp(RK[i], RK[i + 1], eio((t - RT[i]) / (RT[i + 1] - RT[i])));
+  document.getElementById('ringOn').setAttribute('stroke-dasharray', `${(ringK * 1000).toFixed(1)} 1000`);
+  const ang = -Math.PI / 2 + ringK * Math.PI * 2 + (t > 36.9 ? (t - 36.9) * 1.6 : 0);
+  const sp = document.getElementById('spark');
+  sp.setAttribute('cx', 960 + 560 * Math.cos(ang)); sp.setAttribute('cy', 640 + 290 * Math.sin(ang));
+  sp.setAttribute('opacity', vis(t, 25.9, 39.6, 0.4));
+  // S4 화살표
+  document.getElementById('loopArrow').setAttribute('stroke-dasharray', `${eo(clamp((t - 52.6) / 0.8)) * 100} 100`);
+  document.getElementById('loopBack').setAttribute('stroke-dasharray', `${eo(clamp((t - 57.7) / 0.8)) * 100} 100`);
+  // S5 흐름 목록
+  document.querySelectorAll('[data-flow]').forEach((f) => {
+    const t0 = +f.dataset.flow;
+    [...f.children].forEach((c, i) => {
+      const ti = t0 + i * 1.85, k = eo(clamp((t - ti) / 0.6));
+      c.style.opacity = lerp(0, 1, k) * (t > ti + 1.85 && i < 5 ? 0.62 : 1);
+      c.style.transform = `translateX(${(1 - k) * 30}px)`;
+      c.style.padding = '16px 0'; c.style.borderBottom = '1px solid rgba(255,255,255,.08)';
+    });
+  });
+  // S6 타임라인 채우기
+  const tlK = eio(clamp((t - 88.4) / 4.2));
+  document.getElementById('tlFill').style.width = `${tlK * 1440}px`;
+  document.querySelectorAll('[data-tl]').forEach((d) => {
+    const i = +d.dataset.tl, on = clamp((tlK * 1440 - i * 288) / 40 + 1);
+    d.style.background = on > 0 ? '#d47a4a' : '#2a3038'; d.style.borderColor = on > 0 ? '#e8b89a' : 'rgba(255,255,255,.25)';
+    d.style.transform = `scale(${on > 0 ? 1.15 : 1})`;
+  });
+}
+window.render = render;
+render(0);
+</script>
+</body></html>
