@@ -16,6 +16,8 @@ export const CATEGORY_LABEL: Record<ProgramCategory, string> = {
 /** 매칭에 쓰는 회사 조건 — 고객 기업이든 가망고객이 입력한 값이든 같은 모양 */
 export interface MatchProfile {
   region?: string;
+  /** 시·군 (주소에서. 예: 화성시) — 시·군 단위 공고를 가려낸다 */
+  city?: string;
   /** 업종·업태·종목을 이어 붙인 글 */
   industry?: string;
   foundedYear?: number;
@@ -30,6 +32,7 @@ export function profileOfCompany(c: Company): MatchProfile {
   return {
     // 지역 칸이 비어 있으면 주소 앞부분(경기 화성시 → 경기)으로 — 주소만 넣은 고객이 많다
     region: c.region || (c.address ? regionsIn(c.address)[0] : undefined),
+    city: c.address ? citiesIn(c.address)[0] : undefined,
     industry: [c.industry, c.bizCategory, c.bizItem].filter(Boolean).join(" "),
     foundedYear: y && y > 1900 ? y : undefined,
     employees: c.employees || bandMin || undefined,
@@ -82,13 +85,19 @@ export function matchProgram(p: SupportProgram, prof: MatchProfile, now = new Da
   let score = 0;
   const text = `${p.title} ${p.target ?? ""} ${p.summary ?? ""} ${p.tags.join(" ")}`;
 
-  // 지역 — 다른 시·도 전용 공고는 뺀다
-  if (p.regions.length) {
-    if (prof.region && !p.regions.includes(prof.region)) return null;
-    if (prof.region) { score += 3; reasons.push(`지역 맞음: ${prof.region}`); }
-    else cautions.push(`${p.regions.join("·")} 지역 대상`);
+  // 지역 — 다른 시·도 전용 공고는 뺀다. 전국 공고는 "지역 맞음"이 아니다(점수 없음)
+  const regions = programRegions(p);
+  if (regions.length) {
+    if (prof.region && !regions.includes(prof.region)) return null;
+    if (prof.region) {
+      // 시·군 단위 공고(예: "안산시 소상공인 …")는 그 시·군 회사만
+      const cities = citiesIn(`${p.title} ${p.target ?? ""}`);
+      if (cities.length && prof.city && !cities.includes(prof.city)) return null;
+      if (cities.length && !prof.city) cautions.push(`${cities.join("·")} 대상 — 회사 소재 시·군 확인 필요`);
+      else { score += 3; reasons.push(`지역 맞음: ${cities.length ? cities.join("·") : prof.region}`); }
+    } else cautions.push(`${regions.join("·")} 지역 대상`);
   } else {
-    score += 1; reasons.push("전국 대상");
+    reasons.push("전국 대상");
   }
 
   // 업력 — 예비창업 전용 / "창업 N년 이내"
@@ -101,6 +110,9 @@ export function matchProgram(p: SupportProgram, prof: MatchProfile, now = new Da
     const n = Number(within[1]);
     if (age > n) return null;
     score += 2; reasons.push(`업력 ${n}년 이내 조건: 업력 ${age}년`);
+  } else if (!within && age !== undefined && age > 7 && /창업\s*(?:기업|벤처)|초기\s*창업|스타트업/.test(`${p.title} ${p.target ?? ""}`)) {
+    // 창업기업은 보통 업력 7년 이내(중소기업창업 지원법). 빼지는 않고 맞는 고객에서 내린다
+    score -= 2; cautions.push(`창업기업(업력 7년 이내) 대상일 수 있음 — 업력 ${age}년`);
   }
 
   // 업종
@@ -137,6 +149,43 @@ const LONG_REGION: Record<string, string> = {
   세종특별자치시: "세종", 경기도: "경기", 강원도: "강원", 강원특별자치도: "강원", 충청북도: "충북", 충청남도: "충남", 전라북도: "전북",
   전북특별자치도: "전북", 전라남도: "전남", 경상북도: "경북", 경상남도: "경남", 제주특별자치도: "제주",
 };
+/**
+ * 공고가 실제로 어느 시·도 공고인가.
+ * 기업마당 해시태그에는 전국 17개 시·도가 다 붙어 오는 공고가 많다 — 그대로 믿으면 모든 회사가 "지역 맞음"이 된다.
+ * 순서: 공고명의 지역([경기] · 경북 TIPS) → 소관 기관이 지자체면 그 지역(경상북도·대전광역시) → 해시태그 지역이 3곳 이하일 때만 → 아니면 전국.
+ * 담당자가 직접 넣은 공고는 고른 지역 그대로.
+ */
+export function programRegions(p: Pick<SupportProgram, "source" | "title" | "agency" | "regions">): string[] {
+  if (p.source === "manual") return p.regions;
+  const fromTitle = regionsIn(p.title);
+  if (fromTitle.length && fromTitle.length <= 3) return fromTitle;
+  const fromAgency = regionsIn(p.agency ?? "");
+  if (fromAgency.length === 1) return fromAgency;
+  return p.regions.length && p.regions.length <= 3 ? p.regions : [];
+}
+
+/** 시·군 이름 (자치구 제외). 주소·공고명에서 "화성시", "화천군"처럼 낱말로 나온 것만 */
+const CITY_NAMES = [
+  "수원시", "성남시", "의정부시", "안양시", "부천시", "광명시", "평택시", "동두천시", "안산시", "고양시", "과천시", "구리시", "남양주시", "오산시", "시흥시", "군포시", "의왕시", "하남시", "용인시", "파주시", "이천시", "안성시", "김포시", "화성시", "양주시", "포천시", "여주시",
+  "춘천시", "원주시", "강릉시", "동해시", "태백시", "속초시", "삼척시", "청주시", "충주시", "제천시", "천안시", "공주시", "보령시", "아산시", "서산시", "논산시", "계룡시", "당진시",
+  "전주시", "군산시", "익산시", "정읍시", "남원시", "김제시", "목포시", "여수시", "순천시", "나주시", "광양시",
+  "포항시", "경주시", "김천시", "안동시", "구미시", "영주시", "영천시", "상주시", "문경시", "경산시", "창원시", "진주시", "통영시", "사천시", "김해시", "밀양시", "거제시", "양산시", "제주시", "서귀포시",
+  "가평군", "양평군", "연천군", "홍천군", "횡성군", "영월군", "평창군", "정선군", "철원군", "화천군", "양구군", "인제군", "고성군", "양양군",
+  "보은군", "옥천군", "영동군", "증평군", "진천군", "괴산군", "음성군", "단양군", "금산군", "부여군", "서천군", "청양군", "홍성군", "예산군", "태안군",
+  "완주군", "진안군", "무주군", "장수군", "임실군", "순창군", "고창군", "부안군", "담양군", "곡성군", "구례군", "고흥군", "보성군", "화순군", "장흥군", "강진군", "해남군", "영암군", "무안군", "함평군", "영광군", "장성군", "완도군", "진도군", "신안군",
+  "군위군", "의성군", "청송군", "영양군", "영덕군", "청도군", "고령군", "성주군", "칠곡군", "예천군", "봉화군", "울진군", "울릉군",
+  "의령군", "함안군", "창녕군", "남해군", "하동군", "산청군", "함양군", "거창군", "합천군", "기장군", "달성군", "강화군", "옹진군", "울주군",
+];
+export function citiesIn(text: string): string[] {
+  const out: string[] = [];
+  for (const c of CITY_NAMES) {
+    // "화성시" · "화성 시" 는 잡고, "남화성시" 같은 앞 글자 붙은 것은 버린다
+    const re = new RegExp(`(^|[^가-힣])${c.slice(0, -1)}\\s?${c.slice(-1)}(?![가-힣])`);
+    if (re.test(text) && !out.includes(c)) out.push(c);
+  }
+  return out;
+}
+
 export function regionsIn(text: string): string[] {
   const out = new Set<string>();
   for (const [long, short] of Object.entries(LONG_REGION)) if (text.includes(long)) out.add(short);
@@ -181,7 +230,7 @@ export function normalizeBizinfo(item: Record<string, unknown>, fetchedAt: strin
     agency: pick("jrsdInsttNm", "author"),
     operator: clean(item.excInsttNm) || undefined,
     category: categoryOf(pick("pldirSportRealmLclasCodeNm", "lcategory") || title),
-    regions: regionsIn(`${title} ${tags.join(" ")}`),
+    regions: programRegions({ source: "bizinfo", title, agency: pick("jrsdInsttNm", "author"), regions: regionsIn(tags.join(" ")) }),
     target: target || undefined,
     summary: pick("bsnsSumryCn", "description").slice(0, 600) || undefined,
     applyStart,

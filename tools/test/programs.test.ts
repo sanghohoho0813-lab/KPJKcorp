@@ -1,5 +1,5 @@
 // 지원사업 매칭(lib/programs) — 기업마당 응답 읽기 · 매칭 규칙. 시험용 값은 지어낸 것(실제 공고 아님).
-import { bizinfoItems, matchProgram, matchPrograms, normalizeBizinfo, regionsIn, profileOfCompany } from "../../src/lib/programs";
+import { bizinfoItems, citiesIn, programRegions, matchProgram, matchPrograms, normalizeBizinfo, regionsIn, profileOfCompany } from "../../src/lib/programs";
 import type { SupportProgram } from "../../src/lib/types";
 let fail = 0;
 const ok = (c: boolean, m: string) => { console.log((c ? "OK  " : "FAIL") + " " + m); if (!c) fail++; };
@@ -56,5 +56,32 @@ ok(profileOfCompany({ address: "충청북도 청주시" } as never).region === "
   ok(off?.url === "https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_TEST09", "공식 형식: 공고 주소 그대로");
   const alt = normalizeBizinfo({ seq: "PBLN_TEST10", title: "시험용 다른 이름 공고", link: "https://www.bizinfo.go.kr/x", author: "시험부", reqstDt: "20261101 ~ 20261130", lcategory: "금융" }, at);
   ok(alt?.id === "bz_PBLN_TEST10" && alt.agency === "시험부" && alt.applyEnd === "2026-11-30" && alt.category === "금융", "공식 형식: 다른 이름(seq·title·link·author·reqstDt·lcategory)도 읽음");
+}
+// 실제 화면에서 나온 문제(2026-10-02): 해시태그에 17개 시·도가 다 붙은 공고 → 모든 회사가 "맞는 고객". 값은 시험용
+{
+  const ALL = "2026,서울,경기,인천,부산,대구,대전,광주,울산,세종,강원,충북,충남,전북,전남,경북,경남,제주";
+  const nz = (id: string, title: string, agency: string, extra: Record<string, unknown> = {}) =>
+    normalizeBizinfo({ pblancId: id, pblancNm: title, jrsdInsttNm: agency, reqstBeginEndDe: "20261001 ~ 20261031", hashTags: ALL, ...extra }, at)!;
+  const nat = nz("PBLN_T21", "2026년 시험용 조선해양 파트너십 참가기업 모집 공고", "산업통상부", { trgetNm: "중소기업" });
+  const gb = nz("PBLN_T22", "2026년 3차 경북 시험용 TIPS 후보기업 모집 연장공고", "경상북도", { trgetNm: "창업벤처" });
+  const dj = nz("PBLN_T23", "2026년 시험용 웰컴 스테이 지원사업 참가기업 모집", "대전광역시");
+  const as = nz("PBLN_T24", "[경기] 안산시 2026년 시험용 소상공인 특례보증 추가 지원", "경기도");
+  const mf = nz("PBLN_T25", "2026년 시험용 제조 중소기업 스마트공장 구축 지원", "중소벤처기업부");
+  ok(nat.regions.length === 0, "17개 시·도 해시태그 → 전국 공고로 봄");
+  ok(programRegions({ source: "bizinfo", title: nat.title, agency: "산업통상부", regions: ALL.split(",").slice(1) }).length === 0, "이미 저장된 옛 공고(지역 17곳)도 전국으로 읽음");
+  ok(gb.regions.join() === "경북" && dj.regions.join() === "대전" && as.regions.join() === "경기", "공고명·소관 지자체로 지역 판단 (경북 · 대전 · 경기)");
+  const now2 = new Date("2026-10-02T09:00:00");
+  const hwaseongIT = { region: "경기", city: "화성시", industry: "소프트웨어 개발", foundedYear: 2019 };
+  const strong = (p: SupportProgram, prof: Parameters<typeof matchProgram>[1]) => { const m = matchProgram(p, prof, now2); return !!m && m.score >= 3; };
+  ok(!strong(nat, hwaseongIT), "전국 공고는 지역만으로 '맞는 고객'이 아님");
+  ok(matchProgram(gb, hwaseongIT, now2) === null && matchProgram(dj, hwaseongIT, now2) === null, "다른 시·도 공고(경북·대전)는 경기 회사에서 빠짐");
+  ok(matchProgram(as, hwaseongIT, now2) === null, "안산시 공고는 화성시 회사에서 빠짐");
+  ok(strong(as, { region: "경기", city: "안산시" }), "안산시 공고는 안산시 회사에 '맞는 고객'");
+  const gbOld = matchProgram(gb, { region: "경북", city: "포항시", foundedYear: 2010 }, now2);
+  ok(!!gbOld && gbOld.score < 3 && gbOld.cautions.some((c) => c.includes("창업기업")), "창업벤처 대상 + 업력 16년 → 주의, 맞는 고객에서 내림");
+  ok(strong(mf, { region: "경기", city: "화성시", industry: "정밀부품 제조" }), "전국 공고라도 업종(제조)이 맞으면 '맞는 고객'");
+  ok(!strong(mf, hwaseongIT), "업종이 다르면(소프트웨어) 제조 공고는 아님");
+  ok(profileOfCompany({ address: "경기 화성시 봉담읍", industry: "제조" } as never).city === "화성시", "주소에서 시·군 읽기 (화성시)");
+  ok(citiesIn("경기도 남양주시 진접읍").join() === "남양주시" && citiesIn("2026 전시회 참가").length === 0, "시·군 낱말만 (전시회는 아님)");
 }
 console.log(fail ? `\nFAIL ${fail}` : "\n전부 통과"); process.exit(fail ? 1 : 0);

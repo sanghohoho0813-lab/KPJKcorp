@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { AlertTriangle, Check, ExternalLink } from "lucide-react";
 import type { ProgramMatch } from "@/lib/programs";
-import { CATEGORY_LABEL } from "@/lib/programs";
+import { CATEGORY_LABEL, programRegions } from "@/lib/programs";
 import { Badge, cx } from "@/components/ui/ui";
 
 /** 공고 한 건 — 왜 맞는지(근거)와 확인할 점을 함께 */
@@ -14,7 +14,7 @@ export function ProgramCard({ m, actions, extra, compact }: { m: ProgramMatch; a
       <div className="flex flex-wrap items-center gap-1.5">
         <Badge tone={m.deadline.urgent ? "error" : "neutral"}>{m.deadline.label}</Badge>
         <Badge>{CATEGORY_LABEL[p.category]}</Badge>
-        {p.regions.length > 0 && <Badge tone="info">{p.regions.join("·")}</Badge>}
+        {programRegions(p).length > 0 ? <Badge tone="info">{programRegions(p).join("·")}</Badge> : <Badge tone="neutral">전국</Badge>}
         {p.source === "manual" && <span className="text-[0.72rem] text-ink-3">담당자 등록</span>}
       </div>
       <div className="mt-1.5 font-bold leading-snug">{p.title}</div>
