@@ -1,5 +1,6 @@
 "use client";
 
+import { HUB_TONE } from "@/components/domain/portal/PortalHome";
 import { type ReactNode, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -118,7 +119,7 @@ export function PortalShell({ children }: { children: ReactNode }) {
       {isInternal && (
         <div className="flex items-center gap-2 border-b border-warning/30 bg-warning-bg px-4 py-2 text-[0.8rem] font-semibold text-warning md:px-6">
           <Eye size={14} className="shrink-0" />
-          <span>읽기 전용 미리보기입니다. 자료 제출·문의·회신은 고객 계정으로만 할 수 있습니다.</span>
+          <span>미리보기 중입니다. 상담 요청·관심·공고 문의는 <b>고객 대신 접수</b>로 넣을 수 있습니다. 자료 제출·문의 작성·견적 회신은 고객 계정으로만 합니다.</span>
         </div>
       )}
       <header className="sticky top-0 z-30 border-b border-line bg-surface/90 backdrop-blur">
@@ -127,7 +128,7 @@ export function PortalShell({ children }: { children: ReactNode }) {
         <div className="mx-auto flex h-[var(--header-h)] max-w-[1480px] items-center gap-2 px-4 md:gap-3 md:px-6">
           <Link href="/portal" className="flex min-w-0 items-center gap-2.5">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-shell text-[0.65rem] font-black text-white">KPJK</span>
-            <span className="truncate text-[1rem] font-bold"><span className="hidden 2xl:inline">KPJK Consulting </span>Portal</span>
+            <span className="truncate text-[1rem] font-bold"><span className="hidden 2xl:inline">KPJK </span>성장 플랫폼</span>
           </Link>
           {/* 메뉴가 잘려 보이면 안 된다 — 넓은 화면(xl)에서 8개 전부, 그보다 좁으면 앞의 6개(나머지는 알림·내 정보에서) */}
           <nav className="ml-1 hidden shrink-0 items-center gap-0.5 lg:flex" data-testid="portal-nav">
@@ -167,6 +168,7 @@ export function PortalShell({ children }: { children: ReactNode }) {
           <ServerBanner audience="client" />
           <LivePopups audience="client" />
           <PasswordNudge href="/portal/me#password" />
+        {ready && pathname !== "/portal" && <PortalCrumb pathname={pathname} />}
         {ready ? <div key={pathname} className="anim-page">{children}</div> : <PageSkeleton />}
       </main>
 
@@ -192,6 +194,20 @@ export function PortalShell({ children }: { children: ReactNode }) {
       <DevicePreviewOverlay />
       <Toaster />
     </div>
+  );
+}
+
+/** 하위 화면 위 길잡이 — 홈 › 메뉴. 메뉴판과 같은 색 아이콘으로 "한 플랫폼 안"이라는 것을 보인다 */
+function PortalCrumb({ pathname }: { pathname: string }) {
+  const n = NAV.filter((x) => x.href !== "/portal").find((x) => isActive(pathname, x.href));
+  if (!n) return null;
+  return (
+    <nav aria-label="현재 위치" className="mb-3 flex items-center gap-1.5 text-[0.82rem] text-ink-3" data-testid="portal-crumb">
+      <Link href="/portal" className="pressable inline-flex min-h-8 items-center rounded-lg px-1.5 font-semibold hover:bg-surface-2 hover:text-ink">우리 회사 홈</Link>
+      <ChevronRight size={14} className="shrink-0" />
+      <span className={cx("flex h-6 w-6 items-center justify-center rounded-lg [&>svg]:h-3.5 [&>svg]:w-3.5", HUB_TONE[n.href] ?? "bg-surface-2 text-ink-2")}>{n.icon}</span>
+      <span className="font-semibold text-ink-2">{n.label}</span>
+    </nav>
   );
 }
 

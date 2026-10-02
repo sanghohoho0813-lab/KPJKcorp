@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { type ReactNode, useState } from "react";
-import { AlertTriangle, FileCheck2, NotebookPen, Wallet, Megaphone, Archive, ArrowRight, Building2, KeyRound, Pencil, ShieldAlert, Trash2, UserPlus, CalendarDays, CheckCircle2, ChevronDown, FileUp, MessageSquare, Clock, FileText, RefreshCw, Sparkles, Upload, UserCheck, Search, Briefcase, Bell, LogIn, Download, RotateCcw, TrendingUp, ShieldCheck, ClipboardList, UserMinus, Repeat, Receipt, Ruler } from "lucide-react";
+import { AlertTriangle, FileCheck2, NotebookPen, Wallet, Megaphone, Archive, ArrowRight, Building2, KeyRound, Pencil, ShieldAlert, Trash2, UserPlus, CalendarDays, CheckCircle2, ChevronDown, FileUp, MessageSquare, Clock, FileText, RefreshCw, Sparkles, Upload, UserCheck, Search, Briefcase, Bell, LogIn, Download, RotateCcw, TrendingUp, ShieldCheck, ClipboardList, UserMinus, Repeat, Receipt, Ruler, XCircle } from "lucide-react";
 import type { Activity, DocStatus, InternalStage, Schedule, TaskStatus, Priority, InquiryStatus } from "@/lib/types";
 import { DOC_STATUS, INQUIRY_STATUS, PRIORITY, SCHEDULE_TYPE, TASK_STATUS, stageLabel, stageProgress } from "@/lib/stages";
 import type { BriefItem } from "@/lib/brief";
@@ -229,6 +229,8 @@ const ACT_ICON: Record<Activity["type"], ReactNode> = {
   result_downloaded: <Download size={14} />,
   opportunity_created: <TrendingUp size={14} />,
   program_shared: <Megaphone size={14} />,
+  program_unshared: <Megaphone size={14} />,
+  request_canceled: <XCircle size={14} />,
   lead_created: <TrendingUp size={14} />,
   lead_updated: <TrendingUp size={14} />,
   opportunity_status_changed: <TrendingUp size={14} />,

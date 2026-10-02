@@ -9,7 +9,7 @@ import type { Role, User } from "@/lib/types";
 import { Confirm, Modal } from "@/components/ui/overlay";
 import { Badge, Button, Field, Input, Select } from "@/components/ui/ui";
 
-const ROLE_LABEL: Record<Role, string> = { admin: "대표 · 관리자", consultant: "컨설턴트", client: "기업고객" };
+import { ROLE_LABEL } from "@/lib/permissions";
 
 function pwIssue(pw: string) {
   if (pw.length < 8) return "8자 이상이어야 합니다.";
@@ -184,9 +184,17 @@ function UserModalInner({ open, userId, presetCompanyId, onClose, onCreated }: {
           ) : (
             <Select value={role} onChange={(e) => setRole(e.target.value as Role)}>
               <option value="consultant">컨설턴트</option>
+              <option value="staff">사무직원 (회사 매출 정보 제외)</option>
               <option value="admin">대표 · 관리자</option>
               <option value="client">기업고객 (Portal)</option>
             </Select>
+          )}
+          {!editing && role !== "client" && (
+            <p className="mt-1.5 text-[0.78rem] leading-relaxed text-ink-3" data-testid="role-hint">
+              {role === "admin" ? "모든 화면과 회사 매출 정보(계약 금액·수금·승인)까지 봅니다. 계정 관리도 합니다."
+                : role === "consultant" ? "기업·프로젝트·자료·상담·견적까지 합니다. 계약 금액·수금·매출 리포트는 볼 수 없습니다."
+                : "기업 정보·자료 요청·일정·업무·서류함·지원사업 등 일반 업무를 합니다. 견적·계약 금액·수금·승인·매출 리포트는 볼 수 없습니다."}
+            </p>
           )}
         </Field>
         {(role === "client" || editing?.role === "client") && (
@@ -320,7 +328,7 @@ export function UserAdmin() {
   const [confirmOff, setConfirmOff] = useState<User | null>(null);
 
   const activeAdmins = st.users.filter((u) => u.role === "admin" && u.active !== false).length;
-  const order: Role[] = ["admin", "consultant", "client"];
+  const order: Role[] = ["admin", "consultant", "staff", "client"];
   const rows = [...st.users].sort((a, b) => order.indexOf(a.role) - order.indexOf(b.role) || a.name.localeCompare(b.name));
 
   return (

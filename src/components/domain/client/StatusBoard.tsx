@@ -1,5 +1,6 @@
 "use client";
 
+import { useMay } from "@/components/domain/EntityModals";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { AlertTriangle, Building2, ChevronRight, ClipboardCheck, Wallet } from "lucide-react";
@@ -16,11 +17,16 @@ import { WorkChip, WorkStatusSheet } from "./WorkTab";
  * 열은 KPJK 가 실제로 하고 있는 프로젝트 유형에서 만든다(데이터에 없는 업무를 칸으로 미리 만들지 않는다).
  * 급한 기업이 위로 온다: 지금 처리할 일 수 → 전체 경고 수 → 가장 가까운 기한.
  */
+const NO_PAYMENTS: never[] = [];
+
 export function StatusBoard({ companies }: { companies: Company[] }) {
   const projects = useStore((s) => s.projects);
   const vaults = useStore((s) => s.companyVaults);
   const files = useStore((s) => s.companyFiles);
-  const payments = useStore((s) => s.payments);
+  // 수금은 회사 매출 정보 — 대표만 본다(컨설턴트·사무직원은 못 받은 돈 칸·수금 경고가 없다)
+  const fin = useMay()("finance.view");
+  const allPayments = useStore((s) => s.payments);
+  const payments = fin ? allPayments : NO_PAYMENTS;
   const [sheet, setSheet] = useState<Project | null>(null);
   const [sev, setSev] = useState<Severity | "all">("all");
   const [showAll, setShowAll] = useState(false);
@@ -50,11 +56,11 @@ export function StatusBoard({ companies }: { companies: Company[] }) {
 
   return (
     <div className="space-y-4" id="status-board">
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <div className={cx("grid grid-cols-2 gap-3", fin ? "xl:grid-cols-4" : "xl:grid-cols-3")}>
         <Tile icon={<AlertTriangle size={16} />} label="지금 처리할 일" value={`${count("critical")}건`} tone={count("critical") ? "error" : "success"} hint={count("critical") ? "마감 지남 · 수금 연체" : "급한 일이 없습니다"} onClick={() => setSev("critical")} />
         <Tile icon={<ClipboardCheck size={16} />} label="곧 처리할 일" value={`${count("warning")}건`} tone={count("warning") ? "warning" : undefined} hint="7일 이내 마감 · 서류 만료 · 회신 지연" onClick={() => setSev("warning")} />
         <Tile icon={<Building2 size={16} />} label="관리 중인 기업" value={`${rows.length}곳`} hint={`진행 업무 ${rows.reduce((s, r) => s + r.ctx.projects.filter((p) => isOpen(workCell(p, today).status)).length, 0)}건`} />
-        <Tile icon={<Wallet size={16} />} label="못 받은 돈" value={won(unpaid)} tone={overduePay ? "error" : undefined} hint={overduePay ? `예정일 지난 건 ${overduePay}건` : "연체 없음"} />
+        {fin && <Tile icon={<Wallet size={16} />} label="못 받은 돈" value={won(unpaid)} tone={overduePay ? "error" : undefined} hint={overduePay ? `예정일 지난 건 ${overduePay}건` : "연체 없음"} />}
       </div>
 
       {allAlerts.length > 0 && (
@@ -117,7 +123,7 @@ export function StatusBoard({ companies }: { companies: Company[] }) {
               <th className="sticky left-0 z-10 bg-surface">기업</th>
               {columns.map((col) => <th key={col} className="text-center">{col}</th>)}
               <th className="text-center">서류</th>
-              <th className="text-right">못 받은 돈</th>
+              {fin && <th className="text-right">못 받은 돈</th>}
             </tr>
           </thead>
           <tbody>
@@ -143,7 +149,7 @@ export function StatusBoard({ companies }: { companies: Company[] }) {
                   );
                 })}
                 <td className="text-center align-top"><Link href={`/ax/clients/${r.c.id}?tab=vault`} className={cx("tnum font-semibold", r.progress.docsUsable < r.progress.docsTotal ? "text-ink" : "text-success")}>{r.progress.docsUsable}/{r.progress.docsTotal}</Link></td>
-                <td className="text-right align-top"><span className={cx("tnum font-semibold", r.money.overdue ? "text-error" : "")}>{r.money.unpaid ? won(r.money.unpaid) : "—"}</span></td>
+                {fin && <td className="text-right align-top"><span className={cx("tnum font-semibold", r.money.overdue ? "text-error" : "")}>{r.money.unpaid ? won(r.money.unpaid) : "—"}</span></td>}
               </tr>
             ))}
           </tbody>

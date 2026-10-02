@@ -58,7 +58,7 @@ create extension if not exists "pgcrypto";
 create table if not exists public.profiles (
   id            uuid primary key references auth.users(id) on delete cascade,
   name          text not null,
-  role          text not null check (role in ('admin','consultant','client')),
+  role          text not null check (role in ('admin','consultant','staff','client')),
   title         text not null default '',
   email         text not null unique,
   phone         text,
@@ -68,6 +68,9 @@ create table if not exists public.profiles (
   created_at    timestamptz not null default now()
 );
 comment on table public.profiles is '로그인 계정의 업무상 정보. 비밀번호는 auth.users가 보관하며 이 테이블에는 없다.';
+-- 2026-10-02 사무직원(staff) 역할 추가 — 이미 만든 표에도 적용
+alter table public.profiles drop constraint if exists profiles_role_check;
+alter table public.profiles add constraint profiles_role_check check (role in ('admin','consultant','staff','client'));
 
 -- -----------------------------------------------------------------------------
 -- 2. 기업고객
@@ -607,6 +610,12 @@ $$;
 
 create or replace function public.kpjk_is_internal() returns boolean
 language sql stable security definer set search_path = public as $$
+  select coalesce(public.kpjk_role() in ('admin','consultant','staff'), false)
+$$;
+
+/** 견적·승인을 다루는 역할 — 대표·컨설턴트 (사무직원은 금액을 보지 않는다) */
+create or replace function public.kpjk_is_manager() returns boolean
+language sql stable security definer set search_path = public as $$
   select coalesce(public.kpjk_role() in ('admin','consultant'), false)
 $$;
 
@@ -643,6 +652,7 @@ language sql stable security definer set search_path = public as $$
         then exists (select 1 from public.companies c where c.id = cid and c.consultant_id = auth.uid())
         else true
       end
+    when 'staff' then true
     when 'client' then cid is not null and cid = public.kpjk_my_company()
     else false
   end
@@ -655,7 +665,7 @@ language sql volatile security definer set search_path = public as $$
 $$;
 
 grant execute on function
-  public.kpjk_role, public.kpjk_is_admin, public.kpjk_is_internal, public.kpjk_is_client,
+  public.kpjk_role, public.kpjk_is_admin, public.kpjk_is_internal, public.kpjk_is_manager, public.kpjk_is_client,
   public.kpjk_my_company, public.kpjk_can_see_company, public.kpjk_touch_login
   to authenticated;
 
@@ -736,8 +746,8 @@ end $$;
 -- 승인은 company_id 가 비어 있을 수 있다(회사와 무관한 내부 승인)
 drop policy if exists approvals_internal on public.approvals;
 create policy approvals_internal on public.approvals for all to authenticated
-  using (public.kpjk_is_internal() and (company_id is null or public.kpjk_can_see_company(company_id)))
-  with check (public.kpjk_is_internal() and (company_id is null or public.kpjk_can_see_company(company_id)));
+  using (public.kpjk_is_manager() and (company_id is null or public.kpjk_can_see_company(company_id)))
+  with check (public.kpjk_is_manager() and (company_id is null or public.kpjk_can_see_company(company_id)));
 
 -- 고객이 Portal 에서 "관심 있습니다" 를 누르는 경로만 예외로 연다
 drop policy if exists opportunities_client_insert on public.opportunities;
@@ -755,17 +765,17 @@ drop policy if exists opportunities_client_select on public.opportunities;
 -- 고객은 client_opportunities 로 읽는다 (담당자 진행 메모 제외). 고객의 "관심·상담 요청" 쓰기 정책은 위에 그대로.
 
 -- -----------------------------------------------------------------------------
--- 6. 계약 — 고객은 읽기만
+-- 6. 계약 — 계약 금액은 회사 매출 정보: 내부에서는 대표만. 고객은 자기 계약(작성 중 제외)을 읽기만
 -- -----------------------------------------------------------------------------
 drop policy if exists contracts_select on public.contracts;
 create policy contracts_select on public.contracts for select to authenticated
   using (public.kpjk_can_see_company(company_id)
-         and (public.kpjk_is_internal() or status <> 'draft'));
+         and (public.kpjk_is_admin() or (public.kpjk_is_client() and status <> 'draft')));
 
 drop policy if exists contracts_write on public.contracts;
 create policy contracts_write on public.contracts for all to authenticated
-  using (public.kpjk_is_internal() and public.kpjk_can_see_company(company_id))
-  with check (public.kpjk_is_internal() and public.kpjk_can_see_company(company_id));
+  using (public.kpjk_is_admin())
+  with check (public.kpjk_is_admin());
 
 -- -----------------------------------------------------------------------------
 -- 7. 자료요청 — 고객이 제출한다
@@ -883,13 +893,14 @@ create policy results_write on public.results for all to authenticated
 drop policy if exists quotes_select on public.quotes;
 create policy quotes_select on public.quotes for select to authenticated
   using (public.kpjk_can_see_company(company_id)
-         and (public.kpjk_is_internal()
-              or status in ('sent','accepted','declined','converted')));
+         and (public.kpjk_is_manager()
+              or (public.kpjk_is_client() and status in ('sent','accepted','declined','converted'))));
 
+-- 견적(금액)은 대표·컨설턴트만 — 사무직원은 보지 않는다
 drop policy if exists quotes_internal on public.quotes;
 create policy quotes_internal on public.quotes for all to authenticated
-  using (public.kpjk_is_internal() and public.kpjk_can_see_company(company_id))
-  with check (public.kpjk_is_internal() and public.kpjk_can_see_company(company_id));
+  using (public.kpjk_is_manager() and public.kpjk_can_see_company(company_id))
+  with check (public.kpjk_is_manager() and public.kpjk_can_see_company(company_id));
 
 -- 금액·항목을 고객이 고칠 수 없게 상태만 바꾸도록 좁힌다
 drop policy if exists quotes_client_respond on public.quotes;
@@ -928,7 +939,7 @@ create policy activities_insert on public.activities for insert to authenticated
 do $$
 declare t text;
 begin
-  foreach t in array array['company_vaults','company_files','journal_entries','payments'] loop
+  foreach t in array array['company_vaults','company_files','journal_entries'] loop
     execute format('drop policy if exists %1$s_internal on public.%1$s', t);
     execute format(
       'create policy %1$s_internal on public.%1$s for all to authenticated
@@ -936,6 +947,11 @@ begin
          with check (public.kpjk_is_internal() and public.kpjk_can_see_company(company_id))', t);
   end loop;
 end $$;
+-- 수금(받을 돈·입금)은 회사 매출 정보 — 대표만 (2026-10-02 권한 분리)
+drop policy if exists payments_internal on public.payments;
+create policy payments_internal on public.payments for all to authenticated
+  using (public.kpjk_is_admin())
+  with check (public.kpjk_is_admin());
 
 -- -----------------------------------------------------------------------------
 -- 13. 알림 · 설문 · 설정
@@ -1356,6 +1372,41 @@ create trigger kpjk_lead_created after insert on public.leads for each row execu
 
 
 -- ---------------------------------------------------------------------------
+--  고객이 보낸 요청 취소 (상담 요청 · 관심 표시 · 지원사업 문의)
+--  고객은 매출기회 표를 직접 고칠 수 없다(고객용 보기로만 읽음). 이 함수 하나로만, 자기 회사의 자기 요청을,
+--  담당자가 제안·견적으로 넘어가기 전(관심/연락함)까지만 "종료"로 바꾼다. 딸린 상담 연락 업무도 정리한다.
+--  담당자 알림·기록은 고객 화면이 함께 보낸다(고객이 보낼 수 있는 행).
+-- ---------------------------------------------------------------------------
+create or replace function public.kpjk_client_cancel_request(p_opp text) returns text
+language plpgsql security definer set search_path = public as $$
+declare o public.opportunities%rowtype; v_company text; v_title text;
+begin
+  select * into o from public.opportunities where id = p_opp;
+  if not found or not public.kpjk_is_client() or o.company_id is distinct from public.kpjk_my_company() then
+    raise exception '취소할 수 있는 요청이 아닙니다.' using errcode = '42501';
+  end if;
+  if o.source not in ('portal_interest', 'portal_request') then
+    raise exception '담당자가 올린 제안은 고객 화면에서 취소하지 않습니다.' using errcode = '42501';
+  end if;
+  if o.status = 'dropped' then return '이미 취소된 요청입니다.'; end if;
+  if o.status not in ('interest', 'contacted') then
+    raise exception '이미 제안·진행 단계라 화면에서 취소할 수 없습니다. 담당 컨설턴트에게 말씀해 주세요.';
+  end if;
+  update public.opportunities
+     set status = 'dropped', updated_at = now(),
+         history = history || jsonb_build_array(jsonb_build_object('at', now(), 'status', 'dropped', 'by', auth.uid(), 'note', '고객이 요청을 취소함'))
+   where id = p_opp;
+  select name into v_company from public.companies where id = o.company_id;
+  v_title := replace(o.service_name, '지원사업: ', '');
+  delete from public.tasks
+   where company_id = o.company_id and source = 'auto' and status in ('todo', 'doing')
+     and (position(o.service_name in title) > 0 or (o.service_key = 'support_program' and position(v_title in title) > 0));
+  return '요청을 취소했습니다.';
+end $$;
+revoke execute on function public.kpjk_client_cancel_request(text) from public, anon;
+grant execute on function public.kpjk_client_cancel_request(text) to authenticated;
+
+-- ---------------------------------------------------------------------------
 --  지원사업 공고 매일 자동 갱신 (기업마당 → 이 표)
 --  Vercel 이 매일 아침 9시에 /api/programs/sync 를 부르면, 그 서버가 기업마당 공고를 받아
 --  아래 함수로 넣는다. 관리자 키(service_role) 없이 "공고 저장 전용 열쇠"만 쓴다.
@@ -1398,7 +1449,7 @@ begin
   if v_hash is null or v_hash <> encode(sha256(convert_to(coalesce(p_key, ''), 'UTF8')), 'hex') then
     raise exception '자동 갱신 열쇠가 맞지 않습니다.' using errcode = '42501';
   end if;
-  if jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) > 3000 then
+  if jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) > 5000 then
     raise exception '공고 목록 형식이 맞지 않습니다.';
   end if;
   for it in select value from jsonb_array_elements(p_items) loop

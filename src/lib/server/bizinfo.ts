@@ -3,10 +3,10 @@ import type { SupportProgram } from "@/lib/types";
 
 /**
  * 기업마당 지원사업 공고 받기 — 서버(경로 처리기)에서만 쓴다. 인증키(BIZINFO_API_KEY)는 브라우저로 나가지 않는다.
- * 최근 등록 1000건을 받아 이미 마감된 공고는 뺀다. 같은 서버 인스턴스에서는 30분 동안 받은 것을 다시 쓴다.
+ * 최근 등록 3000건을 받아 이미 마감된 공고는 뺀다. 같은 서버 인스턴스에서는 30분 동안 받은 것을 다시 쓴다.
  */
 const TTL = 30 * 60 * 1000;
-const FETCH_COUNT = 1000;
+const FETCH_COUNT = 3000;
 let cache: { at: number; items: SupportProgram[] } | null = null;
 
 /** 한국 날짜(YYYY-MM-DD) — Vercel 서버 시계는 UTC 다 */

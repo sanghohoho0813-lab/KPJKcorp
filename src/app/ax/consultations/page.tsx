@@ -32,7 +32,7 @@ function ConsultationsInner() {
   return (
     <div>
       <PageHeader
-        title="상담 · 견적 · 계약"
+        title={may("finance.view") ? "상담 · 견적 · 계약" : may("quote.create") ? "상담 · 견적" : "상담 기록"}
         desc="상담에서 정한 내용이 견적이 되고, 고객이 수락하면 계약으로 이어집니다. 할인은 발송 전에 대표 승인을 거칩니다."
         actions={tab === "quote"
           ? <Button variant="accent" icon={<Plus size={16} />} onClick={() => setNewQuote(true)}>견적 작성</Button>
@@ -40,9 +40,14 @@ function ConsultationsInner() {
             ? (may("contract.manage") ? <Button variant="accent" icon={<Plus size={16} />} onClick={() => setNewContract(true)}>계약 등록</Button> : undefined)
             : <Button variant="accent" icon={<Plus size={16} />} onClick={() => setNewConsult(true)}>상담 기록 작성</Button>}
       />
-      <Tabs tabs={[{ key: "consult", label: "상담 기록", count: consultations.length }, { key: "quote", label: "견적", count: quotes.filter((q) => q.status !== "converted").length }, { key: "contract", label: "계약", count: contracts.length }]} value={tab} onChange={setTab} />
+      <Tabs tabs={[
+        { key: "consult" as const, label: "상담 기록", count: consultations.length },
+        // 견적은 컨설턴트까지, 계약(금액)은 대표만 — 사무직원은 상담 기록만
+        ...(may("quote.create") ? [{ key: "quote" as const, label: "견적", count: quotes.filter((q) => q.status !== "converted").length }] : []),
+        ...(may("finance.view") ? [{ key: "contract" as const, label: "계약", count: contracts.length }] : []),
+      ]} value={tab} onChange={setTab} />
       <div className="mt-5">
-        {tab === "consult" ? (
+        {tab === "consult" || (tab === "quote" && !may("quote.create")) || (tab === "contract" && !may("finance.view")) ? (
           <div className="space-y-3">
             {consultations.map((cs) => {
               const c = st.companies.find((x) => x.id === cs.companyId);

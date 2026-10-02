@@ -32,8 +32,13 @@ export async function GET(request: Request) {
   const r = await getBizinfo(true);
   if (!r.ok) return Response.json(r);
   const sb = createClient(url, anon, { auth: { persistSession: false, autoRefreshToken: false } });
-  const { data, error } = await sb.rpc("kpjk_sync_programs", { p_key: secret, p_items: r.items });
-  if (error) return Response.json({ ok: false, reason: error.code === "42501" ? "key_mismatch" : "db", detail: error.message });
-  const out = data as { added: number; updated: number };
-  return Response.json({ ok: true, total: r.items.length, added: out.added, updated: out.updated, by: fromCron ? "cron" : "staff" });
+  // 한 번에 수천 건을 보내면 요청이 너무 커진다 — 500건씩 나눠 넣는다
+  let added = 0, updated = 0;
+  for (let i = 0; i < r.items.length; i += 500) {
+    const { data, error } = await sb.rpc("kpjk_sync_programs", { p_key: secret, p_items: r.items.slice(i, i + 500) });
+    if (error) return Response.json({ ok: false, reason: error.code === "42501" ? "key_mismatch" : "db", detail: error.message, added, updated });
+    const out = data as { added: number; updated: number };
+    added += out.added; updated += out.updated;
+  }
+  return Response.json({ ok: true, total: r.items.length, added, updated, by: fromCron ? "cron" : "staff" });
 }

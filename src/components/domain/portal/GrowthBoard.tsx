@@ -1,5 +1,6 @@
 "use client";
 
+import { CancelRequestButton, OnBehalfNote, useOnBehalf } from "./CancelRequest";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ArrowRight, CalendarDays, Check, CheckCircle2, ChevronRight, FileCheck2, FolderUp, MessageSquarePlus, Receipt, Sparkles, ThumbsUp, TrendingUp } from "lucide-react";
@@ -128,14 +129,14 @@ export function NextGrowth({ board, companyId, compact, only, title }: { board: 
   const toast = useStore((s) => s.toast);
   const [ask, setAsk] = useState<{ it: GrowthItem; kind: "interest" | "request" } | null>(null);
   const [note, setNote] = useState("");
-  const isClient = st.session?.role === "client";
+  const { isClient, onBehalf } = useOnBehalf();
   const items = [...board.review, ...board.proposed, ...board.suggested].filter((x) => !only || only.includes(x.state));
   if (only && items.length === 0) return null;
   const submit = () => {
     if (!ask?.it.service) return;
-    if (!isClient) { toast("읽기 전용 미리보기입니다. 고객 계정으로만 요청할 수 있습니다.", "error"); return; }
-    raise({ companyId, serviceKey: ask.it.service.key, note: note.trim() || undefined, reason: [ask.it.reason, ask.it.basis && `(근거: ${ask.it.basis})`].filter(Boolean).join(" "), source: ask.kind === "request" ? "portal_request" : "portal_interest" }, user?.id ?? "", "client");
-    toast(ask.kind === "request" ? "상담 요청이 담당 컨설턴트에게 전달되었습니다." : "검토 요청이 전달되었습니다. 담당 컨설턴트가 확인 후 연락드립니다.");
+    if (!isClient && !onBehalf) { toast("고객 계정 또는 대표·컨설턴트 계정에서만 접수할 수 있습니다.", "error"); return; }
+    raise({ companyId, serviceKey: ask.it.service.key, note: note.trim() || undefined, reason: [ask.it.reason, ask.it.basis && `(근거: ${ask.it.basis})`].filter(Boolean).join(" "), source: ask.kind === "request" ? "portal_request" : "portal_interest", onBehalf }, user?.id ?? "", isClient ? "client" : (st.session?.role ?? "consultant"));
+    toast(onBehalf ? "고객 대신 접수했습니다 — 담당 컨설턴트에게 업무·알림이 갔습니다." : ask.kind === "request" ? "상담 요청이 담당 컨설턴트에게 전달되었습니다." : "검토 요청이 전달되었습니다. 담당 컨설턴트가 확인 후 연락드립니다.");
     setAsk(null); setNote("");
   };
   return (
@@ -159,7 +160,7 @@ export function NextGrowth({ board, companyId, compact, only, title }: { board: 
               {it.reason && <div className="mt-1.5 text-[0.85rem] leading-relaxed text-ink-2">{it.reason}</div>}
               {it.basis && <div className="mt-1.5 inline-flex rounded-md bg-surface-2 px-2 py-0.5 text-[0.72rem] font-semibold text-ink-3">근거 · {it.basis}</div>}
               {it.state === "review" ? (
-                <div className="mt-2 text-[0.8rem] text-ink-3">{fmtRelative(it.opportunity!.createdAt)} 요청 · 담당 컨설턴트가 확인하고 있습니다.</div>
+                <div className="mt-2 flex flex-wrap items-center gap-x-2 text-[0.8rem] text-ink-3">{fmtRelative(it.opportunity!.createdAt)} 요청 · 담당 컨설턴트가 확인하고 있습니다.<CancelRequestButton opp={it.opportunity!} className="-ml-1" /></div>
               ) : it.service && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Button size="sm" variant="outline" icon={<ThumbsUp size={14} />} onClick={() => { setAsk({ it, kind: "interest" }); setNote(""); }}>검토하고 싶어요</Button>
@@ -171,7 +172,8 @@ export function NextGrowth({ board, companyId, compact, only, title }: { board: 
         </div>
       )}
       <Modal open={!!ask} onClose={() => setAsk(null)} size="sm" title={ask?.kind === "request" ? `${ask?.it.area} 상담 요청` : `${ask?.it.area} 검토 요청`}
-        footer={<><Button variant="ghost" onClick={() => setAsk(null)}>취소</Button><Button variant="accent" onClick={submit}>{ask?.kind === "request" ? "상담 요청" : "검토 요청"}</Button></>}>
+        footer={<><Button variant="ghost" onClick={() => setAsk(null)}>취소</Button><Button variant="accent" onClick={submit}>{onBehalf ? "고객 대신 접수" : ask?.kind === "request" ? "상담 요청" : "검토 요청"}</Button></>}>
+        {onBehalf && <OnBehalfNote />}
         {ask?.it.service && <div className="rounded-xl bg-surface-2 px-4 py-3 text-[0.85rem]"><div className="font-semibold">{ask.it.service.blurb}</div><ul className="mt-1.5 space-y-0.5 text-ink-2">{ask.it.service.points.map((p) => <li key={p} className="flex gap-1.5"><Check size={14} className="mt-0.5 shrink-0 text-success" />{p}</li>)}</ul></div>}
         <label className="mt-3 block text-[0.85rem] font-semibold text-ink-2">담당자에게 남길 말 (선택)
           <Textarea rows={3} className="mt-1" value={note} onChange={(e) => setNote(e.target.value)} placeholder="예: 다음 달 결산 전에 이야기 나누고 싶습니다." />

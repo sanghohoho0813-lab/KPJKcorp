@@ -1,4 +1,5 @@
-export type Role = "admin" | "consultant" | "client";
+/** staff: 사무직원 — 일반 업무는 같이 하고, 회사 매출(계약 금액·수금·견적·승인)은 보지 않는다 */
+export type Role = "admin" | "consultant" | "staff" | "client";
 
 export type InternalStage =
   | "inquiry"
@@ -662,6 +663,8 @@ export type ActivityType =
   | "result_downloaded"
   | "opportunity_created"
   | "program_shared"
+  | "program_unshared"
+  | "request_canceled"
   | "lead_created"
   | "lead_updated"
   | "opportunity_status_changed"
@@ -754,6 +757,8 @@ export interface Session {
   companyId?: string;
   /** internal user previewing the portal for a company */
   portalPreviewCompanyId?: string;
+  /** 보기 전환 — 대표가 컨설턴트·사무직원 화면으로 볼 때 실제 역할(admin). role 은 보고 있는 역할 */
+  realRole?: Role;
   /** 로그인 시각 — 세션 만료 판단에 쓴다 */
   signedInAt?: string;
 }

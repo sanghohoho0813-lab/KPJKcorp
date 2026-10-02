@@ -1,5 +1,6 @@
 "use client";
 
+import { useMay } from "@/components/domain/EntityModals";
 import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { BarChart3, Printer } from "lucide-react";
@@ -25,6 +26,7 @@ export default function ReportsPage() {
 function ReportsInner() {
   const params = useSearchParams();
   const initialTab = params.get("tab") as ReportTab | null;
+  const may = useMay();
   const st = useStore();
   const [tab, setTab] = useState<ReportTab>(initialTab && REPORT_TABS.includes(initialTab) ? initialTab : "sprint");
   const sprint = useSprint();
@@ -224,7 +226,7 @@ function ReportsInner() {
               <div className="card p-4"><div className="text-[0.75rem] font-bold text-ink-3">Baseline 수집</div><div className="text-[1.1rem] font-bold text-warning">미시작</div></div>
             </div>
 
-            {axes.map((g) => (
+            {axes.filter((g) => g.key !== "revenue" || may("finance.view")).map((g) => (
               <Card key={g.key} className="p-5">
                 <SectionTitle>{g.title}</SectionTitle>
                 <p className="-mt-1 mb-3 text-[0.85rem] text-ink-2">{g.desc}</p>

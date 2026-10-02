@@ -59,6 +59,7 @@ insert into auth.users(id, email) values
   ('00000000-0000-0000-0000-00000000a001','ceo@kpjk.test'),
   ('00000000-0000-0000-0000-00000000c001','park@kpjk.test'),
   ('00000000-0000-0000-0000-00000000c002','lee@kpjk.test'),
+  ('00000000-0000-0000-0000-00000000d001','office@kpjk.test'),
   ('00000000-0000-0000-0000-00000000f001','a@clientA.test'),
   ('00000000-0000-0000-0000-00000000f002','b@clientB.test');
 
@@ -67,7 +68,8 @@ insert into auth.users(id, email) values
 insert into public.profiles(id, name, role, email) values
   ('00000000-0000-0000-0000-00000000a001','대표','admin','ceo@kpjk.test'),
   ('00000000-0000-0000-0000-00000000c001','박컨설턴트','consultant','park@kpjk.test'),
-  ('00000000-0000-0000-0000-00000000c002','이컨설턴트','consultant','lee@kpjk.test');
+  ('00000000-0000-0000-0000-00000000c002','이컨설턴트','consultant','lee@kpjk.test'),
+  ('00000000-0000-0000-0000-00000000d001','최사무','staff','office@kpjk.test');
 
 insert into public.companies(id, code, name, consultant_id) values
   ('co_a','A','에이테스트(주)','00000000-0000-0000-0000-00000000c001'),
@@ -152,7 +154,7 @@ select chk('고객A: B사 문의는 안 보인다',        (select count(*) from
 select chk('고객A: 다른 고객 계정은 안 보인다',
        (select count(*) from public.profiles where role='client'), 1::bigint);
 select chk('고객A: 내부 담당자는 보인다',
-       (select count(*) from public.profiles where role<>'client'), 3::bigint);
+       (select count(*) from public.profiles where role<>'client'), 4::bigint);
 select chk('고객A: 파일도 자기 회사 것만',       (select count(*) from storage.objects), 1::bigint);
 
 -- 고객이 넘어서는 안 되는 선
@@ -220,14 +222,18 @@ select chk('컨설턴트: 공지는 전부 보인다',        (select count(*) f
 select chk('컨설턴트: 공지를 쓸 수 있다',
        affected($$insert into public.notices(id, title) values ('nc_c','컨설턴트 공지')$$), 1::bigint);
 select chk('컨설턴트(전체): 서류함 두 곳 다 보인다', (select count(*) from public.company_vaults), 2::bigint);
-select chk('컨설턴트(전체): 수금 두 건 보인다',   (select count(*) from public.payments), 2::bigint);
+select chk('컨설턴트: 수금(회사 매출)은 안 보인다',  (select count(*) from public.payments), 0::bigint);
+select chk('컨설턴트: 계약(금액)은 안 보인다',      (select count(*) from public.contracts), 0::bigint);
+select chk('컨설턴트: 견적은 보인다(직접 만든다)',   (select count(*) from public.quotes) > 0, true);
 select chk('컨설턴트(전체): 서류함 보관함 파일 보인다', (select count(*) from storage.objects where bucket_id='vault'), 2::bigint);
 select chk('컨설턴트: 업무 일기를 쓸 수 있다',
        affected($$insert into public.journal_entries(id, company_id, type, content) values ('jn_c','co_a','note','메모')$$), 1::bigint);
 select chk('컨설턴트: 빈 일기는 거절된다',
        denied($$insert into public.journal_entries(id, company_id, type, content) values ('jn_e','co_a','note','   ')$$), true);
-select chk('컨설턴트: 입금 확인을 할 수 있다',
-       affected($$update public.payments set received_at=current_date where id='pm_a1'$$), 1::bigint);
+select chk('컨설턴트: 입금 확인을 못 한다(대표만)',
+       affected($$update public.payments set received_at=current_date where id='pm_a1'$$), 0::bigint);
+select chk('컨설턴트: 수금 항목을 못 만든다',
+       denied($$insert into public.payments(id, company_id, kind, label) values ('pm_c','co_a','deposit','x')$$), true);
 select chk('컨설턴트: 스스로 대표가 못 된다',
        affected($$update public.profiles set role='admin' where id=auth.uid()$$), 0::bigint);
 select chk('컨설턴트: 남의 계정을 못 만든다',
@@ -235,6 +241,25 @@ select chk('컨설턴트: 남의 계정을 못 만든다',
                 values('00000000-0000-0000-0000-0000000000ff','가짜','admin','x@x.test')$$), true);
 select chk('컨설턴트: 기록을 못 고친다',
        denied($$update public.activities set message='조작' where id='ac_a1'$$), true);
+reset role; reset request.jwt.claim.sub;
+
+-- =========================== 사무직원 (staff) =================================
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000d001';
+select chk('사무직원: 기업은 다 보인다',            (select count(*) from public.companies), 2::bigint);
+select chk('사무직원: 요청자료 보인다',             (select count(*) from public.document_requests) > 0, true);
+select chk('사무직원: 업무 보인다',                 (select count(*) from public.tasks) > 0, true);
+select chk('사무직원: 서류함 보인다',               (select count(*) from public.company_vaults), 2::bigint);
+select chk('사무직원: 수금 안 보인다',              (select count(*) from public.payments), 0::bigint);
+select chk('사무직원: 계약 안 보인다',              (select count(*) from public.contracts), 0::bigint);
+select chk('사무직원: 견적 안 보인다',              (select count(*) from public.quotes), 0::bigint);
+select chk('사무직원: 승인 안 보인다',              (select count(*) from public.approvals), 0::bigint);
+select chk('사무직원: 견적을 못 만든다',
+       denied($$insert into public.quotes(id, company_id, title) values ('qt_s','co_a','x')$$), true);
+select chk('사무직원: 업무 일기는 쓴다',
+       affected($$insert into public.journal_entries(id, company_id, type, content) values ('jn_s','co_a','note','사무 메모')$$), 1::bigint);
+select chk('사무직원: 스스로 대표가 못 된다',
+       affected($$update public.profiles set role='admin' where id=auth.uid()$$), 0::bigint);
 reset role; reset request.jwt.claim.sub;
 
 -- =========================== 스위치를 '내 담당만' 으로 =========================
@@ -259,6 +284,7 @@ reset role; reset request.jwt.claim.sub;
 set role authenticated;
 set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000a001';   -- 대표
 select chk('대표: 스위치와 무관하게 전부 보인다', (select count(*) from public.companies), 2::bigint);
+select chk('대표: 수금은 대표가 본다',             (select count(*) from public.payments), 2::bigint);
 reset role; reset request.jwt.claim.sub;
 
 update public.app_settings set consultant_scope='all' where id=1;
@@ -378,6 +404,23 @@ select chk('맞는 열쇠: 담당자가 직접 넣은 공고는 못 고친다',
 reset role;
 select chk('알림 보낸 기록은 갱신에도 남는다',
        (select count(*) from public.support_programs where id = 'mp_t2' and title = '직접 추가 공고'), 1::bigint);
+
+-- =========================== 고객 요청 취소 (kpjk_client_cancel_request) ==============
+insert into public.opportunities(id, company_id, service_key, service_name, source, status) values
+  ('op_cx', 'co_a', 'kpjk_이익소각', '이익소각', 'portal_request', 'interest');
+insert into public.tasks(id, company_id, title, source, status) values ('tk_cx', 'co_a', '에이테스트(주) 이익소각 관심 — 상담 연락', 'auto', 'todo');
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000f001';   -- 고객 A
+select chk('고객A: 담당자 제안은 화면에서 못 취소한다', denied($$select public.kpjk_client_cancel_request('op_prop')$$), true);
+select chk('고객A: 다른 회사 요청은 못 취소한다',       denied($$select public.kpjk_client_cancel_request('op_bp')$$), true);
+select chk('고객A: 내 상담 요청은 취소한다',            public.kpjk_client_cancel_request('op_cx'), '요청을 취소했습니다.');
+reset role; reset request.jwt.claim.sub;
+select chk('취소: 매출기회가 종료로',                   (select status from public.opportunities where id='op_cx'), 'dropped');
+select chk('취소: 딸린 상담 연락 업무 정리',            (select count(*) from public.tasks where id='tk_cx'), 0::bigint);
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000c001';   -- 컨설턴트는 이 함수를 쓸 일이 없다(화면에서 직접 단계 이동)
+select chk('컨설턴트: 고객용 취소 함수는 거절',          denied($$select public.kpjk_client_cancel_request('op_req')$$), true);
+reset role; reset request.jwt.claim.sub;
 
 -- =========================== 결과 ===========================================
 select n, case when pass then '통과' else '실패' end as 결과, label as 검증, detail as 비고

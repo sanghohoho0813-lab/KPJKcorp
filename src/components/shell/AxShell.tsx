@@ -29,6 +29,7 @@ import {
   Menu,
 } from "lucide-react";
 import { useStore, useCurrentUser } from "@/lib/store";
+import { can, ROLE_LABEL, type Permission } from "@/lib/permissions";
 import { NEXT_FEATURES, useUi } from "@/lib/ui-store";
 import { useIsMobile, useIsPreviewFrame, useNow } from "@/lib/hooks";
 import { LiveClock } from "./LiveClock";
@@ -59,6 +60,8 @@ interface NavItem {
   id?: string;
   /** live count key — resolved in NavLink so the sidebar shows what needs attention */
   badge?: "approvals" | "tasks" | "leads";
+  /** 이 권한이 있는 역할에게만 보인다 (예: 사무직원은 매출기회·승인 메뉴가 없다) */
+  perm?: Permission;
 }
 
 interface NavGroup {
@@ -83,7 +86,7 @@ const NAV_GROUPS: NavGroup[] = [
     inkColor: "var(--nav-core-ink)",
     items: [
       { href: "/ax/dashboard", label: "대시보드", icon: <LayoutDashboard size={18} />, hint: "오늘의 코치 · 브리핑", id: "tut-nav-dashboard" },
-      { href: "/ax/opportunities", label: "승인 · 매출기회", icon: <ShieldCheck size={18} />, hint: "대표 승인 대기 · 추가서비스 기회", id: "tut-nav-approvals", badge: "approvals" },
+      { href: "/ax/opportunities", label: "승인 · 매출기회", icon: <ShieldCheck size={18} />, hint: "대표 승인 대기 · 추가서비스 기회", id: "tut-nav-approvals", badge: "approvals", perm: "opportunity.advance" },
       { href: "/ax/tasks", label: "업무함", icon: <CheckSquare size={18} />, hint: "내 업무 · 고객 문의", badge: "tasks" },
     ],
   },
@@ -124,6 +127,7 @@ const MOBILE_PRIMARY = ["/ax/dashboard", "/ax/clients", "/ax/projects", "/ax/doc
 
 function NavLink({ item, color, onClick, mobile, utility }: { item: NavItem; color: string; onClick?: () => void; mobile?: boolean; utility?: boolean }) {
   const pathname = usePathname();
+  const role = useStore((s) => s.session?.role);
   const badgeCount = useStore((s) => {
     if (item.badge === "approvals") return s.approvals.filter((a) => a.status === "pending").length;
     if (item.badge === "leads") return s.leads.filter((l) => l.status === "new").length;
@@ -136,6 +140,9 @@ function NavLink({ item, color, onClick, mobile, utility }: { item: NavItem; col
     return 0;
   });
   const active = pathname === item.href || pathname.startsWith(item.href + "/");
+  if (item.perm && !can(role, item.perm)) return null;
+  // 계약(금액)은 대표만, 견적은 컨설턴트까지 — 메뉴 이름도 보이는 것만
+  const label = item.href === "/ax/consultations" ? (can(role, "finance.view") ? item.label : can(role, "quote.create") ? "상담 · 견적" : "상담 기록") : item.label;
   return (
     <Link
       id={item.id}
@@ -159,7 +166,7 @@ function NavLink({ item, color, onClick, mobile, utility }: { item: NavItem; col
       <span className="nav-icon flex h-5 w-5 shrink-0 items-center justify-center transition-opacity" style={{ color, opacity: active ? 1 : utility ? 0.6 : 0.75 }}>
         {item.icon}
       </span>
-      <span className="flex-1 truncate">{item.label}</span>
+      <span className="flex-1 truncate">{label}</span>
       {badgeCount > 0 && (
         <span key={badgeCount} className={cx("anim-tick tnum shrink-0 rounded-full px-1.5 text-[0.72rem] font-bold", item.badge === "approvals" ? "bg-accent text-accent-ink" : mobile ? "bg-surface-2 text-ink-2" : "bg-white/15 text-white")}>{badgeCount}</span>
       )}
@@ -300,6 +307,8 @@ function Header() {
   const inFrame = useIsPreviewFrame();
   const [pick, setPick] = useState(false);
   const [menu, setMenu] = useState(false);
+  const [acct, setAcct] = useState(false);
+  const session = useStore((s) => s.session);
   const serverMode = useStore((s) => s.serverMode);
   const btn = "pressable flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-2 text-[0.82rem] font-semibold text-ink-2 hover:bg-surface-2";
   const lbl = "hidden 2xl:inline";
@@ -345,24 +354,97 @@ function Header() {
         <span className="hdr-optional hidden min-[430px]:inline"><LiveClock compact /></span>
       </div>
       <span className="shrink-0"><NotificationBell audience="internal" /></span>
-      <div className="hidden items-center gap-2 pl-2 lg:flex">
-        <Avatar name={user?.name ?? "K"} size={38} />
-        <div className="hdr-optional hidden whitespace-nowrap leading-tight xl:block">
-          <div className="text-[0.82rem] font-bold">{user?.name}</div>
-          <div className="text-[0.7rem] text-ink-3">{user?.title}</div>
-        </div>
-        <button onClick={() => { logout(); router.push("/login"); }} className="pressable ml-1 icon-btn text-ink-3 hover:bg-surface-2 hover:text-ink" title="로그아웃" aria-label="로그아웃">
-          <LogOut size={18} />
+      <div className="relative hidden items-center gap-1 pl-2 lg:flex">
+        <button type="button" onClick={() => setAcct((v) => !v)} aria-expanded={acct} aria-haspopup="menu" data-testid="account-menu-button"
+          className="pressable flex items-center gap-2 rounded-xl py-1 pl-1 pr-2 hover:bg-surface-2" title="계정 · 보기 전환">
+          <Avatar name={user?.name ?? "K"} size={38} />
+          <span className="hdr-optional hidden whitespace-nowrap text-left leading-tight xl:block">
+            <span className="block text-[0.82rem] font-bold">{user?.name}</span>
+            <span className="block text-[0.7rem] text-ink-3">{session?.realRole ? `${ROLE_LABEL[session.role]} 화면으로 보는 중` : user?.title}</span>
+          </span>
+          <ChevronDown size={15} className={cx("shrink-0 text-ink-3 transition-transform", acct && "rotate-180")} />
         </button>
+        {acct && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setAcct(false)} aria-hidden />
+            <div role="menu" className="anim-fade absolute right-0 top-[calc(100%+6px)] z-50 w-[19rem] rounded-2xl border border-line bg-surface p-3 shadow-2xl" data-testid="account-menu">
+              <div className="mb-2 flex items-center gap-2.5 px-1">
+                <Avatar name={user?.name ?? "K"} />
+                <div className="min-w-0 leading-tight"><div className="truncate font-bold">{user?.name} {user?.title}</div><div className="truncate text-[0.75rem] text-ink-3">{user?.email}</div></div>
+              </div>
+              <ConnectionStatus className="mb-2" />
+              <ViewSwitch onPickClient={() => { setAcct(false); setPick(true); }} onDone={() => setAcct(false)} />
+              <button type="button" role="menuitem" onClick={() => { setAcct(false); logout(); router.push("/login"); }}
+                className="pressable mt-1 flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-[0.88rem] font-semibold text-ink-2 hover:bg-surface-2">
+                <LogOut size={16} className="text-ink-3" /> 로그아웃
+              </button>
+            </div>
+          </>
+        )}
       </div>
       <CompanyPickerModal open={pick} onClose={() => setPick(false)} />
-      <MobileMenu open={menu} onClose={() => setMenu(false)} />
+      <MobileMenu open={menu} onClose={() => setMenu(false)} setPick={setPick} />
     </header>
   );
 }
 
+/**
+ * 보기 전환 — 대표 계정만 보인다. 컨설턴트·사무직원 화면으로 바꾸면 메뉴·버튼·저장 권한까지 그 역할로 줄어든다
+ * (직원이 실제로 보는 화면 그대로). 고객 화면은 기업을 골라 미리보기로. 권한을 올리는 전환은 없다.
+ */
+function ViewSwitch({ onPickClient, onDone }: { onPickClient: () => void; onDone?: () => void }) {
+  const session = useStore((s) => s.session);
+  const switchView = useStore((s) => s.switchView);
+  const toast = useStore((s) => s.toast);
+  const router = useRouter();
+  const real = session?.realRole ?? session?.role;
+  if (real !== "admin") return null;
+  const opts: { role: "admin" | "consultant" | "staff"; label: string; desc: string }[] = [
+    { role: "admin", label: "대표 화면", desc: "모든 화면 · 매출 정보" },
+    { role: "consultant", label: "컨설턴트 화면", desc: "매출 정보 없이" },
+    { role: "staff", label: "사무직원 화면", desc: "견적·계약·수금 없이" },
+  ];
+  return (
+    <div className="rounded-xl border border-line p-1.5" data-testid="view-switch">
+      <div className="px-1.5 pb-1 pt-0.5 text-[0.7rem] font-bold tracking-[0.12em] text-ink-3">보기 전환</div>
+      {opts.map((o) => {
+        const on = session?.role === o.role;
+        return (
+          <button key={o.role} type="button" role="menuitemradio" aria-checked={on}
+            onClick={() => { if (!on && switchView(o.role)) { toast(o.role === "admin" ? "대표 화면으로 돌아왔습니다." : `${o.label}으로 봅니다 — 버튼·저장도 그 권한만큼만 됩니다.`); router.push("/ax/dashboard"); } onDone?.(); }}
+            className={cx("pressable flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left", on ? "bg-surface-2" : "hover:bg-surface-2")}>
+            <span className={cx("h-2 w-2 shrink-0 rounded-full", on ? "bg-accent" : "bg-line-2")} />
+            <span className="flex-1 text-[0.88rem] font-semibold">{o.label}</span>
+            <span className="text-[0.72rem] text-ink-3">{o.desc}</span>
+          </button>
+        );
+      })}
+      <button type="button" role="menuitem" onClick={onPickClient}
+        className="pressable flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left hover:bg-surface-2">
+        <Eye size={14} className="shrink-0 text-ink-3" />
+        <span className="flex-1 text-[0.88rem] font-semibold">고객 화면</span>
+        <span className="text-[0.72rem] text-ink-3">기업 골라서</span>
+      </button>
+    </div>
+  );
+}
+
+/** 보기 전환 중 — 화면 위에 늘 보이고, 한 번에 대표로 돌아온다 */
+function ViewAsBanner() {
+  const session = useStore((s) => s.session);
+  const switchView = useStore((s) => s.switchView);
+  if (!session?.realRole) return null;
+  return (
+    <div role="status" className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-info/40 bg-info-bg/70 px-3 py-2 text-[0.85rem]" data-testid="view-as-banner">
+      <Eye size={16} className="shrink-0 text-info" />
+      <span className="min-w-0 flex-1"><b>{ROLE_LABEL[session.role]} 화면</b>으로 보는 중입니다. 메뉴·버튼·저장도 이 역할 권한만큼만 됩니다.</span>
+      <button type="button" onClick={() => switchView("admin")} className="pressable inline-flex min-h-9 items-center rounded-lg bg-ink px-3 font-semibold text-surface">대표 화면으로</button>
+    </div>
+  );
+}
+
 /** 휴대폰 왼쪽 위 메뉴 — 사이드바와 같은 목록 전체 + 지금 연결 상태 + 로그아웃 */
-function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
+function MobileMenu({ open, onClose, setPick }: { open: boolean; onClose: () => void; setPick: (v: boolean) => void }) {
   const user = useCurrentUser();
   const session = useStore((s) => s.session);
   const logout = useStore((s) => s.logout);
@@ -374,10 +456,11 @@ function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
           <Avatar name={user?.name ?? "K"} />
           <div className="min-w-0 flex-1 leading-tight">
             <div className="truncate font-bold">{user?.name} {user?.title}</div>
-            <div className="text-[0.75rem] text-ink-3">{session?.role === "admin" ? "대표" : "컨설턴트"}</div>
+            <div className="text-[0.75rem] text-ink-3">{session?.realRole ? `${ROLE_LABEL[session.role]} 화면으로 보는 중` : ROLE_LABEL[session?.role ?? "consultant"]}</div>
           </div>
         </div>
         <ConnectionStatus className="mb-3" />
+        <div className="mb-3"><ViewSwitch onPickClient={() => { onClose(); setPick(true); }} onDone={onClose} /></div>
         {NAV_GROUPS.map((g, gi) => (
           <div key={g.key} className={cx(gi > 0 && "mt-2.5 border-t border-line pt-2")}>
             <div className="px-3 pb-1 pt-0.5 text-[0.66rem] font-bold tracking-[0.16em] text-ink-3">{g.label}</div>
@@ -449,11 +532,12 @@ function MoreSheet() {
           <Avatar name={user?.name ?? "K"} />
           <div className="flex-1 leading-tight">
             <div className="font-bold">{user?.name} {user?.title}</div>
-            <div className="text-[0.75rem] text-ink-3">{session?.role === "admin" ? "대표 화면" : "직원 화면"}</div>
+            <div className="text-[0.75rem] text-ink-3">{session?.realRole ? `${ROLE_LABEL[session.role]} 화면으로 보는 중` : `${ROLE_LABEL[session?.role ?? "consultant"]} 화면`}</div>
           </div>
-          <Badge tone={session?.role === "admin" ? "accent" : "neutral"}>{session?.role === "admin" ? "대표" : "컨설턴트"}</Badge>
+          <Badge tone={session?.role === "admin" ? "accent" : "neutral"}>{ROLE_LABEL[session?.role ?? "consultant"]}</Badge>
         </div>
         <ConnectionStatus className="mb-4" />
+        <div className="mb-4"><ViewSwitch onPickClient={() => { close(); setPick(true); }} onDone={close} /></div>
         <div className="mb-4 rounded-xl border border-line p-3">
           <div className="mb-2 text-[0.82rem] font-semibold text-ink-2">글자 크기</div>
           <FontScalePicker />
@@ -533,6 +617,7 @@ export function AxShell({ children }: { children: ReactNode }) {
         <Header />
         <main className={cx("mx-auto w-full max-w-[1720px] px-4 py-5 md:px-6 md:py-7", isMobile && "pb-24")}>
           <ServerBanner audience="internal" />
+          <ViewAsBanner />
           <LivePopups audience="internal" />
           <PasswordNudge href="/ax/settings?open=account" />
           {ready ? <div key={pathname} className="anim-page">{children}</div> : <PageSkeleton />}

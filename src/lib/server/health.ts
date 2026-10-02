@@ -149,7 +149,7 @@ export async function runServerCheck(input: HealthInput): Promise<CheckItem[]> {
   } else if (!roleRes.data) {
     out.push({ key: "role", label: "권한 함수 · 내 역할", status: "fail", detail: "이 계정에 역할이 없습니다(대표 계정 연결 누락). 아무 데이터도 보이지 않는 상태입니다.", fix: "setup.sql 실행 결과의 '다음 할 일' 칸에 적힌 한 줄을 이 계정 이메일로 바꿔 실행하세요. README 1단계." });
   } else {
-    const label = roleRes.data === "admin" ? "대표" : roleRes.data === "consultant" ? "컨설턴트" : roleRes.data === "client" ? "고객" : String(roleRes.data);
+    const label = roleRes.data === "admin" ? "대표" : roleRes.data === "consultant" ? "컨설턴트" : roleRes.data === "staff" ? "사무직원" : roleRes.data === "client" ? "고객" : String(roleRes.data);
     out.push({ key: "role", label: "권한 함수 · 내 역할", status: "ok", detail: `${label} 권한으로 동작 중` });
   }
 

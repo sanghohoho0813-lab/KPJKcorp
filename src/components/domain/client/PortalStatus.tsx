@@ -1,5 +1,6 @@
 "use client";
 
+import { useMay } from "@/components/domain/EntityModals";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, ChevronRight, Eye, Link2, Link2Off } from "lucide-react";
 import { useStore } from "@/lib/store";
@@ -57,11 +58,15 @@ export function PortalStatus({ company, onMakeAccount }: { company: Company; onM
 }
 
 /** 이 기업에서 지금 챙길 것 — 마감 지남 · 회신 지연 · 서류 만료 · 수금 연체 */
+const NO_PAYMENTS: never[] = [];
+
 export function CompanyAlertsCard({ company, onOpen }: { company: Company; onOpen: (tab: OpsAlert["tab"]) => void }) {
   const projects = useStore((s) => s.projects);
   const vault = useStore((s) => s.companyVaults.find((v) => v.companyId === company.id));
   const files = useStore((s) => s.companyFiles);
-  const payments = useStore((s) => s.payments);
+  const fin = useMay()("finance.view");
+  const allPayments = useStore((s) => s.payments);
+  const payments = fin ? allPayments : NO_PAYMENTS;
   const alerts = companyAlerts({ company, projects: projects.filter((p) => p.companyId === company.id), vault, files: files.filter((f) => f.companyId === company.id), payments: payments.filter((p) => p.companyId === company.id) });
   if (!alerts.length) return null;
   return (

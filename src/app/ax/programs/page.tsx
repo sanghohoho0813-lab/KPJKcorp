@@ -29,6 +29,7 @@ export default function ProgramsPage() {
   const router = useRouter();
   const may = useMay();
   const upsert = useStore((s) => s.upsertPrograms);
+  const unshare = useStore((s) => s.unshareProgram);
   const share = useStore((s) => s.shareProgram);
   const remove = useStore((s) => s.removeProgram);
   const setLead = useStore((s) => s.updateLeadStatus);
@@ -97,7 +98,7 @@ export default function ProgramsPage() {
 
   const shown = programs
     .filter((p) => !q.trim() || `${p.title} ${p.agency} ${p.target ?? ""}`.includes(q.trim()))
-    .filter((p) => filter === "all" || (filter === "matched" ? (byProgram.get(p.id)?.companies.length ?? 0) + (byProgram.get(p.id)?.leads ?? 0) > 0 : (() => { const m = matchProgram(p, {}); return !!m?.deadline.urgent; })()))
+    .filter((p) => filter === "all" || (filter === "matched" ? (byProgram.get(p.id)?.companies.length ?? 0) + (byProgram.get(p.id)?.leads ?? 0) + p.notified.length > 0 : (() => { const m = matchProgram(p, {}); return !!m?.deadline.urgent; })()))
     .sort((a, b) => (a.applyEnd ?? "9999").localeCompare(b.applyEnd ?? "9999"));
   const newLeads = st.leads.filter((l) => l.status === "new").length;
 
@@ -149,6 +150,26 @@ export default function ProgramsPage() {
                     <div><b>맞는 고객 {info.companies.length}곳</b> · {info.companies.slice(0, 6).map((c) => <Link key={c.id} href={`/ax/clients/${c.id}`} className="mr-1.5 inline-block text-accent hover:underline" title={c.reasons.join(", ")}>{c.name}{p.notified.includes(c.id) ? " ✓" : ""}</Link>)}{info.companies.length > 6 ? `외 ${info.companies.length - 6}곳` : ""}</div>
                   ) : <div className="text-ink-3">조건이 맞는 고객 없음</div>}
                   {info.leads > 0 && <button type="button" className="mt-0.5 font-semibold text-accent" onClick={() => setTab("leads")}>맞는 가망고객 {info.leads}명 →</button>}
+                  {p.notified.length > 0 && (
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5 border-t border-line pt-1.5" data-program-sent={p.id}>
+                      <span className="font-semibold text-ink-2">알림 보낸 곳 {p.notified.length}</span>
+                      {p.notified.map((cid) => {
+                        const co = st.companies.find((x) => x.id === cid);
+                        return (
+                          <span key={cid} className="inline-flex items-center gap-0.5 rounded-full border border-line bg-surface pl-2.5 text-[0.78rem]">
+                            {co?.name ?? "지운 기업"}
+                            {may("program.manage") && (
+                              <button type="button" aria-label={`${co?.name ?? ""} 알림 취소`} title="알림 취소 — 고객 화면에서 빠집니다"
+                                className="pressable inline-flex h-7 w-7 items-center justify-center rounded-full text-ink-3 hover:bg-surface-2 hover:text-error"
+                                onClick={() => { unshare(p.id, cid, me); toast(`${co?.name ?? "고객"}에 보낸 공고 알림을 취소했습니다. 고객 화면에서 빠집니다.`); }}>
+                                <X size={13} />
+                              </button>
+                            )}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               } actions={may("program.manage") ? <>
                 {pending.length > 0 && <Button size="sm" variant="accent" icon={<Bell size={14} />} onClick={() => { const n = share(p.id, pending.map((c) => c.id), me); toast(`고객 ${n}곳에 알림을 보냈습니다. 고객 화면 '지원사업'에 보입니다.`); }}>맞는 고객 {pending.length}곳에 알림</Button>}

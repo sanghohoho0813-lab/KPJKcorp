@@ -56,59 +56,68 @@ export type Permission =
   | "notice.write"
   | "vault.write"
   | "journal.write"
-  | "payment.write";
+  | "payment.write"
+  | "finance.view";
 
 const POLICY: Record<Permission, Role[]> = {
-  "company.create": ["admin", "consultant"],
-  "company.update": ["admin", "consultant"],
-  "project.create": ["admin", "consultant"],
-  "project.update": ["admin", "consultant"],
-  "doc.request": ["admin", "consultant"],
-  "doc.review": ["admin", "consultant"],
+  "company.create": ["admin", "consultant", "staff"],
+  "company.update": ["admin", "consultant", "staff"],
+  "project.create": ["admin", "consultant", "staff"],
+  "project.update": ["admin", "consultant", "staff"],
+  "doc.request": ["admin", "consultant", "staff"],
+  "doc.review": ["admin", "consultant", "staff"],
   "doc.submit": ["client"],
-  "schedule.create": ["admin", "consultant"],
-  "schedule.update": ["admin", "consultant"],
-  "schedule.delete": ["admin", "consultant"],
-  "task.create": ["admin", "consultant"],
-  "task.update": ["admin", "consultant"],
-  "task.delete": ["admin", "consultant"],
-  "consultation.create": ["admin", "consultant"],
+  "schedule.create": ["admin", "consultant", "staff"],
+  "schedule.update": ["admin", "consultant", "staff"],
+  "schedule.delete": ["admin", "consultant", "staff"],
+  "task.create": ["admin", "consultant", "staff"],
+  "task.update": ["admin", "consultant", "staff"],
+  "task.delete": ["admin", "consultant", "staff"],
+  "consultation.create": ["admin", "consultant", "staff"],
   "quote.create": ["admin", "consultant"],
   "quote.send": ["admin", "consultant"],
   "quote.respond": ["client"],
-  "opportunity.create": ["admin", "consultant", "client"],
+  "opportunity.create": ["admin", "consultant", "staff", "client"],
   "opportunity.advance": ["admin", "consultant"],
   "approval.request": ["consultant"],
   // 승인은 대표만. 이전에는 버튼만 숨겼고 액션은 누구나 호출할 수 있었다.
   "approval.decide": ["admin"],
-  "result.share": ["admin", "consultant"],
+  "result.share": ["admin", "consultant", "staff"],
   "inquiry.create": ["client"],
-  "inquiry.answer": ["admin", "consultant"],
-  "settings.write": ["admin", "consultant", "client"],
+  "inquiry.answer": ["admin", "consultant", "staff"],
+  "settings.write": ["admin", "consultant", "staff", "client"],
   "baseline.write": ["admin"],
   "sprint.manage": ["admin"],
-  "portal.preview": ["admin", "consultant"],
+  "portal.preview": ["admin", "consultant", "staff"],
   // 계정 생성·비활성화·비밀번호 재설정은 대표만. 직원이 계정을 만들 수 있으면 권한 체계가 무의미해진다.
   "user.manage": ["admin"],
   "company.archive": ["admin", "consultant"],
   "project.archive": ["admin", "consultant"],
-  "doc.update": ["admin", "consultant"],
-  "consultation.update": ["admin", "consultant"],
+  "doc.update": ["admin", "consultant", "staff"],
+  "consultation.update": ["admin", "consultant", "staff"],
   "quote.update": ["admin", "consultant"],
-  "contract.manage": ["admin", "consultant"],
-  "result.withdraw": ["admin", "consultant"],
+  // 계약 금액 · 수금은 회사 매출 정보 — 대표만 (2026-10-02 권한 분리)
+  "contract.manage": ["admin"],
+  "result.withdraw": ["admin", "consultant", "staff"],
   "rules.manage": ["admin"],
   // 운영 모드 전환·백업·복원·데모 초기화. 데이터 전체를 바꾸는 일이라 대표만
   "data.manage": ["admin"],
   // 공지는 여러 고객에게 한 번에 나간다 — 내부 계정만 쓴다
-  "notice.write": ["admin", "consultant"],
-  "vault.write": ["admin", "consultant"],
-  "journal.write": ["admin", "consultant"],
-  "payment.write": ["admin", "consultant"],
+  "notice.write": ["admin", "consultant", "staff"],
+  "vault.write": ["admin", "consultant", "staff"],
+  "journal.write": ["admin", "consultant", "staff"],
+  "payment.write": ["admin"],
   // 지원사업 공고 불러오기·추가·고객 알림 / 가망고객 관리
-  "program.manage": ["admin", "consultant"],
-  "lead.manage": ["admin", "consultant"],
+  "program.manage": ["admin", "consultant", "staff"],
+  "lead.manage": ["admin", "consultant", "staff"],
+  // 회사 매출 정보 보기 — 계약 금액 · 수금 · 못 받은 돈 · 리포트 매출 축. 대표만
+  "finance.view": ["admin"],
 };
+
+/** 화면에 쓰는 역할 이름 — 한 곳에서 */
+export const ROLE_LABEL: Record<Role, string> = { admin: "대표·관리자", consultant: "컨설턴트", staff: "사무직원", client: "기업고객" };
+/** 내부 계정(고객 아님) */
+export const isInternal = (role: Role | undefined | null) => role === "admin" || role === "consultant" || role === "staff";
 
 export function can(role: Role | undefined | null, p: Permission): boolean {
   if (!role) return false;
@@ -137,6 +146,7 @@ export const PERMISSION_ROWS: { label: string; perms: Permission[] }[] = [
   { label: "가망고객 관리", perms: ["lead.manage"] },
   { label: "업무 일기 쓰기", perms: ["journal.write"] },
   { label: "수금 항목 · 입금 확인", perms: ["payment.write"] },
+  { label: "회사 매출 정보 보기 (계약 금액 · 수금 · 매출 리포트)", perms: ["finance.view"] },
   { label: "문의 작성", perms: ["inquiry.create"] },
   { label: "문의 답변", perms: ["inquiry.answer"] },
   { label: "실증 기준선 · 스프린트", perms: ["baseline.write", "sprint.manage"] },

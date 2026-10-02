@@ -1,5 +1,6 @@
 "use client";
 
+import { CancelDocRequestButton } from "@/components/domain/portal/CancelRequest";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -32,6 +33,9 @@ import { EXTRACT_METHOD_LABEL } from "@/lib/docextract";
 
 type TabKey = "overview" | "work" | "vault" | "docs" | "contract" | "consult" | "schedule" | "portal" | "journal" | "history";
 const TAB_KEYS: TabKey[] = ["overview", "work", "vault", "docs", "contract", "consult", "schedule", "portal", "journal", "history"];
+
+/** 아직 고객이 내기 전인 요청만 취소한다(낸 것은 검토에서 반려·완료로) */
+const DOC_CANCELLABLE = ["planned", "requested", "revision"];
 
 export default function ClientCardPage() {
   const { id } = useParams<{ id: string }>();
@@ -104,7 +108,8 @@ export default function ClientCardPage() {
     { key: "work", label: "진행 업무", count: projects.filter((p) => !p.archived).length },
     { key: "vault", label: "서류함", count: st.companyFiles.filter((f) => f.companyId === c.id).length },
     { key: "docs", label: "요청자료", count: docs.length },
-    { key: "contract", label: "계약 · 수금", count: unpaid || contracts.length },
+    // 계약 금액 · 수금은 회사 매출 정보 — 대표만
+    ...(may("finance.view") ? [{ key: "contract" as TabKey, label: "계약 · 수금", count: unpaid || contracts.length }] : []),
     { key: "consult", label: "상담", count: consultations.length },
     { key: "schedule", label: "일정", count: upcoming.length },
     { key: "portal", label: "고객 플랫폼", count: openIq.length || undefined },
@@ -209,7 +214,7 @@ export default function ClientCardPage() {
 
       {tab === "overview" && (
         <div className="space-y-5">
-          <CompanyAlertsCard company={c} onOpen={(t) => setTab(t === "money" ? "contract" : t)} />
+          <CompanyAlertsCard company={c} onOpen={(t) => setTab(t === "money" ? (may("finance.view") ? "contract" : "overview") : t)} />
           <ProfileCard company={c} />
         </div>
       )}
@@ -313,7 +318,7 @@ export default function ClientCardPage() {
       {tab === "vault" && <VaultTab company={c} />}
       {tab === "journal" && <><InternalOnly /><JournalTab company={c} /></>}
 
-      {tab === "contract" && (
+      {tab === "contract" && may("finance.view") && (
         <>
         <InternalOnly />
         <MoneySection company={c} />
@@ -357,7 +362,8 @@ export default function ClientCardPage() {
           </div>
           <div className="divide-y divide-line lg:hidden">
             {docs.map((d) => (
-              <button key={d.id} onClick={() => setReviewReq(d)} className="pressable block w-full px-4 py-3 text-left">
+              <div key={d.id} className="flex items-start">
+              <button onClick={() => setReviewReq(d)} className="pressable block min-w-0 flex-1 px-4 py-3 text-left">
                 <div className="flex items-center gap-2"><DocStatusBadge status={d.status} /><span className="truncate font-semibold">{d.name}</span></div>
                 <div className="mt-1 truncate text-[0.82rem] text-ink-2">{st.projects.find((p) => p.id === d.projectId)?.name}</div>
                 <div className="mt-1 flex flex-wrap items-center gap-x-3 text-[0.78rem] text-ink-3">
@@ -365,12 +371,14 @@ export default function ClientCardPage() {
                   <span>담당 {st.users.find((u) => u.id === d.assigneeId)?.name}</span>
                 </div>
               </button>
+              {DOC_CANCELLABLE.includes(d.status) && <CancelDocRequestButton id={d.id} name={d.name} className="mr-2 mt-2.5" />}
+              </div>
             ))}
             {docs.length === 0 && <div className="py-8 text-center text-[0.85rem] text-ink-3">요청자료가 없습니다.</div>}
           </div>
           <div className="hidden lg:block">
             <table className="tbl">
-              <thead><tr><th>자료명</th><th>프로젝트</th><th>상태</th><th>제출기한</th><th>제출일</th><th>파일</th><th>담당</th></tr></thead>
+              <thead><tr><th>자료명</th><th>프로젝트</th><th>상태</th><th>제출기한</th><th>제출일</th><th>파일</th><th>담당</th><th></th></tr></thead>
               <tbody>
                 {docs.map((d) => (
                   <tr key={d.id} className="row-clickable" onClick={() => setReviewReq(d)}>
@@ -381,6 +389,7 @@ export default function ClientCardPage() {
                     <td className="tnum">{d.submittedAt ? fmtDate(d.submittedAt) : "-"}</td>
                     <td className="text-ink-2">{d.files.length ? `${d.files[d.files.length - 1].fileName} (${fmtSize(d.files[d.files.length - 1].size)})` : "-"}</td>
                     <td>{st.users.find((u) => u.id === d.assigneeId)?.name}</td>
+                    <td className="w-px whitespace-nowrap">{DOC_CANCELLABLE.includes(d.status) && <CancelDocRequestButton id={d.id} name={d.name} />}</td>
                   </tr>
                 ))}
               </tbody>

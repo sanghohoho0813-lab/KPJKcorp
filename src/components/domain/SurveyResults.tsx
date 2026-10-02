@@ -93,7 +93,7 @@ export function SurveyResults() {
             {responses.filter((r) => r.freeText).map((r) => (
               <div key={r.id} className="py-3">
                 <p className="text-[0.9rem] leading-relaxed">{r.freeText}</p>
-                <div className="mt-1 text-[0.75rem] text-ink-3">{r.userName} · {r.role === "admin" ? "대표" : r.role === "consultant" ? "직원" : "고객"} · {fmtDate(r.submittedAt)}</div>
+                <div className="mt-1 text-[0.75rem] text-ink-3">{r.userName} · {r.role === "admin" ? "대표" : r.role === "client" ? "고객" : "직원"} · {fmtDate(r.submittedAt)}</div>
               </div>
             ))}
           </div>

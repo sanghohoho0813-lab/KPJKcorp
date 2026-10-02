@@ -1,5 +1,6 @@
 "use client";
 
+import { CancelRequestButton, OnBehalfNote, useOnBehalf } from "@/components/domain/portal/CancelRequest";
 import { useMemo, useState } from "react";
 import { Check, ChevronRight, MessageSquarePlus, Receipt, Sparkles, ThumbsUp } from "lucide-react";
 import { useStore, usePortalCompanyId, useCurrentUser, quoteGross, quoteNet } from "@/lib/store";
@@ -24,6 +25,7 @@ export default function PortalServicesPage() {
   const [reply, setReply] = useState<{ q: Quote; decision: "accepted" | "declined" } | null>(null);
   const [replyNote, setReplyNote] = useState("");
 
+  const { isClient, onBehalf } = useOnBehalf();
   const c = st.companies.find((x) => x.id === companyId);
   const board = useGrowth(c);
   const tick = useNow(60000);
@@ -41,18 +43,17 @@ export default function PortalServicesPage() {
   const consultant = st.users.find((u) => u.id === c.consultantId);
   // 관리자 미리보기에서도 "고객이 한 행동"으로 기록되어야 Loop가 실제와 같아진다.
   const contactUser = st.users.find((u) => u.role === "client" && u.companyId === c.id);
-  const isClient = st.session?.role === "client";
-  const actorId = isClient ? (user?.id ?? contactUser?.id ?? "") : "";
+  const actorId = isClient ? (user?.id ?? contactUser?.id ?? "") : (user?.id ?? "");
 
   const submit = () => {
     if (!ask) return;
-    if (!isClient) { toast("읽기 전용 미리보기입니다. 관심 표시는 고객 계정으로만 가능합니다.", "error"); return; }
+    if (!isClient && !onBehalf) { toast("고객 계정 또는 대표·컨설턴트 계정에서만 접수할 수 있습니다.", "error"); return; }
     raise(
-      { companyId: c.id, serviceKey: ask.svc.key, note: note.trim() || undefined, reason: ask.reason, source: ask.kind === "request" ? "portal_request" : "portal_interest" },
+      { companyId: c.id, serviceKey: ask.svc.key, note: note.trim() || undefined, reason: ask.reason, source: ask.kind === "request" ? "portal_request" : "portal_interest", onBehalf },
       actorId,
-      "client",
+      isClient ? "client" : (st.session?.role ?? "consultant"),
     );
-    toast(ask.kind === "request" ? "상담 요청이 전달되었습니다. 담당 컨설턴트가 연락드립니다." : "관심으로 접수했습니다. 담당 컨설턴트가 확인합니다.");
+    toast(onBehalf ? `고객 대신 접수했습니다 — ${consultant ? `${consultant.name} ${consultant.title}에게 ` : ""}업무·알림이 갔습니다.` : ask.kind === "request" ? "상담 요청이 전달되었습니다. 담당 컨설턴트가 연락드립니다." : "관심으로 접수했습니다. 담당 컨설턴트가 확인합니다.");
     setNote("");
     setAsk(null);
   };
@@ -136,7 +137,10 @@ export default function PortalServicesPage() {
                   {o.note && <div className="mt-0.5 text-[0.85rem] text-ink-2">“{o.note}”</div>}
                   <div className="mt-0.5 text-[0.78rem] text-ink-3">{fmtRelative(o.createdAt)} 접수 · 담당 {st.users.find((u) => u.id === o.assigneeId)?.name} {st.users.find((u) => u.id === o.assigneeId)?.title}</div>
                 </div>
-                <Badge tone={OPP_STATUS[o.status].tone}>{OPP_STATUS[o.status].clientLabel}</Badge>
+                <div className="flex items-center gap-1.5">
+                  <Badge tone={OPP_STATUS[o.status].tone}>{OPP_STATUS[o.status].clientLabel}</Badge>
+                  <CancelRequestButton opp={o} />
+                </div>
               </div>
             ))}
           </div>
@@ -272,7 +276,7 @@ export default function PortalServicesPage() {
         footer={
           <>
             <Button variant="ghost" onClick={() => setAsk(null)}>취소</Button>
-            <Button variant="accent" onClick={submit}>{ask?.kind === "request" ? "상담 요청" : "관심 남기기"}</Button>
+            <Button variant="accent" onClick={submit}>{onBehalf ? "고객 대신 접수" : ask?.kind === "request" ? "상담 요청" : "관심 남기기"}</Button>
           </>
         }
       >
@@ -284,6 +288,7 @@ export default function PortalServicesPage() {
         <p className="mt-2 text-[0.8rem] text-ink-3">
           {ask?.kind === "request" ? "담당 컨설턴트에게 바로 전달되며, 영업일 기준 1일 내 연락드립니다." : "담당 컨설턴트가 확인한 뒤 필요한 경우에만 연락드립니다."}
         </p>
+        {onBehalf && <OnBehalfNote />}
       </Modal>
       <Modal
         open={!!peek}

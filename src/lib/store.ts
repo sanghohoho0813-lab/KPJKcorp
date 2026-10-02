@@ -49,12 +49,12 @@ import { nowIso, uid, addDays, iso, daysBetween } from "./format";
 import { CUSTOMER_STEPS, stageLabel, stageToCustomerStep } from "./stages";
 import { RULE_BY_KEY, ruleDays, ruleOn } from "./rules";
 import { emptyVault, slotLabel, slotsOf } from "./vault";
-import { PAYMENT_KIND_LABEL, WORK_STATUS, won, workStatusOf } from "./work-status";
+import { PAYMENT_KIND_LABEL, WORK_STATUS, workStatusOf } from "./work-status";
 import { JOURNAL_TYPE } from "./journal";
 import { OPP_STATUS, SERVICE_BY_KEY } from "./services";
-import { can, type Permission } from "./permissions";
+import { can, ROLE_LABEL, type Permission } from "./permissions";
 import { toLegacyBaseline } from "./baseline-survey";
-import { serverConfigured, setDemoForced } from "./server/client";
+import { serverConfigured, setDemoForced, supa } from "./server/client";
 import { currentServerUser, serverSignIn as authSignIn, serverSignOut } from "./server/auth";
 import { loadAll, ORG_SETTING_KEYS, pendingWrites, pushChanges, pushSettings, retryOutbox, setOutboxOwner, unsavedCount, writeSeq, type ServerSettings } from "./server/sync";
 
@@ -72,6 +72,8 @@ export interface StoreState extends SeedData {
   /** 현재 세션이 이 행동을 할 수 있는가. 화면과 액션이 같은 답을 쓴다. */
   may: (p: Permission) => boolean;
   setPortalPreview: (companyId?: string) => void;
+  /** 보기 전환 — 대표 계정만. 컨설턴트·사무직원 화면으로 보거나(권한도 그 역할로 줄어든다) 대표로 돌아온다 */
+  switchView: (role: "admin" | "consultant" | "staff") => boolean;
   setSettings: (patch: Partial<Settings>) => void;
   toast: (text: string, tone?: "success" | "error" | "info") => void;
   dismissToast: (id: string) => void;
@@ -197,7 +199,12 @@ export interface StoreState extends SeedData {
   shareResult: (data: Omit<ResultFile, "id" | "sharedAt">, byUserId: string) => void;
   downloadResult: (resultId: string, byUserId: string) => void;
   // opportunity / approval / survey
-  raiseOpportunity: (data: { companyId: string; serviceKey: string; note?: string; reason?: string; source: OpportunitySource }, byUserId: string, byRole: Role) => void;
+  /** onBehalf: 대표·컨설턴트가 고객 화면(미리보기)에서 고객 대신 접수 — 기록에 그렇게 남는다 */
+  raiseOpportunity: (data: { companyId: string; serviceKey: string; note?: string; reason?: string; source: OpportunitySource; onBehalf?: boolean }, byUserId: string, byRole: Role) => void;
+  /** 고객이 보낸 상담 요청·관심·지원사업 문의 취소 (제안·견적으로 넘어가기 전까지). 서버 모드 고객은 서버 함수로 */
+  cancelMyRequest: (opportunityId: string, byUserId: string) => Promise<{ ok: boolean; reason?: string }>;
+  /** 고객에게 보낸 지원사업 공고 알림 취소 — 고객 화면 "담당 컨설턴트가 보낸 공고"에서 빠진다 */
+  unshareProgram: (programId: string, companyId: string, byUserId: string) => void;
   /** 담당 컨설턴트가 고객 화면 "함께 검토해볼 것"에 제안을 올린다 (왜 제안하는지 = 고객에게 보이는 글) */
   proposeService: (companyId: string, serviceKey: string, reason: string, byUserId: string) => string | null;
   /** 고객이 요청했거나 제안한 성장과제를 실제 진행 업무로 시작 — 기회는 "진행 확정", 고객 홈엔 "진행 중"으로 */
@@ -350,6 +357,9 @@ function applyServer(
   server: ServerSettings | undefined,
 ) {
   const cur = get().settings;
+  // 대표가 보기 전환 중이었다면(같은 계정) 새로고침 뒤에도 그 화면을 유지한다
+  const prev = get().session;
+  const keepView = prev?.userId === user.id && prev.realRole === "admin" && user.role === "admin" ? { role: prev.role, realRole: "admin" as const } : undefined;
   // 서버 화면으로 바뀌기 전에, 이 브라우저에만 입력해 둔 기업을 따로 보관한다 — 서버 화면에서 "서버로 올리기"로 옮긴다
   if (!get().serverMode) stashLocalCompanies(get().companies);
   loadingFromServer = true;
@@ -360,7 +370,8 @@ function applyServer(
     syncError: undefined,
     session: {
       userId: user.id,
-      role: user.role,
+      role: keepView?.role ?? user.role,
+      ...(keepView ? { realRole: keepView.realRole } : {}),
       companyId: user.companyId,
       signedInAt: nowIso(),
     },
@@ -496,6 +507,15 @@ export const useStore = create<StoreState>()(
         set({ session: null });
       },
       may: (p) => can(get().session?.role, p),
+      switchView: (role) => {
+        const s = get().session;
+        if (!s) return false;
+        const real = s.realRole ?? s.role;
+        if (real !== "admin") return false; // 대표만 — 권한을 올리는 전환은 없다
+        set({ session: { ...s, role, realRole: role === "admin" ? undefined : "admin", portalPreviewCompanyId: undefined } });
+        return true;
+      },
+
       setPortalPreview: (companyId) => {
         const s = get().session;
         if (!s) return;
@@ -796,7 +816,7 @@ export const useStore = create<StoreState>()(
         };
         set({
           users: [...st.users, user],
-          activities: [makeActivity({ type: "user_created", companyId: user.companyId, actorId: byUserId, actorRole: st.session?.role ?? "admin", text: `계정 생성: ${user.name} (${user.email}) · ${user.role === "admin" ? "대표" : user.role === "consultant" ? "컨설턴트" : "기업고객"}` }), ...st.activities],
+          activities: [makeActivity({ type: "user_created", companyId: user.companyId, actorId: byUserId, actorRole: st.session?.role ?? "admin", text: `계정 생성: ${user.name} (${user.email}) · ${ROLE_LABEL[user.role]}` }), ...st.activities],
         });
         return id;
       },
@@ -937,7 +957,7 @@ export const useStore = create<StoreState>()(
           quotes: st.quotes.map((q) => (q.id === id ? next : q)),
           // 승인 대기 중이던 건의 할인율이 바뀌면 그 승인 요청은 더 이상 유효하지 않다.
           approvals: discountChanged && before.approvalId ? st.approvals.map((a) => (a.id === before.approvalId && a.status === "pending" ? { ...a, status: "rejected" as const, decidedAt: nowIso(), decisionNote: "견적 할인율 변경으로 자동 철회" } : a)) : st.approvals,
-          activities: [makeActivity({ type: "quote_updated", companyId: before.companyId, projectId: before.projectId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `견적 수정: ${next.title} — ${changed.map((k) => LABEL[k] ?? k).join(", ")}${discountChanged && before.approvalId ? " (기존 승인 무효)" : ""}`, meta: { fields: changed.join(","), amount: quoteNet(next) } }), ...st.activities],
+          activities: [makeActivity({ type: "quote_updated", companyId: before.companyId, projectId: before.projectId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `견적 수정: ${next.title} — ${changed.map((k) => LABEL[k] ?? k).join(", ")}${discountChanged && before.approvalId ? " (기존 승인 무효)" : ""}`, meta: { fields: changed.join(",") } }), ...st.activities],
         });
       },
 
@@ -1598,7 +1618,7 @@ export const useStore = create<StoreState>()(
         const pay: Payment = { ...data, id: uid("pm"), label: data.label.trim() || PAYMENT_KIND_LABEL[data.kind], createdAt: nowIso() };
         set({
           payments: [...st.payments, pay],
-          activities: [makeActivity({ type: "payment_added", companyId: data.companyId, projectId: data.projectId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `수금 항목 추가: ${pay.label} ${won(pay.amount)}` }), ...st.activities],
+          activities: [makeActivity({ type: "payment_added", companyId: data.companyId, projectId: data.projectId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `수금 항목 추가: ${pay.label}` }), ...st.activities],
         });
         return pay.id;
       },
@@ -1612,7 +1632,7 @@ export const useStore = create<StoreState>()(
         set({
           payments: st.payments.map((x) => (x.id === id ? next : x)),
           activities: received
-            ? [makeActivity({ type: "payment_received", companyId: cur.companyId, projectId: cur.projectId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `입금 확인: ${next.label} ${won(next.amount)}` }), ...st.activities]
+            ? [makeActivity({ type: "payment_received", companyId: cur.companyId, projectId: cur.projectId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `입금 확인: ${next.label}` }), ...st.activities]
             : st.activities,
         });
       },
@@ -1623,7 +1643,7 @@ export const useStore = create<StoreState>()(
         if (deny(st, "payment.write", `수금 항목 삭제 (${cur.label})`, set)) return;
         set({
           payments: st.payments.filter((x) => x.id !== id),
-          activities: [makeActivity({ type: "payment_removed", companyId: cur.companyId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `수금 항목 삭제: ${cur.label} ${won(cur.amount)}${cur.receivedAt ? " (입금됨)" : ""}` }), ...st.activities],
+          activities: [makeActivity({ type: "payment_removed", companyId: cur.companyId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `수금 항목 삭제: ${cur.label}${cur.receivedAt ? " (입금됨)" : ""}` }), ...st.activities],
         });
       },
 
@@ -1844,7 +1864,7 @@ export const useStore = create<StoreState>()(
         if (!company || !svc) return;
         if (deny(st, "opportunity.create", `매출기회 등록 (${svc.name})`, set)) return;
         const now = nowIso();
-        const fromClient = data.source === "portal_interest" || data.source === "portal_request";
+        const fromClient = (data.source === "portal_interest" || data.source === "portal_request") && !data.onBehalf;
         const assigneeId = company.consultantId;
         const opp: Opportunity = {
           id: uid("op"),
@@ -1857,9 +1877,9 @@ export const useStore = create<StoreState>()(
           createdAt: now,
           createdBy: byUserId,
           updatedAt: now,
-          note: data.note,
+          note: data.onBehalf ? `[담당자 대신 접수] ${data.note ?? ""}`.trim() : data.note,
           reason: data.reason,
-          history: [{ at: now, status: "interest", by: byUserId }],
+          history: [{ at: now, status: "interest", by: byUserId, ...(data.onBehalf ? { note: "고객 화면에서 담당자가 대신 접수" } : {}) }],
         };
         // 관심 표시는 그 자체로는 아무 일도 아니다 — 담당자에게 실제 업무가 생겨야 Loop가 닫힌다.
         const task: Task = {
@@ -1880,14 +1900,55 @@ export const useStore = create<StoreState>()(
           tasks: [task, ...st.tasks],
           activities: [
             makeActivity({ type: "task_created", companyId: data.companyId, actorId: "system", actorRole: "system", text: `자동 생성: ${svc.name} 상담 연락 Task` }),
-            makeActivity({ type: "opportunity_created", companyId: data.companyId, actorId: byUserId, actorRole: fromClient ? "client" : byRole, text: `${data.source === "portal_request" ? "고객 상담요청" : data.source === "portal_interest" ? "고객 관심표시" : "내부 등록"}: ${svc.name}`, meta: { serviceKey: data.serviceKey, source: data.source } }),
+            makeActivity({ type: "opportunity_created", companyId: data.companyId, actorId: byUserId, actorRole: fromClient ? "client" : byRole, text: `${data.onBehalf ? "고객 대신 접수 — " : ""}${data.source === "portal_request" ? "고객 상담요청" : data.source === "portal_interest" ? "고객 관심표시" : "내부 등록"}: ${svc.name}`, meta: { serviceKey: data.serviceKey, source: data.source, ...(data.onBehalf ? { onBehalf: 1 } : {}) } }),
             ...st.activities,
           ],
           notifications: [
             makeNotification({ audience: "internal", companyId: data.companyId, title: `${data.source === "portal_request" ? "상담 요청" : "추가서비스 관심"}: ${company.name}`, body: `${svc.name}${data.note ? ` — ${data.note}` : ""}`, href: "/ax/opportunities" }),
-            ...(fromClient ? [makeNotification({ audience: "client", companyId: data.companyId, title: "요청이 접수되었습니다", body: `${svc.name} 관련 문의가 담당 컨설턴트에게 전달되었습니다.`, href: "/portal/services" })] : []),
+            ...(fromClient || data.onBehalf ? [makeNotification({ audience: "client", companyId: data.companyId, title: "요청이 접수되었습니다", body: `${svc.name} 관련 문의가 담당 컨설턴트에게 전달되었습니다.`, href: "/portal/services" })] : []),
             ...st.notifications,
           ],
+        });
+      },
+
+      cancelMyRequest: async (opportunityId, byUserId) => {
+        const st = get();
+        const o = st.opportunities.find((x) => x.id === opportunityId);
+        if (!o) return { ok: false, reason: "요청을 찾지 못했습니다." };
+        const isClient = st.session?.role === "client";
+        if (isClient && o.companyId !== st.session?.companyId) return { ok: false, reason: "취소할 수 있는 요청이 아닙니다." };
+        if (!isClient && deny(st, "opportunity.advance", `요청 취소 (${o.serviceName})`, set)) return { ok: false, reason: "권한이 없습니다." };
+        if (o.source !== "portal_interest" && o.source !== "portal_request") return { ok: false, reason: "담당자가 올린 제안은 여기서 취소하지 않습니다." };
+        if (o.status === "dropped") return { ok: true };
+        if (o.status !== "interest" && o.status !== "contacted") return { ok: false, reason: "이미 제안·진행 단계라 화면에서 취소할 수 없습니다. 담당 컨설턴트에게 말씀해 주세요." };
+        // 서버 모드 고객: 매출기회는 고객이 직접 못 고친다 — 서버 함수가 상태·업무를 정리한다
+        if (st.serverMode && isClient) {
+          const sb = supa();
+          const { error } = sb ? await sb.rpc("kpjk_client_cancel_request", { p_opp: opportunityId }) : { error: { message: "서버에 연결되지 않았습니다." } };
+          if (error) return { ok: false, reason: error.message };
+        }
+        const now = nowIso();
+        const company = get().companies.find((c) => c.id === o.companyId);
+        const plain = o.serviceName.replace(/^지원사업: /, "");
+        set({
+          opportunities: get().opportunities.map((x) => (x.id === opportunityId ? { ...x, status: "dropped" as const, updatedAt: now, history: [...x.history, { at: now, status: "dropped" as const, by: byUserId, note: isClient ? "고객이 요청을 취소함" : "고객 화면에서 담당자가 취소" }] } : x)),
+          tasks: get().tasks.filter((t) => !(t.source === "auto" && t.companyId === o.companyId && (t.status === "todo" || t.status === "doing") && (t.title.includes(o.serviceName) || (o.serviceKey === "support_program" && t.title.includes(plain))))),
+          activities: [makeActivity({ type: "request_canceled", companyId: o.companyId, actorId: byUserId, actorRole: st.session?.role ?? "client", text: `${isClient ? "고객이" : "담당자가"} 요청 취소: ${o.serviceName}` }), ...get().activities],
+          notifications: [makeNotification({ audience: "internal", companyId: o.companyId, title: `요청 취소: ${company?.name ?? ""}`, body: `${o.serviceName} — ${isClient ? "고객이 요청을 취소했습니다. 연락하지 않으셔도 됩니다." : "고객 화면에서 취소했습니다."}`, href: "/ax/opportunities" }), ...get().notifications],
+        });
+        return { ok: true };
+      },
+
+      unshareProgram: (programId, companyId, byUserId) => {
+        const st = get();
+        const p = st.programs.find((x) => x.id === programId);
+        if (!p || !p.notified.includes(companyId)) return;
+        if (deny(st, "program.manage", `공고 알림 취소 (${p.title})`, set)) return;
+        set({
+          programs: st.programs.map((x) => (x.id === programId ? { ...x, notified: x.notified.filter((c) => c !== companyId) } : x)),
+          // 고객이 아직 안 읽은 그 공고 알림은 거둔다(읽은 것은 기록으로 남는다)
+          notifications: st.notifications.filter((n) => !(n.audience === "client" && n.companyId === companyId && !n.read && n.href === "/portal/programs" && n.body.includes(p.title))),
+          activities: [makeActivity({ type: "program_unshared", companyId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `지원사업 공고 알림 취소: ${p.title}` }), ...st.activities],
         });
       },
 
@@ -1988,7 +2049,7 @@ export const useStore = create<StoreState>()(
         };
         set({
           quotes: [q, ...st.quotes],
-          activities: [makeActivity({ type: "quote_created", companyId: data.companyId, projectId: data.projectId, actorId: byUserId, actorRole: "consultant", text: `견적 작성: ${data.title}${company ? ` (${company.name})` : ""}`, meta: { amount: quoteNet(q), discountPct: data.discountPct } }), ...st.activities],
+          activities: [makeActivity({ type: "quote_created", companyId: data.companyId, projectId: data.projectId, actorId: byUserId, actorRole: "consultant", text: `견적 작성: ${data.title}${company ? ` (${company.name})` : ""}`, meta: { discountPct: data.discountPct } }), ...st.activities],
         });
       },
 
@@ -2046,7 +2107,7 @@ export const useStore = create<StoreState>()(
           tasks: [task, ...st.tasks],
           activities: [
             makeActivity({ type: "task_created", companyId: q.companyId, actorId: "system", actorRole: "system", text: `자동 생성: ${task.title}` }),
-            makeActivity({ type: "quote_sent", companyId: q.companyId, projectId: q.projectId, actorId: byUserId, actorRole: "consultant", text: `견적 발송: ${q.title}`, meta: { amount: quoteNet(q) } }),
+            makeActivity({ type: "quote_sent", companyId: q.companyId, projectId: q.projectId, actorId: byUserId, actorRole: "consultant", text: `견적 발송: ${q.title}` }),
             ...st.activities,
           ],
           notifications: [makeNotification({ audience: "client", companyId: q.companyId, title: "제안서가 도착했습니다", body: `${q.title} — 내용을 확인하고 회신해 주세요.`, href: "/portal/services" }), ...st.notifications],
@@ -2113,7 +2174,7 @@ export const useStore = create<StoreState>()(
           contracts: [contract, ...st.contracts],
           quotes: st.quotes.map((x) => (x.id === quoteId ? { ...x, status: "converted" as QuoteStatus, contractId: contract.id } : x)),
           opportunities,
-          activities: [makeActivity({ type: "quote_converted", companyId: q.companyId, projectId: q.projectId, actorId: byUserId, actorRole: "consultant", text: `계약 전환: ${q.title}`, meta: { amount: quoteNet(q) } }), ...st.activities],
+          activities: [makeActivity({ type: "quote_converted", companyId: q.companyId, projectId: q.projectId, actorId: byUserId, actorRole: "consultant", text: `계약 전환: ${q.title}` }), ...st.activities],
           notifications: [makeNotification({ audience: "client", companyId: q.companyId, title: "계약서를 보내드렸습니다", body: `${q.title} 계약 진행을 시작합니다.`, href: "/portal/projects" }), ...st.notifications],
         });
       },
@@ -2319,7 +2380,8 @@ export const useStore = create<StoreState>()(
           live: arrived.length ? [...arrived, ...(cur.live ?? [])].slice(0, 4) : cur.live,
           syncError: undefined,
           // 역할이 바뀌었으면 따라간다. 미리보기·로그인 시각은 그대로 둔다
-          session: cur.session ? { ...cur.session, role: me.user.role, companyId: me.user.companyId } : cur.session,
+          // 보기 전환 중인 대표는 보고 있는 역할을 유지한다(실제 역할이 대표가 아니게 되면 풀린다)
+          session: cur.session ? (cur.session.realRole === "admin" && me.user.role === "admin" ? { ...cur.session, companyId: me.user.companyId } : { ...cur.session, role: me.user.role, realRole: undefined, companyId: me.user.companyId }) : cur.session,
           settings: {
             ...cur.settings,
             org: loaded.settings?.org ?? cur.settings.org,

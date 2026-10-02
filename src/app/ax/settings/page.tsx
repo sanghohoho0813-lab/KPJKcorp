@@ -33,7 +33,7 @@ function SettingsInner() {
   const params = useSearchParams();
   const openId = params.get("open");
   const [confirm, setConfirm] = useState(false);
-  const [permTab, setPermTab] = useState<"admin" | "consultant" | "client">(session?.role === "consultant" ? "consultant" : "admin");
+  const [permTab, setPermTab] = useState<"admin" | "consultant" | "staff" | "client">(session?.role === "consultant" || session?.role === "staff" ? session.role : "admin");
 
   return (
     <div>
@@ -89,17 +89,17 @@ function SettingsInner() {
             이 표는 설명이 아니라 <b className="text-ink-2">실제 규칙</b>입니다. <code className="rounded bg-surface-2 px-1">src/lib/permissions.ts</code>의 정책에서 직접 그려지며,
             같은 정책을 저장 로직이 검사합니다. 화면에서 버튼이 숨겨질 뿐 아니라, 권한 없는 계정이 해당 동작을 호출하면 거절되고 그 사실이 기록으로 남습니다.
           </p>
-          <div className="mb-2 md:hidden"><SegmentedControl size="sm" value={permTab} onChange={setPermTab} options={[{ key: "admin", label: "대표" }, { key: "consultant", label: "직원" }, { key: "client", label: "고객" }]} /></div>
+          <div className="mb-2 md:hidden"><SegmentedControl size="sm" value={permTab} onChange={setPermTab} options={[{ key: "admin", label: "대표" }, { key: "consultant", label: "컨설턴트" }, { key: "staff", label: "사무직원" }, { key: "client", label: "고객" }]} /></div>
           <div className="overflow-x-auto rounded-xl border border-line">
             <table className="tbl tbl-compact">
-              <thead><tr><th className="w-[34%]">기능</th><th className={cx("md:table-cell", permTab !== "admin" && "hidden")}>대표/관리자</th><th className={cx("md:table-cell", permTab !== "consultant" && "hidden")}>컨설턴트</th><th className={cx("md:table-cell", permTab !== "client" && "hidden")}>기업고객</th></tr></thead>
+              <thead><tr><th className="w-[34%]">기능</th><th className={cx("md:table-cell", permTab !== "admin" && "hidden")}>대표/관리자</th><th className={cx("md:table-cell", permTab !== "consultant" && "hidden")}>컨설턴트</th><th className={cx("md:table-cell", permTab !== "staff" && "hidden")}>사무직원</th><th className={cx("md:table-cell", permTab !== "client" && "hidden")}>기업고객</th></tr></thead>
               <tbody>
                 {PERMISSION_ROWS.map((row) => {
-                  const cell = (r: "admin" | "consultant" | "client") => {
+                  const cell = (r: "admin" | "consultant" | "staff" | "client") => {
                     const v = rowVerdict(r, row.perms);
                     return <td className={cx("md:table-cell", permTab !== r && "hidden", v === "none" && "text-ink-3")}>{v === "all" ? "✓" : v === "some" ? "△ 일부" : "×"}</td>;
                   };
-                  return <tr key={row.label}><td className="font-semibold">{row.label}</td>{cell("admin")}{cell("consultant")}{cell("client")}</tr>;
+                  return <tr key={row.label}><td className="font-semibold">{row.label}</td>{cell("admin")}{cell("consultant")}{cell("staff")}{cell("client")}</tr>;
                 })}
               </tbody>
             </table>
