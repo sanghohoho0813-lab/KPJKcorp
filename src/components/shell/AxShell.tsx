@@ -27,6 +27,7 @@ import {
   Compass,
   Megaphone,
   Menu,
+  MonitorPlay,
 } from "lucide-react";
 import { useStore, useCurrentUser } from "@/lib/store";
 import { can, ROLE_LABEL, type Permission } from "@/lib/permissions";
@@ -121,6 +122,9 @@ const NAV_UTILITY: NavItem[] = [
   { href: "/ax/settings", label: "설정", icon: <Settings size={17} />, id: "tut-nav-settings" },
   { href: "/ax/why", label: "Why AX", icon: <BookOpen size={17} />, hint: "기획의도", id: "tut-nav-why" },
 ];
+
+/** 실사용 영상 — 향후 확장 바로 아래에 둔다. */
+const VIDEO_ITEM: NavItem = { href: "/ax/video", label: "실사용 영상", icon: <MonitorPlay size={17} />, hint: "KPJK AX 소개 영상 · 4분" };
 
 /** Routes already reachable from the mobile bottom bar — excluded from 더보기. */
 const MOBILE_PRIMARY = ["/ax/dashboard", "/ax/clients", "/ax/projects", "/ax/documents"];
@@ -256,6 +260,9 @@ function Sidebar() {
           </div>
         ))}
         <NextGroup />
+        <div className="mt-0.5" data-testid="nav-video">
+          <NavLink item={VIDEO_ITEM} color="var(--color-highlight)" utility />
+        </div>
       </nav>
       <div className="border-t border-white/10 p-2">
         <div className="space-y-0.5">
@@ -473,6 +480,9 @@ function MobileMenu({ open, onClose, setPick }: { open: boolean; onClose: () => 
           </div>
         ))}
         <div className="mt-2.5 border-t border-line pt-2">
+          <NavLink item={VIDEO_ITEM} color="var(--color-accent)" onClick={onClose} mobile />
+        </div>
+        <div className="mt-2.5 border-t border-line pt-2">
           <div className="space-y-0.5">
             {NAV_UTILITY.map((item) => <NavLink key={item.href} item={item} color="var(--nav-sys-ink)" onClick={onClose} mobile />)}
           </div>
@@ -580,6 +590,9 @@ function MoreSheet() {
           </div>
         </div>
         <NextGroup mobile />
+        <div className="mt-0.5">
+          <NavLink item={VIDEO_ITEM} color="var(--color-accent)" onClick={close} mobile />
+        </div>
       </Sheet>
       <CompanyPickerModal open={pick} onClose={() => setPick(false)} />
       <Confirm open={confirmReset} onClose={() => setConfirmReset(false)} onConfirm={() => { resetDemo(); toast("데모 데이터를 초기화했습니다."); }} title="데모 초기화" desc="모든 Action 상태, 고객 제출, 문의를 초기 상태로 되돌립니다." confirmText="초기화" danger />
