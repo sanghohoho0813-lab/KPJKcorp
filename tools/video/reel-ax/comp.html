@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<style>
+  :root { --bg:#0f1216; --shell:#171b20; --shell2:#22272e; --acc:#d47a4a; --acc2:#b75b2a; --hi:#e8b89a;
+          --ink:#f4f1ec; --ink2:rgba(244,241,236,.72); --ink3:rgba(244,241,236,.46); --line:rgba(255,255,255,.09); }
+  * { box-sizing:border-box; margin:0; padding:0; animation:none !important; transition:none !important; }
+  html,body { width:1080px; height:1920px; overflow:hidden; background:var(--bg); color:var(--ink);
+              font-family:'Pretendard Variable','Pretendard',sans-serif; -webkit-font-smoothing:antialiased; word-break:keep-all; }
+  .bg { position:absolute; inset:-10%; background:
+      radial-gradient(70% 40% at 85% 8%, rgba(212,122,74,.24), transparent 60%),
+      radial-gradient(60% 35% at 10% 92%, rgba(232,184,154,.10), transparent 60%),
+      linear-gradient(170deg, #12161b 0%, #171b20 45%, #0d1014 100%); }
+  .grid { position:absolute; inset:0; opacity:.5;
+      background-image:linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+      background-size:90px 90px; mask-image:radial-gradient(80% 55% at 50% 40%, #000 30%, transparent 85%); }
+  .scene { position:absolute; inset:0; opacity:0; }
+  .abs { position:absolute; }
+  .eyebrow { font-size:26px; font-weight:700; letter-spacing:.3em; color:var(--hi); text-transform:uppercase; }
+  .h1 { font-size:88px; font-weight:800; letter-spacing:-.025em; line-height:1.12; }
+  .h2 { font-size:64px; font-weight:800; letter-spacing:-.02em; line-height:1.2; }
+  .h3 { font-size:46px; font-weight:700; letter-spacing:-.01em; line-height:1.3; }
+  .p  { font-size:36px; font-weight:500; color:var(--ink2); line-height:1.5; }
+  .acc { color:var(--hi); }
+  .dim { color:var(--ink3); }
+  .glass { background:linear-gradient(160deg, rgba(255,255,255,.075), rgba(255,255,255,.025)); border:1px solid rgba(255,255,255,.12);
+           border-radius:28px; box-shadow:0 40px 80px -30px rgba(0,0,0,.7); }
+  .glass.hot { border-color:rgba(232,184,154,.55); background:linear-gradient(160deg, rgba(212,122,74,.16), rgba(212,122,74,.04)); }
+  .note { position:absolute; left:72px; top:1296px; font-size:22px; font-weight:500; color:var(--ink3); }
+  .title { position:absolute; left:72px; right:120px; top:250px; }
+  .title .h2, .title .h3 { margin-top:18px; }
+  /* 행 */
+  .row { position:absolute; left:72px; width:888px; display:flex; align-items:center; gap:26px; padding:30px 34px; font-size:38px; font-weight:700; line-height:1.3; }
+  .row .ic { flex:none; width:56px; height:56px; border-radius:50%; background:var(--acc); color:#fff; display:flex; align-items:center; justify-content:center; font-size:30px; font-weight:800; }
+  .row .ic.ghost { background:rgba(255,255,255,.1); color:var(--hi); }
+  .row small { display:block; font-size:24px; font-weight:700; color:var(--hi); letter-spacing:.08em; margin-bottom:6px; }
+  /* 말풍선 */
+  .bubble { position:absolute; padding:30px 40px; border-radius:40px 40px 40px 12px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14);
+            font-size:44px; font-weight:700; box-shadow:0 30px 60px -30px rgba(0,0,0,.7); white-space:nowrap; }
+  .bubble:before { content:attr(data-who); position:absolute; top:-40px; left:8px; font-size:24px; font-weight:600; color:var(--ink3); }
+  /* 칩 */
+  .chip { position:absolute; padding:26px 34px; border-radius:24px; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.14); white-space:nowrap; }
+  .chip b { display:block; font-size:24px; font-weight:700; color:var(--hi); letter-spacing:.06em; margin-bottom:6px; }
+  .chip span { font-size:40px; font-weight:800; }
+  /* 기기 */
+  .browser { position:absolute; border-radius:20px; overflow:hidden; background:#fff; box-shadow:0 50px 120px -30px rgba(0,0,0,.75), 0 0 0 1px rgba(255,255,255,.08); }
+  .browser .bar { height:40px; background:#eef0f3; display:flex; align-items:center; gap:9px; padding:0 18px; border-bottom:1px solid #dfe2e6; }
+  .browser .bar i { width:13px; height:13px; border-radius:50%; background:#d6d9de; display:block; }
+  .browser .bar b { margin-left:18px; height:24px; flex:0 0 46%; border-radius:6px; background:#fff; font-size:14px; font-weight:600; color:#7a828c; display:flex; align-items:center; padding-left:12px; }
+  .view { position:relative; overflow:hidden; }
+  .view img, .kbw { position:absolute; left:0; top:0; width:100%; transform-origin:0 0; display:block; }
+  .kbw img { position:static; }
+  .phone { position:absolute; border-radius:60px; padding:14px; background:#0b0d10; box-shadow:0 60px 120px -30px rgba(0,0,0,.8), 0 0 0 2px rgba(255,255,255,.14) inset; }
+  .phone .view { border-radius:46px; background:#fff; }
+  .phone .notch { position:absolute; top:24px; left:50%; width:130px; height:34px; margin-left:-65px; background:#0b0d10; border-radius:20px; z-index:3; }
+  .hl { position:absolute; border:4px solid var(--acc); border-radius:14px; box-shadow:0 0 0 9999px rgba(15,18,22,.0), 0 0 30px rgba(212,122,74,.6); }
+  .tag { position:absolute; left:72px; display:flex; align-items:center; gap:18px; padding:16px 26px 16px 18px; border-radius:20px; background:rgba(15,18,22,.86);
+         border:1px solid rgba(232,184,154,.45); font-size:36px; font-weight:800; white-space:nowrap; }
+  .tag .n { width:52px; height:52px; border-radius:50%; background:var(--acc); color:#fff; font-size:28px; display:flex; align-items:center; justify-content:center; }
+  /* 순환 */
+  .node { position:absolute; width:260px; height:112px; margin:-56px 0 0 -130px; border-radius:26px; display:flex; flex-direction:column; align-items:center; justify-content:center;
+          text-align:center; border:2px solid rgba(255,255,255,.14); font-size:34px; font-weight:800; }
+  .node small { font-size:21px; font-weight:600; color:var(--ink3); margin-top:4px; }
+  .vnode { position:absolute; left:72px; width:760px; height:150px; border-radius:28px; padding:0 40px; display:flex; flex-direction:column; justify-content:center; border:2px solid rgba(255,255,255,.14); }
+  .vnode b { font-size:44px; font-weight:800; } .vnode small { font-size:26px; font-weight:600; color:var(--ink3); margin-top:6px; }
+  .strike { position:relative; display:inline-block; }
+  .strike i { position:absolute; left:-4px; top:54%; height:7px; width:0; border-radius:6px; background:linear-gradient(90deg, var(--acc), var(--hi)); }
+  .tl-dot { position:absolute; left:120px; width:30px; height:30px; margin:-15px 0 0 -15px; border-radius:50%; background:#2a3038; border:4px solid rgba(255,255,255,.25); }
+  .tl-label { position:absolute; left:180px; font-size:42px; font-weight:800; transform:translateY(-50%); }
+  .tl-label small { font-size:26px; color:var(--hi); font-weight:800; margin-right:16px; letter-spacing:.04em; }
+  .logo { display:inline-flex; align-items:center; justify-content:center; width:150px; height:150px; border-radius:38px; background:#fff; color:var(--shell); font-weight:900; font-size:46px; letter-spacing:.04em; }
+  /* 자막 */
+  #sub { position:absolute; left:132px; right:132px; top:1330px; height:180px; display:flex; align-items:flex-end; justify-content:center; z-index:50; }
+  #sub span { max-width:816px; padding:16px 30px; border-radius:20px; background:rgba(15,18,22,.80); border:1px solid rgba(255,255,255,.10);
+              font-size:46px; font-weight:700; letter-spacing:-.01em; line-height:1.42; text-align:center; white-space:pre-line; }
+  #sub b { color:var(--hi); font-weight:800; }
+  .guide { position:absolute; pointer-events:none; outline:2px dashed rgba(255,80,80,.7); display:none; z-index:60; }
+  body.show-guide .guide { display:block; }
+</style></head>
+<body><div id="stage">
+  <div class="bg" id="bg"></div><div class="grid"></div>
+
+  <!-- S1 후킹 (0 – 16.4) -->
+  <div class="scene" data-in="0" data-out="16.4" data-fi="0">
+    <div class="abs" style="left:72px;right:120px;top:520px" data-in="0" data-out="6.2" data-a="up" data-fi="0">
+      <div class="eyebrow">KPJK Consulting</div>
+      <div class="h1" style="margin-top:30px;font-size:96px">경영컨설팅 현장<br><span class="acc">약 8년</span></div>
+      <div class="p" style="margin-top:34px" data-in="1.4" data-out="6.2" data-a="up">기업 · 법인 경영컨설팅</div>
+    </div>
+    <div class="abs" style="left:72px;right:120px;top:540px" data-in="6.3" data-out="10.0" data-a="up">
+      <div class="h2" style="font-size:72px">처음부터<br><span class="dim">IT회사</span>를<br>만들려던 건 아닙니다</div>
+    </div>
+    <div class="abs" style="left:72px;right:120px;top:540px" data-in="10.1" data-out="16.4" data-a="up">
+      <div class="h2" style="font-size:72px">현장에서<br><span class="acc">같은 문제</span>가<br>계속 반복됐습니다</div>
+    </div>
+  </div>
+
+  <!-- S2 문제 1 (16.4 – 45.9) -->
+  <div class="scene" data-in="16.4" data-out="45.9">
+    <div data-in="16.4" data-out="32.8" data-a="fade">
+      <div class="title" data-in="16.6" data-out="32.8" data-a="up">
+        <div class="eyebrow">Problem 01</div>
+        <div class="h2" style="font-size:76px">정보가<br><span class="acc">흩어집니다</span></div>
+      </div>
+      <div class="chip" data-float="0" style="left:96px;top:700px" data-in="20.9" data-out="32.8" data-a="scale"><b>상담 내용</b><span>카카오톡</span></div>
+      <div class="chip" data-float="1" style="left:520px;top:800px" data-in="23.3" data-out="32.8" data-a="scale"><b>자료</b><span>엑셀 · 파일</span></div>
+      <div class="chip" data-float="2" style="left:150px;top:960px" data-in="25.6" data-out="32.8" data-a="scale"><b>일정</b><span>캘린더</span></div>
+      <div class="chip" data-float="3" style="left:400px;top:1110px;border-color:rgba(232,184,154,.5)" data-in="27.6" data-out="32.8" data-a="scale"><b>다음에 할 일</b><span>담당자의 기억</span></div>
+    </div>
+    <div data-in="32.8" data-out="45.9" data-a="fade">
+      <div class="title" data-in="33.0" data-out="45.9" data-a="up">
+        <div class="eyebrow">Problem 01</div>
+        <div class="h2">고객과 프로젝트가<br><span class="acc">늘어날수록</span></div>
+      </div>
+      <div class="row glass" style="top:640px" data-in="38.2" data-out="45.9" data-a="left"><span class="ic">!</span>현재 상태 확인에만 시간이 듭니다</div>
+      <div class="row glass" style="top:800px" data-in="42.4" data-out="45.9" data-a="left"><span class="ic">!</span>자료 누락이 생깁니다</div>
+      <div class="row glass" style="top:960px" data-in="43.8" data-out="45.9" data-a="left"><span class="ic">!</span>후속 연락을 놓칩니다</div>
+    </div>
+  </div>
+
+  <!-- S3 구조 (45.9 – 64.3) -->
+  <div class="scene" data-in="45.9" data-out="64.3">
+    <div class="abs" style="left:72px;right:120px;top:520px" data-in="46.0" data-out="53.5" data-a="up">
+      <div class="h2 dim" style="font-size:60px"><span class="strike">고객 명단 관리 CRM<i id="strike1"></i></span>이 아니라</div>
+      <div class="h1" style="margin-top:40px" data-in="50.5" data-out="53.5" data-a="up">업무의<br><span class="acc">흐름 자체</span>를<br>하나의 구조로</div>
+    </div>
+    <div data-in="53.5" data-out="64.3" data-a="fade">
+      <div class="title" data-in="53.6" data-out="64.3" data-a="up">
+        <div class="eyebrow">State-based Workflow</div>
+        <div class="h3" style="font-size:52px;font-weight:800">업무가 생기면 상태가 바뀌고,<br>상태가 <span class="acc">다음 할 일</span>을 보여줍니다</div>
+      </div>
+      <svg class="abs" width="1080" height="1920" style="left:0;top:0">
+        <path id="vline" d="M 300 730 L 300 1130" stroke="#d47a4a" stroke-width="5" fill="none" pathLength="100" stroke-dasharray="0 100"/>
+        <path id="vloop" d="M 832 1130 C 960 1130, 960 655, 832 655" stroke="#e8b89a" stroke-width="5" fill="none" stroke-linecap="round" pathLength="100" stroke-dasharray="0 100"/>
+      </svg>
+      <div class="vnode" data-vn="53.7" style="top:580px"><b>업무 발생</b><small>상담 · 계약 · 자료 제출</small></div>
+      <div class="vnode" data-vn="57.3" style="top:780px"><b>기업의 현재 상태</b><small>지금 어디까지 왔나</small></div>
+      <div class="vnode" data-vn="59.9" style="top:980px"><b>담당자의 다음 할 일</b><small>상태에 맞는 할 일을 보여줌</small></div>
+      <div class="abs" style="left:868px;top:870px;font-size:24px;font-weight:700;color:var(--hi);writing-mode:vertical-rl" data-in="62.6" data-out="64.3" data-a="fade">다시 상태로</div>
+    </div>
+  </div>
+
+  <!-- S4 문제 2 (64.3 – 80.6) -->
+  <div class="scene" data-in="64.3" data-out="80.6">
+    <div class="title" data-in="64.4" data-out="80.6" data-a="up">
+      <div class="eyebrow">Problem 02</div>
+      <div class="h2"><span class="acc">고객</span>도<br>같은 불편을 겪습니다</div>
+    </div>
+    <div class="bubble" data-who="고객" style="left:72px;top:700px" data-in="68.5" data-out="80.6" data-a="up">지금 어디까지 진행됐나요?</div>
+    <div class="bubble" data-who="고객" style="left:72px;top:880px" data-in="70.3" data-out="80.6" data-a="up">제가 뭘 더 보내야 하나요?</div>
+    <div class="bubble" data-who="고객" style="left:72px;top:1060px" data-in="72.3" data-out="80.6" data-a="up">다음 일정은 언제인가요?</div>
+    <div class="abs p" style="left:72px;top:1230px;font-size:30px" data-in="77.3" data-out="80.6" data-a="up">담당자는 같은 설명을 반복합니다</div>
+  </div>
+
+  <!-- S5 고객 Portal (80.6 – 92.2) -->
+  <div class="scene" data-in="80.6" data-out="92.2">
+    <div class="title" data-in="80.7" data-out="92.2" data-a="up">
+      <div class="eyebrow">Customer Portal</div>
+      <div class="h2">고객 휴대폰에서<br><span class="acc">직접 확인</span>하고 제출</div>
+    </div>
+    <div class="phone" style="left:72px;top:540px;width:468px" data-in="80.9" data-out="92.2" data-a="up"><div class="notch"></div><div class="view" style="height:700px">
+      <img data-shot="phone-portal-home.png" data-in="80.6" data-out="86.2">
+      <img data-shot="phone-portal-home-2.png" data-in="86.0" data-out="89.9">
+      <img data-shot="phone-docs-list.png" data-in="89.8" data-out="92.2">
+    </div></div>
+    <div class="abs" style="left:590px;top:600px;width:370px">
+      <div class="row" style="position:relative;left:0;width:auto;padding:22px 0;font-size:36px;border-bottom:1px solid rgba(255,255,255,.1)" data-in="83.4" data-out="92.2" data-a="left">진행 상황</div>
+      <div class="row" style="position:relative;left:0;width:auto;padding:22px 0;font-size:36px;border-bottom:1px solid rgba(255,255,255,.1)" data-in="85.4" data-out="92.2" data-a="left">필요한 자료</div>
+      <div class="row" style="position:relative;left:0;width:auto;padding:22px 0;font-size:36px;border-bottom:1px solid rgba(255,255,255,.1)" data-in="87.2" data-out="92.2" data-a="left">다음 일정</div>
+      <div class="row" style="position:relative;left:0;width:auto;padding:22px 0;font-size:36px;border-bottom:1px solid rgba(255,255,255,.1)" data-in="88.3" data-out="92.2" data-a="left">지금 해야 할 일</div>
+      <div class="row acc" style="position:relative;left:0;width:auto;padding:22px 0;font-size:36px" data-in="90.2" data-out="92.2" data-a="left">→ 바로 제출</div>
+    </div>
+    <div class="note" data-in="81" data-out="92.2" data-a="fade">화면 속 기업 · 인물은 예시 데이터입니다</div>
+  </div>
+
+  <!-- S6 Closed Loop (92.2 – 115.2) -->
+  <div class="scene" data-in="92.2" data-out="115.2">
+    <div class="title" data-in="92.3" data-out="115.2" data-a="up">
+      <div class="eyebrow">Closed Loop</div>
+      <div class="h3" style="font-size:54px;font-weight:800">고객 휴대폰 ↔ <span class="acc">KPJK 내부</span></div>
+    </div>
+    <div data-in="92.2" data-out="104.9" data-a="fade">
+      <div class="tag" style="top:420px" data-in="92.3" data-out="94.5" data-a="up"><span class="n">1</span>고객이 휴대폰으로 법인등기부등본 제출</div>
+      <div class="tag" style="top:420px" data-in="94.5" data-out="98.2" data-a="up"><span class="n">2</span>KPJK 업무함에 검토 업무 자동 생성</div>
+      <div class="tag" style="top:420px" data-in="98.2" data-out="100.9" data-a="up"><span class="n">3</span>담당자 검토 · 상태 변경</div>
+      <div class="tag" style="top:420px" data-in="100.9" data-out="104.9" data-a="up"><span class="n">4</span>고객 휴대폰에 실시간 반영</div>
+      <!-- 1 휴대폰 제출 -->
+      <div class="phone" style="left:306px;top:540px;width:468px" data-in="92.3" data-out="94.6" data-a="up"><div class="notch"></div><div class="view" style="height:700px">
+        <img data-shot="phone-upload.png" data-in="92.2" data-out="93.6">
+        <img data-shot="phone-docs-after.png" data-in="93.5" data-out="94.6">
+      </div></div>
+      <!-- 2 업무 자동 생성 -->
+      <div class="browser" style="left:72px;top:560px;width:936px" data-in="94.5" data-out="98.3" data-a="card"><div class="bar"><i></i><i></i><i></i><b>KPJK Business AX · 업무함</b></div><div class="view" style="height:640px">
+        <div class="kbw" data-kb="94.5,97.6,1,0,0,1.3,-261,-180"><img data-shot="pc-tasks-new.png"><div class="hl" data-in="95.6" data-out="98.3" data-a="fade" style="left:198px;top:350px;width:726px;height:68px"></div></div>
+      </div></div>
+      <!-- 3 검토 · 완료 -->
+      <div class="browser" style="left:72px;top:560px;width:936px" data-in="98.2" data-out="101.0" data-a="card"><div class="bar"><i></i><i></i><i></i><b>KPJK Business AX · 요청자료</b></div><div class="view" style="height:640px">
+        <div class="kbw" data-in="98.2" data-out="99.8" data-kb="98.2,99.8,1,0,0,1.25,-117,-86"><img data-shot="pc-review.png"></div>
+        <div class="kbw" data-in="99.7" data-out="101.0" data-kb="99.7,101.0,1.1,-40,-60,1.2,-94,-140"><img data-shot="pc-review-done.png"></div>
+      </div></div>
+      <!-- 4 휴대폰 반영 -->
+      <div class="phone" style="left:306px;top:540px;width:468px" data-in="100.9" data-out="104.9" data-a="up"><div class="notch"></div><div class="view" style="height:700px">
+        <img data-shot="phone-docs-done-2.png">
+      </div></div>
+      <div class="note" data-in="92.4" data-out="104.9" data-a="fade">화면 속 기업 · 인물 · 자료는 예시 데이터입니다</div>
+    </div>
+    <!-- 순환 도식 -->
+    <div data-in="104.9" data-out="115.2" data-a="fade">
+      <svg class="abs" width="1080" height="1920" style="left:0;top:0">
+        <ellipse cx="540" cy="860" rx="290" ry="380" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="3" stroke-dasharray="6 14"/>
+        <path id="ring" d="M 540 480 A 290 380 0 1 1 540 1240 A 290 380 0 1 1 540 480" fill="none" stroke="#d47a4a" stroke-width="6" stroke-linecap="round" pathLength="1000" stroke-dasharray="0 1000"/>
+        <circle id="spark" r="12" fill="#e8b89a"/>
+      </svg>
+      <div class="node" data-node="0" style="left:540px;top:480px">고객 행동<small>자료 제출</small></div>
+      <div class="node" data-node="1" style="left:816px;top:743px">내부 업무<small>자동 생성</small></div>
+      <div class="node" data-node="2" style="left:710px;top:1167px">담당자<small>검토 · 처리</small></div>
+      <div class="node" data-node="3" style="left:370px;top:1167px">상태 변경<small>확인완료</small></div>
+      <div class="node" data-node="4" style="left:264px;top:743px">고객 화면<small>실시간 반영</small></div>
+      <div class="abs" style="left:0;right:0;top:806px;text-align:center" data-in="111.4" data-out="115.2" data-a="scale">
+        <div class="h3" style="font-size:48px;font-weight:800">하나의<br><span class="acc">순환 구조</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- S7 효과 (115.2 – 137.5) -->
+  <div class="scene" data-in="115.2" data-out="137.5">
+    <div data-in="115.2" data-out="127.9" data-a="fade">
+      <div class="abs" style="left:72px;right:120px;top:300px" data-in="115.4" data-out="127.9" data-a="up">
+        <div class="h2 dim" style="font-size:58px"><span class="strike">편리한 프로그램 하나<i id="strike2"></i></span>가 아니라</div>
+      </div>
+      <div class="row glass" style="top:560px" data-in="119.6" data-out="127.9" data-a="left"><span class="ic">↓</span><div><small>줄어드는 것</small>반복 확인 · 전달 시간</div></div>
+      <div class="row glass" style="top:760px" data-in="123.0" data-out="127.9" data-a="left"><span class="ic">↓</span><div><small>낮아지는 것</small>자료 누락 · 후속 업무 놓침</div></div>
+    </div>
+    <div data-in="127.9" data-out="137.5" data-a="fade">
+      <div class="title" data-in="128.1" data-out="137.5" data-a="up">
+        <div class="eyebrow">More Time For</div>
+        <div class="h2">직원은<br><span class="acc">더 중요한 일</span>에</div>
+      </div>
+      <div class="row glass" style="top:640px" data-in="131.1" data-out="137.5" data-a="left"><span class="ic ghost">1</span>고객 상담</div>
+      <div class="row glass" style="top:800px" data-in="132.2" data-out="137.5" data-a="left"><span class="ic ghost">2</span>문제 해결</div>
+      <div class="row glass hot" style="top:960px" data-in="133.1" data-out="137.5" data-a="left"><span class="ic">3</span>새로운 계약과 매출</div>
+    </div>
+  </div>
+
+  <!-- S8 문제 3 · 기업성장 관리 (137.5 – 178.4) -->
+  <div class="scene" data-in="137.5" data-out="178.4">
+    <div class="abs" style="left:72px;right:120px;top:540px" data-in="137.7" data-out="142.1" data-a="up">
+      <div class="eyebrow">Problem 03</div>
+      <div class="h1" style="margin-top:30px">한 번의 상담으로<br><span class="acc">끝나는</span> 컨설팅</div>
+    </div>
+    <div data-in="142.1" data-out="158.9" data-a="fade">
+      <div class="title" data-in="142.2" data-out="158.9" data-a="up">
+        <div class="eyebrow">Growth Platform</div>
+        <div class="h2" style="font-size:58px">진행 조회를 넘어<br><span class="acc">기업성장 관리 플랫폼</span>으로</div>
+      </div>
+      <div class="phone" style="left:72px;top:560px;width:450px" data-in="142.6" data-out="158.9" data-a="up"><div class="notch"></div><div class="view" style="height:680px">
+        <img data-shot="phone-portal-home.png" data-in="142.1" data-out="151.6">
+        <img data-shot="phone-portal-home-2.png" data-in="151.4" data-out="158.9">
+      </div></div>
+      <div class="abs" style="left:574px;top:610px;width:386px">
+        <div class="row" style="position:relative;left:0;width:auto;padding:22px 0;font-size:34px;border-bottom:1px solid rgba(255,255,255,.1)" data-flow="0" data-in="147.4" data-out="158.9" data-a="left">우리 회사<br>현재 상태</div>
+        <div class="row" style="position:relative;left:0;width:auto;padding:22px 0;font-size:34px;border-bottom:1px solid rgba(255,255,255,.1)" data-flow="1" data-in="149.9" data-out="158.9" data-a="left">지금 해야 할 일</div>
+        <div class="row" style="position:relative;left:0;width:auto;padding:22px 0;font-size:34px;border-bottom:1px solid rgba(255,255,255,.1)" data-flow="2" data-in="151.8" data-out="158.9" data-a="left">진행 중인<br>성장과제</div>
+        <div class="row" style="position:relative;left:0;width:auto;padding:22px 0;font-size:34px" data-flow="3" data-in="153.5" data-out="158.9" data-a="left">다음에 검토할<br>과제</div>
+      </div>
+      <div class="note" data-in="142.6" data-out="158.9" data-a="fade">화면 속 기업 · 인물은 예시 데이터입니다</div>
+    </div>
+    <div data-in="158.9" data-out="168.4" data-a="fade">
+      <div class="title" data-in="159.0" data-out="168.4" data-a="up">
+        <div class="eyebrow">기업성장 관리 기능 중 하나</div>
+        <div class="h2" style="font-size:58px">조건에 맞는<br><span class="acc">정부지원사업 공고</span> 선별</div>
+      </div>
+      <div class="abs" style="left:72px;top:500px;display:flex;gap:16px">
+        <div class="chip" style="position:relative;padding:14px 26px" data-in="159.4" data-out="168.4" data-a="scale"><span style="font-size:32px">업종</span></div>
+        <div class="chip" style="position:relative;padding:14px 26px" data-in="160.4" data-out="168.4" data-a="scale"><span style="font-size:32px">지역</span></div>
+        <div class="chip" style="position:relative;padding:14px 26px" data-in="161.4" data-out="168.4" data-a="scale"><span style="font-size:32px">업력</span></div>
+        <div class="chip" style="position:relative;padding:14px 26px;border-color:rgba(232,184,154,.5)" data-in="162.8" data-out="168.4" data-a="scale"><span style="font-size:32px" class="acc">기업마당 공고</span></div>
+      </div>
+      <div class="phone" style="left:306px;top:630px;width:468px" data-in="159.3" data-out="168.4" data-a="up"><div class="notch"></div><div class="view" style="height:610px">
+        <img data-shot="phone-programs.png">
+      </div></div>
+      <div class="note" data-in="159.3" data-out="168.4" data-a="fade">화면 속 기업 · 공고는 예시 데이터입니다</div>
+    </div>
+    <div data-in="168.4" data-out="178.4" data-a="fade">
+      <div class="title" data-in="168.5" data-out="178.4" data-a="up">
+        <div class="eyebrow">Principle</div>
+        <div class="h2">중요한 것은</div>
+      </div>
+      <div class="row glass" style="top:560px;color:var(--ink3)" data-in="168.9" data-out="178.4" data-a="left"><span class="ic ghost">✕</span><span class="strike">특정 자금을 자동으로 판단<i id="strike3"></i></span></div>
+      <div class="row glass hot" style="top:740px;align-items:flex-start" data-in="172.5" data-out="178.4" data-a="left"><span class="ic">✓</span><div>기업이 자기 상태를 이해하고<br><span class="acc">다음 행동을 선택</span>하도록 돕는 것</div></div>
+    </div>
+  </div>
+
+  <!-- S9 개발 주체 (178.4 – 188.6) -->
+  <div class="scene" data-in="178.4" data-out="188.6">
+    <div class="title" data-in="178.5" data-out="188.6" data-a="up">
+      <div class="eyebrow">Who Built What</div>
+      <div class="h2">현장의 노하우가<br>제품의 <span class="acc">뼈대</span>입니다</div>
+    </div>
+    <div class="abs glass hot" style="left:72px;top:560px;width:888px;height:440px;padding:44px 48px" data-in="178.7" data-out="188.6" data-a="up">
+      <div style="font-size:26px;font-weight:800;letter-spacing:.14em;color:var(--hi)">KPJK 주도</div>
+      <div style="margin-top:20px;font-size:40px;font-weight:800;line-height:1.75">
+        <div data-in="178.8" data-out="188.6" data-a="left">· 현장의 문제 정의</div>
+        <div data-in="180.0" data-out="188.6" data-a="left">· 업무 규칙</div>
+        <div data-in="180.9" data-out="188.6" data-a="left">· 제품 방향</div>
+        <div data-in="182.2" data-out="188.6" data-a="left">· 실제 사용 검증</div>
+      </div>
+    </div>
+    <div class="abs glass" style="left:72px;top:1030px;width:888px;height:220px;padding:40px 48px" data-in="184.4" data-out="188.6" data-a="up">
+      <div style="font-size:26px;font-weight:800;letter-spacing:.14em;color:var(--ink3)">외부 전문 개발사 협력</div>
+      <div style="margin-top:18px;font-size:40px;font-weight:800">· 소프트웨어 구현</div>
+    </div>
+  </div>
+
+  <!-- S10 경과 · 특허 (188.6 – 196.3) -->
+  <div class="scene" data-in="188.6" data-out="196.3">
+    <div class="title" data-in="188.7" data-out="196.3" data-a="up">
+      <div class="eyebrow">Development</div>
+      <div class="h2">문제 정리에서<br><span class="acc">특허 출원</span>까지</div>
+    </div>
+    <div class="abs" style="left:118px;top:620px;width:4px;height:420px;background:rgba(255,255,255,.12);border-radius:4px"></div>
+    <div class="abs" id="tlFill" style="left:118px;top:620px;width:4px;height:0;background:linear-gradient(#d47a4a,#e8b89a);border-radius:4px"></div>
+    <div class="tl-dot" data-tl="188.9" style="top:620px"></div><div class="tl-label" style="top:620px" data-in="188.9" data-out="196.3" data-a="left"><small>6월</small>문제 정리</div>
+    <div class="tl-dot" data-tl="190.6" style="top:760px"></div><div class="tl-label" style="top:760px" data-in="190.6" data-out="196.3" data-a="left">업무 흐름 구조화</div>
+    <div class="tl-dot" data-tl="191.9" style="top:900px"></div><div class="tl-label" style="top:900px" data-in="191.9" data-out="196.3" data-a="left">시스템 구현</div>
+    <div class="tl-dot" data-tl="193.3" style="top:1040px"></div><div class="tl-label acc" style="top:1040px" data-in="193.3" data-out="196.3" data-a="left">특허 출원 완료</div>
+    <div class="abs glass hot" style="left:180px;top:1110px;width:700px;padding:26px 36px" data-in="194.0" data-out="196.3" data-a="scale">
+      <div class="eyebrow" style="font-size:20px">Patent Application</div>
+      <div style="font-size:34px;font-weight:800;margin-top:10px">출원번호 10-2026-0177079</div>
+    </div>
+  </div>
+
+  <!-- S11 사업화 (196.3 – 222.9) -->
+  <div class="scene" data-in="196.3" data-out="222.9">
+    <div class="abs" style="left:72px;right:120px;top:520px" data-in="196.4" data-out="202.3" data-a="up">
+      <div class="h2 dim" style="font-size:60px"><span class="strike">한 번에 큰 플랫폼<i id="strike4"></i></span></div>
+      <div class="h1" style="margin-top:36px" data-in="199.8" data-out="202.3" data-a="up"><span class="acc">단계적으로</span><br>넓혀 갑니다</div>
+    </div>
+    <div data-in="202.3" data-out="222.9" data-a="fade">
+      <div class="title" data-in="202.4" data-out="222.9" data-a="up">
+        <div class="eyebrow">Business Roadmap</div>
+        <div class="h2">현장에서 검증하고,<br><span class="acc">업계로</span> 넓힙니다</div>
+      </div>
+      <div class="row glass" style="top:560px" data-in="202.6" data-out="222.9" data-a="left"><span class="ic ghost">1</span><div><small>STEP 1</small>기존 고객에 실제 적용</div></div>
+      <div class="row glass" style="top:734px" data-in="205.0" data-out="222.9" data-a="left"><span class="ic ghost">2</span><div><small>STEP 2</small>사용 데이터 축적</div></div>
+      <div class="row glass" style="top:908px" data-in="207.6" data-out="222.9" data-a="left"><span class="ic ghost">3</span><div><small>STEP 3</small>업무 규칙 · 관리 흐름 표준화</div></div>
+      <div class="row glass hot" style="top:1082px" data-in="215.5" data-out="222.9" data-a="left"><span class="ic">4</span><div><small>STEP 4</small>컨설팅 · 전문 서비스 업계<br><span class="acc">구독형 서비스</span></div></div>
+    </div>
+  </div>
+
+  <!-- S12 장기 (222.9 – 241.6) -->
+  <div class="scene" data-in="222.9" data-out="241.6">
+    <div class="title" data-in="223.0" data-out="241.6" data-a="up">
+      <div class="eyebrow">Long-term</div>
+      <div class="h2">쌓인 데이터로<br><span class="acc">더 정교하게</span></div>
+    </div>
+    <div class="row glass" style="top:560px" data-in="226.5" data-out="241.6" data-a="left"><span class="ic ghost">?</span>어디서 업무가 자주 지연되는지</div>
+    <div class="row glass" style="top:720px" data-in="229.2" data-out="241.6" data-a="left"><span class="ic ghost">?</span>어떤 고객에게 어떤 도움이 필요한지</div>
+    <div class="row glass" style="top:880px" data-in="232.3" data-out="241.6" data-a="left"><span class="ic ghost">?</span>어떤 다음 행동이 효과적이었는지</div>
+    <div class="row glass hot" style="top:1060px" data-in="236.8" data-out="241.6" data-a="up"><span class="ic">AI</span><div><small>장기 목표</small>담당자의 판단을 <span class="acc">보조</span></div></div>
+  </div>
+
+  <!-- S13 정리 (241.6 – 263.0) -->
+  <div class="scene" data-in="241.6" data-out="263.0">
+    <div class="abs" style="left:72px;right:120px;top:540px" data-in="241.8" data-out="245.4" data-a="up">
+      <div class="h1" style="font-size:80px">단순한 고객 관리<br>프로그램이<br><span class="acc">아닙니다</span></div>
+    </div>
+    <div data-in="245.4" data-out="263.0" data-a="fade">
+      <div class="title" data-in="245.5" data-out="263.0" data-a="up">
+        <div class="eyebrow">What We Build</div>
+        <div class="h2">현장의 반복을<br><span class="acc">시스템</span>으로</div>
+      </div>
+      <div class="row glass" style="top:560px;font-size:36px" data-in="245.6" data-out="263.0" data-a="left"><span class="ic ghost">→</span>반복되는 문제를 데이터 · 업무 규칙으로</div>
+      <div class="row glass" style="top:700px;font-size:36px" data-in="249.8" data-out="263.0" data-a="left"><span class="ic ghost">↔</span>고객 행동과 내부 업무를 연결</div>
+      <div class="row glass" style="top:840px;font-size:36px" data-in="252.5" data-out="263.0" data-a="left"><span class="ic ghost">↓</span>사람이 하던 반복 업무는 줄이고</div>
+      <div class="row glass" style="top:980px;font-size:36px" data-in="254.9" data-out="263.0" data-a="left"><span class="ic ghost">+</span>더 많은 고객을 안정적으로 관리</div>
+      <div class="row glass hot" style="top:1120px;font-size:36px" data-in="258.4" data-out="263.0" data-a="left"><span class="ic">↗</span>성장과 매출에 집중</div>
+    </div>
+  </div>
+
+  <!-- S14 현재 단계 · 마무리 (263.0 – 끝) -->
+  <div class="scene" data-in="263.0" data-out="271.95">
+    <div class="title" data-in="263.1" data-out="271.95" data-a="up">
+      <div class="eyebrow">Current Stage</div>
+      <div class="h1" style="margin-top:18px">초기 <span class="acc">실증</span> 단계</div>
+    </div>
+    <div class="row" style="top:600px;padding-left:0" data-in="263.5" data-out="271.95" data-a="left"><span class="ic">✓</span>첫 번째 실사용 시스템 구현</div>
+    <div class="row" style="top:730px;padding-left:0" data-in="266.4" data-out="271.95" data-a="left"><span class="ic">✓</span>실제 고객 적용 · 검증</div>
+    <div class="row" style="top:860px;padding-left:0" data-in="269.8" data-out="271.95" data-a="left"><span class="ic ghost">→</span>단계적 확장</div>
+  </div>
+  <div class="scene" data-v="1" data-in="240.3" data-out="244.4">
+    <div class="abs" style="left:0;right:0;top:560px;text-align:center" data-v="1" data-in="240.4" data-out="244.4" data-a="scale">
+      <div class="logo">KPJK</div>
+      <div class="h2" style="margin-top:60px;font-size:60px">현장의 노하우를,<br><span class="acc">실제로 작동하는 기술</span>로</div>
+      <div class="eyebrow" style="margin-top:40px">KPJK Consulting · Business AX</div>
+    </div>
+  </div>
+
+  <div id="sub"><span></span></div>
+  <div class="guide" style="left:0;right:0;top:0;height:220px"></div>
+  <div class="guide" style="left:72px;width:888px;top:220px;height:1080px"></div>
+  <div class="guide" style="left:132px;right:132px;top:1330px;height:180px"></div>
+  <div class="guide" style="left:0;right:0;top:1520px;bottom:0"></div>
+  <div class="guide" style="left:960px;right:0;top:220px;height:1300px"></div>
+</div>
+<script>
+  const SHOT = window.SHOT_DIR || 'shots/';
+  const KNOTS = window.KNOTS || [[0, 0], [1000, 1000]];
+  const OFFSET = window.OFFSET ?? 0.5;
+  const SUBS = window.SUBS || [];
+  if (new URLSearchParams(location.search).get('guide')) document.body.classList.add('show-guide');
+  document.querySelectorAll('img[data-shot]').forEach((im) => { im.src = SHOT + im.dataset.shot; });
+
+  // 원본 음성 시각 → 영상 시각 (쉼 단축 · 1.1배속 반영)
+  function M(t) {
+    for (let i = 0; i < KNOTS.length - 1; i++) {
+      const [a, ta] = KNOTS[i], [b, tb] = KNOTS[i + 1];
+      if (t >= a && t <= b) return OFFSET + (ta + (tb - ta) * (b > a ? (t - a) / (b - a) : 0)) / 1.1;
+    }
+    return OFFSET + KNOTS[KNOTS.length - 1][1] / 1.1 + (t - KNOTS[KNOTS.length - 1][0]) / 1.1;
+  }
+  const isV = (el) => el.dataset.v === '1';
+  const conv = (el, x) => (isV(el) ? x : M(x));
+  for (const el of document.querySelectorAll('[data-in]')) {
+    el._in = el.dataset.fi === '0' ? 0 : conv(el, +el.dataset.in);
+    el._out = conv(el, +el.dataset.out);
+  }
+  for (const el of document.querySelectorAll('[data-kb]')) {
+    const v = el.dataset.kb.split(',').map(Number); v[0] = M(v[0]); v[1] = M(v[1]); el._kb = v;
+  }
+  const VN = [...document.querySelectorAll('[data-vn]')].map((n) => [n, M(+n.dataset.vn)]);
+  const TL = [...document.querySelectorAll('[data-tl]')].map((n) => [n, M(+n.dataset.tl)]);
+  const NODE_T = [105.0, 106.4, 108.0, 109.6, 110.6].map(M), RING_END = M(111.4);
+  const T = { strike1: M(47.6), strike2: M(116.6), strike3: M(170.4), strike4: M(197.6), vline: M(55.4), vloop: M(62.0), tl0: M(188.9), tl1: M(193.3) };
+
+  const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+  const eo = (x) => 1 - Math.pow(1 - x, 3);
+  const eio = (x) => (x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+  const lerp = (a, b, x) => a + (b - a) * x;
+  const vis = (t, tin, tout, d = .6) => Math.min(tin <= 0 ? 1 : eo(clamp((t - tin) / d)), 1 - eio(clamp((t - (tout - d * .8)) / (d * .8))));
+  const esc = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+  const animated = [...document.querySelectorAll('[data-in]')];
+  const subEl = document.querySelector('#sub span');
+  let subIdx = -2;
+
+  function render(t) {
+    document.getElementById('bg').style.transform = `translate(${Math.sin(t / 9) * 30}px, ${Math.cos(t / 11) * 20}px) scale(1.04)`;
+    for (const el of animated) {
+      const tin = el._in, tout = el._out, a = el.dataset.a || 'fade';
+      const isScene = el.classList.contains('scene');
+      const p = tin <= 0 ? 1 : eo(clamp((t - tin) / .8));
+      el.style.opacity = el.tagName === 'IMG' || el.classList.contains('kbw') ? vis(t, tin, tout, .35) : vis(t, tin, tout, isScene ? .55 : .7);
+      if (a === 'up') el.style.transform = `translateY(${(1 - p) * 34}px)`;
+      else if (a === 'left') el.style.transform = `translateX(${(1 - p) * -60}px)`;
+      else if (a === 'scale') el.style.transform = `scale(${lerp(.94, 1, p)})`;
+      else if (a === 'card') el.style.transform = `translateY(${(1 - p) * 60}px) scale(${lerp(.92, 1, p)})`;
+    }
+    document.querySelectorAll('[data-kb]').forEach((im) => {
+      const [a, b, s0, x0, y0, s1, x1, y1] = im._kb;
+      const k = eio(clamp((t - a) / (b - a)));
+      im.style.transform = `translate(${lerp(x0, x1, k)}px, ${lerp(y0, y1, k)}px) scale(${lerp(s0, s1, k)})`;
+    });
+    // 떠 있는 칩
+    document.querySelectorAll('[data-float]').forEach((c) => {
+      const i = +c.dataset.float, base = c.style.transform || '';
+      c.style.transform = base + ` translate(${Math.sin(t * .7 + i * 1.7) * 8}px, ${Math.cos(t * .6 + i) * 10}px) rotate(${(i % 2 ? 1 : -1) * 2}deg)`;
+    });
+    // 취소선
+    for (const k of ['strike1', 'strike2', 'strike3', 'strike4']) document.getElementById(k).style.width = `calc(${eio(clamp((t - T[k]) / .8)) * 100}% + 8px)`;
+    // 세로 흐름
+    VN.forEach(([n, tn]) => {
+      const on = eo(clamp((t - tn) / .6));
+      n.style.opacity = on; n.style.transform = `translateY(${(1 - on) * 30}px)`;
+      n.style.borderColor = `rgba(232,184,154,${lerp(.14, .7, on)})`;
+      n.style.background = `linear-gradient(rgba(212,122,74,${lerp(.03, .16, on)}), rgba(212,122,74,${lerp(.03, .16, on)})), #1c2026`;
+    });
+    document.getElementById('vline').setAttribute('stroke-dasharray', `${eio(clamp((t - T.vline) / (VN[2][1] - T.vline))) * 100} 100`);
+    document.getElementById('vloop').setAttribute('stroke-dasharray', `${eo(clamp((t - T.vloop) / 1.0)) * 100} 100`);
+    // 순환 도식
+    const RK = [0, .2, .4, .6, .8, 1], RT = [...NODE_T, RING_END];
+    let rk = t <= RT[0] ? 0 : 1;
+    for (let i = 0; i < 5; i++) if (t >= RT[i] && t < RT[i + 1]) rk = lerp(RK[i], RK[i + 1], eio((t - RT[i]) / (RT[i + 1] - RT[i])));
+    document.getElementById('ring').setAttribute('stroke-dasharray', `${(rk * 1000).toFixed(1)} 1000`);
+    const ang = -Math.PI / 2 + rk * Math.PI * 2 + (t > RING_END ? (t - RING_END) * 1.4 : 0);
+    const sp = document.getElementById('spark');
+    sp.setAttribute('cx', 540 + 290 * Math.cos(ang)); sp.setAttribute('cy', 860 + 380 * Math.sin(ang));
+    sp.setAttribute('opacity', t >= NODE_T[0] ? 1 : 0);
+    document.querySelectorAll('[data-node]').forEach((n) => {
+      const i = +n.dataset.node, on = eo(clamp((t - NODE_T[i]) / .6));
+      n.style.opacity = eo(clamp((t - (M(104.9) + i * .12)) / .6));
+      n.style.borderColor = `rgba(232,184,154,${lerp(.14, .75, on)})`;
+      n.style.background = `linear-gradient(rgba(212,122,74,${lerp(.04, .2, on)}), rgba(212,122,74,${lerp(.04, .2, on)})), #1c2026`;
+      n.style.transform = `scale(${lerp(.95, 1, on)})`;
+    });
+    // 목록이 쌓이면 지난 항목은 흐리게
+    const flows = [...document.querySelectorAll('[data-flow]')];
+    flows.forEach((f, i) => { const nx = flows[i + 1]; if (nx && t > nx._in + .3) f.style.opacity = Math.min(+f.style.opacity, .62); });
+    // 세로 타임라인
+    const tk = eio(clamp((t - TL[0][1]) / (TL[3][1] - TL[0][1])));
+    document.getElementById('tlFill').style.height = `${tk * 420}px`;
+    TL.forEach(([d, td]) => { const on = t >= td; d.style.background = on ? '#d47a4a' : '#2a3038'; d.style.borderColor = on ? '#e8b89a' : 'rgba(255,255,255,.25)'; });
+    // 자막
+    const i = SUBS.findIndex(([a, b]) => t >= a - .12 && t < b + .12);
+    if (i !== subIdx) { subIdx = i; if (i >= 0) subEl.innerHTML = esc(SUBS[i][2]).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>'); }
+    if (i < 0) subEl.parentElement.style.opacity = 0;
+    else { const [a, b] = SUBS[i]; subEl.parentElement.style.opacity = Math.min(clamp((t - a + .12) / .12), clamp((b + .12 - t) / .12)); }
+  }
+  window.render = render;
+  render(0);
+</script>
+</body></html>
