@@ -1355,6 +1355,84 @@ drop trigger if exists kpjk_lead_created on public.leads;
 create trigger kpjk_lead_created after insert on public.leads for each row execute function public.kpjk_after_lead();
 
 
+-- ---------------------------------------------------------------------------
+--  지원사업 공고 매일 자동 갱신 (기업마당 → 이 표)
+--  Vercel 이 매일 아침 9시에 /api/programs/sync 를 부르면, 그 서버가 기업마당 공고를 받아
+--  아래 함수로 넣는다. 관리자 키(service_role) 없이 "공고 저장 전용 열쇠"만 쓴다.
+--  열쇠는 원문이 아니라 해시로만, API 로 보이지 않는 kpjk_private 에 둔다.
+--  열쇠 정하기(한 번): select public.kpjk_set_program_sync_key('Vercel 의 CRON_SECRET 과 같은 값');
+-- ---------------------------------------------------------------------------
+create schema if not exists kpjk_private;
+revoke all on schema kpjk_private from public, anon, authenticated;
+create table if not exists kpjk_private.secrets (
+  name       text primary key,
+  hash       text not null,
+  updated_at timestamptz not null default now()
+);
+revoke all on kpjk_private.secrets from public, anon, authenticated;
+
+create or replace function public.kpjk_set_program_sync_key(p_key text) returns text
+language plpgsql security definer set search_path = public, kpjk_private as $$
+begin
+  if p_key is null or char_length(p_key) < 16 then
+    raise exception '열쇠는 16자 이상으로 정해 주세요.';
+  end if;
+  insert into kpjk_private.secrets(name, hash) values ('program_sync', encode(sha256(convert_to(p_key, 'UTF8')), 'hex'))
+  on conflict (name) do update set hash = excluded.hash, updated_at = now();
+  return '자동 갱신 열쇠를 저장했습니다. Vercel 의 CRON_SECRET 에도 같은 값을 넣으세요.';
+end $$;
+-- SQL Editor(관리자)에서만 부를 수 있다
+revoke execute on function public.kpjk_set_program_sync_key(text) from public, anon, authenticated;
+
+-- 기업마당 공고만(bz_ 로 시작) 넣거나 바뀐 칸만 고친다. 알림 보낸 기록(notified)·담당자 직접 추가 공고는 건드리지 않는다
+create or replace function public.kpjk_sync_programs(p_key text, p_items jsonb) returns jsonb
+language plpgsql security definer set search_path = public, kpjk_private as $$
+declare
+  v_hash text;
+  it jsonb;
+  v_new boolean;
+  n_new int := 0;
+  n_upd int := 0;
+begin
+  select hash into v_hash from kpjk_private.secrets where name = 'program_sync';
+  if v_hash is null or v_hash <> encode(sha256(convert_to(coalesce(p_key, ''), 'UTF8')), 'hex') then
+    raise exception '자동 갱신 열쇠가 맞지 않습니다.' using errcode = '42501';
+  end if;
+  if jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) > 3000 then
+    raise exception '공고 목록 형식이 맞지 않습니다.';
+  end if;
+  for it in select value from jsonb_array_elements(p_items) loop
+    continue when left(coalesce(it->>'id', ''), 3) <> 'bz_' or coalesce(it->>'title', '') = '';
+    v_new := null;
+    insert into public.support_programs as sp
+      (id, title, agency, operator, category, regions, target, summary, apply_start, apply_end, period_text, url, tags, source, fetched_at)
+    values (
+      it->>'id', left(it->>'title', 300), coalesce(left(it->>'agency', 120), ''), left(it->>'operator', 120),
+      case when it->>'category' in ('금융','기술','인력','수출','내수','창업','경영','기타') then it->>'category' else '기타' end,
+      coalesce(array(select jsonb_array_elements_text(coalesce(it->'regions', '[]'::jsonb))), '{}'),
+      left(it->>'target', 500), left(it->>'summary', 1000),
+      nullif(it->>'applyStart', '')::date, nullif(it->>'applyEnd', '')::date, left(it->>'periodText', 200),
+      left(it->>'url', 500),
+      coalesce(array(select jsonb_array_elements_text(coalesce(it->'tags', '[]'::jsonb))), '{}'),
+      'bizinfo', now())
+    on conflict (id) do update set
+      title = excluded.title, agency = excluded.agency, operator = excluded.operator, category = excluded.category,
+      regions = excluded.regions, target = excluded.target, summary = excluded.summary,
+      apply_start = excluded.apply_start, apply_end = excluded.apply_end, period_text = excluded.period_text,
+      url = excluded.url, tags = excluded.tags, fetched_at = excluded.fetched_at
+    where sp.source = 'bizinfo' and (sp.title, sp.agency, sp.operator, sp.category, sp.regions, sp.target, sp.summary, sp.apply_start, sp.apply_end, sp.period_text, sp.url, sp.tags)
+      is distinct from (excluded.title, excluded.agency, excluded.operator, excluded.category, excluded.regions, excluded.target, excluded.summary, excluded.apply_start, excluded.apply_end, excluded.period_text, excluded.url, excluded.tags)
+    returning (xmax = 0) into v_new;
+    if v_new is true then n_new := n_new + 1; elsif v_new is false then n_upd := n_upd + 1; end if;
+  end loop;
+  return jsonb_build_object('added', n_new, 'updated', n_upd, 'at', now());
+end $$;
+revoke execute on function public.kpjk_sync_programs(text, jsonb) from public;
+grant execute on function public.kpjk_sync_programs(text, jsonb) to anon, authenticated;
+-- 새 함수를 API 가 바로 알아보게
+notify pgrst, 'reload schema';
+
+
 -- =============================================================================
 --  고객용 보기 — 고객은 기업·프로젝트·제안을 이 보기로만 읽는다
 --  보기는 만든 사람 권한으로 돌므로 행 조건(자기 회사·공개 프로젝트)을 여기서 직접 건다.

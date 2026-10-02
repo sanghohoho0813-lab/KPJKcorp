@@ -7,7 +7,7 @@ import { Bell, Building2, Copy, Download, Link2, Phone, Plus, Trash2, UserPlus, 
 import { useStore } from "@/lib/store";
 import { useMay } from "@/components/domain/EntityModals";
 import { CATEGORY_LABEL, PROGRAM_CATEGORIES, matchPrograms, matchProgram, profileOfCompany, type MatchProfile } from "@/lib/programs";
-import { fetchBizinfo, lastSync, markSynced, openOnly, type LiveStatus } from "@/lib/programs-client";
+import { fetchBizinfo, lastSync, markSynced, newestFetch, openOnly, syncOnServer, type LiveStatus } from "@/lib/programs-client";
 import { REGIONS } from "@/lib/company-options";
 import { fmtRelative } from "@/lib/format";
 import type { Lead, LeadStatus, ProgramCategory, SupportProgram } from "@/lib/types";
@@ -21,7 +21,8 @@ const LEAD_STATUS: Record<LeadStatus, { label: string; tone: "accent" | "info" |
   new: { label: "새 요청", tone: "accent" }, contacted: { label: "연락함", tone: "info" }, converted: { label: "고객 전환", tone: "success" }, dropped: { label: "종료", tone: "neutral" },
 };
 const leadProfile = (l: Lead): MatchProfile => ({ region: l.region, industry: l.industry, foundedYear: l.foundedYear, employees: l.employees, entityType: l.entityType, interests: l.interests });
-const SIX_HOURS = 6 * 3600 * 1000;
+/** 하루 + 여유 1시간 (자동 갱신은 9:00~9:59 사이에 돈다) */
+const DAY_PLUS = 25 * 3600 * 1000;
 
 export default function ProgramsPage() {
   const st = useStore();
@@ -57,8 +58,21 @@ export default function ProgramsPage() {
     return out;
   }, [programs, companies, st.leads]);
 
+  const refresh = useStore((s) => s.refreshFromServer);
   const sync = async (fresh = true) => {
     setBusy(true);
+    // 서버 모드: 서버가 받아 서버에 저장(매일 9시 자동 갱신과 같은 길) → 화면은 서버에서 다시 읽기만
+    if (st.serverMode) {
+      const s = await syncOnServer();
+      if (s.ok) {
+        await refresh();
+        setBusy(false); setLive("ok"); markSynced();
+        if (fresh) toast(`기업마당 접수 중 공고 ${s.total}건 — 새 공고 ${s.added}건, 바뀐 공고 ${s.updated}건`);
+        return;
+      }
+      if (s.reason === "not_configured") { setBusy(false); setLive("not_configured"); if (fresh) toast("기업마당 인증키가 아직 연결되지 않았습니다 — 아래 안내를 보세요.", "error"); return; }
+      // 자동 갱신 열쇠가 아직 없으면(no_sync_key 등) 예전처럼 이 화면이 받아 저장한다
+    }
     const r = await fetchBizinfo(fresh);
     setBusy(false);
     setLive(r.status);
@@ -67,11 +81,11 @@ export default function ProgramsPage() {
     markSynced();
     if (fresh) toast(`기업마당 공고 ${r.items.length}건 확인 — 새 공고 ${res.added}건, 바뀐 공고 ${res.updated}건`);
   };
-  // 6시간마다 한 번은 저절로 (이 화면을 열 때)
+  // 매일 9시 자동 갱신이 돌고 있으면 화면을 열 때 기다릴 일이 없다. 마지막으로 받은 지 하루가 넘었을 때만 이 화면이 대신 받는다
   useEffect(() => {
     if (!may("program.manage")) return;
-    const last = lastSync();
-    if (!last || Date.now() - Date.parse(last) > SIX_HOURS) { const t = setTimeout(() => void sync(false), 0); return () => clearTimeout(t); }
+    const last = Math.max(newestFetch(st.programs), Date.parse(lastSync() ?? "") || 0);
+    if (Date.now() - last > DAY_PLUS) { const t = setTimeout(() => void sync(false), 0); return () => clearTimeout(t); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

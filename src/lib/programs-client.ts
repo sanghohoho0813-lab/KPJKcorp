@@ -32,6 +32,8 @@ export async function loadPublicPrograms(local: SupportProgram[]): Promise<{ pro
     const { data } = await sb.from("support_programs").select("*");
     if (data) base = (data as Record<string, unknown>[]).map(M.programFromRow);
   }
+  // 서버에 기업마당 공고가 이미 저장돼 있으면(매일 9시 자동 갱신) 기업마당을 다시 부르지 않는다
+  if (base.some((p) => p.source === "bizinfo")) return { programs: openOnly(base), live: "ok" };
   const live = await fetchBizinfo();
   const ids = new Set(base.map((p) => p.id));
   return { programs: openOnly([...base, ...live.items.filter((p) => !ids.has(p.id))]), live: live.status };
@@ -51,3 +53,28 @@ export async function submitLeadServer(lead: Lead): Promise<{ ok: boolean; reaso
 const LAST_SYNC = "kpjk-programs-sync";
 export function lastSync(): string | null { try { return window.localStorage.getItem(LAST_SYNC); } catch { return null; } }
 export function markSynced() { try { window.localStorage.setItem(LAST_SYNC, new Date().toISOString()); } catch { /* 저장소 막힘 */ } }
+
+/**
+ * 서버에서 받아 서버에 바로 저장(대표·컨설턴트 로그인 토큰으로). 매일 9시 자동 갱신과 같은 길이다.
+ * 열쇠(CRON_SECRET)가 아직 없으면 no_sync_key — 그때는 예전처럼 화면이 받아 저장한다.
+ */
+export async function syncOnServer(): Promise<{ ok: true; total: number; added: number; updated: number } | { ok: false; reason: string }> {
+  const sb = supa();
+  if (!sb) return { ok: false, reason: "no_server" };
+  try {
+    const { data } = await sb.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) return { ok: false, reason: "forbidden" };
+    const res = await fetch("/api/programs/sync", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+    return (await res.json()) as { ok: true; total: number; added: number; updated: number } | { ok: false; reason: string };
+  } catch {
+    return { ok: false, reason: "unreachable" };
+  }
+}
+
+/** 마지막으로 기업마당 공고를 받은 때 — 서버에 저장된 공고의 가장 최근 받은 시각 */
+export function newestFetch(programs: SupportProgram[]): number {
+  let t = 0;
+  for (const p of programs) if (p.source === "bizinfo") { const v = Date.parse(p.fetchedAt); if (v > t) t = v; }
+  return t;
+}

@@ -142,6 +142,27 @@ export function matchPrograms(programs: SupportProgram[], prof: MatchProfile, op
     .sort((a, b) => b.score - a.score || (a.deadline.daysLeft ?? 999) - (b.deadline.daysLeft ?? 999));
 }
 
+/**
+ * 고객 화면용 — 담당자가 알림으로 보낸 공고(규칙과 상관없이 늘 맨 위) + 규칙으로 맞는 공고.
+ * 보낸 공고가 규칙에서 빠지는 경우(예: 담당자가 판단해 보낸 전국 공고)에도 고객에게 보여야 알림과 화면이 어긋나지 않는다.
+ */
+export function programsForCompany(programs: SupportProgram[], companyId: string, prof: MatchProfile, now = new Date()) {
+  const sent: ProgramMatch[] = [];
+  const sentIds = new Set<string>();
+  for (const p of programs) {
+    if (!p.notified.includes(companyId)) continue;
+    const dl = deadlineOf(p, now);
+    if (dl.closed) continue;
+    const m = matchProgram(p, prof, now);
+    const base: ProgramMatch = m ?? { program: p, score: 0, reasons: [], cautions: [], deadline: { label: dl.label, urgent: dl.urgent, daysLeft: dl.daysLeft } };
+    sent.push({ ...base, reasons: ["담당 컨설턴트 추천", ...base.reasons] });
+    sentIds.add(p.id);
+  }
+  sent.sort((a, b) => (a.deadline.daysLeft ?? 999) - (b.deadline.daysLeft ?? 999));
+  const matches = matchPrograms(programs, prof, { now, strongOnly: true }).filter((m) => !sentIds.has(m.program.id));
+  return { sent, matches };
+}
+
 /* ------------------------------ 기업마당 공고 읽기 ------------------------------ */
 
 const LONG_REGION: Record<string, string> = {

@@ -124,14 +124,15 @@ export function PortalShell({ children }: { children: ReactNode }) {
       <header className="sticky top-0 z-30 border-b border-line bg-surface/90 backdrop-blur">
         {/* 글자 크기를 키우면 이 줄의 모든 요소가 같이 넓어진다. 줄일 수 있는 것(로고 문구·메뉴)은
             줄어들게 하고, 줄이면 안 되는 것(알림·계정)에만 shrink-0을 준다. */}
-        <div className="mx-auto flex h-[var(--header-h)] max-w-[1280px] items-center gap-2 px-4 md:gap-3 md:px-6">
+        <div className="mx-auto flex h-[var(--header-h)] max-w-[1480px] items-center gap-2 px-4 md:gap-3 md:px-6">
           <Link href="/portal" className="flex min-w-0 items-center gap-2.5">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-shell text-[0.65rem] font-black text-white">KPJK</span>
-            <span className="truncate text-[1rem] font-bold"><span className="hidden xl:inline">KPJK Consulting </span>Portal</span>
+            <span className="truncate text-[1rem] font-bold"><span className="hidden 2xl:inline">KPJK Consulting </span>Portal</span>
           </Link>
-          <nav className="ml-2 hidden min-w-0 items-center gap-0.5 overflow-hidden lg:flex">
-            {NAV.slice(0, 7).map((n) => (
-              <Link key={n.href} href={n.href} className={cx("pressable lift whitespace-nowrap rounded-lg px-2.5 py-2 text-[0.85rem] font-semibold transition-colors", isActive(pathname, n.href) ? "bg-surface-2 text-ink" : "text-ink-2 hover:bg-surface-2 hover:text-ink")}>
+          {/* 메뉴가 잘려 보이면 안 된다 — 넓은 화면(xl)에서 8개 전부, 그보다 좁으면 앞의 6개(나머지는 알림·내 정보에서) */}
+          <nav className="ml-1 hidden shrink-0 items-center gap-0.5 lg:flex" data-testid="portal-nav">
+            {NAV.slice(0, 8).map((n, i) => (
+              <Link key={n.href} href={n.href} className={cx("pressable lift whitespace-nowrap rounded-lg px-2 py-2 text-[0.85rem] font-semibold transition-colors", i >= 6 && "hidden xl:block", isActive(pathname, n.href) ? "bg-surface-2 text-ink" : "text-ink-2 hover:bg-surface-2 hover:text-ink")}>
                 {n.label}
               </Link>
             ))}
@@ -149,7 +150,7 @@ export function PortalShell({ children }: { children: ReactNode }) {
           </div>
           <span className="shrink-0"><NotificationBell audience="client" companyId={companyId} /></span>
           <Link href="/portal/me" className="flex shrink-0 items-center gap-2 pl-1">
-            <div className="hdr-optional hidden max-w-[180px] whitespace-nowrap text-right leading-tight sm:block">
+            <div className="hdr-optional hidden max-w-[180px] whitespace-nowrap text-right leading-tight sm:block lg:hidden 2xl:block">
               <div className="truncate text-[0.82rem] font-bold">{company?.name}</div>
               <div className="truncate text-[0.7rem] text-ink-3">{isInternal ? company?.contactName : user?.name} {isInternal ? company?.contactTitle : user?.title}</div>
             </div>
@@ -162,7 +163,7 @@ export function PortalShell({ children }: { children: ReactNode }) {
           )}
         </div>
       </header>
-      <main className={cx("mx-auto w-full max-w-[1280px] px-4 py-5 md:px-6 md:py-8", isMobile && "pb-24")}>
+      <main className={cx("mx-auto w-full max-w-[1480px] px-4 py-5 md:px-6 md:py-8", isMobile && "pb-24")}>
           <ServerBanner audience="client" />
           <LivePopups audience="client" />
           <PasswordNudge href="/portal/me#password" />

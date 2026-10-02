@@ -126,7 +126,19 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...
 1. 기업마당(bizinfo.go.kr) → 정책정보 개방 → **API 활용 신청** (무료, 승인 후 인증키 발급).
 2. Vercel → 프로젝트 → Settings → Environment Variables 에 `BIZINFO_API_KEY` = 받은 인증키 (Production 체크) → **Redeploy**.
    - 이름 앞에 `NEXT_PUBLIC_` 을 붙이지 마세요. 서버에서만 쓰는 값이라 화면(브라우저)으로 나가지 않습니다.
-3. 대표 계정 → **지원사업 매칭 → 기업마당에서 불러오기**. 이후 화면을 열 때 6시간이 지났으면 알아서 다시 불러옵니다.
+3. 대표 계정 → **지원사업 매칭 → 기업마당에서 불러오기**.
+
+### (선택) 매일 아침 9시 자동 갱신
+
+켜 두면 매일 아침(9:00~9:59 사이, Vercel 무료 요금제는 시각이 1시간 범위로 정해집니다) 서버가 기업마당 공고를 받아 저장합니다.
+화면을 열 때 기다릴 일이 없고, 고객 화면도 바로 뜹니다. 관리자 키(service_role)는 쓰지 않습니다 — "공고 저장 전용 열쇠" 하나만 씁니다.
+
+1. 아무 긴 문자열(16자 이상, 예: 비밀번호 생성기로 32자)을 하나 정합니다. 이것이 열쇠입니다.
+2. Supabase → SQL Editor 에서 한 줄 실행: `select public.kpjk_set_program_sync_key('정한 열쇠');`
+3. Vercel → Settings → Environment Variables 에 이름 `CRON_SECRET`, 값 = 같은 열쇠 → **Redeploy**.
+4. 확인: Vercel → 프로젝트 → **Settings → Cron Jobs** 에 `/api/programs/sync` 가 보이면 켜진 것입니다. 지원사업 매칭 → 기업마당에서 불러오기 를 눌러 "접수 중 공고 N건 — 새 공고 …"가 뜨면 열쇠도 맞는 것입니다.
+
+열쇠를 넣지 않아도 버튼으로 불러오기는 그대로 됩니다(예전 방식).
 
 ## 3. 나머지 계정 만들기
 

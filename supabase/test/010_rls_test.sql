@@ -363,6 +363,22 @@ select chk('컨설턴트: 가망고객 상태 변경',
        affected($$update public.leads set status='contacted' where id='ld_t1'$$), 1::bigint);
 reset role; reset request.jwt.claim.sub;
 
+-- =========================== 지원사업 공고 매일 자동 갱신 (공고 저장 전용 열쇠) ==========
+select public.kpjk_set_program_sync_key('rls-test-sync-key-0001');
+set role anon;
+select chk('비로그인: 자동 갱신 열쇠를 바꿀 수 없다',
+       denied($$select public.kpjk_set_program_sync_key('attacker-key-000000000')$$), true);
+select chk('비로그인: 열쇠 보관함을 못 읽는다',     denied($$select * from kpjk_private.secrets$$), true);
+select chk('틀린 열쇠: 공고를 넣을 수 없다',
+       denied($$select public.kpjk_sync_programs('wrong-key', '[{"id":"bz_t9","title":"가짜"}]'::jsonb)$$), true);
+select chk('맞는 열쇠: 기업마당 공고(bz_)만 넣는다',
+       (public.kpjk_sync_programs('rls-test-sync-key-0001', '[{"id":"bz_t9","title":"자동 공고"},{"id":"mp_x9","title":"가짜 직접 공고"}]'::jsonb)->>'added')::int, 1);
+select chk('맞는 열쇠: 담당자가 직접 넣은 공고는 못 고친다',
+       (public.kpjk_sync_programs('rls-test-sync-key-0001', '[{"id":"mp_t2","title":"바꿔치기"}]'::jsonb)->>'updated')::int, 0);
+reset role;
+select chk('알림 보낸 기록은 갱신에도 남는다',
+       (select count(*) from public.support_programs where id = 'mp_t2' and title = '직접 추가 공고'), 1::bigint);
+
 -- =========================== 결과 ===========================================
 select n, case when pass then '통과' else '실패' end as 결과, label as 검증, detail as 비고
 from _r order by n;
