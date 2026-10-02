@@ -17,7 +17,10 @@ await login(ceo, ACC.ceo, /\/ax\//);
 await cli.goto(B + '/portal', { waitUntil: 'domcontentloaded' }); await cli.waitForTimeout(2500);
 let t = await body(cli);
 ok('1 홈: 우리 회사 현재 상태', t.includes(`${CO1} 현재 상태`) && t.includes('업력 14년') && t.includes('법인'));
-ok('1 홈: 지금 할 일(요청자료)', (await cli.getByTestId('now-actions').innerText()).includes('파일럿 제출자료 A-1'));
+// 앞선 시험(loop·link)에 따라 요청 중인 자료가 달라진다 — 서버에서 요청 중인 자료 이름을 읽어 그중 하나가 보이는지 본다(3건까지 + "그 밖의 요청자료")
+const openDocs = sql(`select name from document_requests where company_id='${coId}' and status in ('requested','revision')`).split('\n').filter(Boolean);
+const na = await cli.getByTestId('now-actions').innerText();
+ok('1 홈: 지금 할 일(요청자료)', openDocs.length > 0 && openDocs.some((n) => na.includes(n)) && (openDocs.length <= 3 || na.includes(`그 밖의 요청자료 ${openDocs.length - 3}건`)), `요청 중 ${openDocs.length}건`);
 ok('1 홈: 진행 중 성장과제(기업부설연구소)', await cli.locator('[data-growth-active="기업부설연구소"]').count() === 1);
 const next = await cli.locator('#portal-next-growth').innerText();
 ok('1 홈: 근거 있는 다음 과제 — 가업승계(업력)', next.includes('가업승계') && next.includes('근거 · 기업정보: 업력 14년'));
