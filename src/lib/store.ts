@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import { clearCarryover, loadCarryover, sameCompany, stashLocalCompanies } from "./local-carryover";
 import { buildSeed, type SeedData } from "./demo/seed";
 import type {
   OrgInfo,
@@ -112,6 +113,8 @@ export interface StoreState extends SeedData {
   // ---- 기업고객 / 프로젝트 등록·수정 ----
   createCompany: (data: Omit<Company, "id" | "code">, byUserId: string) => string | null;
   updateCompany: (id: string, patch: Partial<Omit<Company, "id" | "code">>, byUserId: string) => void;
+  /** 서버 연결 전 이 브라우저에만 입력했던 기업을 서버로 올린다. 이미 있는 기업은 건너뛴다 */
+  uploadCarryover: (byUserId: string) => { added: string[]; skipped: string[] } | null;
   createProject: (data: Omit<Project, "id" | "stageChangedAt">, byUserId: string) => string | null;
   updateProject: (id: string, patch: Partial<Omit<Project, "id" | "companyId">>, byUserId: string) => void;
 
@@ -347,6 +350,8 @@ function applyServer(
   server: ServerSettings | undefined,
 ) {
   const cur = get().settings;
+  // 서버 화면으로 바뀌기 전에, 이 브라우저에만 입력해 둔 기업을 따로 보관한다 — 서버 화면에서 "서버로 올리기"로 옮긴다
+  if (!get().serverMode) stashLocalCompanies(get().companies);
   loadingFromServer = true;
   set({
     ...EMPTY_DATA,
@@ -686,6 +691,25 @@ export const useStore = create<StoreState>()(
       // ---------- 기업고객 / 프로젝트 등록 · 수정 ----------
       // 모든 쓰기 액션은 deny()를 먼저 통과한다. 화면에서 버튼을 숨기는 것만으로는
       // "권한이 적용된다"고 말할 수 없다 — 액션 자체가 거절해야 한다.
+      uploadCarryover: (byUserId) => {
+        const st = get();
+        const carry = loadCarryover();
+        if (!st.serverMode || !carry) return null;
+        if (deny(st, "company.create", "이 브라우저에 있던 기업 서버로 올리기", set)) return null;
+        const added: string[] = [];
+        const skipped: string[] = [];
+        for (const c of carry.companies) {
+          if (get().companies.some((x) => !x.archived && sameCompany(x, c))) { skipped.push(c.name); continue; }
+          // 데모 저장소의 번호·담당자 ID·서류함 기록은 서버에서 뜻이 없다 — 기본 정보만 옮기고 담당은 올린 사람으로
+          const { id: _id, code: _code, docs: _docs, sample: _sample, consultantId: _cid, ...rest } = c;
+          void _id; void _code; void _docs; void _sample; void _cid;
+          const id = get().createCompany({ ...rest, consultantId: byUserId, archived: false, archivedAt: undefined }, byUserId);
+          if (id) added.push(c.name);
+        }
+        clearCarryover();
+        return { added, skipped };
+      },
+
       createCompany: (data, byUserId) => {
         const st = get();
         if (deny(st, "company.create", `기업고객 등록 (${data.name})`, set)) return null;
@@ -2332,6 +2356,8 @@ export const useStore = create<StoreState>()(
       },
 
       leaveEmergencyDemo: () => {
+        // 데모 모드에서 직접 입력한 기업은 버리지 않고 보관 — 서버 로그인 뒤 "서버로 올리기"
+        stashLocalCompanies(get().companies);
         setDemoForced(false);
         loadingFromServer = true;
         // 데모 기업이 서버 화면에 섞이지 않게 비운다. 로그인하면 서버에서 새로 읽는다.

@@ -1,7 +1,7 @@
 "use client";
 
 import { useStore } from "@/lib/store";
-import { serverConfigured } from "@/lib/server/client";
+import { deployedWithoutServer, serverConfigured } from "@/lib/server/client";
 
 import Link from "next/link";
 import { type ReactNode, type ButtonHTMLAttributes, type InputHTMLAttributes, type SelectHTMLAttributes, type TextareaHTMLAttributes, forwardRef, useEffect, useRef, useState } from "react";
@@ -87,6 +87,8 @@ export function DemoBadge({ className }: { className?: string }) {
   const hydrated = useStore((s) => s.hydrated);
   if (!hydrated) return null;
   if (onServer) return <span className={cx("inline-flex items-center rounded-md bg-success-bg px-1.5 py-0.5 text-[0.65rem] font-bold tracking-wide text-success", className)}>서버 운영</span>;
+  // 인터넷에 올린 사이트인데 서버가 없다 — "운영"(초록)이라고 하면 다른 기기에서도 보이는 줄 안다
+  if (live && deployedWithoutServer()) return <span className={cx("inline-flex items-center rounded-md bg-warning-bg px-1.5 py-0.5 text-[0.65rem] font-bold tracking-wide text-warning", className)} title="서버 미연결 — 입력한 내용은 이 기기 브라우저에만 저장됩니다">이 기기에만 저장</span>;
   if (live) return <span className={cx("inline-flex items-center rounded-md bg-success-bg px-1.5 py-0.5 text-[0.65rem] font-bold tracking-wide text-success", className)}>운영</span>;
   return <span className={cx("inline-flex items-center rounded-md bg-warning-bg px-1.5 py-0.5 text-[0.65rem] font-bold tracking-wide text-warning", className)}>DEMO DATA</span>;
 }

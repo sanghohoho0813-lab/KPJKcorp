@@ -26,6 +26,7 @@ import {
   MessageSquarePlus,
   Compass,
   Megaphone,
+  Menu,
 } from "lucide-react";
 import { useStore, useCurrentUser } from "@/lib/store";
 import { NEXT_FEATURES, useUi } from "@/lib/ui-store";
@@ -45,7 +46,8 @@ import { ServerBanner } from "./ServerBanner";
 import { LivePopups } from "./LivePopups";
 import { PasswordNudge } from "@/components/domain/MyPassword";
 import { DraftDock } from "./DraftDock";
-import { Modal, Sheet, Confirm } from "@/components/ui/overlay";
+import { Modal, Sheet, Confirm, Drawer } from "@/components/ui/overlay";
+import { ConnectionStatus } from "./ConnectionStatus";
 import { Avatar, Badge, Button, DemoBadge, NextBadge, PageSkeleton, cx } from "@/components/ui/ui";
 
 interface NavItem {
@@ -297,13 +299,24 @@ function Header() {
   const router = useRouter();
   const inFrame = useIsPreviewFrame();
   const [pick, setPick] = useState(false);
+  const [menu, setMenu] = useState(false);
+  const serverMode = useStore((s) => s.serverMode);
   const btn = "pressable flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-2 text-[0.82rem] font-semibold text-ink-2 hover:bg-surface-2";
   const lbl = "hidden 2xl:inline";
   return (
-    <header className="sticky top-0 z-30 flex h-[var(--header-h)] items-center gap-2 border-b border-line bg-surface/90 px-4 backdrop-blur md:px-6">
-      <div className="flex min-w-0 items-center gap-2 lg:hidden">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-shell text-[0.65rem] font-black text-white">KPJK</span>
-        <span className="truncate text-[0.95rem] font-bold">Business AX</span>
+    <header className="sticky top-0 z-30 flex h-[var(--header-h)] items-center gap-2 border-b border-line bg-surface/90 px-3 backdrop-blur md:px-6">
+      <div className="flex min-w-0 items-center gap-1.5 lg:hidden">
+        {/* 휴대폰: 왼쪽 위 메뉴 — 아래 막대 4개 밖의 화면(지원사업·일정·리포트·설정 …)으로 한 번에 */}
+        <button type="button" onClick={() => setMenu(true)} aria-label="메뉴 열기" data-testid="mobile-menu-button"
+          className="pressable -ml-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-ink hover:bg-surface-2">
+          <Menu size={22} />
+        </button>
+        <Link href="/ax/dashboard" className="flex shrink-0 items-center gap-2" aria-label="대시보드로">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-shell text-[0.65rem] font-black text-white">KPJK</span>
+          {serverMode && <span className="hidden text-[0.95rem] font-bold min-[430px]:inline">Business AX</span>}
+        </Link>
+        {/* 서버가 아니면(데모·이 기기에만 저장) 휴대폰에서도 늘 보이게 — 자세한 것은 메뉴 맨 위 */}
+        {!serverMode && <DemoBadge className="shrink-0" />}
       </div>
       <div className="hidden items-center gap-3 lg:flex">
         <SearchTrigger />
@@ -329,7 +342,7 @@ function Header() {
       <div className="flex shrink-0 items-center gap-1 lg:hidden">
         <SearchTrigger compact />
         <FontScaleStepper />
-        <span className="hdr-optional"><LiveClock compact /></span>
+        <span className="hdr-optional hidden min-[430px]:inline"><LiveClock compact /></span>
       </div>
       <span className="shrink-0"><NotificationBell audience="internal" /></span>
       <div className="hidden items-center gap-2 pl-2 lg:flex">
@@ -343,7 +356,47 @@ function Header() {
         </button>
       </div>
       <CompanyPickerModal open={pick} onClose={() => setPick(false)} />
+      <MobileMenu open={menu} onClose={() => setMenu(false)} />
     </header>
+  );
+}
+
+/** 휴대폰 왼쪽 위 메뉴 — 사이드바와 같은 목록 전체 + 지금 연결 상태 + 로그아웃 */
+function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const user = useCurrentUser();
+  const session = useStore((s) => s.session);
+  const logout = useStore((s) => s.logout);
+  const router = useRouter();
+  return (
+    <Drawer open={open} onClose={onClose} side="left" width="max-w-[19rem]" title={<span className="flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-shell text-[0.6rem] font-black text-white">KPJK</span>Business AX</span>}>
+      <div data-testid="mobile-menu" className="-mt-1">
+        <div className="mb-3 flex items-center gap-3">
+          <Avatar name={user?.name ?? "K"} />
+          <div className="min-w-0 flex-1 leading-tight">
+            <div className="truncate font-bold">{user?.name} {user?.title}</div>
+            <div className="text-[0.75rem] text-ink-3">{session?.role === "admin" ? "대표" : "컨설턴트"}</div>
+          </div>
+        </div>
+        <ConnectionStatus className="mb-3" />
+        {NAV_GROUPS.map((g, gi) => (
+          <div key={g.key} className={cx(gi > 0 && "mt-2.5 border-t border-line pt-2")}>
+            <div className="px-3 pb-1 pt-0.5 text-[0.66rem] font-bold tracking-[0.16em] text-ink-3">{g.label}</div>
+            <div className="space-y-0.5">
+              {g.items.map((item) => <NavLink key={item.href} item={item} color={g.inkColor} onClick={onClose} mobile />)}
+            </div>
+          </div>
+        ))}
+        <div className="mt-2.5 border-t border-line pt-2">
+          <div className="space-y-0.5">
+            {NAV_UTILITY.map((item) => <NavLink key={item.href} item={item} color="var(--nav-sys-ink)" onClick={onClose} mobile />)}
+          </div>
+        </div>
+        <button type="button" onClick={() => { onClose(); logout(); router.push("/login"); }}
+          className="pressable mt-3 flex w-full items-center gap-2.5 rounded-lg border border-line px-3 py-2.5 text-[0.9rem] font-semibold text-ink-2 hover:bg-surface-2">
+          <LogOut size={17} className="text-ink-3" /> 로그아웃
+        </button>
+      </div>
+    </Drawer>
   );
 }
 
@@ -400,6 +453,7 @@ function MoreSheet() {
           </div>
           <Badge tone={session?.role === "admin" ? "accent" : "neutral"}>{session?.role === "admin" ? "대표" : "컨설턴트"}</Badge>
         </div>
+        <ConnectionStatus className="mb-4" />
         <div className="mb-4 rounded-xl border border-line p-3">
           <div className="mb-2 text-[0.82rem] font-semibold text-ink-2">글자 크기</div>
           <FontScalePicker />

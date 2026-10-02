@@ -44,6 +44,16 @@ export const serverEnv = () => ({ url, key: anonKey });
 /** 이 앱 빌드에 서버 주소가 들어 있는가 (비상 데모 전환과 무관) */
 export const serverAvailable = () => !!(url && anonKey);
 
+/**
+ * 인터넷에 올린 사이트인데 서버 주소가 빌드에 없다 — 입력한 것이 그 기기 브라우저에만 남는다.
+ * (Vercel 환경변수를 넣지 않았거나, 넣고 다시 배포하지 않은 경우. NEXT_PUBLIC_ 값은 배포할 때 굳는다)
+ * 내 PC(localhost)에서 돌리는 시연·시험은 해당하지 않는다.
+ */
+export function deployedWithoutServer(): boolean {
+  if (serverAvailable() || typeof window === "undefined") return false;
+  return !/^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])$/.test(window.location.hostname);
+}
+
 /** 지금 이 브라우저가 서버로 도는가 (로그인 여부와 무관). 비상 데모로 돌렸으면 false */
 export const serverConfigured = () => serverAvailable() && !demoForced();
 

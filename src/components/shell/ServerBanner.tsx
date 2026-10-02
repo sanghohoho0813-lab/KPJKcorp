@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { CloudOff, FlaskConical, RefreshCw, WifiOff, X } from "lucide-react";
+import { CloudOff, CloudUpload, FlaskConical, HardDrive, RefreshCw, WifiOff, X } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { demoForced, serverAvailable } from "@/lib/server/client";
+import { demoForced, deployedWithoutServer, serverAvailable } from "@/lib/server/client";
+import { clearCarryover, loadCarryover } from "@/lib/local-carryover";
+import { can } from "@/lib/permissions";
 import { discardOutbox, retryOutbox } from "@/lib/server/sync";
 import { Confirm } from "@/components/ui/overlay";
 
@@ -26,6 +28,7 @@ export function ServerBanner({ audience }: { audience: "internal" | "client" }) 
   const [busy, setBusy] = useState(false);
   const [drop, setDrop] = useState(false);
   const [back, setBack] = useState(false);
+  const live = useStore((s) => s.settings.liveMode);
 
   // 서버가 연결된 사이트에서 이 브라우저만 데모 — 가장 헷갈리는 상황이라 항상 크게 보인다
   if (hydrated && !serverMode && serverAvailable() && demoForced()) {
@@ -37,13 +40,35 @@ export function ServerBanner({ audience }: { audience: "internal" | "client" }) 
         <button type="button" onClick={() => setBack(true)} className="pressable inline-flex min-h-9 items-center rounded-lg bg-error px-3 font-semibold text-white">서버로 돌아가기</button>
         <Confirm open={back} onClose={() => setBack(false)} danger confirmText="서버로 돌아가기"
           title="서버로 돌아갈까요?"
-          desc="이 브라우저의 데모 데이터는 지워집니다. 데모 모드에서 직접 입력한 기업이 있다면 먼저 '입력한 내용 엑셀로 받기'로 받아 두고, 서버에 로그인한 뒤 기업고객 → 일괄 등록으로 올리세요."
+          desc="이 브라우저의 데모 화면은 지워집니다. 여기서 직접 등록한 기업은 따로 보관해 두었다가, 서버에 로그인하면 화면 위에 '서버로 올리기'로 보여 드립니다."
           onConfirm={() => { leaveDemo(); window.location.replace("/login"); }} />
+      </div>
+    );
+  }
+  // 인터넷에 올린 사이트인데 서버가 연결되지 않은 빌드 — 실제로 쓰기 시작했다면(운영 모드) 늘 크게 알린다
+  if (hydrated && !serverMode && live && deployedWithoutServer() && audience === "internal") {
+    return (
+      <div role="alert" className="mb-4 rounded-xl border border-error/40 bg-error-bg px-3 py-2.5 text-[0.85rem] text-ink" data-testid="no-server-banner">
+        <div className="flex items-start gap-2">
+          <HardDrive size={16} className="mt-0.5 shrink-0 text-error" />
+          <span className="min-w-0 flex-1">
+            <b className="text-error">이 사이트는 아직 서버에 연결되지 않았습니다.</b> 지금 입력하는 내용은 <b>이 기기 브라우저에만</b> 저장되어 휴대폰·다른 PC에서는 보이지 않습니다.
+            <span className="mt-1 block text-[0.78rem] text-ink-2">Vercel → Settings → Environment Variables 에 <code>NEXT_PUBLIC_SUPABASE_URL</code> · <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> 를 넣고 <b>다시 배포</b>하면 연결됩니다. 여기서 등록한 기업은 서버 로그인 뒤 한 번에 올릴 수 있습니다.</span>
+          </span>
+        </div>
       </div>
     );
   }
   if (!serverMode) return null;
 
+  if (audience === "internal") {
+    const carry = <CarryoverCard />;
+    if (unsaved === 0 && !err) return carry;
+    return <>{carry}{bannerBody()}</>;
+  }
+  return bannerBody();
+
+  function bannerBody() {
   if (unsaved > 0) {
     const text = audience === "client"
       ? "방금 입력하신 내용이 아직 서버에 전달되지 않았습니다. 인터넷이 연결되면 자동으로 다시 보냅니다. 이 화면을 닫지 말아 주세요."
@@ -87,6 +112,51 @@ export function ServerBanner({ audience }: { audience: "internal" | "client" }) 
         onClick={() => useStore.setState({ syncError: undefined })}>
         <X size={14} />
       </button>
+    </div>
+  );
+  }
+}
+
+/**
+ * 서버 연결 전 이 브라우저에만 입력해 둔 기업 — 한 번에 서버로 올린다.
+ * (서버 로그인 순간 store 가 보관해 둔 것. 같은 사업자번호·이름이 서버에 있으면 건너뛴다)
+ */
+function CarryoverCard() {
+  const role = useStore((s) => s.session?.role);
+  const userId = useStore((s) => s.session?.userId);
+  const upload = useStore((s) => s.uploadCarryover);
+  const toast = useStore((s) => s.toast);
+  const [, setVer] = useState(0);
+  const [drop, setDrop] = useState(false);
+  const carry = loadCarryover();
+  if (!carry || !userId || !can(role, "company.create")) return null;
+  const names = carry.companies.map((c) => c.name);
+  return (
+    <div role="status" className="mb-4 rounded-xl border border-accent/40 bg-accent/[0.06] px-3 py-3 text-[0.85rem] text-ink" data-testid="carryover-card">
+      <div className="flex items-start gap-2">
+        <CloudUpload size={17} className="mt-0.5 shrink-0 text-accent" />
+        <div className="min-w-0 flex-1">
+          <b>서버 연결 전에 이 브라우저에만 입력했던 기업 {names.length}곳이 있습니다.</b>
+          <div className="mt-0.5 text-[0.8rem] text-ink-2">{names.slice(0, 5).join(" · ")}{names.length > 5 ? ` 외 ${names.length - 5}곳` : ""}</div>
+          <div className="mt-0.5 text-[0.78rem] text-ink-3">올리면 휴대폰·다른 PC 어디서나 보입니다. 기업 기본 정보·담당자만 옮기며, 서버에 이미 있는 기업은 건너뜁니다.</div>
+        </div>
+      </div>
+      <div className="mt-2.5 flex flex-wrap justify-end gap-2">
+        <button type="button" onClick={() => setDrop(true)} className="pressable inline-flex min-h-9 items-center rounded-lg px-3 font-semibold text-ink-3 hover:bg-surface-2">올리지 않기</button>
+        <button type="button" className="pressable inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-accent px-3 font-semibold text-accent-ink"
+          onClick={() => {
+            const r = upload(userId);
+            setVer((v) => v + 1);
+            if (!r) { toast("올리지 못했습니다. 대표·컨설턴트 계정으로 로그인했는지 확인해 주세요.", "error"); return; }
+            toast(r.added.length ? `기업 ${r.added.length}곳을 서버에 올렸습니다${r.skipped.length ? ` · 이미 있던 ${r.skipped.length}곳은 건너뜀` : ""}.` : `모두 이미 서버에 있어 건너뛰었습니다 (${r.skipped.length}곳).`);
+          }}>
+          <CloudUpload size={15} /> 서버로 올리기
+        </button>
+      </div>
+      <Confirm open={drop} onClose={() => setDrop(false)} danger confirmText="올리지 않기"
+        title="이 기업들을 서버에 올리지 않을까요?"
+        desc="이 브라우저에 보관해 둔 목록을 지웁니다. 되돌릴 수 없습니다. 서버에 이미 같은 기업을 다시 등록하셨다면 지워도 됩니다."
+        onConfirm={() => { clearCarryover(); setVer((v) => v + 1); }} />
     </div>
   );
 }

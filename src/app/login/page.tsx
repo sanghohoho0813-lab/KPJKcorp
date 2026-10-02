@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { AlertCircle, ArrowRight, Eye, EyeOff, KeyRound, Mail, WifiOff } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { hashPassword, LOCK_SECONDS, MAX_ATTEMPTS } from "@/lib/auth";
-import { demoForced, serverAvailable, serverConfigured, serverEnv } from "@/lib/server/client";
+import { demoForced, deployedWithoutServer, serverAvailable, serverConfigured, serverEnv } from "@/lib/server/client";
 import { sendPasswordReset } from "@/lib/server/auth";
 import { Badge, Button, DemoBadge, Field, Input, cx } from "@/components/ui/ui";
 import { Toaster } from "@/components/ui/Toaster";
@@ -187,6 +187,11 @@ export default function LoginPage() {
               ? "계정 아이디와 비밀번호를 입력해 주세요. 데이터는 서버에 저장되며 어느 기기에서 열어도 같습니다."
               : "계정 아이디와 비밀번호를 입력해 주세요. 역할은 계정에 따라 결정됩니다."}
           </p>
+          {hydrated && !onServer && !forcedDemo && deployedWithoutServer() && (
+            <div className="mt-3 rounded-xl border border-warning/40 bg-warning-bg/60 px-3 py-2.5 text-[0.82rem]" data-testid="login-no-server">
+              <b>이 사이트는 서버에 연결되어 있지 않습니다.</b> 여기서 입력한 내용은 이 기기 브라우저에만 저장되어 다른 기기에서는 보이지 않습니다.
+            </div>
+          )}
 
           <div className="mt-6 space-y-3">
             <Field label="아이디 (이메일)">

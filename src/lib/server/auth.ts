@@ -64,7 +64,9 @@ export async function serverSignIn(email: string, password: string): Promise<Sig
 }
 
 export async function serverSignOut() {
-  await supa()?.auth.signOut();
+  // 이 기기만 로그아웃한다. 기본값(global)은 같은 계정의 모든 기기를 함께 로그아웃시켜,
+  // PC 에서 로그아웃하면 휴대폰도 로그인 화면으로 튕긴다.
+  await supa()?.auth.signOut({ scope: "local" });
 }
 
 /**
