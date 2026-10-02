@@ -176,7 +176,7 @@ export function GrowthJourney({ board }: { board: Board }) {
             {l.items.length === 0 ? <div className="py-2 text-[0.82rem] text-ink-3">{l.empty}</div> : (
               <div className="space-y-1.5">
                 {l.items.slice(0, 4).map((x) => (
-                  <Link key={`${l.key}-${x.label}`} href={x.href} className="flex items-center gap-2 rounded-xl bg-surface px-3 py-2 text-[0.85rem] hover:ring-1 hover:ring-accent/40">
+                  <Link key={`${l.key}-${x.label}`} href={x.href} {...(l.key === "active" ? { "data-growth-active": x.label } : {})} className="flex items-center gap-2 rounded-xl bg-surface px-3 py-2 text-[0.85rem] hover:ring-1 hover:ring-accent/40">
                     {l.key === "done" ? <Check size={14} className="shrink-0 text-success" /> : null}
                     <span className="min-w-0 flex-1 truncate font-semibold">{x.label}</span>
                     <span className="shrink-0 text-[0.72rem] text-ink-3">{x.note}</span>

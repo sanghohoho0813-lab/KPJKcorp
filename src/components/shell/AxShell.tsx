@@ -364,6 +364,9 @@ function Header() {
           </span>
           <ChevronDown size={15} className={cx("shrink-0 text-ink-3 transition-transform", acct && "rotate-180")} />
         </button>
+        <button onClick={() => { logout(); router.push("/login"); }} className="pressable icon-btn text-ink-3 hover:bg-surface-2 hover:text-ink" title="로그아웃" aria-label="로그아웃">
+          <LogOut size={18} />
+        </button>
         {acct && (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setAcct(false)} aria-hidden />

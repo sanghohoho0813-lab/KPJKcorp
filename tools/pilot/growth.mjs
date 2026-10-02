@@ -65,7 +65,8 @@ t = await body(cli);
 ok('4 고객 홈: 이력(진행 단계: 완료)', t.includes('진행 단계: 완료'));
 ok('4 고객 홈: 이어지는 과제 — 상속증여(가업승계 완료)', (await cli.locator('#portal-next-growth').innerText()).includes('진행이력: 가업승계 완료'));
 const tiles = await cli.getByTestId('growth-tiles').innerText();
-ok('4 고객 홈: 완료한 과제 1', /완료한 과제\s*1/.test(tiles), tiles.replace(/\n/g, ' '));
+// 휴대폰에서는 칸 이름이 짧다(완료) — PC 는 "완료한 과제"
+ok('4 고객 홈: 완료한 과제 1', /완료(한 과제)?\s*1/.test(tiles), tiles.replace(/\n/g, ' '));
 await shot(cli, 'growth-4-client-home-after');
 ok('5 실증 기록: 요청→확정→프로젝트→완료', ['opportunity_created', 'opportunity_status_changed', 'project_created', 'project_stage_changed'].every((x) => sql(`select count(*) from activities where company_id='${coId}' and type='${x}'`) !== '0'));
 const errs = [...ceo.errs, ...cli.errs].filter((e) => !/ERR_CERT|ERR_NAME|fonts|Failed to load resource|WebSocket/.test(e));
