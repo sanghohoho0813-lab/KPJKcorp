@@ -7,7 +7,7 @@ import { serverConfigured, supa } from "@/lib/server/client";
 
 /** 바뀌면 곧바로 다시 읽을 표 — setup.sql 의 실시간 목록과 같다 */
 const LIVE_TABLES = ["notifications", "document_requests", "document_files", "inquiries", "inquiry_messages", "opportunities", "quotes", "schedules", "projects", "tasks", "companies", "notices"];
-import { pendingWrites, setSyncErrorHandler, setUnsavedHandler } from "@/lib/server/sync";
+import { pendingWrites, setAuthLostHandler, setSyncErrorHandler, setUnsavedHandler } from "@/lib/server/sync";
 import type { FontScale } from "@/lib/types";
 
 /** 이전 버전에서 저장된 값("small"/"base"/"large")은 최소 단계로 본다. */
@@ -34,6 +34,13 @@ export function ThemeBoot() {
       useStore.getState().toast(msg, "error");
     });
     setUnsavedHandler((n) => useStore.setState({ unsaved: n }));
+    // 저장하려는데 로그인이 없다 — 정말 풀린 것인지 서버에 확인하고, 풀렸으면 "다시 로그인" 창을 띄운다
+    let checking = false;
+    setAuthLostHandler(() => {
+      if (checking) return;
+      checking = true;
+      void useStore.getState().checkSession().finally(() => { checking = false; });
+    });
   }, []);
 
   // 새로고침해도 로그인이 유지되게 한다. 이 브라우저에 남은 지난 화면을 그대로 믿지 않고

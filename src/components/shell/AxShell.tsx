@@ -46,6 +46,7 @@ import { NextSheet } from "./NextSheet";
 import { AiReadyModal, DraftModal } from "@/components/ai/AiModals";
 import { Toaster } from "@/components/ui/Toaster";
 import { ServerBanner } from "./ServerBanner";
+import { ReLoginDialog } from "./ReLoginDialog";
 import { LivePopups } from "./LivePopups";
 import { PasswordNudge } from "@/components/domain/MyPassword";
 import { DraftDock } from "./DraftDock";
@@ -635,6 +636,7 @@ export function AxShell({ children }: { children: ReactNode }) {
         <Header />
         <main className={cx("mx-auto w-full max-w-[1720px] px-4 py-5 md:px-6 md:py-7", isMobile && "pb-24")}>
           <ServerBanner audience="internal" />
+          <ReLoginDialog />
           <ViewAsBanner />
           <LivePopups audience="internal" />
           <PasswordNudge href="/ax/settings?open=account" />

@@ -289,6 +289,22 @@ let pending = 0;
 let seq = 0;
 
 export const setSyncErrorHandler = (fn: (msg: string) => void) => { onError = fn; };
+/** 로그인이 풀린 채로 저장하려 했다 — 화면에 "다시 로그인" 창을 띄운다 */
+let onAuthLost: (() => void) | null = null;
+export const setAuthLostHandler = (fn: () => void) => { onAuthLost = fn; };
+/**
+ * 지금 이 브라우저에 로그인이 살아 있는가.
+ * 풀린 채로 보내면 손님(anon) 권한으로 나가 거절되거나(추가) 아무 줄도 안 바뀐 채 성공처럼 끝난다(수정·삭제).
+ * 그래서 보내기 전에 확인하고, 풀렸으면 보관함에 넣어 두었다가 다시 로그인하면 보낸다.
+ */
+async function signedIn(sb: SupabaseClient) {
+  try {
+    const { data, error } = await sb.auth.getSession();
+    // 인터넷이 끊겨 로그인 갱신을 못 한 것은 "풀림"이 아니다 — 그대로 보내 보고, 실패하면 보관함이 받는다
+    if (!data.session && error && isNetworkError(error)) return true;
+    return !!data.session;
+  } catch (e) { return isNetworkError(e); }
+}
 
 /* ------------------------------------------------------------------------------------------------
  * 보내지 못한 변경 보관함 (outbox)
@@ -352,6 +368,7 @@ export function retryOutbox(): Promise<{ left: number; reason?: string }> {
   if (!sb || !outbox.length) return Promise.resolve({ left: unsavedCount() });
   pending += 1;
   const run = queue.then(async () => {
+    if (!(await signedIn(sb))) { onAuthLost?.(); return { left: unsavedCount(), reason: "로그인이 풀렸습니다." }; }
     const todo = outbox;
     outbox = [];
     let reason: string | undefined;
@@ -427,6 +444,21 @@ async function flush(
     console.error(`[sync] ${what}`, e);
     onError?.(`${what} 저장 실패 — ${explain(e)}`);
   };
+
+  if (!(await signedIn(sb))) {
+    // 버리지 않는다 — 같은 계정으로 다시 로그인하면 이 순서 그대로 보낸다
+    for (const c of changes) {
+      const table = SPEC[c.key].table;
+      if (c.insert.length) outbox.push({ t: "insert", table, rows: c.insert });
+      for (const u of c.update) outbox.push({ t: "update", table, patch: u.patch, ids: [u.id] });
+    }
+    if (nested.files.length) outbox.push({ t: "insert", table: "document_files", rows: nested.files });
+    if (nested.msgs.length) outbox.push({ t: "insert", table: "inquiry_messages", rows: nested.msgs });
+    for (const c of [...changes].reverse()) if (c.remove.length) outbox.push({ t: "delete", table: SPEC[c.key].table, ids: c.remove });
+    saveOutbox();
+    onAuthLost?.();
+    return;
+  }
 
   // 1) 추가·수정은 부모 → 자식 순서로
   for (const c of changes) {

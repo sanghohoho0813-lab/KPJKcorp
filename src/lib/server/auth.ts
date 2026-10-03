@@ -73,25 +73,52 @@ export async function serverSignOut() {
  * 새로고침 후에도 로그인이 유지되는지 확인한다.
  * "로그인이 풀렸다"와 "서버에 닿지 못했다"를 구분한다 — 앞의 것은 화면을 비우고,
  * 뒤의 것은 마지막으로 받은 화면을 지키면서 알린다.
+ *
+ * 확실히 풀린 것만 "풀렸다"로 본다. 서버가 잠깐 500·429(요청 몰림)를 내거나 프로필을 못 읽은 것은
+ * 연결 문제로 친다 — 예전에는 이것도 로그아웃으로 처리해 입력하던 화면이 통째로 비워졌다.
+ *  - expired: 로그인 유효기간이 지났거나 서버에서 세션이 끝났다 → 그 자리에서 비밀번호만 다시 받는다
+ *  - suspended / missing: 계정이 중지됐거나 프로필이 없다 → 로그아웃하고 이유를 알린다
  */
-export async function currentServerUser(): Promise<{ user: User | null; offline?: boolean }> {
+export type SessionEnd = "expired" | "suspended" | "missing";
+export async function currentServerUser(): Promise<{ user: User | null; offline?: boolean; ended?: SessionEnd }> {
   const sb = supa();
   if (!sb) return { user: null };
   try {
     const { data: s, error: sErr } = await sb.auth.getSession();
     if (sErr && isNetworkError(sErr)) return { user: null, offline: true };
-    if (!s.session) return { user: null };
+    if (!s.session) return { user: null, ended: "expired" };
     const { data, error } = await sb.auth.getUser();
-    if (error && isNetworkError(error)) return { user: null, offline: true };
-    if (!data.user) return { user: null };
+    if (error) {
+      if (isNetworkError(error)) return { user: null, offline: true };
+      if (authGone(error)) return { user: null, ended: (error as { code?: string }).code === "user_not_found" ? "missing" : "expired" };
+      return { user: null, offline: true };
+    }
+    if (!data.user) return { user: null, ended: "expired" };
     const { data: row, error: pErr } = await sb.from("profiles").select("*").eq("id", data.user.id).maybeSingle();
-    if (pErr && isNetworkError(pErr)) return { user: null, offline: true };
-    if (!row) return { user: null };
+    if (pErr) return { user: null, offline: true };
+    if (!row) return { user: null, ended: "missing" };
     const user = userFromRow(row);
-    return { user: user.active === false ? null : user };
-  } catch (e) {
-    return { user: null, offline: isNetworkError(e) };
+    return user.active === false ? { user: null, ended: "suspended" } : { user };
+  } catch {
+    // 예상 못 한 실패도 "풀렸다"로 단정하지 않는다 — 화면을 지키고 다음 주기에 다시 확인
+    return { user: null, offline: true };
   }
+}
+
+/** 인증 서버가 "이 토큰·세션은 더 이상 없다"고 확실히 답했는가 (일시 장애·요청 몰림은 아니다) */
+function authGone(e: unknown): boolean {
+  const x = e as { status?: number; code?: string; message?: string };
+  if (x.code && /session_not_found|session_expired|bad_jwt|refresh_token_not_found|refresh_token_already_used|user_not_found|no_authorization/.test(x.code)) return true;
+  if (x.status === 401 || x.status === 403) return true;
+  return /JWT expired|invalid JWT|Session from session_id claim|Auth session missing|User from sub claim/i.test(x.message ?? "");
+}
+
+/** 같은 계정 비밀번호 다시 확인 — 로그인이 풀렸을 때 화면을 그대로 둔 채 이어가기 위해 */
+export async function reauthenticate(email: string, password: string, userId: string): Promise<{ ok: boolean; reason?: string; offline?: boolean; other?: boolean }> {
+  const r = await serverSignIn(email, password);
+  if (!r.ok || !r.user) return { ok: false, reason: r.reason, offline: r.offline };
+  if (r.user.id !== userId) return { ok: false, other: true, reason: "다른 계정입니다." };
+  return { ok: true };
 }
 
 /**

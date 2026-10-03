@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { AlertCircle, ArrowRight, Eye, EyeOff, KeyRound, Mail, WifiOff } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { clearSignOut, parseSignOut, peekSignOut, returnPath, SIGNOUT_TEXT } from "@/lib/signout-notice";
 import { hashPassword, LOCK_SECONDS, MAX_ATTEMPTS } from "@/lib/auth";
 import { demoForced, deployedWithoutServer, serverAvailable, serverConfigured, serverEnv } from "@/lib/server/client";
 import { sendPasswordReset } from "@/lib/server/auth";
@@ -17,6 +18,9 @@ const DEMO_ACCOUNTS = [
   { label: "컨설턴트", id: "park@kpjk.co.kr", pw: "kpjk2026!" },
   { label: "기업고객", id: "ceo@a-precision.demo", pw: "client2026!" },
 ];
+
+/** sessionStorage 는 바뀌어도 알려 주지 않는다 — 처음 읽은 값만 쓴다 */
+const noSubscribe = () => () => {};
 
 export default function LoginPage() {
   const hydrated = useStore((s) => s.hydrated);
@@ -44,6 +48,9 @@ export default function LoginPage() {
   const [attempts, setAttempts] = useState(0);
   const [lockUntil, setLockUntil] = useState(0);
   const [now, setNow] = useState(0);
+  // 누르지 않았는데 로그아웃된 경우의 이유와, 다시 로그인하면 돌아갈 화면
+  const noticeRaw = useSyncExternalStore(noSubscribe, peekSignOut, () => null);
+  const notice = useMemo(() => parseSignOut(noticeRaw), [noticeRaw]);
 
   useEffect(() => {
     if (hydrated && session && !busy) {
@@ -114,7 +121,9 @@ export default function LoginPage() {
         }
         setPreview(undefined);
         const role = useStore.getState().session?.role;
-        setTimeout(() => router.push(role === "client" ? "/portal" : "/ax/dashboard"), 200);
+        const back = role ? returnPath(notice?.path, role) : undefined;
+        clearSignOut();
+        setTimeout(() => router.push(back ?? (role === "client" ? "/portal" : "/ax/dashboard")), 200);
         return;
       }
 
@@ -233,6 +242,12 @@ export default function LoginPage() {
               </div>
             </Field>
 
+            {notice && !error && (
+              <div role="status" data-testid="signout-notice" className="flex items-start gap-2 rounded-xl bg-warning-bg px-4 py-3 text-[0.85rem] font-semibold text-warning">
+                <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                <span>{SIGNOUT_TEXT[notice.reason]}</span>
+              </div>
+            )}
             {error && (
               <div role="alert" className="anim-pop-in flex items-start gap-2 rounded-xl bg-error-bg px-4 py-3 text-[0.85rem] font-semibold text-error">
                 <AlertCircle size={16} className="mt-0.5 shrink-0" />

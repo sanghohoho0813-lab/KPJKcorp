@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { CheckCircle2, Download, FileText, MessageSquareText, RefreshCw, Search, Upload, Camera } from "lucide-react";
 import type { DocumentRequest } from "@/lib/types";
 import { useStore } from "@/lib/store";
@@ -113,10 +113,16 @@ export function UploadModal({ req, open, onClose }: { req: DocumentRequest | nul
   const [shrinking, setShrinking] = useState(false);
   const [drag, setDrag] = useState(false);
   const [busy, setBusy] = useState(false);
+  // 올리는 중 진행률 (0~1) · 실패 이유(토스트는 금방 사라져 휴대폰에서 놓치기 쉽다 — 창 안에 남긴다) · 취소
+  const [progress, setProgress] = useState<number | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
+  const abort = useRef<AbortController | null>(null);
   if (!req) return null;
+  const close = () => { abort.current?.abort(); setFailed(null); onClose(); };
   // 큰 휴대폰 사진은 서류가 읽히는 크기로 줄여서 올린다 (문서 파일·작은 사진은 그대로)
   const pick = async (f: File | undefined) => {
     if (!f) return;
+    setFailed(null);
     setShrinking(true);
     const { file: out, from } = await shrinkPhoto(f);
     setShrinking(false);
@@ -146,8 +152,23 @@ export function UploadModal({ req, open, onClose }: { req: DocumentRequest | nul
     if (onServer) {
       if (!file.blob) { toast("샘플 파일은 서버에 올릴 수 없습니다. 실제 파일을 선택해 주세요.", "error"); setBusy(false); return; }
       const fileId = uid("f");
-      const r = await uploadDocumentFile(req.companyId, req.id, fileId, file.blob);
-      if (!r.ok) { toast(r.reason ?? "파일을 올리지 못했습니다.", "error"); setBusy(false); return; }
+      setFailed(null);
+      setProgress(0);
+      abort.current = new AbortController();
+      const r = await uploadDocumentFile(req.companyId, req.id, fileId, file.blob, {
+        signal: abort.current.signal,
+        onProgress: (loaded, total) => setProgress(total ? loaded / total : 0),
+      });
+      abort.current = null;
+      setProgress(null);
+      if (!r.ok) {
+        setBusy(false);
+        if (r.cancelled) return;
+        // 고른 파일은 그대로 둔다 — 연결이 돌아오면 "다시 올리기" 한 번이면 된다
+        setFailed(r.reason ?? "파일을 올리지 못했습니다.");
+        if (r.authLost) void useStore.getState().checkSession();
+        return;
+      }
       storagePath = r.path;
     }
 
@@ -167,10 +188,14 @@ export function UploadModal({ req, open, onClose }: { req: DocumentRequest | nul
     onClose();
   };
   return (
-    <Modal open={open} onClose={onClose} title={<span className="flex items-center gap-2"><Upload size={18} /> 자료 제출</span>} size="sm" footer={
+    <Modal open={open} onClose={close} title={<span className="flex items-center gap-2"><Upload size={18} /> 자료 제출</span>} size="sm" footer={
       <>
-        <Button variant="ghost" onClick={onClose}>취소</Button>
-        <Button variant="accent" onClick={submit} disabled={busy || shrinking} icon={<Upload size={16} />}>{busy ? "올리는 중…" : "제출하기"}</Button>
+        {progress !== null
+          ? <Button variant="ghost" onClick={() => abort.current?.abort()} data-testid="upload-cancel">올리기 취소</Button>
+          : <Button variant="ghost" onClick={close}>취소</Button>}
+        <Button variant="accent" onClick={submit} disabled={busy || shrinking} icon={<Upload size={16} />}>
+          {busy ? (progress !== null ? `올리는 중 ${Math.round(progress * 100)}%` : "올리는 중…") : failed ? "다시 올리기" : "제출하기"}
+        </Button>
       </>
     }>
       <div className="mb-3">
@@ -202,6 +227,16 @@ export function UploadModal({ req, open, onClose }: { req: DocumentRequest | nul
         )}
         <Input type="file" className="hidden" onChange={(e) => void pick(e.target.files?.[0])} />
       </label>
+      {progress !== null && (
+        <div className="mt-2" data-testid="upload-progress">
+          <div className="h-1.5 overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-label="올리는 중" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)}>
+            <div className="h-full rounded-full bg-accent transition-[width] duration-300" style={{ width: `${Math.max(3, Math.round(progress * 100))}%` }} />
+          </div>
+        </div>
+      )}
+      {failed && (
+        <p role="alert" data-testid="upload-error" className="mt-2 rounded-lg bg-error-bg px-3 py-2 text-[0.85rem] font-semibold text-error">{failed}</p>
+      )}
       {/* 휴대폰: 서류를 바로 사진으로 — 뒤쪽 카메라가 열린다 */}
       <label className="pressable mt-2 flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-line-2 text-[0.9rem] font-semibold text-ink-2 hover:bg-surface-2 md:hidden" data-testid="camera-upload">
         <Camera size={18} /> 사진 찍어 올리기

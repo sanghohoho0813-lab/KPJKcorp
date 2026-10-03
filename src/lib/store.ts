@@ -56,7 +56,8 @@ import { can, ROLE_LABEL, type Permission } from "./permissions";
 import { isUnreadFor } from "./notifications";
 import { toLegacyBaseline } from "./baseline-survey";
 import { serverConfigured, setDemoForced, supa } from "./server/client";
-import { currentServerUser, serverSignIn as authSignIn, serverSignOut } from "./server/auth";
+import { currentServerUser, reauthenticate, serverSignIn as authSignIn, serverSignOut } from "./server/auth";
+import { noteSignOut, type SignOutReason } from "./signout-notice";
 import { loadAll, ORG_SETTING_KEYS, pendingWrites, pushChanges, pushSettings, retryOutbox, setOutboxOwner, unsavedCount, writeSeq, type ServerSettings } from "./server/sync";
 
 export interface StoreState extends SeedData {
@@ -87,6 +88,12 @@ export interface StoreState extends SeedData {
   syncError?: string;
   /** 서버에 아직 저장되지 않은 줄 수 (보관했다가 다시 보낸다) */
   unsaved?: number;
+  /** 쓰던 중에 로그인이 풀렸다 — 화면은 그대로 두고 "다시 로그인" 창을 띄운다 (저장되지 않는 상태) */
+  authLost?: boolean;
+  /** 로그인이 아직 살아 있는지 확인한다. 풀렸으면 authLost, 계정 중지면 로그아웃 */
+  checkSession: () => Promise<"ok" | "offline" | "lost" | "out">;
+  /** 다시 로그인 창: 같은 계정 비밀번호로 이어가기 */
+  reauth: (password: string) => Promise<{ ok: boolean; reason?: string; offline?: boolean }>;
   /** 다른 기기·다른 사람이 만들어 방금 서버에서 도착한 알림 — 화면 구석에 잠깐 띄운다 */
   live?: Notification[];
   dismissLive: (id: string) => void;
@@ -96,7 +103,7 @@ export interface StoreState extends SeedData {
   resumeServerSession: () => Promise<boolean>;
   /** 로그인한 채로 서버의 최신 내용을 다시 읽는다 (다른 기기·다른 사람이 바꾼 것). 세션·미리보기는 그대로 */
   refreshFromServer: () => Promise<boolean>;
-  serverLogout: () => Promise<void>;
+  serverLogout: (reason?: SignOutReason) => Promise<void>;
   /** 현장 비상용: 이 브라우저만 데모 모드로 전환 / 서버로 복귀. 서버 데이터는 건드리지 않는다 */
   enterEmergencyDemo: () => void;
   leaveEmergencyDemo: () => void;
@@ -369,6 +376,7 @@ function applyServer(
     ...data,
     serverMode: true,
     syncError: undefined,
+    authLost: false,
     session: {
       userId: user.id,
       role: keepView?.role ?? user.role,
@@ -2333,12 +2341,13 @@ export const useStore = create<StoreState>()(
 
       resumeServerSession: async () => {
         const wasServer = get().serverMode;
-        const clearLocal = () => {
+        const clearLocal = (reason?: SignOutReason) => {
           // 로그인이 풀렸거나(만료·다른 곳에서 로그아웃·계정 중지) 이 브라우저가 비상 데모로 바뀌었다.
           // 지난번 서버 내용이 이 브라우저에 남아 보이면 안 된다.
           if (!wasServer) return;
+          if (reason) noteSignOut(reason);
           loadingFromServer = true;
-          set({ ...EMPTY_DATA, session: null, serverMode: false, syncError: undefined });
+          set({ ...EMPTY_DATA, session: null, serverMode: false, syncError: undefined, authLost: false });
           loadingFromServer = false;
         };
         if (!serverConfigured()) { clearLocal(); return false; }
@@ -2348,7 +2357,7 @@ export const useStore = create<StoreState>()(
           if (wasServer) set({ syncError: "서버에 연결하지 못했습니다. 마지막으로 불러온 내용을 보여 드립니다 — 지금 바꾼 것은 저장되지 않을 수 있습니다." });
           return false;
         }
-        if (!me.user) { clearLocal(); return false; }
+        if (!me.user) { clearLocal(me.ended); return false; }
         setOutboxOwner(me.user.id);
         if (unsavedCount() > 0 && (await retryOutbox()).left > 0 && wasServer) {
           // 아직 못 보낸 변경이 있다 — 서버 내용으로 덮으면 사라진다. 이 브라우저에 남은 화면을 지킨다.
@@ -2370,6 +2379,8 @@ export const useStore = create<StoreState>()(
       refreshFromServer: async () => {
         const st = get();
         if (!st.serverMode || !st.session || !serverConfigured()) return false;
+        // 로그인이 풀린 동안에는 다시 읽지 않는다(다른 탭에서 다시 로그인했으면 여기서 이어진다)
+        if (st.authLost && (await get().checkSession()) !== "ok") return false;
         // 내가 보낸 변경이 아직 서버로 가는 중이면 건너뛴다 — 옛 내용으로 화면이 잠깐 되돌아가는 것을 막는다
         if (pendingWrites() > 0) return false;
         // 보내지 못한 변경이 있으면 먼저 다시 보낸다. 그래도 남으면 덮어쓰지 않는다(덮으면 입력한 것이 사라진다).
@@ -2383,9 +2394,14 @@ export const useStore = create<StoreState>()(
           set({ syncError: "서버에 연결하지 못했습니다. 인터넷이 돌아오면 자동으로 다시 불러옵니다 — 그 사이 바꾼 내용은 저장되지 않을 수 있습니다." });
           return false;
         }
+        if (me.ended === "expired") {
+          // 로그인 유효시간이 지났다 — 화면(쓰던 내용 포함)은 그대로 두고 비밀번호만 다시 받는다
+          set({ authLost: true });
+          return false;
+        }
         if (!me.user || me.user.id !== st.session.userId) {
-          // 로그인이 풀렸거나 계정이 중지됐다
-          await get().serverLogout();
+          // 계정이 중지됐거나(이유를 알린다) 다른 탭에서 다른 계정으로 로그인했다(그 계정 화면으로 간다) — 화면을 비운다
+          await get().serverLogout(me.ended);
           return false;
         }
         const loaded = await loadAll({ client: me.user.role === "client" });
@@ -2423,13 +2439,47 @@ export const useStore = create<StoreState>()(
 
       dismissLive: (id) => set({ live: (get().live ?? []).filter((n) => n.id !== id) }),
 
-      serverLogout: async () => {
+      checkSession: async () => {
+        const st = get();
+        if (!st.serverMode || !st.session) return "out";
+        const me = await currentServerUser();
+        if (me.offline) return "offline";
+        if (me.user && me.user.id === st.session.userId) {
+          if (get().authLost) set({ authLost: false, syncError: undefined });
+          return "ok";
+        }
+        if (me.ended === "expired") { set({ authLost: true }); return "lost"; }
+        await get().serverLogout(me.ended);
+        return "out";
+      },
+
+      reauth: async (password) => {
+        const st = get();
+        const email = st.users.find((u) => u.id === st.session?.userId)?.email;
+        if (!st.session || !email) {
+          await get().serverLogout("expired");
+          return { ok: false, reason: "계정 정보를 찾지 못했습니다. 로그인 화면에서 다시 로그인해 주세요." };
+        }
+        const r = await reauthenticate(email, password, st.session.userId);
+        if (!r.ok) {
+          if (r.other) await get().serverLogout("expired");
+          return { ok: false, reason: r.reason, offline: r.offline };
+        }
+        set({ authLost: false, syncError: undefined });
+        // 풀린 동안 보관해 둔 변경을 먼저 보내고, 서버 최신 내용을 다시 읽는다
+        await retryOutbox();
+        await get().refreshFromServer();
+        return { ok: true };
+      },
+
+      serverLogout: async (reason) => {
+        if (reason) noteSignOut(reason);
         // 못 보낸 변경은 이 브라우저에 계정별로 남는다 — 같은 계정으로 다시 로그인하면 이어서 보낸다
         setOutboxOwner(null);
         try { await serverSignOut(); } catch { /* 서버에 닿지 못해도 이 브라우저에서는 로그아웃한다 */ }
         loadingFromServer = true;
         // 공용 PC 에서 다음 사람에게 앞사람 데이터가 보이면 안 된다 — 목록을 비운다.
-        set({ ...EMPTY_DATA, session: null, serverMode: false, syncError: undefined });
+        set({ ...EMPTY_DATA, session: null, serverMode: false, syncError: undefined, authLost: false });
         loadingFromServer = false;
       },
 
@@ -2587,7 +2637,8 @@ export const useStore = create<StoreState>()(
       // SSR safety: first client render must equal the server render (skeleton). ThemeBoot calls rehydrate() after mount.
       skipHydration: true,
       partialize: (s) => {
-        const { hydrated: _h, toasts: _t, live: _l, ...rest } = s;
+        const { hydrated: _h, toasts: _t, live: _l, authLost: _a, ...rest } = s;
+        void _a;
         void _h;
         void _t;
         void _l;

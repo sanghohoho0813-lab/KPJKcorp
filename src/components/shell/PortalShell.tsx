@@ -15,6 +15,7 @@ import { FontScaleStepper } from "./FontScale";
 import { Presentation } from "./Presentation";
 import { Toaster } from "@/components/ui/Toaster";
 import { ServerBanner } from "./ServerBanner";
+import { ReLoginDialog } from "./ReLoginDialog";
 import { LivePopups } from "./LivePopups";
 import { PasswordNudge } from "@/components/domain/MyPassword";
 import { Modal } from "@/components/ui/overlay";
@@ -166,6 +167,7 @@ export function PortalShell({ children }: { children: ReactNode }) {
       </header>
       <main className={cx("mx-auto w-full max-w-[1480px] px-4 py-5 md:px-6 md:py-8", isMobile && "pb-24")}>
           <ServerBanner audience="client" />
+          <ReLoginDialog />
           <LivePopups audience="client" />
           <PasswordNudge href="/portal/me#password" />
         {ready && pathname !== "/portal" && <PortalCrumb pathname={pathname} />}
