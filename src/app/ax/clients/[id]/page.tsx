@@ -22,6 +22,7 @@ import { UserModal } from "@/components/domain/UserModals";
 import { Confirm } from "@/components/ui/overlay";
 import { NewConsultationModal } from "@/components/domain/ConsultationModal";
 import { ProfileCard } from "@/components/domain/client/ProfileCard";
+import { FinancialsCard } from "@/components/domain/client/FinancialsCard";
 import { VaultTab } from "@/components/domain/client/VaultTab";
 import { WorkTab } from "@/components/domain/client/WorkTab";
 import { JournalTab } from "@/components/domain/client/JournalTab";
@@ -216,6 +217,7 @@ export default function ClientCardPage() {
         <div className="space-y-5">
           <CompanyAlertsCard company={c} onOpen={(t) => setTab(t === "money" ? (may("finance.view") ? "contract" : "overview") : t)} />
           <ProfileCard company={c} />
+          <FinancialsCard key={c.id} company={c} />
         </div>
       )}
       {tab === "overview" && (

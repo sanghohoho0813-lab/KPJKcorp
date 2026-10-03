@@ -104,6 +104,26 @@ export interface Company {
   shareholders?: string;
   /** 회사마다 필요한 칸을 직접 만든다 — 예: 공장 등록번호 */
   customFields?: CustomField[];
+
+  /* ---- 고객 화면 "우리 회사 한눈에" ---- */
+  /** 연도별 재무 — 담당자가 재무제표를 보고 입력한다(지어내지 않는다). 고객 화면에 그대로 보인다 */
+  financials?: FinancialYear[];
+  /** KPJK 와 계약을 시작한 날 YYYY-MM-DD — 고객 화면 "계약 N일차" */
+  contractStartedAt?: string;
+  /** 고객 계정이 읽는 근거 서류 확인일만 (서버의 고객용 보기가 docs 대신 준다 — 읽기 전용) */
+  docChecks?: Partial<Record<CompanyDocKind, string>>;
+}
+
+/** 한 해의 재무 숫자 (원 단위). 모르는 칸은 비워 둔다 */
+export interface FinancialYear {
+  year: number;
+  revenue?: number;
+  operatingProfit?: number;
+  netIncome?: number;
+  /** 어디서 본 숫자인가 — 예: "재무제표", "부가세 신고서", "대표 확인" */
+  source?: string;
+  /** 마지막으로 입력·수정한 때 */
+  updatedAt?: string;
 }
 
 export type ProfileGroup = "identity" | "people" | "contact" | "credential";

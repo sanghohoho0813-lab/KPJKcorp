@@ -95,6 +95,9 @@ export const companyFromRow = (r: Row): Company => ({
   bizItemsExtra: u(r.biz_items_extra as string | null),
   shareholders: u(r.shareholders as string | null),
   customFields: u(r.custom_fields as Company["customFields"] | null),
+  financials: Array.isArray(r.financials) && (r.financials as unknown[]).length ? (r.financials as Company["financials"]) : undefined,
+  contractStartedAt: u(r.contract_started_at as string | null),
+  docChecks: r.doc_checks && typeof r.doc_checks === "object" && Object.keys(r.doc_checks as object).length ? (r.doc_checks as Company["docChecks"]) : undefined,
 });
 
 export const companyToRow = (x: Partial<Company> & { id?: string }): Row => ({
@@ -136,6 +139,8 @@ export const companyToRow = (x: Partial<Company> & { id?: string }): Row => ({
   ...(x.bizItemsExtra !== undefined && { biz_items_extra: n(x.bizItemsExtra) }),
   ...(x.shareholders !== undefined && { shareholders: n(x.shareholders) }),
   ...(x.customFields !== undefined && { custom_fields: n(x.customFields) }),
+  ...(x.financials !== undefined && { financials: x.financials ?? [] }),
+  ...(x.contractStartedAt !== undefined && { contract_started_at: ymdOrNull(x.contractStartedAt) }),
 });
 
 /* --------------------------------- 프로젝트 ------------------------------- */

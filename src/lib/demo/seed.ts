@@ -52,7 +52,15 @@ export function buildSeed(now = new Date()): SeedData {
   ];
 
   const companies: Company[] = [
-    { sample: true, id: "co_a", code: "A", name: "에이정밀(주)", ceo: "김민석", industry: "정밀부품 제조", bizNo: "000-81-00001", contactName: "김민석", contactTitle: "대표이사", contactPhone: "010-1000-0001", contactEmail: "ceo@a-precision.demo", address: "경기 화성시", employees: 118, revenue: "420억", firstConsultDate: d(-46), consultantId: "u_park", memo: "2세 승계 준비 중. 원가구조 개선과 조직 재정비가 핵심 관심사." },
+    { sample: true, id: "co_a", code: "A", name: "에이정밀(주)", ceo: "김민석", industry: "정밀부품 제조", bizNo: "000-81-00001", contactName: "김민석", contactTitle: "대표이사", contactPhone: "010-1000-0001", contactEmail: "ceo@a-precision.demo", address: "경기 화성시", employees: 118, revenue: "420억", firstConsultDate: d(-46), consultantId: "u_park", memo: "2세 승계 준비 중. 원가구조 개선과 조직 재정비가 핵심 관심사.",
+      // 고객 화면 "우리 회사 한눈에" 예시 — 샘플 회사의 예시 수치(화면에 "샘플 회사 · 예시 수치"로 표시)
+      entityType: "corporation", establishedAt: "2009-04-01", bizCategory: "제조업", bizItem: "정밀기계부품", region: "경기",
+      contractStartedAt: d(-40).slice(0, 10),
+      financials: [
+        { year: now.getFullYear() - 3, revenue: 36_100_000_000, operatingProfit: 1_820_000_000, source: "재무제표(예시)" },
+        { year: now.getFullYear() - 2, revenue: 38_900_000_000, operatingProfit: 2_050_000_000, source: "재무제표(예시)" },
+        { year: now.getFullYear() - 1, revenue: 42_000_000_000, operatingProfit: 2_310_000_000, source: "재무제표(예시)" },
+      ] },
     { sample: true, id: "co_b", code: "B", name: "비앤테크(주)", ceo: "최민호", industry: "IT 솔루션", bizNo: "000-81-00002", contactName: "최수진", contactTitle: "경영지원팀장", contactPhone: "010-1000-0002", contactEmail: "choi@bntech.demo", address: "서울 구로구", employees: 42, revenue: "68억", firstConsultDate: d(-21), consultantId: "u_lee", memo: "연구소 설립 후 R&D 세액공제 활용 희망. 담당자가 실무 총괄." },
     { sample: true, id: "co_c", code: "C", name: "씨엠푸드(주)", ceo: "한도윤", industry: "식품 제조", bizNo: "000-81-00003", contactName: "한도윤", contactTitle: "대표이사", contactPhone: "010-1000-0003", contactEmail: "han@cmfood.demo", address: "충북 청주시", employees: 65, revenue: "150억", firstConsultDate: d(-62), consultantId: "u_park", memo: "신공장 증설 자금 준비. 대표가 직접 의사결정, 빠른 회신 선호." },
     { sample: true, id: "co_d", code: "D", name: "디원건설(주)", ceo: "오세훈", industry: "종합건설", bizNo: "000-81-00004", contactName: "오세훈", contactTitle: "관리이사", contactPhone: "010-1000-0004", contactEmail: "oh@d1const.demo", address: "대전 유성구", employees: 88, revenue: "260억", firstConsultDate: d(-70), consultantId: "u_jung", memo: "현장 중심 조직. 내부 의사결정이 느린 편이라 후속연락 주기 관리 필요." },

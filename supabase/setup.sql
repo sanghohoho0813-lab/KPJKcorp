@@ -266,6 +266,9 @@ alter table public.companies add column if not exists ceo_gender      text check
 alter table public.companies add column if not exists biz_items_extra text;
 alter table public.companies add column if not exists shareholders    text;
 alter table public.companies add column if not exists custom_fields   jsonb;   -- 기업마다 직접 만든 칸
+-- 고객 화면 "우리 회사 한눈에" (2026-10-03): 연도별 재무(담당자가 재무제표를 보고 입력) · 계약 시작일
+alter table public.companies add column if not exists financials          jsonb not null default '[]'::jsonb;
+alter table public.companies add column if not exists contract_started_at date;
 
 alter table public.projects add column if not exists work_status  text
   check (work_status in ('not_started','in_progress','waiting_client','done','on_hold','not_applicable'));
@@ -1516,9 +1519,13 @@ drop view if exists public.client_companies;
 create view public.client_companies with (security_barrier = true) as
   select id, code, name, ceo, industry, biz_no, contact_name, contact_title, contact_phone, contact_email,
          address, employees, revenue, first_consult_date, consultant_id, archived, archived_at,
-         entity_type, corp_no, established_at, biz_category, biz_item, ceo_birth, capital, region,
+         -- 대표자 생년월일(ceo_birth)은 내지 않는다 — 같은 회사의 다른 고객 계정(직원)에게도 보이는 개인정보 (2026-10-03)
+         entity_type, corp_no, established_at, biz_category, biz_item, capital, region,
          employee_band, revenue_band, company_phone, website, interests, sample, created_at, updated_at,
-         ceo_gender, biz_items_extra
+         ceo_gender, biz_items_extra,
+         -- 우리 회사 한눈에: 재무(연도별) · 계약 시작일 · 근거 서류 확인일만(서류 정보 docs 자체는 내부 전용)
+         financials, contract_started_at,
+         jsonb_strip_nulls(jsonb_build_object('bizReg', docs->'bizReg'->>'readAt', 'corpReg', docs->'corpReg'->>'readAt')) as doc_checks
     from public.companies
    where public.kpjk_is_client() and id = public.kpjk_my_company();
 

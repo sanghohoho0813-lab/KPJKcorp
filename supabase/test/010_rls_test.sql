@@ -139,7 +139,8 @@ set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000f001';
 
 select chk('고객A: 기업 표는 직접 못 읽는다(내부 칸 보호)', (select count(*) from public.companies), 0::bigint);
 select chk('고객A: 고객용 보기로 자기 회사만',   (select count(*) from public.client_companies), 1::bigint);
-select chk('고객A: 고객용 보기에 메모 칸 없음',  (select count(*) from information_schema.columns where table_name='client_companies' and column_name in ('memo','lead_source','shareholders','custom_fields','docs')), 0::bigint);
+select chk('고객A: 고객용 보기에 메모 칸 없음',  (select count(*) from information_schema.columns where table_name='client_companies' and column_name in ('memo','lead_source','shareholders','custom_fields','docs','ceo_birth')), 0::bigint);
+select chk('고객A: 서류는 확인일만(doc_checks)',  (select count(*) from information_schema.columns where table_name='client_companies' and column_name in ('doc_checks','financials','contract_started_at')), 3::bigint);
 select chk('고객A: 프로젝트 보기에 진행 메모 없음', (select count(*) from information_schema.columns where table_name='client_projects' and column_name in ('work_status','next_step','waiting_since')), 0::bigint);
 select chk('고객A: 보이는 회사가 A다',          (select name from public.client_companies), '에이테스트(주)');
 select chk('고객A: 프로젝트 표 직접 못 읽는다',    (select count(*) from public.projects), 0::bigint);

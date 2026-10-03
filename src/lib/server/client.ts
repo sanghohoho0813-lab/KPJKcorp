@@ -79,6 +79,8 @@ export function explain(e: { code?: string; message?: string; details?: string }
   if (code === "23505") return "이미 같은 값이 등록되어 있습니다.";
   if (code === "23503") return "연결된 항목이 아직 서버에 없습니다. 잠시 후 다시 시도해 주세요.";
   if (code === "PGRST116") return "대상을 찾을 수 없습니다. 다른 사람이 먼저 바꿨을 수 있습니다.";
+  // 새 기능의 칸이 서버에 아직 없다 — 업데이트된 supabase/setup.sql 을 아직 다시 실행하지 않은 경우
+  if (code === "PGRST204" || /Could not find the '.+' column/i.test(e.message ?? "")) return "서버에 새 기능의 칸이 아직 없습니다. 대표 계정으로 Supabase 에서 최신 setup.sql 을 한 번 다시 실행해 주세요.";
   if (e.message?.includes("Failed to fetch")) return "서버에 연결하지 못했습니다. 인터넷 연결을 확인해 주세요.";
   return e.message ?? "서버 오류";
 }

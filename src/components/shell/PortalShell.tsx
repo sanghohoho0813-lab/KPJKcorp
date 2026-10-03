@@ -4,7 +4,7 @@ import { HUB_TONE } from "@/components/domain/portal/PortalHome";
 import { type ReactNode, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, Briefcase, CalendarDays, Eye, FileCheck2, FolderUp, HelpCircle, Home, LayoutDashboard, LogOut, MessageSquare, Sparkles, UserRound, ChevronRight, Megaphone } from "lucide-react";
+import { Bell, Briefcase, CalendarDays, Eye, FileCheck2, FolderUp, HelpCircle, Home, LayoutDashboard, LogOut, MessageSquare, Sparkles, UserRound, ChevronRight, Megaphone, Building2 } from "lucide-react";
 import { useStore, useCurrentUser, usePortalCompanyId } from "@/lib/store";
 import { useUi } from "@/lib/ui-store";
 import { useIsMobile, useIsPreviewFrame } from "@/lib/hooks";
@@ -31,6 +31,7 @@ const NAV = [
   { href: "/portal/services", label: "함께 검토", icon: <Sparkles size={20} /> },
   { href: "/portal/programs", label: "지원사업", icon: <Megaphone size={20} /> },
   { href: "/portal/inquiries", label: "문의하기", icon: <MessageSquare size={20} /> },
+  { href: "/portal/company", label: "우리 회사", icon: <Building2 size={20} /> },
   { href: "/portal/notifications", label: "알림", icon: <Bell size={20} /> },
   { href: "/portal/me", label: "내 정보", icon: <UserRound size={20} /> },
 ];

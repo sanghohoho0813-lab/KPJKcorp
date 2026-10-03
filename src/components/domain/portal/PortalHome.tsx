@@ -114,6 +114,7 @@ export const HUB_TONE: Record<string, string> = {
   "/portal/schedule": "bg-[#eef1f5] text-[#4a5568]",
   "/portal/notifications": "bg-[#eef1f5] text-[#4a5568]",
   "/portal/me": "bg-[#eef1f5] text-[#4a5568]",
+  "/portal/company": "bg-[#fff4e5] text-[#a8541e]",
 };
 
 export function PortalHub({ company: c, board }: { company: Company; board: Board }) {

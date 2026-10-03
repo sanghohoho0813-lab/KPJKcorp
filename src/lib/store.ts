@@ -422,7 +422,7 @@ function applyPatch<T extends object>(before: T, patch: Partial<T>, clearable: r
   }
   return { patch: out, changed };
 }
-const COMPANY_CLEARABLE = ["corpNo", "establishedAt", "bizCategory", "bizItem", "ceoBirth", "capital", "region", "employeeBand", "revenueBand", "companyPhone", "website", "leadSource", "ceoGender", "bizItemsExtra", "shareholders", "entityType", "customFields", "docs"];
+const COMPANY_CLEARABLE = ["corpNo", "establishedAt", "bizCategory", "bizItem", "ceoBirth", "capital", "region", "employeeBand", "revenueBand", "companyPhone", "website", "leadSource", "ceoGender", "bizItemsExtra", "shareholders", "entityType", "customFields", "docs", "financials", "contractStartedAt"];
 
 /**
  * 알림 읽음 — 내부 알림은 "읽은 사람"에 나만 더하고, 고객 알림은 그 회사 기준 읽음으로 바꾼다.
@@ -808,7 +808,7 @@ export const useStore = create<StoreState>()(
         if (deny(st, "company.update", `기업고객 수정 (${before.name})`, set)) return;
         const { patch: pc, changed } = applyPatch(before, patch, COMPANY_CLEARABLE);
         if (changed.length === 0) return;
-        const LABEL: Record<string, string> = { name: "기업명", ceo: "대표자", industry: "업종", bizNo: "사업자번호", contactName: "담당자", contactTitle: "직책", contactPhone: "연락처", contactEmail: "이메일", address: "주소", employees: "임직원", revenue: "매출", consultantId: "담당 컨설턴트", memo: "메모", firstConsultDate: "최초 상담일", entityType: "사업자 형태", corpNo: "법인등록번호", establishedAt: "설립일", bizCategory: "업태", bizItem: "종목", ceoBirth: "대표자 생년월일", capital: "자본금", region: "지역", employeeBand: "임직원 규모", revenueBand: "매출 규모", companyPhone: "대표번호", website: "홈페이지", interests: "관심 분야", leadSource: "유입 경로", docs: "서류 확인", ceoGender: "대표자 성별", bizItemsExtra: "종목(그 외)", shareholders: "주주·임원 구성", customFields: "직접 만든 칸" };
+        const LABEL: Record<string, string> = { name: "기업명", ceo: "대표자", industry: "업종", bizNo: "사업자번호", contactName: "담당자", contactTitle: "직책", contactPhone: "연락처", contactEmail: "이메일", address: "주소", employees: "임직원", revenue: "매출", consultantId: "담당 컨설턴트", memo: "메모", firstConsultDate: "최초 상담일", entityType: "사업자 형태", corpNo: "법인등록번호", establishedAt: "설립일", bizCategory: "업태", bizItem: "종목", ceoBirth: "대표자 생년월일", capital: "자본금", region: "지역", employeeBand: "임직원 규모", revenueBand: "매출 규모", companyPhone: "대표번호", website: "홈페이지", interests: "관심 분야", leadSource: "유입 경로", docs: "서류 확인", ceoGender: "대표자 성별", bizItemsExtra: "종목(그 외)", shareholders: "주주·임원 구성", customFields: "직접 만든 칸", financials: "연도별 재무", contractStartedAt: "계약 시작일" };
         set({
           companies: st.companies.map((c) => (c.id === id ? { ...c, ...pc } : c)),
           activities: [makeActivity({ type: "company_updated", companyId: id, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `기업정보 수정: ${before.name} — ${changed.map((k) => LABEL[k] ?? k).join(", ")}`, meta: { fields: changed.join(",") } }), ...st.activities],
