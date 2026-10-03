@@ -7,6 +7,7 @@ import { useStore } from "@/lib/store";
 import { useUi } from "@/lib/ui-store";
 import { fmtDate, fmtDateTime, fmtSize, relativeDay, uid } from "@/lib/format";
 import { MAX_UPLOAD_BYTES, uploadDocument as uploadDocumentFile, DOC_BUCKET, saveToDisk } from "@/lib/server/storage";
+import { shrinkPhoto } from "@/lib/image-shrink";
 import { Modal } from "@/components/ui/overlay";
 import { Button, Field, Textarea, Input, Stat, Badge } from "@/components/ui/ui";
 import { DocStatusBadge } from "./domain";
@@ -108,14 +109,19 @@ export function UploadModal({ req, open, onClose }: { req: DocumentRequest | nul
   const upload = useStore((s) => s.uploadDocument);
   const toast = useStore((s) => s.toast);
   const onServer = useStore((s) => s.serverMode);
-  const [file, setFile] = useState<{ name: string; size: number; blob?: File } | null>(null);
+  const [file, setFile] = useState<{ name: string; size: number; blob?: File; from?: number } | null>(null);
+  const [shrinking, setShrinking] = useState(false);
   const [drag, setDrag] = useState(false);
   const [busy, setBusy] = useState(false);
   if (!req) return null;
-  const pick = (f: File | undefined) => {
+  // 큰 휴대폰 사진은 서류가 읽히는 크기로 줄여서 올린다 (문서 파일·작은 사진은 그대로)
+  const pick = async (f: File | undefined) => {
     if (!f) return;
-    if (f.size > MAX_UPLOAD_BYTES) { toast("50MB 를 넘는 파일은 올릴 수 없습니다.", "error"); return; }
-    setFile({ name: f.name, size: f.size, blob: f });
+    setShrinking(true);
+    const { file: out, from } = await shrinkPhoto(f);
+    setShrinking(false);
+    if (out.size > MAX_UPLOAD_BYTES) { toast("50MB 를 넘는 파일은 올릴 수 없습니다.", "error"); return; }
+    setFile({ name: out.name, size: out.size, blob: out, from });
   };
   // 카메라 사진은 이름이 "image.jpg" 라 담당자가 알아보기 어렵다 — 서류 이름으로 바꿔 둔다
   const pickPhoto = (f: File | undefined) => {
@@ -123,11 +129,11 @@ export function UploadModal({ req, open, onClose }: { req: DocumentRequest | nul
     const ext = (f.name.match(/\.[a-z0-9]+$/i)?.[0] ?? ".jpg").toLowerCase();
     const d = new Date();
     const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}_${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}`;
-    pick(new File([f], `${req.name.replace(/[\\/:*?"<>|\s]+/g, "_")}_사진_${stamp}${ext}`, { type: f.type || "image/jpeg" }));
+    void pick(new File([f], `${req.name.replace(/[\\/:*?"<>|\s]+/g, "_")}_사진_${stamp}${ext}`, { type: f.type || "image/jpeg" }));
   };
   const useSample = () => setFile({ name: `${req.name.replace(/\s+/g, "_")}.xlsx`, size: 240_000 + Math.floor(Math.random() * 400_000) });
   const submit = async () => {
-    if (busy) return;
+    if (busy || shrinking) return;
     if (!file) {
       toast("제출할 파일을 선택해 주세요.", "error");
       return;
@@ -164,7 +170,7 @@ export function UploadModal({ req, open, onClose }: { req: DocumentRequest | nul
     <Modal open={open} onClose={onClose} title={<span className="flex items-center gap-2"><Upload size={18} /> 자료 제출</span>} size="sm" footer={
       <>
         <Button variant="ghost" onClick={onClose}>취소</Button>
-        <Button variant="accent" onClick={submit} disabled={busy} icon={<Upload size={16} />}>{busy ? "올리는 중…" : "제출하기"}</Button>
+        <Button variant="accent" onClick={submit} disabled={busy || shrinking} icon={<Upload size={16} />}>{busy ? "올리는 중…" : "제출하기"}</Button>
       </>
     }>
       <div className="mb-3">
@@ -178,19 +184,23 @@ export function UploadModal({ req, open, onClose }: { req: DocumentRequest | nul
       <label
         onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
         onDragLeave={() => setDrag(false)}
-        onDrop={(e) => { e.preventDefault(); setDrag(false); pick(e.dataTransfer.files?.[0]); }}
+        onDrop={(e) => { e.preventDefault(); setDrag(false); void pick(e.dataTransfer.files?.[0]); }}
         className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-8 text-center transition-colors ${drag ? "border-accent bg-soft/50" : "border-line-2 hover:bg-surface-2"}`}
       >
         <Upload size={26} className="text-ink-3" />
-        {file ? (
+        {shrinking ? (
+          <div className="text-[0.88rem] font-semibold text-ink-2" data-testid="shrinking">사진을 줄이는 중…</div>
+        ) : file ? (
           <div>
-            <div className="font-semibold">{file.name}</div>
-            <div className="text-[0.8rem] text-ink-3">{fmtSize(file.size)}</div>
+            <div className="font-semibold break-all">{file.name}</div>
+            <div className="text-[0.8rem] text-ink-3" data-testid="upload-size">
+              {file.from ? <>사진을 줄여서 올립니다 · {fmtSize(file.from)} → <b className="text-ink-2">{fmtSize(file.size)}</b> (글자는 그대로 읽힙니다)</> : fmtSize(file.size)}
+            </div>
           </div>
         ) : (
           <div className="text-[0.88rem] text-ink-2">파일을 끌어다 놓거나 <span className="font-semibold text-accent">클릭하여 선택</span></div>
         )}
-        <Input type="file" className="hidden" onChange={(e) => pick(e.target.files?.[0])} />
+        <Input type="file" className="hidden" onChange={(e) => void pick(e.target.files?.[0])} />
       </label>
       {/* 휴대폰: 서류를 바로 사진으로 — 뒤쪽 카메라가 열린다 */}
       <label className="pressable mt-2 flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-line-2 text-[0.9rem] font-semibold text-ink-2 hover:bg-surface-2 md:hidden" data-testid="camera-upload">

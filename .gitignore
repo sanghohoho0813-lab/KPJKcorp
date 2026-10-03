@@ -49,3 +49,7 @@ next-env.d.ts
 # 영상 렌더 결과물 (용량이 커서 저장소에 넣지 않는다)
 /tools/video/out/
 /tools/acceptance/out/
+/tools/pilot/out/
+# 사진 업로드 시험용 큰 사진(약 9MB) — tools/pilot/make-doc-photo.mjs 로 만든다
+/tools/pilot/files/doc-photo*.jpg
+/tools/pilot/files/doc-photo.png

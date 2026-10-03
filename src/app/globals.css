@@ -12,7 +12,7 @@
   --theme-secondary: #6b7680;
   --theme-accent: #d47a4a;
   /* 흰 배경 위 글자 / 글자가 올라가는 채움면에 쓰는 값. accent 원색은 대비가 2.2~3.4:1 밖에 안 나온다. */
-  --theme-accent-strong: #b75b2a;
+  --theme-accent-strong: #a45226;
   --theme-highlight: #e8b89a;
   --theme-soft: #f4ebe4;
   --theme-accent-ink: #ffffff;
@@ -25,7 +25,7 @@
   --neutral-text-2: #5c6570;
   /* #8a939d는 흰 배경에서 3.1:1 밖에 안 나온다. 주석·단위·각주가 전부 이 색이라
      "왜 이 숫자가 이렇게 나왔는지" 설명하는 문장이 가장 안 읽히는 문장이 되어 있었다. */
-  --neutral-text-3: #697280;
+  --neutral-text-3: #616976; /* 연한 바탕(상태색·테마 바탕) 위에서도 4.6:1 이상 — 2026-10-03 접근성 점검 */
   --neutral-border: #e7eaee;
   --neutral-border-2: #d5dae0;
   --neutral-shadow: 0 1px 2px rgba(23, 27, 32, 0.04), 0 4px 16px rgba(23, 27, 32, 0.05);
@@ -93,14 +93,14 @@
    Page background, Card, Surface and Table always use the fixed Neutral tokens above.
    `--theme-soft` is a large-area fill (chat bubble, memo box, selected row) so it is kept
    near-neutral: 12% accent on white. Raising its chroma is what makes a theme look hazy. */
-html[data-theme="kpjk"] { --theme-shell:#171b20; --theme-shell-2:#22272e; --theme-primary:#343b44; --theme-secondary:#6b7680; --theme-accent:#d47a4a; --theme-accent-strong:#b75b2a; --theme-highlight:#e8b89a; --theme-soft:#faefe9; }
-html[data-theme="navy"] { --theme-shell:#0b1830; --theme-shell-2:#132447; --theme-primary:#2457d6; --theme-secondary:#1687a7; --theme-accent:#17a889; --theme-accent-strong:#11836b; --theme-highlight:#e7c873; --theme-soft:#e3f5f1; }
-html[data-theme="navygold"] { --theme-shell:#111a2d; --theme-shell-2:#1a2640; --theme-primary:#2847a7; --theme-secondary:#a37a28; --theme-accent:#d0a84b; --theme-accent-strong:#917024; --theme-highlight:#f0d995; --theme-soft:#f9f5e9; }
-html[data-theme="emerald"] { --theme-shell:#11332b; --theme-shell-2:#19453b; --theme-primary:#0e7663; --theme-secondary:#2c9277; --theme-accent:#b4862a; --theme-accent-strong:#946e21; --theme-highlight:#e8ce88; --theme-soft:#f6f0e5; }
-html[data-theme="forest"] { --theme-shell:#17352c; --theme-shell-2:#20473c; --theme-primary:#356e58; --theme-secondary:#73977e; --theme-accent:#a58e4d; --theme-accent-strong:#86733e; --theme-highlight:#d9d2aa; --theme-soft:#f4f1ea; }
-html[data-theme="teal"] { --theme-shell:#08323a; --theme-shell-2:#0e434d; --theme-primary:#087a83; --theme-secondary:#1597a3; --theme-accent:#d2704c; --theme-accent-strong:#bd542e; --theme-highlight:#e9b59b; --theme-soft:#faeeea; }
-html[data-theme="onyx"] { --theme-shell:#15171c; --theme-shell-2:#1f222a; --theme-primary:#343942; --theme-secondary:#6a717c; --theme-accent:#b89032; --theme-accent-strong:#8f6f26; --theme-highlight:#e0c76f; --theme-soft:#f6f2e6; }
-html[data-theme="steel"] { --theme-shell:#24303b; --theme-shell-2:#2f3e4c; --theme-primary:#44647a; --theme-secondary:#6d8899; --theme-accent:#4c9aaa; --theme-accent-strong:#3d7e8b; --theme-highlight:#c9d6de; --theme-soft:#eaf3f5; }
+html[data-theme="kpjk"] { --theme-shell:#171b20; --theme-shell-2:#22272e; --theme-primary:#343b44; --theme-secondary:#6b7680; --theme-accent:#d47a4a; --theme-accent-strong:#a45226; --theme-highlight:#e8b89a; --theme-soft:#faefe9; }
+html[data-theme="navy"] { --theme-shell:#0b1830; --theme-shell-2:#132447; --theme-primary:#2457d6; --theme-secondary:#1687a7; --theme-accent:#17a889; --theme-accent-strong:#0f7560; --theme-highlight:#e7c873; --theme-soft:#e3f5f1; }
+html[data-theme="navygold"] { --theme-shell:#111a2d; --theme-shell-2:#1a2640; --theme-primary:#2847a7; --theme-secondary:#a37a28; --theme-accent:#d0a84b; --theme-accent-strong:#816320; --theme-highlight:#f0d995; --theme-soft:#f9f5e9; }
+html[data-theme="emerald"] { --theme-shell:#11332b; --theme-shell-2:#19453b; --theme-primary:#0e7663; --theme-secondary:#2c9277; --theme-accent:#b4862a; --theme-accent-strong:#85631e; --theme-highlight:#e8ce88; --theme-soft:#f6f0e5; }
+html[data-theme="forest"] { --theme-shell:#17352c; --theme-shell-2:#20473c; --theme-primary:#356e58; --theme-secondary:#73977e; --theme-accent:#a58e4d; --theme-accent-strong:#786738; --theme-highlight:#d9d2aa; --theme-soft:#f4f1ea; }
+html[data-theme="teal"] { --theme-shell:#08323a; --theme-shell-2:#0e434d; --theme-primary:#087a83; --theme-secondary:#1597a3; --theme-accent:#d2704c; --theme-accent-strong:#ab4c2a; --theme-highlight:#e9b59b; --theme-soft:#faeeea; }
+html[data-theme="onyx"] { --theme-shell:#15171c; --theme-shell-2:#1f222a; --theme-primary:#343942; --theme-secondary:#6a717c; --theme-accent:#b89032; --theme-accent-strong:#816422; --theme-highlight:#e0c76f; --theme-soft:#f6f2e6; }
+html[data-theme="steel"] { --theme-shell:#24303b; --theme-shell-2:#2f3e4c; --theme-primary:#44647a; --theme-secondary:#6d8899; --theme-accent:#4c9aaa; --theme-accent-strong:#37717d; --theme-highlight:#c9d6de; --theme-soft:#eaf3f5; }
 
 /* Font scale — 지금까지의 크기(19px)가 가장 작은 단계다. 위로만 커진다.
    rem 기반이라 여백·아이콘·버튼 높이까지 같이 커진다. */

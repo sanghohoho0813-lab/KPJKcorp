@@ -24,6 +24,9 @@ type Row = Record<string, unknown>;
 const u = <T>(v: T | null | undefined): T | undefined => (v === null ? undefined : v);
 /** undefined → null (DB 에 "지움"으로 전달) */
 const n = <T>(v: T | undefined): T | null => (v === undefined ? null : v);
+/** 다른 표를 가리키는 번호(기업·프로젝트) — 빈 글자도 "없음"으로. 빈 글자를 그대로 보내면 없는 번호를 가리켜 저장 전체가 거절된다
+ *  (프로젝트 없이 기업에 바로 건 자료 요청에 고객이 제출하면, 활동 기록이 project_id = '' 로 가서 실패하던 문제) */
+const ref = (v: string | undefined | null): string | null => (v ? v : null);
 /** 날짜 칸 마지막 안전장치 — 빈 값·달력에 없는 날짜(2월 30일 등)는 비운다. 한 줄 때문에 묶음 전체가 거절되면 안 된다 */
 const ymdOrNull = (v: string | undefined): string | null => (v && isRealYmd(v.slice(0, 10)) ? v.slice(0, 10) : null);
 const s = (v: unknown): string => (typeof v === "string" ? v : "");
@@ -59,7 +62,7 @@ export const userToRow = (x: Partial<User>): Row => ({
   ...(x.title !== undefined && { title: x.title }),
   ...(x.email !== undefined && { email: x.email.toLowerCase() }),
   ...(x.phone !== undefined && { phone: n(x.phone) }),
-  ...(x.companyId !== undefined && { company_id: n(x.companyId) }),
+  ...(x.companyId !== undefined && { company_id: ref(x.companyId) }),
   ...(x.active !== undefined && { active: x.active }),
 });
 
@@ -183,7 +186,7 @@ export const consultationFromRow = (r: Row): Consultation => ({
 export const consultationToRow = (x: Partial<Consultation> & { id?: string }): Row => ({
   ...(x.id !== undefined && { id: x.id }),
   ...(x.companyId !== undefined && { company_id: x.companyId }),
-  ...(x.projectId !== undefined && { project_id: n(x.projectId) }),
+  ...(x.projectId !== undefined && { project_id: ref(x.projectId) }),
   ...(x.date !== undefined && { date: x.date }),
   ...(x.consultantId !== undefined && { consultant_id: personId(x.consultantId) }),
   ...(x.type !== undefined && { type: x.type }),
@@ -206,7 +209,7 @@ export const contractFromRow = (r: Row): Contract => ({
 export const contractToRow = (x: Partial<Contract> & { id?: string }): Row => ({
   ...(x.id !== undefined && { id: x.id }),
   ...(x.companyId !== undefined && { company_id: x.companyId }),
-  ...(x.projectId !== undefined && { project_id: x.projectId || null }),
+  ...(x.projectId !== undefined && { project_id: ref(x.projectId) }),
   ...(x.title !== undefined && { title: x.title }),
   ...(x.status !== undefined && { status: x.status }),
   ...(x.sentAt !== undefined && { sent_at: n(x.sentAt) }),
@@ -241,7 +244,7 @@ export const docRequestFromRow = (r: Row, files: DocumentFile[] = []): DocumentR
 export const docRequestToRow = (x: Partial<DocumentRequest> & { id?: string }): Row => ({
   ...(x.id !== undefined && { id: x.id }),
   ...(x.companyId !== undefined && { company_id: x.companyId }),
-  ...(x.projectId !== undefined && { project_id: x.projectId || null }),
+  ...(x.projectId !== undefined && { project_id: ref(x.projectId) }),
   ...(x.name !== undefined && { name: x.name }),
   ...(x.description !== undefined && { description: x.description }),
   ...(x.requestedAt !== undefined && { requested_at: x.requestedAt }),
@@ -268,7 +271,7 @@ export const noticeFromRow = (r: Row): Notice => ({
 
 export const noticeToRow = (x: Partial<Notice> & { id?: string }): Row => ({
   ...(x.id !== undefined && { id: x.id }),
-  ...(x.companyId !== undefined && { company_id: n(x.companyId) }),
+  ...(x.companyId !== undefined && { company_id: ref(x.companyId) }),
   ...(x.title !== undefined && { title: x.title }),
   ...(x.body !== undefined && { body: x.body }),
   ...(x.pinned !== undefined && { pinned: x.pinned }),
@@ -289,8 +292,8 @@ export const scheduleFromRow = (r: Row): Schedule => ({
 
 export const scheduleToRow = (x: Partial<Schedule> & { id?: string }): Row => ({
   ...(x.id !== undefined && { id: x.id }),
-  ...(x.companyId !== undefined && { company_id: n(x.companyId) }),
-  ...(x.projectId !== undefined && { project_id: n(x.projectId) }),
+  ...(x.companyId !== undefined && { company_id: ref(x.companyId) }),
+  ...(x.projectId !== undefined && { project_id: ref(x.projectId) }),
   ...(x.title !== undefined && { title: x.title }),
   ...(x.type !== undefined && { type: x.type }),
   ...(x.start !== undefined && { start_at: x.start }),
@@ -314,8 +317,8 @@ export const taskFromRow = (r: Row): Task => ({
 
 export const taskToRow = (x: Partial<Task> & { id?: string }): Row => ({
   ...(x.id !== undefined && { id: x.id }),
-  ...(x.companyId !== undefined && { company_id: n(x.companyId) }),
-  ...(x.projectId !== undefined && { project_id: n(x.projectId) }),
+  ...(x.companyId !== undefined && { company_id: ref(x.companyId) }),
+  ...(x.projectId !== undefined && { project_id: ref(x.projectId) }),
   ...(x.title !== undefined && { title: x.title }),
   ...(x.type !== undefined && { type: x.type }),
   ...(x.dueDate !== undefined && { due_date: x.dueDate }),
@@ -347,7 +350,7 @@ export const inquiryFromRow = (r: Row, messages: Message[] = []): Inquiry => ({
 export const inquiryToRow = (x: Partial<Inquiry> & { id?: string }): Row => ({
   ...(x.id !== undefined && { id: x.id }),
   ...(x.companyId !== undefined && { company_id: x.companyId }),
-  ...(x.projectId !== undefined && { project_id: n(x.projectId) }),
+  ...(x.projectId !== undefined && { project_id: ref(x.projectId) }),
   ...(x.title !== undefined && { title: x.title }),
   ...(x.category !== undefined && { category: x.category }),
   ...(x.createdAt !== undefined && { created_at: x.createdAt }),
@@ -369,7 +372,7 @@ export const resultFromRow = (r: Row): ResultFile => ({
 export const resultToRow = (x: Partial<ResultFile> & { id?: string }): Row => ({
   ...(x.id !== undefined && { id: x.id }),
   ...(x.companyId !== undefined && { company_id: x.companyId }),
-  ...(x.projectId !== undefined && { project_id: x.projectId || null }),
+  ...(x.projectId !== undefined && { project_id: ref(x.projectId) }),
   ...(x.name !== undefined && { name: x.name }),
   ...(x.kind !== undefined && { kind: x.kind }),
   ...(x.sharedAt !== undefined && { shared_at: x.sharedAt }),
@@ -421,7 +424,7 @@ export const quoteFromRow = (r: Row): Quote => ({
 export const quoteToRow = (x: Partial<Quote> & { id?: string }): Row => ({
   ...(x.id !== undefined && { id: x.id }),
   ...(x.companyId !== undefined && { company_id: x.companyId }),
-  ...(x.projectId !== undefined && { project_id: n(x.projectId) }),
+  ...(x.projectId !== undefined && { project_id: ref(x.projectId) }),
   ...(x.opportunityId !== undefined && { opportunity_id: n(x.opportunityId) }),
   ...(x.title !== undefined && { title: x.title }),
   ...(x.scope !== undefined && { scope: x.scope }),
@@ -457,8 +460,8 @@ export const approvalToRow = (x: Partial<Approval> & { id?: string }): Row => ({
   ...(x.kind !== undefined && { kind: x.kind }),
   ...(x.title !== undefined && { title: x.title }),
   ...(x.summary !== undefined && { summary: x.summary }),
-  ...(x.companyId !== undefined && { company_id: n(x.companyId) }),
-  ...(x.projectId !== undefined && { project_id: n(x.projectId) }),
+  ...(x.companyId !== undefined && { company_id: ref(x.companyId) }),
+  ...(x.projectId !== undefined && { project_id: ref(x.projectId) }),
   ...(x.opportunityId !== undefined && { opportunity_id: n(x.opportunityId) }),
   ...(x.quoteId !== undefined && { quote_id: n(x.quoteId) }),
   ...(x.baseAmount !== undefined && { base_amount: n(x.baseAmount) }),
@@ -484,7 +487,7 @@ export const activityFromRow = (r: Row): Activity => ({
 });
 
 export const activityToRow = (x: Activity): Row => ({
-  id: x.id, type: x.type, company_id: n(x.companyId), project_id: n(x.projectId),
+  id: x.id, type: x.type, company_id: ref(x.companyId), project_id: ref(x.projectId),
   // 계정이 아닌 작성자(자동 처리)는 서버 규칙상 "system" 으로만 남는다
   actor_id: personId(x.actorId), actor_role: personId(x.actorId) ? x.actorRole : "system", at: x.at, message: x.text,
   meta: n(x.meta),
@@ -500,7 +503,7 @@ export const notificationFromRow = (r: Row): Notification => ({
 export const notificationToRow = (x: Partial<Notification> & { id?: string }): Row => ({
   ...(x.id !== undefined && { id: x.id }),
   ...(x.audience !== undefined && { audience: x.audience }),
-  ...(x.companyId !== undefined && { company_id: n(x.companyId) }),
+  ...(x.companyId !== undefined && { company_id: ref(x.companyId) }),
   ...(x.title !== undefined && { title: x.title }),
   ...(x.body !== undefined && { body: x.body }),
   ...(x.at !== undefined && { at: x.at }),
@@ -586,7 +589,7 @@ export const paymentFromRow = (r: Row): Payment => ({
 export const paymentToRow = (x: Partial<Payment> & { id?: string }): Row => ({
   ...(x.id !== undefined && { id: x.id }),
   ...(x.companyId !== undefined && { company_id: x.companyId }),
-  ...(x.projectId !== undefined && { project_id: n(x.projectId) }),
+  ...(x.projectId !== undefined && { project_id: ref(x.projectId) }),
   ...(x.kind !== undefined && { kind: x.kind }),
   ...(x.label !== undefined && { label: x.label }),
   ...(x.amount !== undefined && { amount: n(x.amount) }),
