@@ -2,11 +2,11 @@ import type { Company, DocumentRequest, FinancialYear, Opportunity, Schedule } f
 import { formatYmd, profileRows, todayLocal, yearsInBusiness, type ProfileRow } from "./company-profile";
 
 /**
- * 고객 화면 "우리 회사 한눈에" — 대표가 들어오자마자 회사 현황을 숫자로 보고, 다음에 할 일을 퀘스트처럼 깨 나가게.
+ * 고객 화면 "우리 회사 한눈에" — 대표가 들어오자마자 회사 현황을 숫자로 보고, 다음에 할 일을 하나씩 점검해 나가게.
  *
  * 원칙
  * - 모든 숫자는 기록에서 센다. 재무는 담당자가 재무제표를 보고 넣은 값만 쓴다. 없으면 "없음"으로 보이고 지어내지 않는다.
- * - 퀘스트는 정해진 규칙으로 기록을 보고 고른다(자동 안내). 자금 가능 여부·금액 같은 판단은 하지 않는다.
+ * - 체크리스트는 정해진 규칙으로 기록을 보고 고른다(자동 안내). 자금 가능 여부·금액 같은 판단은 하지 않는다.
  * - 메모·대표자 생년월일·주주 구성처럼 내부에서만 쓰는 칸은 고객 화면에 내지 않는다.
  */
 
@@ -98,7 +98,7 @@ export function clientFacts(c: Company, today = todayLocal()): ProfileRow[] {
   return rows.map((r) => ({ ...r, edit: "none" as const }));
 }
 
-/* ---------------- 성장 퀘스트 ---------------- */
+/* ---------------- 성장 체크리스트 ---------------- */
 
 export interface Quest {
   key: string;
@@ -106,7 +106,7 @@ export interface Quest {
   /** 왜 하는지 한 줄 */
   why: string;
   done: boolean;
-  /** 앞 퀘스트를 깨야 열린다 */
+  /** 앞 항목을 마쳐야 열린다 */
   locked?: boolean;
   /** "3/5" · "+12.3%" 처럼 지금 숫자 */
   progress?: string;

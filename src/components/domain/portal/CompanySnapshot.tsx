@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ArrowDownRight, ArrowRight, ArrowUpRight, Building2, CalendarCheck2, Check, ClipboardCopy, FileCheck2, Lock, Minus, Sparkles, Trophy, Users } from "lucide-react";
+import { ArrowDownRight, ArrowRight, ArrowUpRight, Building2, CalendarCheck2, Check, ClipboardCopy, FileCheck2, Lock, Minus, Sparkles, TrendingUp, Users } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { EMPLOYEE_BANDS } from "@/lib/company-options";
 import { DOC_SOURCE_LABEL } from "@/lib/docparse";
@@ -18,7 +18,7 @@ type Board = NonNullable<ReturnType<typeof useGrowth>>;
 
 /**
  * 고객 화면 "우리 회사 한눈에" — 대표가 들어오자마자 회사 현황을 숫자로 본다.
- * 업력 · 최근 매출과 전년 대비 · 임직원 · 계약 N일차 → 연도별 매출 → 성장 퀘스트(다음에 할 일).
+ * 업력 · 최근 매출과 전년 대비 · 임직원 · 계약 N일차 → 연도별 매출 → 성장 체크리스트(다음에 할 일).
  * 숫자는 모두 기록에서 온다(재무는 담당자가 재무제표를 보고 입력). 없는 숫자는 "아직 없음"으로 두고 지어내지 않는다.
  */
 
@@ -80,7 +80,7 @@ export function CompanySnapshot({ company: c, board, showFactsLink = true }: { c
         <h2 className="text-[1.1rem] font-bold">우리 회사 한눈에</h2>
         {c.sample && <span className="rounded-full bg-warning-bg px-2.5 py-0.5 text-[0.75rem] font-bold text-warning" data-testid="sample-figures">샘플 회사 · 예시 수치</span>}
         <span className="ml-auto flex items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-1 text-[0.78rem] font-bold text-ink-2" data-testid="growth-level">
-          <Trophy size={14} className="text-accent-strong" /> Lv.{level.level} {level.name}
+          <TrendingUp size={14} className="text-accent-strong" /> 성장 {level.level}/5단계 · {level.name}
         </span>
       </div>
 
@@ -151,7 +151,7 @@ export function RevenueBars({ company: c }: { company: Company }) {
   );
 }
 
-/* ------------------------------ 성장 퀘스트 ------------------------------ */
+/* ------------------------------ 성장 체크리스트 ------------------------------ */
 
 export function GrowthQuests({ company: c, board, limit }: { company: Company; board: Board; limit?: number }) {
   const { quests, level } = useQuests(c, board);
@@ -163,11 +163,11 @@ export function GrowthQuests({ company: c, board, limit }: { company: Company; b
     <section className="card p-5 md:p-6" data-testid="growth-quests">
       <div className="flex flex-wrap items-center gap-2">
         <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-soft text-accent-strong"><Sparkles size={18} /></span>
-        <h2 className="text-[1.1rem] font-bold">성장 퀘스트</h2>
+        <h2 className="text-[1.1rem] font-bold">성장 체크리스트</h2>
         <span className="tnum ml-auto text-[0.88rem] font-bold text-ink-2" data-testid="quest-count">{level.done}/{level.total} 완료</span>
       </div>
       <div className="mt-3 flex items-center gap-3">
-        <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-label="성장 퀘스트 진행" aria-valuemin={0} aria-valuemax={100} aria-valuenow={level.pct}>
+        <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-label="성장 체크리스트 진행" aria-valuemin={0} aria-valuemax={100} aria-valuenow={level.pct}>
           <div className="h-full rounded-full bg-accent transition-[width] duration-700" style={{ width: `${Math.max(4, level.pct)}%` }} />
         </div>
         <span className="tnum text-[0.85rem] font-extrabold text-accent-strong">{level.pct}%</span>
@@ -176,7 +176,7 @@ export function GrowthQuests({ company: c, board, limit }: { company: Company; b
 
       {level.next && (
         <Link href={level.next.href} className="mt-3 flex items-center gap-3 rounded-2xl bg-soft/70 px-4 py-3 ring-1 ring-accent/25 hover:bg-soft" data-testid="next-quest">
-          <span className="text-[0.72rem] font-extrabold tracking-wide text-accent-strong">다음 퀘스트</span>
+          <span className="text-[0.72rem] font-extrabold tracking-wide text-accent-strong">다음 할 일</span>
           <span className="min-w-0 flex-1 truncate text-[0.95rem] font-bold">{level.next.title}</span>
           <ArrowRight size={16} className="shrink-0 text-accent-strong" />
         </Link>
@@ -187,7 +187,7 @@ export function GrowthQuests({ company: c, board, limit }: { company: Company; b
       </ul>
       {limit && ordered.length > limit && (
         <button type="button" onClick={() => setAll((v) => !v)} className="pressable mt-2 min-h-9 text-[0.85rem] font-semibold text-accent">
-          {all ? "접기" : `퀘스트 ${ordered.length - limit}개 더 보기`}
+          {all ? "접기" : `${ordered.length - limit}개 더 보기`}
         </button>
       )}
     </section>

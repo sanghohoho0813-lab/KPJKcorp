@@ -11,7 +11,7 @@ import { CompanySnapshot, GrowthQuests } from "@/components/domain/portal/Compan
 
 /**
  * 고객 홈 — 우리 회사 성장 공간.
- * 위에서부터: 우리 회사 현재 상태(담당 컨설턴트·다음 일정) → 우리 회사 한눈에(숫자) → 성장 퀘스트 → 성장 플랫폼 메뉴판 → 지금 할 일 · 최근 안내
+ * 위에서부터: 우리 회사 현재 상태(담당 컨설턴트·다음 일정) → 우리 회사 한눈에(숫자) → 성장 체크리스트 → 성장 플랫폼 메뉴판 → 지금 할 일 · 최근 안내
  * → 성장 여정(완료→진행→다음) → 맞는 지원사업 → 다음으로 검토할 과제 → 완료 이력.
  */
 export default function PortalHome() {
@@ -40,7 +40,7 @@ export default function PortalHome() {
         </Card>
       )}
       <PortalHero company={c} board={board} displayName={displayName} />
-      {/* 우리 회사 한눈에 — 업력·매출 추이·임직원·계약 일차를 숫자로, 그다음 할 일을 퀘스트로 */}
+      {/* 우리 회사 한눈에 — 업력·매출 추이·임직원·계약 일차를 숫자로, 그다음 할 일을 체크리스트로 */}
       <CompanySnapshot company={c} board={board} />
       <GrowthQuests company={c} board={board} limit={4} />
       <PortalHub company={c} board={board} />

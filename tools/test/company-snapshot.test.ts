@@ -1,4 +1,4 @@
-// 고객 화면 "우리 회사 한눈에" — 매출 추이 · 일차 · 고객에게 보이는 칸 · 성장 퀘스트. 시험용 값은 지어낸 것.
+// 고객 화면 "우리 회사 한눈에" — 매출 추이 · 일차 · 고객에게 보이는 칸 · 성장 체크리스트. 시험용 값은 지어낸 것.
 import { parseMoneyKo, clientFacts, companyQuests, dayNumber, fmtMoneyKo, fmtPct, questLevel, revenueTrend, yoyOf, finSeries } from "../../src/lib/company-snapshot";
 import type { Company } from "../../src/lib/types";
 let fail = 0;
@@ -32,14 +32,14 @@ ok(facts.find((r) => r.key === "ceo")?.value === "홍길동", "대표자는 이�
 ok(facts.find((r) => r.key === "establishedAt")?.value.includes("8년차") === true, "업력 표시 " + facts.find((r) => r.key === "establishedAt")?.value);
 ok(facts.every((r) => r.edit === "none"), "고객 화면에서는 고칠 수 없음");
 
-// 4) 퀘스트
+// 4) 체크리스트
 const ctx = { docRequests: [], schedules: [], opportunities: [], activeCount: 0, completedCount: 0, programCount: 0, now: new Date("2026-10-03T00:00:00Z") };
 const q0 = companyQuests({ company: base, ...ctx });
 ok(q0.find((q) => q.key === "basics")?.done === true, "기본 정보 다 있음 → 완료");
-ok(q0.find((q) => q.key === "growth")?.locked === true && !q0.find((q) => q.key === "growth")?.done, "매출 2개년 없으면 성장 퀘스트 잠김");
+ok(q0.find((q) => q.key === "growth")?.locked === true && !q0.find((q) => q.key === "growth")?.done, "매출 2개년 없으면 성장 체크리스트 잠김");
 ok(q0.find((q) => q.key === "financials")?.progress === "0/3", "재무 0/3");
 const q1 = companyQuests({ company: fin, ...ctx, docRequests: [{ id: "d1", companyId: "co_t", status: "requested" }, { id: "d2", companyId: "co_t", status: "done" }, { id: "d3", companyId: "co_t", status: "planned" }] as never });
-ok(q1.find((q) => q.key === "growth")?.done === true && q1.find((q) => q.key === "growth")?.progress?.startsWith("+20.0%") === true, "성장 퀘스트 완료 +20%");
+ok(q1.find((q) => q.key === "growth")?.done === true && q1.find((q) => q.key === "growth")?.progress?.startsWith("+20.0%") === true, "성장 체크리스트 완료 +20%");
 ok(q1.find((q) => q.key === "financials")?.done === true, "3개년 → 재무 완료");
 ok(q1.find((q) => q.key === "requests")?.progress === "1/2" && !q1.find((q) => q.key === "requests")?.done, "요청 자료 1/2 (보내기 전 요청은 빼고)");
 const noBasics = companyQuests({ company: { ...base, bizNo: "", establishedAt: undefined }, ...ctx });

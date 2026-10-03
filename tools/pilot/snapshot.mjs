@@ -1,6 +1,6 @@
 // 고객 화면 "우리 회사 한눈에" — 담당자가 재무제표 숫자를 넣으면 고객 대표 휴대폰에 숫자로 보인다
 //  1) 컨설턴트(PC): 기업 상세 → 재무·계약 현황 → 2개년 매출 입력("42억" · "38억 5천만") · 계약 시작일 → 서버에 저장
-//  2) 고객(휴대폰): 홈 "우리 회사 한눈에" → 최근 매출 · 전년 대비 +9.1% · 계약 N일차 · 연도별 막대 2개 · 성장 퀘스트
+//  2) 고객(휴대폰): 홈 "우리 회사 한눈에" → 최근 매출 · 전년 대비 +9.1% · 계약 N일차 · 연도별 막대 2개 · 성장 체크리스트
 //  3) 고객: 우리 회사 화면 — 사업자등록번호 보임, 내부 메모·대표자 생년월일 안 보임, 서류는 확인일만
 //  4) 고객은 재무를 고칠 수 없다 — 고객 토큰으로 직접 보내도 서버가 막는다
 import { readFileSync } from 'node:fs';
@@ -47,7 +47,7 @@ try {
   ok('2 고객: 연도별 막대 2개', (await c.getByTestId('revenue-bars').getByRole('listitem').count()) === 2);
   await c.getByTestId('growth-quests').getByRole('button', { name: /더 보기/ }).click().catch(() => {});
   ok('2 고객: "전년보다 매출 키우기" 완료', (await c.getByTestId('quest-growth').getAttribute('data-done')) === '1');
-  ok('2 고객: 재무 퀘스트 2/3', /2\/3/.test(await c.getByTestId('quest-financials').innerText()));
+  ok('2 고객: 재무 항목 2/3', /2\/3/.test(await c.getByTestId('quest-financials').innerText()));
   ok('2 가로 넘침 없음', (await c.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) === 0);
 
   // 3) 우리 회사 화면 — 보이는 것 / 안 보이는 것
