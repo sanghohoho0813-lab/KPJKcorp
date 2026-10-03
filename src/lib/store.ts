@@ -53,6 +53,7 @@ import { PAYMENT_KIND_LABEL, WORK_STATUS, workStatusOf } from "./work-status";
 import { JOURNAL_TYPE } from "./journal";
 import { OPP_STATUS, SERVICE_BY_KEY } from "./services";
 import { can, ROLE_LABEL, type Permission } from "./permissions";
+import { isUnreadFor } from "./notifications";
 import { toLegacyBaseline } from "./baseline-survey";
 import { serverConfigured, setDemoForced, supa } from "./server/client";
 import { currentServerUser, serverSignIn as authSignIn, serverSignOut } from "./server/auth";
@@ -410,6 +411,30 @@ function applyPatch<T extends object>(before: T, patch: Partial<T>, clearable: r
   return { patch: out, changed };
 }
 const COMPANY_CLEARABLE = ["corpNo", "establishedAt", "bizCategory", "bizItem", "ceoBirth", "capital", "region", "employeeBand", "revenueBand", "companyPhone", "website", "leadSource", "ceoGender", "bizItemsExtra", "shareholders", "entityType", "customFields", "docs"];
+
+/**
+ * 알림 읽음 — 내부 알림은 "읽은 사람"에 나만 더하고, 고객 알림은 그 회사 기준 읽음으로 바꾼다.
+ * 서버 모드에서 내부 알림은 서버 함수가 내 이름만 더한다(동시에 읽어도 덮어쓰지 않게).
+ * 그 함수가 없는 옛 서버(setup.sql 재실행 전)에서는 예전처럼 모두 읽음으로 처리한다.
+ */
+function markRead(get: () => StoreState, set: (p: Partial<StoreState>) => void, pick: (n: Notification) => boolean) {
+  const st = get();
+  const me = st.session?.userId;
+  const ids: string[] = [];
+  const notifications = st.notifications.map((n) => {
+    if (!pick(n) || !isUnreadFor(n, me)) return n;
+    if (n.audience === "internal" && me) { ids.push(n.id); return { ...n, readBy: [...(n.readBy ?? []), me] }; }
+    return { ...n, read: true };
+  });
+  set({ notifications });
+  if (!ids.length || !st.serverMode) return;
+  const sb = supa();
+  if (!sb) return;
+  void sb.rpc("kpjk_mark_notifications_read", { p_ids: ids }).then(({ error }) => {
+    if (!error) return;
+    set({ notifications: get().notifications.map((n) => (ids.includes(n.id) ? { ...n, read: true } : n)) });
+  });
+}
 
 export const useStore = create<StoreState>()(
   persist(
@@ -2280,8 +2305,8 @@ export const useStore = create<StoreState>()(
         });
       },
 
-      markNotificationRead: (id) => set({ notifications: get().notifications.map((n) => (n.id === id ? { ...n, read: true } : n)) }),
-      markAllRead: (audience, companyId) => set({ notifications: get().notifications.map((n) => (n.audience === audience && (!companyId || n.companyId === companyId) ? { ...n, read: true } : n)) }),
+      markNotificationRead: (id) => markRead(get, set, (n) => n.id === id),
+      markAllRead: (audience, companyId) => markRead(get, set, (n) => n.audience === audience && (!companyId || n.companyId === companyId)),
 
       // ---------- 서버 연결 ----------
       serverSignIn: async (email, password) => {
@@ -2373,7 +2398,7 @@ export const useStore = create<StoreState>()(
         // 이번에 처음 도착한 알림(내가 만든 것은 이미 화면에 있다) — 최근 10분 것만 띄운다
         const seen = new Set(cur.notifications.map((n) => n.id));
         const mine = cur.session?.role === "client" ? "client" : "internal";
-        const arrived = (loaded.data.notifications ?? []).filter((n) => !seen.has(n.id) && n.audience === mine && !n.read && Date.now() - Date.parse(n.at) < 10 * 60 * 1000);
+        const arrived = (loaded.data.notifications ?? []).filter((n) => !seen.has(n.id) && n.audience === mine && isUnreadFor(n, get().session?.userId) && Date.now() - Date.parse(n.at) < 10 * 60 * 1000);
         loadingFromServer = true;
         set({
           ...loaded.data,

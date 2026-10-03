@@ -747,7 +747,10 @@ export interface Notification {
   title: string;
   body: string;
   at: string;
+  /** 고객 알림: 그 회사 기준 읽음. 내부 알림: 예전에 "모두 읽음" 처리된 것(호환용) */
   read: boolean;
+  /** 내부 알림을 읽은 사람(계정 id) — 한 명이 읽어도 다른 사람에게는 안 읽음으로 남는다 */
+  readBy?: string[];
   href: string;
 }
 

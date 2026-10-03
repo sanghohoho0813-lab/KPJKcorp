@@ -79,7 +79,9 @@ export function NextBadge({ tone = "ink" }: { tone?: "ink" | "shell" }) {
     </span>
   );
 }
-export function DemoBadge({ className }: { className?: string }) {
+export function DemoBadge({ className, compact }: { className?: string; compact?: boolean }) {
+  // compact: 휴대폰 상단처럼 좁은 곳 — 480px 미만에서는 짧은 말로(검색·글자 크기 버튼과 겹치지 않게)
+  const label = (full: string, short: string) => (compact ? <><span className="min-[480px]:hidden">{short}</span><span className="hidden min-[480px]:inline">{full}</span></> : full);
   // 운영 모드에서는 "DEMO DATA"가 거짓말이 된다. 배지도 같이 바뀐다.
   // 서버가 붙은 앱은 로그인 전(아직 운영 표시가 켜지기 전)에도 데모가 아니다.
   const live = useStore((s) => s.settings.liveMode);
@@ -88,9 +90,9 @@ export function DemoBadge({ className }: { className?: string }) {
   if (!hydrated) return null;
   if (onServer) return <span className={cx("inline-flex shrink-0 items-center whitespace-nowrap rounded-md bg-success-bg px-1.5 py-0.5 text-[0.65rem] font-bold tracking-wide text-success", className)}>서버 운영</span>;
   // 인터넷에 올린 사이트인데 서버가 없다 — "운영"(초록)이라고 하면 다른 기기에서도 보이는 줄 안다
-  if (live && deployedWithoutServer()) return <span className={cx("inline-flex shrink-0 items-center whitespace-nowrap rounded-md bg-warning-bg px-1.5 py-0.5 text-[0.65rem] font-bold tracking-wide text-warning", className)} title="서버 미연결 — 입력한 내용은 이 기기 브라우저에만 저장됩니다">이 기기에만 저장</span>;
+  if (live && deployedWithoutServer()) return <span className={cx("inline-flex shrink-0 items-center whitespace-nowrap rounded-md bg-warning-bg px-1.5 py-0.5 text-[0.65rem] font-bold tracking-wide text-warning", className)} title="서버 미연결 — 입력한 내용은 이 기기 브라우저에만 저장됩니다">{label("이 기기에만 저장", "이 기기만")}</span>;
   if (live) return <span className={cx("inline-flex shrink-0 items-center whitespace-nowrap rounded-md bg-success-bg px-1.5 py-0.5 text-[0.65rem] font-bold tracking-wide text-success", className)}>운영</span>;
-  return <span className={cx("inline-flex shrink-0 items-center whitespace-nowrap rounded-md bg-warning-bg px-1.5 py-0.5 text-[0.65rem] font-bold tracking-wide text-warning", className)}>DEMO DATA</span>;
+  return <span className={cx("inline-flex shrink-0 items-center whitespace-nowrap rounded-md bg-warning-bg px-1.5 py-0.5 text-[0.65rem] font-bold tracking-wide text-warning", className)}>{label("DEMO DATA", "DEMO")}</span>;
 }
 export function AiReadyBadge({ onClick, label = "AI READY" }: { onClick?: () => void; label?: string }) {
   return (

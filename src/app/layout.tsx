@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ThemeBoot } from "@/components/shell/ThemeBoot";
 import { FontLoader } from "@/components/shell/FontLoader";
+import { ErrorCatcher } from "@/components/shell/ErrorCatcher";
 
 export const metadata: Metadata = {
   title: "KPJK Consulting AX",
@@ -21,6 +22,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full">
         <ThemeBoot />
         <FontLoader />
+        <ErrorCatcher />
         {children}
       </body>
     </html>

@@ -500,6 +500,8 @@ create table if not exists public.notifications (
   href       text not null default '/'
 );
 create index if not exists notifications_audience_idx on public.notifications(audience, at desc);
+-- 내부 알림을 읽은 사람(계정 id) — 한 명이 읽어도 다른 사람에게는 안 읽음으로 남는다 (2026-10-03)
+alter table public.notifications add column if not exists read_by text[] not null default '{}';
 
 -- -----------------------------------------------------------------------------
 -- 16. AX 고도화 설문
@@ -1405,6 +1407,27 @@ begin
 end $$;
 revoke execute on function public.kpjk_client_cancel_request(text) from public, anon;
 grant execute on function public.kpjk_client_cancel_request(text) to authenticated;
+
+-- 내부 알림 읽음 — 읽은 사람 목록에 "나"만 더한다. 두 사람이 동시에 읽어도 서로 덮어쓰지 않는다.
+-- 볼 수 있는 내부 알림만(알림 읽기 권한과 같은 조건). 고객 알림은 예전처럼 read 칸으로.
+create or replace function public.kpjk_mark_notifications_read(p_ids text[]) returns integer
+language plpgsql security definer set search_path = public as $$
+declare v_me text := auth.uid()::text; v_n integer;
+begin
+  if v_me is null or not public.kpjk_is_internal() then
+    raise exception '내부 계정만 쓸 수 있습니다.' using errcode = '42501';
+  end if;
+  update public.notifications n
+     set read_by = array_append(n.read_by, v_me)
+   where n.id = any(p_ids)
+     and n.audience = 'internal'
+     and not (v_me = any(n.read_by))
+     and (n.company_id is null or public.kpjk_can_see_company(n.company_id));
+  get diagnostics v_n = row_count;
+  return v_n;
+end $$;
+revoke execute on function public.kpjk_mark_notifications_read(text[]) from public, anon;
+grant execute on function public.kpjk_mark_notifications_read(text[]) to authenticated;
 
 -- ---------------------------------------------------------------------------
 --  지원사업 공고 매일 자동 갱신 (기업마당 → 이 표)

@@ -494,6 +494,7 @@ export const notificationFromRow = (r: Row): Notification => ({
   id: s(r.id), audience: r.audience as Notification["audience"],
   companyId: u(r.company_id as string | null),
   title: s(r.title), body: s(r.body), at: s(r.at), read: bool(r.read), href: s(r.href),
+  readBy: Array.isArray(r.read_by) ? (r.read_by as string[]) : [],
 });
 
 export const notificationToRow = (x: Partial<Notification> & { id?: string }): Row => ({
@@ -505,6 +506,8 @@ export const notificationToRow = (x: Partial<Notification> & { id?: string }): R
   ...(x.at !== undefined && { at: x.at }),
   ...(x.read !== undefined && { read: x.read }),
   ...(x.href !== undefined && { href: x.href }),
+  // read_by 는 일부러 보내지 않는다 — 두 사람이 동시에 읽으면 서로 덮어쓴다.
+  // 서버 함수 kpjk_mark_notifications_read 가 "내 이름만 더하기"로 처리한다.
 });
 
 export const surveyFromRow = (r: Row): SurveyResponse => ({

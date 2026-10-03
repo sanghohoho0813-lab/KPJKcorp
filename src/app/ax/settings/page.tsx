@@ -12,6 +12,7 @@ import { can, PERMISSION_ROWS, rowVerdict } from "@/lib/permissions";
 import { UserAdmin } from "@/components/domain/UserModals";
 import { AutoRulesPanel } from "@/components/domain/AutoRulesPanel";
 import { DataPanel } from "@/components/domain/DataPanel";
+import { ErrorLogPanel } from "@/components/domain/ErrorLogPanel";
 import { fmtDateTime } from "@/lib/format";
 import { Badge, Button, Card, DemoBadge, NextBadge, PageHeader, SegmentedControl, cx, AiReadyBadge } from "@/components/ui/ui";
 import { Confirm } from "@/components/ui/overlay";
@@ -126,6 +127,7 @@ function SettingsInner() {
 
         <Section id="data" icon={<Database size={18} className="text-ink-3" />} title="데이터">
           <DataPanel />
+          <ErrorLogPanel />
         </Section>
 
         <Section id="ai" icon={<Sparkles size={18} className="text-accent" />} title="AI">

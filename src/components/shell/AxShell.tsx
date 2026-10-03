@@ -331,10 +331,10 @@ function Header() {
         </button>
         <Link href="/ax/dashboard" className="flex shrink-0 items-center gap-2" aria-label="대시보드로">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-shell text-[0.65rem] font-black text-white">KPJK</span>
-          {serverMode && <span className="hidden text-[0.95rem] font-bold min-[430px]:inline">Business AX</span>}
+          {serverMode && <span className="hidden text-[0.95rem] font-bold min-[480px]:inline">Business AX</span>}
         </Link>
         {/* 서버가 아니면(데모·이 기기에만 저장) 휴대폰에서도 늘 보이게 — 자세한 것은 메뉴 맨 위 */}
-        {!serverMode && <DemoBadge className="shrink-0" />}
+        {!serverMode && <DemoBadge className="shrink-0" compact />}
       </div>
       <div className="hidden items-center gap-3 lg:flex">
         <SearchTrigger />

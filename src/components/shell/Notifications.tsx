@@ -5,16 +5,18 @@ import Link from "next/link";
 import { Bell } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { fmtRelative } from "@/lib/format";
+import { isUnreadFor } from "@/lib/notifications";
 import { cx } from "@/components/ui/ui";
 
 export function NotificationBell({ audience, companyId, className, onNavigate }: { audience: "internal" | "client"; companyId?: string; className?: string; onNavigate?: () => void }) {
   const all = useStore((s) => s.notifications);
   const markRead = useStore((s) => s.markNotificationRead);
   const markAll = useStore((s) => s.markAllRead);
+  const me = useStore((s) => s.session?.userId);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const list = all.filter((n) => n.audience === audience && (!companyId || n.companyId === companyId)).slice(0, 12);
-  const unread = list.filter((n) => !n.read).length;
+  const unread = list.filter((n) => isUnreadFor(n, me)).length;
 
   useEffect(() => {
     if (!open) return;
@@ -41,9 +43,9 @@ export function NotificationBell({ audience, companyId, className, onNavigate }:
           <div className="max-h-[420px] overflow-y-auto">
             {list.length === 0 && <div className="px-4 py-8 text-center text-[0.9rem] text-ink-3">새 알림이 없습니다.</div>}
             {list.map((n) => (
-              <Link key={n.id} href={n.href} onClick={() => { markRead(n.id); setOpen(false); onNavigate?.(); }} className={cx("block border-b border-line px-4 py-3 last:border-0 hover:bg-surface-2", !n.read && "bg-soft/40")}>
+              <Link key={n.id} href={n.href} onClick={() => { markRead(n.id); setOpen(false); onNavigate?.(); }} className={cx("block border-b border-line px-4 py-3 last:border-0 hover:bg-surface-2", isUnreadFor(n, me) && "bg-soft/40")}>
                 <div className="flex items-start gap-2">
-                  {!n.read && <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-accent" />}
+                  {isUnreadFor(n, me) && <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-accent" />}
                   <div className="min-w-0">
                     <div className="text-[0.9rem] font-semibold">{n.title}</div>
                     <div className="mt-0.5 line-clamp-2 text-[0.82rem] text-ink-2">{n.body}</div>

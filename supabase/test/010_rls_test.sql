@@ -422,6 +422,30 @@ set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000c001';   -- 컨설�
 select chk('컨설턴트: 고객용 취소 함수는 거절',          denied($$select public.kpjk_client_cancel_request('op_req')$$), true);
 reset role; reset request.jwt.claim.sub;
 
+-- =========================== 내부 알림 읽음 — 계정별 (kpjk_mark_notifications_read) ====
+insert into public.notifications(id, audience, company_id, title, body) values
+  ('nt_rd1', 'internal', null, '읽음 시험', ''), ('nt_rd2', 'client', 'co_a', '고객 알림', '');
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000d001';   -- 사무직원
+select chk('직원: 내부 알림 읽음 1건',                  public.kpjk_mark_notifications_read(array['nt_rd1']), 1);
+select chk('직원: 같은 알림 또 읽어도 중복 없음',        public.kpjk_mark_notifications_read(array['nt_rd1']), 0);
+select chk('직원: 고객 알림은 이 함수로 못 바꾼다',      public.kpjk_mark_notifications_read(array['nt_rd2']), 0);
+reset role; reset request.jwt.claim.sub;
+select chk('읽은 사람 목록에 직원만',                   (select read_by from public.notifications where id='nt_rd1'), array['00000000-0000-0000-0000-00000000d001']);
+select chk('대표에게는 아직 안 읽음(read 칸 그대로)',    (select read from public.notifications where id='nt_rd1'), false);
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000a001';   -- 대표
+select chk('대표: 읽으면 1건',                          public.kpjk_mark_notifications_read(array['nt_rd1']), 1);
+reset role; reset request.jwt.claim.sub;
+select chk('읽은 사람 2명(덮어쓰지 않고 더함)',          (select cardinality(read_by) from public.notifications where id='nt_rd1'), 2);
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000f001';   -- 고객 A
+select chk('고객: 내부 알림 읽음 함수는 거절',          denied($$select public.kpjk_mark_notifications_read(array['nt_rd1'])$$), true);
+reset role; reset request.jwt.claim.sub;
+set role anon;
+select chk('로그인 안 한 사람: 거절',                   denied($$select public.kpjk_mark_notifications_read(array['nt_rd1'])$$), true);
+reset role;
+
 -- =========================== 결과 ===========================================
 select n, case when pass then '통과' else '실패' end as 결과, label as 검증, detail as 비고
 from _r order by n;
