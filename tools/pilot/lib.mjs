@@ -42,6 +42,8 @@ export async function launch() {
 export async function ctxFor(b, kind = 'pc') {
   const opts = kind === 'mobile' ? { ...devices['iPhone 13'], locale: 'ko-KR' } : { viewport: { width: 1440, height: 950 }, locale: 'ko-KR' };
   const ctx = await b.newContext(opts);
+  // 화면 상태 읽기(mem) 를 켠다 — 앱이 이 표시가 있을 때만 읽기 창구를 연다
+  await ctx.addInitScript(() => { try { localStorage.setItem('kpjk-test', '1'); } catch { /* 무시 */ } });
   const p = await ctx.newPage();
   p.errs = [];
   p.on('pageerror', (e) => p.errs.push(String(e)));
@@ -71,4 +73,6 @@ export async function logout(p) {
 }
 export const body = (p) => p.evaluate(() => document.body.innerText);
 export const toasts = (p) => p.evaluate(() => [...document.querySelectorAll('[role=status],[role=alert]')].map((e) => e.innerText).join(' | '));
+// 화면이 실제로 들고 있는 목록 (서버 모드의 브라우저 저장본은 일부러 줄여 두므로 건수 확인은 이것으로)
+export const mem = (p) => p.evaluate(() => { const s = window.__kpjkState?.(); return s ? JSON.parse(JSON.stringify({ programs: s.programs, activities: s.activities, notifications: s.notifications, docRequests: s.docRequests })) : null; });
 export const state = (p) => p.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.startsWith('kpjk-ax')); return k ? JSON.parse(localStorage.getItem(k)).state : null; });

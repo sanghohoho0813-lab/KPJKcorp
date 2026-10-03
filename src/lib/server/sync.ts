@@ -93,39 +93,136 @@ export interface LoadResult {
   offline?: boolean;
   data?: Partial<StoreState>;
   settings?: ServerSettings;
+  /**
+   * 받은 내용을 화면에 실제로 넣었을 때 부른다 — 그때서야 "이 판을 받았다"고 기억한다.
+   * 읽는 사이 내가 뭔가 바꿔 받은 것을 버리는 경우에는 부르지 않는다(기억하면 다음 번에 다시 받지 않아 남의 변경을 놓친다).
+   */
+  commit?: () => void;
 }
 
 /**
- * 로그인 직후 한 번. 내가 볼 수 있는 것만 온다 — 걸러내는 일은 서버가 한다.
+ * 로그인 직후 한 번, 그 뒤로는 15초마다(또는 실시간 신호). 내가 볼 수 있는 것만 온다 — 걸러내는 일은 서버가 한다.
  * 화면은 지금까지처럼 통째로 들고 있는 목록을 그대로 쓴다.
+ *
+ * 두 가지를 지킨다.
+ * 1) 빠짐없이: Supabase 는 한 번에 1000줄까지만 준다(max_rows). 그냥 읽으면 1000줄을 넘는 표는 말없이 잘린다
+ *    — 실서버 지원사업 공고가 이미 1400건을 넘었고, 활동 기록(실증 근거)도 몇 주면 넘는다. 1000줄씩 이어 읽는다.
+ * 2) 가볍게: 큰 표(공고·활동 기록·알림)는 바뀌었을 때만 다시 받는다. 건수와 가장 최근 시각만 먼저 물어보고(수십 바이트),
+ *    같으면 화면에 있는 것을 그대로 쓴다. 놓치는 변경이 없도록 5분에 한 번은 통째로 다시 받는다.
  */
 /** 고객 계정은 이 표들을 고객용 보기로 읽는다 (내부 칸이 빠진 것) — setup.sql 의 client_* 보기 */
 const CLIENT_VIEW: Partial<Record<string, string>> = { companies: "client_companies", projects: "client_projects", opportunities: "client_opportunities" };
 
-export async function loadAll(opts: { client?: boolean } = {}): Promise<LoadResult> {
+const PAGE = 1000;
+type Rows = { data: Record<string, unknown>[] | null; error: { code?: string; message?: string } | null };
+/** 1000줄씩 끝까지 읽는다. 같은 정렬값끼리 순서가 흔들리지 않게 id 로 한 번 더 정렬하고, 읽는 사이 새로 들어온 줄 때문에 겹친 것은 뺀다. */
+export async function readPaged(make: () => { range: (from: number, to: number) => PromiseLike<Rows> }): Promise<Rows> {
+  const all: Record<string, unknown>[] = [];
+  const seen = new Set<unknown>();
+  for (let from = 0; ; from += PAGE) {
+    const r = await make().range(from, from + PAGE - 1);
+    if (r.error) return r;
+    const rows = r.data ?? [];
+    for (const row of rows) {
+      if (row.id !== undefined) { if (seen.has(row.id)) continue; seen.add(row.id); }
+      all.push(row);
+    }
+    if (rows.length < PAGE || from > 200_000) break;
+  }
+  return { data: all, error: null };
+}
+
+/**
+ * 바뀌었을 때만 다시 받는 큰 표.
+ * - col: 바뀜을 알아보는 시각 칸 / full: 이만큼 지나면 바뀐 게 없어 보여도 통째로 다시(놓친 변경 대비)
+ * - appendOnly: 추가만 되는 표(활동 기록) — 늘어난 만큼만 받아 붙인다. 붙인 뒤 건수가 서버와 다르면 통째로 다시.
+ */
+const HEAVY: Partial<Record<string, { col: string; full: number; appendOnly?: boolean }>> = {
+  support_programs: { col: "updated_at", full: 30 * 60_000 },
+  activities: { col: "at", full: 30 * 60_000, appendOnly: true },
+  // 다른 사람이 읽음 표시한 것은 건수·시각에 안 잡힌다 — 5분마다 통째로
+  notifications: { col: "at", full: 5 * 60_000 },
+};
+/** 다른 기기 시계가 조금 틀려도 놓치지 않게, 마지막으로 본 시각보다 이만큼 앞부터 다시 본다 */
+const APPEND_OVERLAP_MS = 10 * 60_000;
+type HeavyEntry = { fp: string; at: number; rows?: Record<string, unknown>[] };
+let heavyCache: { user: string; client: boolean; fp: Map<string, HeavyEntry> } | null = null;
+/** 로그인·로그아웃·계정이 바뀔 때 — 다음 읽기는 통째로 */
+export function resetLoadCache() { heavyCache = null; }
+
+export async function loadAll(opts: { client?: boolean; userId?: string; incremental?: boolean } = {}): Promise<LoadResult> {
   const sb = supa();
   if (!sb) return { ok: false, reason: "서버가 설정되지 않았습니다." };
+  const client = !!opts.client;
+  if (!opts.userId || heavyCache?.user !== opts.userId || heavyCache.client !== client) {
+    heavyCache = opts.userId ? { user: opts.userId, client, fp: new Map() } : null;
+  }
+  const cache = heavyCache;
+  const staged = new Map<string, HeavyEntry>();
 
+  const query = (t: string, order?: { column: string; ascending: boolean }) => () => {
+    const q = sb.from(t).select("*");
+    return (order ? q.order(order.column, { ascending: order.ascending }) : q).order("id", { ascending: true });
+  };
   const read = async (table: string, order?: { column: string; ascending: boolean }) => {
-    const run = (t: string) => { const q = sb.from(t).select("*"); return order ? q.order(order.column, { ascending: order.ascending }) : q; };
-    const view = opts.client ? CLIENT_VIEW[table] : undefined;
-    if (!view) return run(table);
-    const r = await run(view);
+    const view = client ? CLIENT_VIEW[table] : undefined;
+    if (!view) return readPaged(query(table, order));
+    const r = await readPaged(query(view, order));
     // 아직 새 setup.sql 을 돌리지 않은 서버 — 보기가 없으면 예전처럼 표에서 읽는다
-    if (r.error && (r.error.code === "42P01" || r.error.code === "PGRST205" || /does not exist|Could not find the table/i.test(r.error.message ?? ""))) return run(table);
+    if (r.error && (r.error.code === "42P01" || r.error.code === "PGRST205" || /does not exist|Could not find the table/i.test(r.error.message ?? ""))) return readPaged(query(table, order));
+    return r;
+  };
+  /** 큰 표: 건수 + 가장 최근 시각. 읽지 못하면 null (그때는 통째로 읽는다) */
+  const fingerprint = async (table: string, col: string): Promise<{ fp: string; count: number; newest: string } | null> => {
+    const [c, m] = await Promise.all([
+      sb.from(table).select("id", { count: "exact", head: true }),
+      sb.from(table).select(col).order(col, { ascending: false }).limit(1),
+    ]);
+    if (c.error || m.error || c.count === null) return null;
+    const newest = String((m.data?.[0] as unknown as Record<string, unknown> | undefined)?.[col] ?? "");
+    return { fp: `${c.count}|${newest}`, count: c.count, newest };
+  };
+  /** undefined = 그대로 써도 됨(다시 받지 않음) */
+  const readHeavy = async (table: string, order?: { column: string; ascending: boolean }): Promise<Rows | undefined> => {
+    const h = HEAVY[table];
+    if (!h || !cache) return read(table, order);
+    const f = await fingerprint(table, h.col);
+    const prev = cache.fp.get(table);
+    const fresh = !!prev && Date.now() - prev.at < h.full;
+    if (opts.incremental && f && prev && fresh && prev.fp === f.fp) return undefined;
+    // 추가만 되는 표: 늘어난 것만 받아 붙인다
+    if (opts.incremental && f && prev?.rows && fresh && h.appendOnly) {
+      const last = Date.parse(prev.fp.split("|")[1] ?? "");
+      if (Number.isFinite(last)) {
+        const since = new Date(last - APPEND_OVERLAP_MS).toISOString();
+        const r = await readPaged(() => sb.from(table).select("*").gte(h.col, since).order(h.col, { ascending: false }).order("id"));
+        if (!r.error) {
+          const byId = new Map(prev.rows.map((x) => [x.id, x]));
+          for (const x of r.data ?? []) byId.set(x.id, x);
+          if (byId.size === f.count) {
+            const rows = [...byId.values()].sort((a, b) => String(b[h.col]).localeCompare(String(a[h.col])) || String(a.id).localeCompare(String(b.id)));
+            staged.set(table, { fp: f.fp, at: prev.at, rows });
+            return { data: rows, error: null };
+          }
+        }
+      }
+    }
+    const r = await read(table, order);
+    // 읽기 전에 잰 값을 남긴다 — 읽는 사이에 바뀐 것은 다음 번에 다시 받는다
+    if (!r.error && f) staged.set(table, { fp: f.fp, at: Date.now(), rows: h.appendOnly ? (r.data ?? []) : undefined });
     return r;
   };
 
   try {
     const [profiles, files, messages, settings, ...rest] = await Promise.all([
-      sb.from("profiles").select("*").order("role"),
-      sb.from("document_files").select("*").order("uploaded_at"),
-      sb.from("inquiry_messages").select("*").order("created_at"),
+      readPaged(() => sb.from("profiles").select("*").order("role").order("id")),
+      readPaged(() => sb.from("document_files").select("*").order("uploaded_at").order("id")),
+      readPaged(() => sb.from("inquiry_messages").select("*").order("created_at").order("id")),
       sb.from("app_settings").select("*").eq("id", 1).maybeSingle(),
-      ...ORDER.map((k) => read(SPEC[k].table, SPEC[k].order)),
+      ...ORDER.map((k) => readHeavy(SPEC[k].table, SPEC[k].order)),
     ]);
 
-    const bad = [profiles, files, messages, settings, ...rest].find((r) => r.error);
+    const bad = [profiles, files, messages, settings, ...rest].find((r) => r?.error);
     if (bad?.error) return { ok: false, reason: explain(bad.error), offline: isNetworkError(bad.error) };
 
     // 파일·메시지를 부모 안으로 접어 넣는다 — 화면이 기대하는 모양이다
@@ -142,7 +239,9 @@ export async function loadAll(opts: { client?: boolean } = {}): Promise<LoadResu
 
     const data: Record<string, unknown> = { users: (profiles.data ?? []).map(M.userFromRow) };
     ORDER.forEach((k, i) => {
-      const rows = (rest[i].data ?? []) as Record<string, unknown>[];
+      const got = rest[i];
+      if (!got) return; // 바뀌지 않은 큰 표 — 화면에 있는 것을 그대로 쓴다
+      const rows = (got.data ?? []) as Record<string, unknown>[];
       if (k === "docRequests") data[k] = rows.map((r) => M.docRequestFromRow(r, filesBy.get(String(r.id)) ?? []));
       else if (k === "inquiries") data[k] = rows.map((r) => M.inquiryFromRow(r, msgsBy.get(String(r.id)) ?? []));
       else data[k] = rows.map(SPEC[k].fromRow);
@@ -151,6 +250,7 @@ export async function loadAll(opts: { client?: boolean } = {}): Promise<LoadResu
     const st = settings.data as Record<string, unknown> | null;
     return {
       ok: true,
+      commit: () => { if (cache && heavyCache === cache) for (const [t, e] of staged) cache.fp.set(t, e); },
       data: data as Partial<StoreState>,
       settings: {
         org: (st?.org ?? undefined) as StoreState["settings"]["org"],

@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import { recordError } from "./error-log";
 import { clearCarryover, loadCarryover, sameCompany, stashLocalCompanies } from "./local-carryover";
 import { buildSeed, type SeedData } from "./demo/seed";
 import type {
@@ -58,7 +59,7 @@ import { toLegacyBaseline } from "./baseline-survey";
 import { serverConfigured, setDemoForced, supa } from "./server/client";
 import { currentServerUser, reauthenticate, serverSignIn as authSignIn, serverSignOut } from "./server/auth";
 import { noteSignOut, type SignOutReason } from "./signout-notice";
-import { loadAll, ORG_SETTING_KEYS, pendingWrites, pushChanges, pushSettings, retryOutbox, setOutboxOwner, unsavedCount, writeSeq, type ServerSettings } from "./server/sync";
+import { loadAll, ORG_SETTING_KEYS, pendingWrites, pushChanges, pushSettings, resetLoadCache, retryOutbox, setOutboxOwner, unsavedCount, writeSeq, type ServerSettings } from "./server/sync";
 
 export interface StoreState extends SeedData {
   hydrated: boolean;
@@ -88,6 +89,8 @@ export interface StoreState extends SeedData {
   syncError?: string;
   /** 서버에 아직 저장되지 않은 줄 수 (보관했다가 다시 보낸다) */
   unsaved?: number;
+  /** 이 화면(탭)에서 서버 내용을 마지막으로 받아 넣은 시각 — 새로고침 직후 "아직 오는 중"과 "정말 비어 있음"을 가른다(저장하지 않음) */
+  serverLoadedAt?: number;
   /** 쓰던 중에 로그인이 풀렸다 — 화면은 그대로 두고 "다시 로그인" 창을 띄운다 (저장되지 않는 상태) */
   authLost?: boolean;
   /** 로그인이 아직 살아 있는지 확인한다. 풀렸으면 authLost, 계정 중지면 로그아웃 */
@@ -377,6 +380,7 @@ function applyServer(
     serverMode: true,
     syncError: undefined,
     authLost: false,
+    serverLoadedAt: Date.now(),
     session: {
       userId: user.id,
       role: keepView?.role ?? user.role,
@@ -443,6 +447,27 @@ function markRead(get: () => StoreState, set: (p: Partial<StoreState>) => void, 
     set({ notifications: get().notifications.map((n) => (ids.includes(n.id) ? { ...n, read: true } : n)) });
   });
 }
+
+/** 서버 모드에서 이 브라우저에 남겨 두는 최근 활동 기록·알림 수 (나머지는 다시 열 때 서버에서) */
+const PERSIST_ACTIVITIES = 300;
+const PERSIST_NOTIFICATIONS = 200;
+/**
+ * 브라우저 저장이 꽉 차도(한도 약 5MB) 화면은 멈추지 않게 한다.
+ * 저장 실패를 그대로 두면 상태를 바꿀 때마다 오류가 나 버튼이 먹지 않는다. 서버 모드에서는 자료가 서버에 있으므로 잃는 것이 없다.
+ */
+let storageWarned = false;
+const safeLocalStorage: Storage = {
+  get length() { return localStorage.length; },
+  clear: () => localStorage.clear(),
+  key: (i: number) => localStorage.key(i),
+  getItem: (k: string) => { try { return localStorage.getItem(k); } catch { return null; } },
+  removeItem: (k: string) => { try { localStorage.removeItem(k); } catch { /* 막힘 */ } },
+  setItem: (k: string, v: string) => {
+    try { localStorage.setItem(k, v); } catch (e) {
+      if (!storageWarned) { storageWarned = true; recordError("event", e); }
+    }
+  },
+};
 
 export const useStore = create<StoreState>()(
   persist(
@@ -2323,9 +2348,11 @@ export const useStore = create<StoreState>()(
         // 이 계정으로 지난번에 보내지 못한 변경이 있으면 먼저 보낸다
         setOutboxOwner(r.user.id);
         await retryOutbox();
-        const loaded = await loadAll({ client: r.user.role === "client" });
+        resetLoadCache();
+        const loaded = await loadAll({ client: r.user.role === "client", userId: r.user.id });
         if (!loaded.ok || !loaded.data) return { ok: false, reason: loaded.reason, offline: loaded.offline };
         applyServer(set, get, r.user, loaded.data, loaded.settings);
+        loaded.commit?.();
         // 데모와 같은 기록을 서버에도 남긴다 — 고객 Portal 접속 횟수·실증 기록이 서버 모드에서 0으로 보이면 안 된다.
         // (새로고침으로 다시 붙을 때는 남기지 않는다 — 로그인한 것이 아니다)
         const u = r.user;
@@ -2364,7 +2391,8 @@ export const useStore = create<StoreState>()(
           set({ syncError: "서버에 아직 저장되지 않은 변경이 있어 화면을 그대로 둡니다. 인터넷 연결을 확인해 주세요 — 연결되면 자동으로 다시 보냅니다." });
           return false;
         }
-        const loaded = await loadAll({ client: me.user.role === "client" });
+        resetLoadCache();
+        const loaded = await loadAll({ client: me.user.role === "client", userId: me.user.id });
         if (!loaded.ok || !loaded.data) {
           if (wasServer) set({ syncError: loaded.reason ?? "서버에서 데이터를 가져오지 못했습니다." });
           return false;
@@ -2372,6 +2400,7 @@ export const useStore = create<StoreState>()(
         // 미리보기 중이던 고객 화면은 유지한다
         const preview = get().session?.userId === me.user.id ? get().session?.portalPreviewCompanyId : undefined;
         applyServer(set, get, me.user, loaded.data, loaded.settings);
+        loaded.commit?.();
         if (preview) set({ session: { ...get().session!, portalPreviewCompanyId: preview } });
         return true;
       },
@@ -2404,7 +2433,8 @@ export const useStore = create<StoreState>()(
           await get().serverLogout(me.ended);
           return false;
         }
-        const loaded = await loadAll({ client: me.user.role === "client" });
+        // 큰 표(공고·활동 기록·알림)는 바뀐 것이 있을 때만 다시 받는다
+        const loaded = await loadAll({ client: me.user.role === "client", userId: me.user.id, incremental: true });
         if (!loaded.ok || !loaded.data) {
           if (loaded.offline) set({ syncError: "서버에 연결하지 못했습니다. 인터넷이 돌아오면 자동으로 다시 불러옵니다 — 그 사이 바꾼 내용은 저장되지 않을 수 있습니다." });
           return false;
@@ -2420,6 +2450,7 @@ export const useStore = create<StoreState>()(
           ...loaded.data,
           live: arrived.length ? [...arrived, ...(cur.live ?? [])].slice(0, 4) : cur.live,
           syncError: undefined,
+          serverLoadedAt: Date.now(),
           // 역할이 바뀌었으면 따라간다. 미리보기·로그인 시각은 그대로 둔다
           // 보기 전환 중인 대표는 보고 있는 역할을 유지한다(실제 역할이 대표가 아니게 되면 풀린다)
           session: cur.session ? (cur.session.realRole === "admin" && me.user.role === "admin" ? { ...cur.session, companyId: me.user.companyId } : { ...cur.session, role: me.user.role, realRole: undefined, companyId: me.user.companyId }) : cur.session,
@@ -2434,6 +2465,7 @@ export const useStore = create<StoreState>()(
           },
         });
         loadingFromServer = false;
+        loaded.commit?.();
         return true;
       },
 
@@ -2474,6 +2506,7 @@ export const useStore = create<StoreState>()(
 
       serverLogout: async (reason) => {
         if (reason) noteSignOut(reason);
+        resetLoadCache();
         // 못 보낸 변경은 이 브라우저에 계정별로 남는다 — 같은 계정으로 다시 로그인하면 이어서 보낸다
         setOutboxOwner(null);
         try { await serverSignOut(); } catch { /* 서버에 닿지 못해도 이 브라우저에서는 로그아웃한다 */ }
@@ -2633,16 +2666,25 @@ export const useStore = create<StoreState>()(
     },
     {
       name: "kpjk-ax-demo-v1",
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => safeLocalStorage),
       // SSR safety: first client render must equal the server render (skeleton). ThemeBoot calls rehydrate() after mount.
       skipHydration: true,
       partialize: (s) => {
-        const { hydrated: _h, toasts: _t, live: _l, authLost: _a, ...rest } = s;
+        const { hydrated: _h, toasts: _t, live: _l, authLost: _a, serverLoadedAt: _sl, ...rest } = s;
         void _a;
+        void _sl;
         void _h;
         void _t;
         void _l;
-        return rest as StoreState;
+        if (!rest.serverMode) return rest as StoreState;
+        // 서버 모드: 진짜 자료는 서버에 있다. 이 브라우저에는 화면을 빨리 띄우고 끊겼을 때 보여 줄 만큼만 남긴다.
+        // 다 남기면 공고·활동 기록이 쌓여 브라우저 저장 한도(약 5MB)를 넘고, 바뀔 때마다 수 MB 를 다시 써서 휴대폰이 버벅인다.
+        return {
+          ...rest,
+          programs: [],
+          activities: rest.activities.slice(0, PERSIST_ACTIVITIES),
+          notifications: rest.notifications.slice(0, PERSIST_NOTIFICATIONS),
+        } as unknown as StoreState;
       },
       // NOTE: `initial` is the pre-hydration state whose actions close over set/get — safe to call
       // even while the store binding itself is still being created.
@@ -2679,4 +2721,12 @@ export function usePortalCompanyId() {
   if (!session) return undefined;
   if (session.role === "client") return session.companyId;
   return session.portalPreviewCompanyId;
+}
+
+// 시험 도구용 — 이 브라우저에 "kpjk-test" 표시가 있을 때만 화면 상태를 읽어 볼 수 있다(읽기만).
+// 서버 모드에서는 브라우저 저장본을 일부러 줄여 두므로(위 partialize) 저장본으로는 화면 건수를 확인할 수 없다.
+if (typeof window !== "undefined") {
+  try {
+    if (window.localStorage.getItem("kpjk-test") === "1") (window as unknown as { __kpjkState?: () => StoreState }).__kpjkState = () => useStore.getState();
+  } catch { /* 저장소 막힘 */ }
 }

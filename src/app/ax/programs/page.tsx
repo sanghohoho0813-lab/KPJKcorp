@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, Building2, Copy, Download, Link2, Phone, Plus, Trash2, UserPlus, X } from "lucide-react";
 import { useStore } from "@/lib/store";
@@ -23,6 +23,8 @@ const LEAD_STATUS: Record<LeadStatus, { label: string; tone: "accent" | "info" |
 const leadProfile = (l: Lead): MatchProfile => ({ region: l.region, industry: l.industry, foundedYear: l.foundedYear, employees: l.employees, entityType: l.entityType, interests: l.interests });
 /** 하루 + 여유 1시간 (자동 갱신은 9:00~9:59 사이에 돈다) */
 const DAY_PLUS = 25 * 3600 * 1000;
+/** 공고 목록을 한 번에 그리는 수 — 더 보려면 아래 "더 보기" */
+const PAGE_SIZE = 60;
 
 export default function ProgramsPage() {
   const st = useStore();
@@ -49,15 +51,23 @@ export default function ProgramsPage() {
   const companies = useMemo(() => st.companies.filter((c) => !c.archived), [st.companies]);
   const programs = useMemo(() => openOnly(st.programs), [st.programs]);
   // 공고별 맞는 고객 · 가망고객
+  // (회사·가망고객 조건은 한 번만 만든다 — 공고마다 다시 만들면 공고 1400건에서 휴대폰이 몇 초씩 멈춘다)
   const byProgram = useMemo(() => {
     const out = new Map<string, { companies: { id: string; name: string; reasons: string[] }[]; leads: number }>();
+    const cprofs = companies.map((c) => ({ c, prof: profileOfCompany(c) }));
+    const lprofs = st.leads.filter((l) => l.status !== "dropped" && l.status !== "converted").map(leadProfile);
+    const now = new Date();
     for (const p of programs) {
-      const cs = companies.map((c) => ({ c, m: matchProgram(p, profileOfCompany(c)) })).filter((x) => x.m && x.m.score >= 3).map((x) => ({ id: x.c.id, name: x.c.name, reasons: x.m!.reasons }));
-      const ls = st.leads.filter((l) => l.status !== "dropped" && l.status !== "converted").filter((l) => { const m = matchProgram(p, leadProfile(l)); return m && m.score >= 3; }).length;
+      const cs: { id: string; name: string; reasons: string[] }[] = [];
+      for (const { c, prof } of cprofs) { const m = matchProgram(p, prof, now); if (m && m.score >= 3) cs.push({ id: c.id, name: c.name, reasons: m.reasons }); }
+      let ls = 0;
+      for (const prof of lprofs) { const m = matchProgram(p, prof, now); if (m && m.score >= 3) ls++; }
       out.set(p.id, { companies: cs, leads: ls });
     }
     return out;
   }, [programs, companies, st.leads]);
+  // 한 번에 다 그리지 않는다 — "전체"는 1000건이 넘는다
+  const [limit, setLimit] = useState(PAGE_SIZE);
 
   const refresh = useStore((s) => s.refreshFromServer);
   const sync = async (fresh = true) => {
@@ -83,12 +93,17 @@ export default function ProgramsPage() {
     if (fresh) toast(`기업마당 공고 ${r.items.length}건 확인 — 새 공고 ${res.added}건, 바뀐 공고 ${res.updated}건`);
   };
   // 매일 9시 자동 갱신이 돌고 있으면 화면을 열 때 기다릴 일이 없다. 마지막으로 받은 지 하루가 넘었을 때만 이 화면이 대신 받는다
+  // 서버 모드에서 새로고침 직후에는 공고가 아직 서버에서 오는 중이다(브라우저에 공고를 남겨 두지 않는다) — 받은 뒤에 한 번만 판단한다
+  const loadedAt = useStore((s) => s.serverLoadedAt);
+  const checked = useRef(false);
   useEffect(() => {
-    if (!may("program.manage")) return;
+    if (checked.current || !may("program.manage")) return;
+    if (st.serverMode && !loadedAt) return;
+    checked.current = true;
     const last = Math.max(newestFetch(st.programs), Date.parse(lastSync() ?? "") || 0);
     if (Date.now() - last > DAY_PLUS) { const t = setTimeout(() => void sync(false), 0); return () => clearTimeout(t); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loadedAt]);
 
   const matchLink = typeof window !== "undefined" ? `${window.location.origin}/match?ref=${me}` : "/match";
   const copyLink = async () => {
@@ -96,10 +111,11 @@ export default function ProgramsPage() {
     try { await navigator.clipboard.writeText(text); toast("가망고객용 안내 문구와 링크를 복사했습니다. 카카오톡에 붙여 넣으세요."); } catch { toast(matchLink); }
   };
 
-  const shown = programs
+  const shownAll = useMemo(() => programs
     .filter((p) => !q.trim() || `${p.title} ${p.agency} ${p.target ?? ""}`.includes(q.trim()))
     .filter((p) => filter === "all" || (filter === "matched" ? (byProgram.get(p.id)?.companies.length ?? 0) + (byProgram.get(p.id)?.leads ?? 0) + p.notified.length > 0 : (() => { const m = matchProgram(p, {}); return !!m?.deadline.urgent; })()))
-    .sort((a, b) => (a.applyEnd ?? "9999").localeCompare(b.applyEnd ?? "9999"));
+    .sort((a, b) => (a.applyEnd ?? "9999").localeCompare(b.applyEnd ?? "9999")), [programs, q, filter, byProgram]);
+  const shown = shownAll.slice(0, limit);
   const newLeads = st.leads.filter((l) => l.status === "new").length;
 
   return (
@@ -133,8 +149,8 @@ export default function ProgramsPage() {
       {tab === "programs" && (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            {(["matched", "urgent", "all"] as const).map((k) => <Chip key={k} selected={filter === k} onClick={() => setFilter(k)}>{k === "matched" ? "고객·가망고객과 맞는 공고" : k === "urgent" ? "마감 7일 이내" : "전체"}</Chip>)}
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="공고명·기관 검색" className="!h-9 !w-auto min-w-40 flex-1 !rounded-full" aria-label="공고 검색" />
+            {(["matched", "urgent", "all"] as const).map((k) => <Chip key={k} selected={filter === k} onClick={() => { setFilter(k); setLimit(PAGE_SIZE); }}>{k === "matched" ? "고객·가망고객과 맞는 공고" : k === "urgent" ? "마감 7일 이내" : "전체"}</Chip>)}
+            <Input value={q} onChange={(e) => { setQ(e.target.value); setLimit(PAGE_SIZE); }} placeholder="공고명·기관 검색" className="!h-9 !w-auto min-w-40 flex-1 !rounded-full" aria-label="공고 검색" />
           </div>
           <p className="text-[0.78rem] text-ink-3">{MATCH_NOTE}</p>
           {shown.length === 0 ? (
@@ -178,6 +194,12 @@ export default function ProgramsPage() {
               </> : undefined} />
             );
           })}
+          {shownAll.length > shown.length && (
+            <button type="button" onClick={() => setLimit((n) => n + PAGE_SIZE * 2)} data-testid="programs-more"
+              className="pressable w-full rounded-xl border border-line bg-surface py-3 text-[0.9rem] font-semibold text-ink-2 hover:bg-surface-2">
+              더 보기 · {shown.length} / {shownAll.length}건
+            </button>
+          )}
         </div>
       )}
 

@@ -6,6 +6,7 @@
 import type { Lead, SupportProgram } from "./types";
 import { supa } from "./server/client";
 import * as M from "./server/rows";
+import { readPaged } from "./server/sync";
 
 export type LiveStatus = "ok" | "not_configured" | "error" | "loading";
 
@@ -29,8 +30,10 @@ export async function loadPublicPrograms(local: SupportProgram[]): Promise<{ pro
   let base = local;
   const sb = supa();
   if (sb) {
-    const { data } = await sb.from("support_programs").select("*");
-    if (data) base = (data as Record<string, unknown>[]).map(M.programFromRow);
+    // 1000건 넘게 쌓여도 빠짐없이 — 끝난 공고는 서버에서 미리 거른다
+    const { data } = await readPaged(() => sb.from("support_programs").select("*")
+      .or(`apply_end.is.null,apply_end.gte.${today()}`).order("apply_end", { ascending: true }).order("id"));
+    if (data) base = data.map(M.programFromRow);
   }
   // 서버에 기업마당 공고가 이미 저장돼 있으면(매일 9시 자동 갱신) 기업마당을 다시 부르지 않는다
   if (base.some((p) => p.source === "bizinfo")) return { programs: openOnly(base), live: "ok" };

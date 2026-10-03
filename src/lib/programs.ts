@@ -77,21 +77,62 @@ export function deadlineOf(p: SupportProgram, now = new Date()): ProgramMatch["d
 }
 
 /** 공고 하나를 회사 조건에 맞춰 본다. 맞지 않는 근거가 분명하면 null */
+/**
+ * 공고 쪽에서만 나오는 값(지역·시군·업종·조건 문구) — 회사마다 다시 읽지 않게 공고 하나에 한 번만 계산해 둔다.
+ * 공고 1400건 × 고객 수십 곳이면 같은 글을 수만 번 정규식으로 훑게 되어, 휴대폰에서 매칭 화면이 몇 초씩 멈췄다.
+ * 공고 내용이 바뀌면(제목·대상·요약·태그) 다시 계산한다.
+ */
+interface ProgramFeatures {
+  /** 계산할 때의 원본 값 — 공고가 바뀌었는지 알아보는 데 쓴다(같은 값이면 대부분 같은 문자열 그 자체라 비교가 즉시 끝난다) */
+  src: [string, string | undefined, string | undefined, string[], string | undefined, string, string[]];
+  regions: string[]; cities: string[]; theirs: string[];
+  preStartupOnly: boolean; within?: number; startupTitle: boolean; smallBiz: boolean; soleOnly: boolean;
+}
+const featureCache = new WeakMap<SupportProgram, ProgramFeatures>();
+const sameSrc = (a: ProgramFeatures["src"], b: ProgramFeatures["src"]) => a.every((v, i) => v === b[i]);
+function featuresOf(p: SupportProgram): ProgramFeatures {
+  const src: ProgramFeatures["src"] = [p.title, p.target, p.summary, p.tags, p.agency, p.source, p.regions];
+  const hit = featureCache.get(p);
+  if (hit && sameSrc(hit.src, src)) return hit;
+  const text = `${p.title} ${p.target ?? ""} ${p.summary ?? ""} ${p.tags.join(" ")}`;
+  const w = /(?:창업|업력)\s*(\d{1,2})\s*년\s*(?:이내|미만|이하)/.exec(text) ?? /(\d{1,2})\s*년\s*(?:이내|미만)\s*(?:창업|기업)/.exec(text);
+  const f: ProgramFeatures = {
+    src,
+    regions: programRegions(p),
+    cities: citiesIn(`${p.title} ${p.target ?? ""}`),
+    theirs: groupsOf(text),
+    preStartupOnly: /예비\s*창업/.test(text) && !/기창업|창업\s*\d+\s*년/.test(text),
+    within: w ? Number(w[1]) : undefined,
+    startupTitle: /창업\s*(?:기업|벤처)|초기\s*창업|스타트업/.test(`${p.title} ${p.target ?? ""}`),
+    smallBiz: /소상공인/.test(text),
+    soleOnly: /개인사업자/.test(text) && !/법인/.test(text),
+  };
+  featureCache.set(p, f);
+  return f;
+}
+/** 회사 업종 → 업종 묶음 (회사 수십 곳 × 공고 수천 건마다 다시 훑지 않게) */
+const industryCache = new Map<string, string[]>();
+const industryGroups = (industry: string) => {
+  let g = industryCache.get(industry);
+  if (!g) { g = groupsOf(industry); if (industryCache.size < 500) industryCache.set(industry, g); }
+  return g;
+};
+
 export function matchProgram(p: SupportProgram, prof: MatchProfile, now = new Date()): ProgramMatch | null {
   const dl = deadlineOf(p, now);
   if (dl.closed) return null;
   const reasons: string[] = [];
   const cautions: string[] = [];
   let score = 0;
-  const text = `${p.title} ${p.target ?? ""} ${p.summary ?? ""} ${p.tags.join(" ")}`;
+  const f = featuresOf(p);
 
   // 지역 — 다른 시·도 전용 공고는 뺀다. 전국 공고는 "지역 맞음"이 아니다(점수 없음)
-  const regions = programRegions(p);
+  const regions = f.regions;
   if (regions.length) {
     if (prof.region && !regions.includes(prof.region)) return null;
     if (prof.region) {
       // 시·군 단위 공고(예: "안산시 소상공인 …")는 그 시·군 회사만
-      const cities = citiesIn(`${p.title} ${p.target ?? ""}`);
+      const cities = f.cities;
       if (cities.length && prof.city && !cities.includes(prof.city)) return null;
       if (cities.length && !prof.city) cautions.push(`${cities.join("·")} 대상 — 회사 소재 시·군 확인 필요`);
       else { score += 3; reasons.push(`지역 맞음: ${cities.length ? cities.join("·") : prof.region}`); }
@@ -102,22 +143,21 @@ export function matchProgram(p: SupportProgram, prof: MatchProfile, now = new Da
 
   // 업력 — 예비창업 전용 / "창업 N년 이내"
   const age = prof.foundedYear ? now.getFullYear() - prof.foundedYear : undefined;
-  if (/예비\s*창업/.test(text) && !/기창업|창업\s*\d+\s*년/.test(text)) {
+  if (f.preStartupOnly) {
     if (age !== undefined) return null;
   }
-  const within = /(?:창업|업력)\s*(\d{1,2})\s*년\s*(?:이내|미만|이하)/.exec(text) ?? /(\d{1,2})\s*년\s*(?:이내|미만)\s*(?:창업|기업)/.exec(text);
-  if (within && age !== undefined) {
-    const n = Number(within[1]);
+  if (f.within !== undefined && age !== undefined) {
+    const n = f.within;
     if (age > n) return null;
     score += 2; reasons.push(`업력 ${n}년 이내 조건: 업력 ${age}년`);
-  } else if (!within && age !== undefined && age > 7 && /창업\s*(?:기업|벤처)|초기\s*창업|스타트업/.test(`${p.title} ${p.target ?? ""}`)) {
+  } else if (f.within === undefined && age !== undefined && age > 7 && f.startupTitle) {
     // 창업기업은 보통 업력 7년 이내(중소기업창업 지원법). 빼지는 않고 맞는 고객에서 내린다
     score -= 2; cautions.push(`창업기업(업력 7년 이내) 대상일 수 있음 — 업력 ${age}년`);
   }
 
   // 업종
-  const mine = prof.industry ? groupsOf(prof.industry) : [];
-  const theirs = groupsOf(text);
+  const mine = prof.industry ? industryGroups(prof.industry) : [];
+  const theirs = f.theirs;
   const both = mine.filter((g) => theirs.includes(g));
   if (both.length) { score += 3; reasons.push(`업종 맞음: ${both.join("·")}`); }
   else if (theirs.length && mine.length) { score -= 1; cautions.push(`${theirs.join("·")} 업종 중심 공고`); }
@@ -126,8 +166,8 @@ export function matchProgram(p: SupportProgram, prof: MatchProfile, now = new Da
   if (prof.interests?.includes(p.category)) { score += 2; reasons.push(`관심 분야: ${CATEGORY_LABEL[p.category]}`); }
 
   // 소상공인 전용 — 인원이 많으면 확인 필요(업종별 기준이 달라 빼지는 않는다)
-  if (/소상공인/.test(text) && (prof.employees ?? 0) >= 10) cautions.push("소상공인 기준(상시근로자 수) 확인 필요");
-  if (/개인사업자/.test(text) && !/법인/.test(text) && prof.entityType === "corporation") cautions.push("개인사업자 대상인지 확인 필요");
+  if (f.smallBiz && (prof.employees ?? 0) >= 10) cautions.push("소상공인 기준(상시근로자 수) 확인 필요");
+  if (f.soleOnly && prof.entityType === "corporation") cautions.push("개인사업자 대상인지 확인 필요");
 
   if (dl.urgent) reasons.push(dl.daysLeft === 0 ? "오늘 마감" : `마감 ${dl.daysLeft}일 남음`);
   return { program: p, score, reasons, cautions, deadline: { label: dl.label, urgent: dl.urgent, daysLeft: dl.daysLeft } };
@@ -197,21 +237,24 @@ const CITY_NAMES = [
   "군위군", "의성군", "청송군", "영양군", "영덕군", "청도군", "고령군", "성주군", "칠곡군", "예천군", "봉화군", "울진군", "울릉군",
   "의령군", "함안군", "창녕군", "남해군", "하동군", "산청군", "함양군", "거창군", "합천군", "기장군", "달성군", "강화군", "옹진군", "울주군",
 ];
+// "화성시" · "화성 시" 는 잡고, "남화성시" 같은 앞 글자 붙은 것은 버린다.
+// 정규식은 한 번만 만든다 — 공고 수천 건 × 시·군 200여 곳을 매번 새로 만들면 휴대폰에서 매칭 화면이 멈칫한다.
+const CITY_RES = CITY_NAMES.map((c) => ({ c, stem: c.slice(0, -1), re: new RegExp(`(^|[^가-힣])${c.slice(0, -1)}\\s?${c.slice(-1)}(?![가-힣])`) }));
 export function citiesIn(text: string): string[] {
   const out: string[] = [];
-  for (const c of CITY_NAMES) {
-    // "화성시" · "화성 시" 는 잡고, "남화성시" 같은 앞 글자 붙은 것은 버린다
-    const re = new RegExp(`(^|[^가-힣])${c.slice(0, -1)}\\s?${c.slice(-1)}(?![가-힣])`);
+  for (const { c, stem, re } of CITY_RES) {
+    if (!text.includes(stem)) continue; // 이름 앞부분조차 없으면 정규식을 돌릴 필요가 없다
     if (re.test(text) && !out.includes(c)) out.push(c);
   }
   return out;
 }
 
+const REGION_RES = REGIONS.map((r) => ({ r, re: new RegExp(`(^|[\\s\\[(·,])${r}(?=$|[\\s\\])·,]|지역|시|도|소재)`) }));
 export function regionsIn(text: string): string[] {
   const out = new Set<string>();
   for (const [long, short] of Object.entries(LONG_REGION)) if (text.includes(long)) out.add(short);
   // [경기] · (경남) · 경기 지역 · 서울시 처럼 짧은 이름이 낱말로 나온 것
-  for (const r of REGIONS) if (new RegExp(`(^|[\\s\\[(·,])${r}(?=$|[\\s\\])·,]|지역|시|도|소재)`).test(text)) out.add(r);
+  for (const { r, re } of REGION_RES) if (text.includes(r) && re.test(text)) out.add(r);
   return [...out];
 }
 
