@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<style>
+  /* 글꼴은 이 컴퓨터의 파일을 직접 읽는다 (인터넷 없이) */
+  @font-face { font-family:'Pretendard Variable'; font-weight:45 920; src:url('file:///root/.fonts/PretendardVariable.ttf') format('truetype'); }
+</style>
+<style>
+  :root { --bg:#0f1216; --shell:#171b20; --shell2:#22272e; --acc:#d47a4a; --acc2:#b75b2a; --hi:#e8b89a;
+          --ink:#f4f1ec; --ink2:rgba(244,241,236,.72); --ink3:rgba(244,241,236,.46); --line:rgba(255,255,255,.09); }
+  * { box-sizing:border-box; margin:0; padding:0; animation:none !important; transition:none !important; }
+  html,body { width:1080px; height:1920px; overflow:hidden; background:var(--bg); color:var(--ink);
+              font-family:'Pretendard Variable','Pretendard',sans-serif; -webkit-font-smoothing:antialiased; word-break:keep-all; }
+  .bg { position:absolute; inset:-10%; background:
+      radial-gradient(70% 40% at 85% 8%, rgba(212,122,74,.24), transparent 60%),
+      radial-gradient(60% 35% at 10% 92%, rgba(232,184,154,.10), transparent 60%),
+      linear-gradient(170deg, #12161b 0%, #171b20 45%, #0d1014 100%); }
+  .grid { position:absolute; inset:0; opacity:.5;
+      background-image:linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+      background-size:90px 90px; -webkit-mask-image:radial-gradient(80% 55% at 50% 40%, #000 30%, transparent 85%);
+      mask-image:radial-gradient(80% 55% at 50% 40%, #000 30%, transparent 85%); }
+  .scene { position:absolute; inset:0; opacity:0; }
+  .abs { position:absolute; }
+  .eyebrow { font-size:26px; font-weight:700; letter-spacing:.3em; color:var(--hi); text-transform:uppercase; }
+  .h1 { font-size:88px; font-weight:800; letter-spacing:-.025em; line-height:1.12; }
+  .h2 { font-size:64px; font-weight:800; letter-spacing:-.02em; line-height:1.2; }
+  .h3 { font-size:46px; font-weight:700; letter-spacing:-.01em; line-height:1.3; }
+  .p  { font-size:36px; font-weight:500; color:var(--ink2); line-height:1.5; }
+  .acc { color:var(--hi); }
+  .center { text-align:center; }
+  .dimtxt { color:var(--ink3); }
+  .glass { background:linear-gradient(160deg, rgba(255,255,255,.075), rgba(255,255,255,.025)); border:1px solid rgba(255,255,255,.12);
+           border-radius:28px; box-shadow:0 40px 80px -30px rgba(0,0,0,.7); }
+  .hiedge { border-color:rgba(232,184,154,.5); }
+  .note { position:absolute; left:72px; top:1270px; font-size:22px; font-weight:500; color:var(--ink3); line-height:1.45; max-width:888px; }
+
+  /* 칩 · 노드 · 허브 */
+  .chip { display:inline-block; padding:14px 26px; border-radius:999px; background:rgba(255,255,255,.06);
+          border:1px solid rgba(255,255,255,.14); font-size:32px; font-weight:700; white-space:nowrap; }
+  .chip.big { font-size:36px; padding:18px 30px; }
+  /* 노드는 불투명 — 뒤로 지나가는 선이 글자 위로 비치지 않게 */
+  .node { padding:20px 12px; border-radius:22px; text-align:center; font-size:32px; font-weight:700;
+          background:linear-gradient(160deg, #262b32, #1b1f25); border:1px solid rgba(255,255,255,.14);
+          box-shadow:0 30px 60px -30px rgba(0,0,0,.7); }
+  .node.hi { border-color:rgba(232,184,154,.6); color:var(--hi); }
+  .hub { width:190px; height:190px; border-radius:50%; background:radial-gradient(circle at 35% 30%, #e08a5b, var(--acc) 55%, var(--acc2));
+         display:flex; align-items:center; justify-content:center; text-align:center; font-size:34px; font-weight:800; color:#fff8f2;
+         box-shadow:0 0 0 10px rgba(212,122,74,.14), 0 30px 60px -20px rgba(0,0,0,.7); line-height:1.2; }
+  .hub.small { width:150px; height:150px; font-size:28px; }
+  .card2 { padding:30px 30px; font-size:44px; font-weight:800; text-align:center; }
+
+  /* 번호 태그 · 체크 목록 · 목록 줄 · 말풍선 */
+  .numtag { display:flex; align-items:center; gap:20px; padding:18px 28px 18px 18px; border-radius:22px;
+            background:rgba(15,18,22,.55); border:1px solid rgba(232,184,154,.45); font-size:40px; font-weight:700; line-height:1.25; }
+  .numtag .num, .check .mark { flex:none; width:58px; height:58px; border-radius:50%; background:var(--acc); color:#16110d;
+            display:flex; align-items:center; justify-content:center; font-size:28px; font-weight:800; }
+  .check { display:flex; align-items:center; gap:22px; font-size:40px; font-weight:700; }
+  .row { display:flex; align-items:center; justify-content:space-between; gap:20px; padding:22px 30px; border-radius:22px;
+         background:linear-gradient(160deg, rgba(255,255,255,.075), rgba(255,255,255,.025)); border:1px solid rgba(255,255,255,.12); }
+  .row .rl { font-size:38px; font-weight:700; } .row .rr { font-size:32px; font-weight:600; color:var(--ink2); white-space:nowrap; }
+  .bubble { padding:20px 30px; border-radius:28px 28px 28px 8px; font-size:36px; font-weight:700; line-height:1.35;
+            background:rgba(255,255,255,.08); border:1px solid rgba(232,184,154,.35); max-width:780px; }
+
+  /* 매출 막대 */
+  .ylabel { font-size:36px; font-weight:700; color:var(--ink2); }
+  .yval { font-size:44px; font-weight:800; }
+  .yval.proj { color:var(--hi); }
+  .ytag { font-size:24px; font-weight:600; color:var(--ink3); }
+  .tagline { font-size:28px; font-weight:700; color:var(--hi); letter-spacing:.02em; }
+  .track { height:22px; border-radius:11px; background:rgba(255,255,255,.07); }
+  .fill { height:100%; width:0; border-radius:11px; background:linear-gradient(90deg, var(--acc2), var(--acc)); }
+  .fill.dash { background:rgba(232,184,154,.14); border:3px dashed var(--hi); }
+
+  /* 상태 · 취소선 · 로고 · 도는 점 */
+  .status { display:flex; align-items:center; gap:16px; padding:16px 28px; border-radius:999px; font-size:36px; font-weight:700;
+            background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.14); }
+  .status i { width:16px; height:16px; border-radius:50%; background:#6fd39a; box-shadow:0 0 14px rgba(111,211,154,.8); }
+  .strike { position:absolute; left:-4px; top:52%; height:5px; width:0; border-radius:3px; background:var(--acc); }
+  .logo { width:132px; height:132px; border-radius:34px; background:#fff; color:#0f1216; display:flex; align-items:center;
+          justify-content:center; font-size:68px; font-weight:900; box-shadow:0 40px 80px -30px rgba(0,0,0,.8); }
+  .orbit { width:20px; height:20px; border-radius:50%; background:var(--hi); box-shadow:0 0 18px 4px rgba(232,184,154,.7); }
+
+  /* 기기 틀 */
+  .phone { border:14px solid #07090b; border-radius:54px; background:#000; overflow:hidden;
+           box-shadow:0 50px 90px -30px rgba(0,0,0,.85), 0 0 0 1px rgba(255,255,255,.1); }
+  .phone .screen { position:relative; overflow:hidden; border-radius:40px; }
+  .phone .notch { position:absolute; top:0; left:50%; transform:translateX(-50%); width:34%; height:28px; background:#07090b; border-radius:0 0 18px 18px; }
+  img.kb { position:absolute; left:0; top:0; max-width:none; transform-origin:0 0; }
+  .browser { border-radius:18px; overflow:hidden; border:1px solid rgba(255,255,255,.14); background:#f5f7fa;
+             box-shadow:0 50px 90px -30px rgba(0,0,0,.85); }
+  .browser .bar { height:38px; background:#1b1f25; display:flex; align-items:center; gap:8px; padding:0 16px; }
+  .browser .bar i { width:11px; height:11px; border-radius:50%; background:rgba(255,255,255,.22); }
+  .browser .bar span { margin-left:16px; padding:4px 14px; border-radius:8px; background:rgba(255,255,255,.08); font-size:15px;
+                       font-weight:700; letter-spacing:.12em; color:var(--ink3); }
+  .browser .view { position:relative; overflow:hidden; }
+
+  /* ── 도형 색 — 글자는 흰색·주황·살구 그대로, 상자·도형만 여러 색 ── */
+  :root { --teal:#2f978d; --blue:#4f78c9; --amber:#d08a1e; --green:#3fa36d; --rose:#c25a7d; --violet:#7a68c9; --copper:#cc6c3a; }
+  .numtag .num, .check .mark { background:var(--c, var(--acc)); color:#fff; }
+  .node { border-top:5px solid var(--c, rgba(255,255,255,.14)); }
+  .chip.dot::before { content:''; display:inline-block; width:14px; height:14px; border-radius:50%; background:var(--c, var(--acc));
+                      margin-right:12px; vertical-align:middle; position:relative; top:-2px; }
+  .row { box-shadow:inset 8px 0 0 var(--c, transparent); padding-left:38px; }
+  .bubble { border-color:var(--c, rgba(232,184,154,.35)); }
+  .fill { background:var(--c, linear-gradient(90deg, var(--acc2), var(--acc))); }
+  .stagebar { position:absolute; left:0; top:0; bottom:0; width:10px; border-radius:28px 0 0 28px; background:var(--c); }
+  .deco { position:absolute; border-radius:50%; pointer-events:none; }
+  .deco.ring { border:6px solid var(--c); opacity:.35; }
+  .deco.disc { background:var(--c); opacity:.16; }
+  .deco.sq { border-radius:28px; background:var(--c); opacity:.14; transform:rotate(12deg); }
+
+  /* ── 밝은 장면 — 따뜻한 미색 바탕 · 차콜 글씨 · 진한 주황 강조 ── */
+  .lbg { position:absolute; inset:0; background:
+      radial-gradient(60% 34% at 90% 6%, rgba(212,122,74,.20), transparent 62%),
+      radial-gradient(55% 30% at 6% 96%, rgba(47,151,141,.14), transparent 60%),
+      linear-gradient(170deg, #fcf9f4 0%, #f5f0e8 55%, #ede6dc 100%); }
+  .lbg::after { content:''; position:absolute; inset:0; opacity:.6;
+      background-image:linear-gradient(rgba(23,27,32,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(23,27,32,.05) 1px, transparent 1px);
+      background-size:90px 90px; -webkit-mask-image:radial-gradient(80% 55% at 50% 40%, #000 30%, transparent 85%);
+      mask-image:radial-gradient(80% 55% at 50% 40%, #000 30%, transparent 85%); }
+  .light { --ink:#171b20; --ink2:rgba(23,27,32,.74); --ink3:rgba(23,27,32,.52); --hi:#c25e2c; color:var(--ink); }
+  .light .glass, .light .row, .light .bubble { background:#fff; border-color:rgba(23,27,32,.09); box-shadow:0 30px 60px -32px rgba(70,45,20,.30); }
+  .light .hiedge { border-color:rgba(194,94,44,.55); }
+  .light .node { background:#fff; border-color:rgba(23,27,32,.08); color:var(--ink); box-shadow:0 24px 50px -28px rgba(70,45,20,.35); }
+  .light .numtag { background:#fff; border-color:rgba(23,27,32,.10); box-shadow:0 24px 50px -30px rgba(70,45,20,.30); }
+  .light .chip { background:#fff; border-color:rgba(23,27,32,.12); }
+  .light .status { background:#fff; border-color:rgba(23,27,32,.12); }
+  .light .track { background:rgba(23,27,32,.08); }
+  .light .fill.dash { border-color:var(--hi); background:rgba(204,108,58,.16); }
+  .light .note { color:var(--ink3); }
+  .light .logo { background:#171b20; color:#fff; }
+
+  /* ── V3.1 보강: 실제 기기 비율 휴대폰 · 실제 스크롤 · 강조 테두리 · 이동하는 데이터 점 ── */
+  .phone { aspect-ratio: 9 / 19.7; }
+  .phone .screen { position:absolute; left:0; top:0; right:0; bottom:0; background:#f6f4f0; }
+  .phone .screen img { position:absolute; left:0; top:0; max-width:none; }
+  .phone .bar { position:absolute; left:0; right:0; background-repeat:no-repeat; z-index:3; }
+  .browser .view img { position:absolute; left:0; top:0; max-width:none; transform-origin:0 0; }
+  .focus { position:absolute; border-radius:18px; border:5px solid var(--acc); box-shadow:0 0 0 8px rgba(212,122,74,.20), 0 0 40px rgba(212,122,74,.45); z-index:4; pointer-events:none; }
+  .mover { position:absolute; width:30px; height:30px; border-radius:50%; background:var(--hi); box-shadow:0 0 0 10px rgba(232,184,154,.22), 0 0 30px 8px rgba(232,184,154,.65); z-index:6; }
+  .light .mover { background:var(--acc); box-shadow:0 0 0 10px rgba(212,122,74,.18), 0 0 30px 8px rgba(212,122,74,.45); }
+  .light .browser { border-color:rgba(23,27,32,.12); box-shadow:0 40px 80px -36px rgba(70,45,20,.45); }
+  .light .phone { box-shadow:0 40px 80px -30px rgba(70,45,20,.55), 0 0 0 1px rgba(23,27,32,.12); }
+  .bignum { font-size:200px; font-weight:800; letter-spacing:-.04em; line-height:1; }
+  .row.big { padding-top:30px; padding-bottom:30px; } .row.big .rl { font-size:44px; } .row.big .rr { font-size:38px; }
+  .node.big { font-size:42px; padding:30px 16px; }
+  .devlabel { font-size:24px; font-weight:700; letter-spacing:.2em; color:var(--ink3); }
+
+  /* 자막 — 밝은 장면에서도 같은 어두운 상자 */
+  #sub { position:absolute; left:132px; right:132px; top:1330px; height:180px; display:flex; align-items:flex-end; justify-content:center; }
+  #sub span { max-width:816px; padding:16px 30px; border-radius:20px; background:rgba(15,18,22,.80); border:1px solid rgba(255,255,255,.10);
+              font-size:46px; font-weight:700; letter-spacing:-.01em; line-height:1.42; text-align:center; white-space:pre-line; }
+  #sub b { color:#e8b89a; font-weight:800; }
+  /* 안전 영역 확인선 (?guide=1) */
+  .guide { position:absolute; pointer-events:none; outline:2px dashed rgba(255,80,80,.7); display:none; }
+  body.show-guide .guide { display:block; }
+</style></head>
+<body><div id="stage">
+  <div class="bg" id="bg"></div><div class="grid"></div>
+
+<!--SCENES-->
+
+  <div id="sub"><span></span></div>
+  <div class="guide" style="left:0;right:0;top:0;height:220px"></div>
+  <div class="guide" style="left:72px;width:888px;top:220px;height:1080px"></div>
+  <div class="guide" style="left:132px;right:132px;top:1330px;height:180px"></div>
+  <div class="guide" style="left:0;right:0;top:1520px;bottom:0"></div>
+  <div class="guide" style="left:960px;right:0;top:220px;height:1300px"></div>
+</div>
+<script>
+  //  자막: [시작, 끝, 문장] — **단어** 는 강조색, \n 은 줄바꿈 (음성 1.13배 · 앞 여백 0.6초 기준)
+  const SUBS = /*SUBS*/;
+  const DUR = /*DUR*/;
+  if (new URLSearchParams(location.search).get('guide')) document.body.classList.add('show-guide');
+
+  const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+  const eo = (x) => 1 - Math.pow(1 - x, 3);
+  const eio = (x) => (x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+  const lerp = (a, b, x) => a + (b - a) * x;
+  const vis = (t, tin, tout, d = .6) => Math.min(eo(clamp((t - tin) / d)), 1 - eio(clamp((t - (tout - d * .8)) / (d * .8))));
+  const esc = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+  const animated = [...document.querySelectorAll('[data-in]')];
+  const draws = [...document.querySelectorAll('[data-draw]')].map((p) => ({ p, L: p.getTotalLength(), r: p.dataset.draw.split(',').map(Number) }));
+  const grows = [...document.querySelectorAll('[data-grow]')];
+  const strikes = [...document.querySelectorAll('[data-strike]')];
+  const orbits = [...document.querySelectorAll('[data-orbit]')];
+  const kbs = [...document.querySelectorAll('[data-kb]')];
+  //  실제 스크롤 — data-path="시각:위치(px),시각:위치,…" 사이를 천천히-빠르게-천천히(eio)로. 그 전·후에는 멈춤
+  const paths = [...document.querySelectorAll('[data-path]')].map((el) => ({ el, k: el.dataset.path.split(',').map((x) => x.split(':').map(Number)) }));
+  const movers = [...document.querySelectorAll('[data-move]')];
+  const focuses = [...document.querySelectorAll('[data-focus]')];
+  const subEl = document.querySelector('#sub span');
+  let subIdx = -2;
+
+  function render(t) {
+    document.getElementById('bg').style.transform = `translate(${Math.sin(t / 9) * 30}px, ${Math.cos(t / 11) * 20}px) scale(1.04)`;
+    for (const el of animated) {
+      const tin = +el.dataset.in, tout = +el.dataset.out, a = el.dataset.a || 'fade';
+      const isScene = el.classList.contains('scene');
+      const p = eo(clamp((t - tin) / .8));
+      let op = el.tagName === 'IMG' ? vis(t, tin, tout, .35) : vis(t, tin, tout, isScene ? .55 : .7);
+      //  목록이 쌓일 땐 지난 것을 흐리게 (.62)
+      if (el.dataset.dim) op *= lerp(1, .62, eo(clamp((t - +el.dataset.dim) / .4)));
+      el.style.opacity = op;
+      if (a === 'up') el.style.transform = `translateY(${(1 - p) * 34}px)`;
+      else if (a === 'left') el.style.transform = `translateX(${(1 - p) * -60}px)`;
+      else if (a === 'scale') el.style.transform = `scale(${lerp(.94, 1, p)})`;
+      else if (a === 'card') el.style.transform = `translateY(${(1 - p) * 60}px) scale(${lerp(.92, 1, p)})`;
+    }
+    //  선이 그려지는 효과 — 그 말이 나오는 시각에
+    for (const { p, L, r } of draws) {
+      p.style.strokeDasharray = L;
+      p.style.strokeDashoffset = L * (1 - eio(clamp((t - r[0]) / (r[1] - r[0]))));
+    }
+    for (const g of grows) {
+      const [a, b, w] = g.dataset.grow.split(',').map(Number);
+      g.style.width = `${lerp(0, w, eio(clamp((t - a) / (b - a))))}px`;
+    }
+    for (const s of strikes) s.style.width = `calc(${eio(clamp((t - +s.dataset.strike) / .8)) * 100}% + 8px)`;
+    for (const o of orbits) {
+      const [t0, cx, cy, rx, ry, per] = o.dataset.orbit.split(',').map(Number);
+      const ang = -Math.PI / 2 + Math.max(0, t - t0) / per * Math.PI * 2;
+      o.style.left = `${cx + rx * Math.cos(ang) - 10}px`; o.style.top = `${cy + ry * Math.sin(ang) - 10}px`;
+    }
+    //  화면 천천히 확대(켄 번즈): data-kb="시작,끝,배율0,x0,y0,배율1,x1,y1"
+    for (const im of kbs) {
+      const [a, b, s0, x0, y0, s1, x1, y1] = im.dataset.kb.split(',').map(Number);
+      const k = eio(clamp((t - a) / (b - a)));
+      im.style.transform = `translate(${lerp(x0, x1, k)}px, ${lerp(y0, y1, k)}px) scale(${lerp(s0, s1, k)})`;
+    }
+    for (const { el, k } of paths) {
+      let y = k[0][1];
+      for (let j = 0; j < k.length - 1; j++) {
+        const [a, ya] = k[j], [b, yb] = k[j + 1];
+        if (t >= a) y = t >= b ? yb : lerp(ya, yb, eio(clamp((t - a) / (b - a))));
+      }
+      el.style.transform = `translateY(${-y}px)`;
+    }
+    //  데이터 점이 한 곳에서 다른 곳으로 — data-move="시작,끝,x0,y0,x1,y1"
+    for (const m of movers) {
+      const [a, b, x0, y0, x1, y1] = m.dataset.move.split(',').map(Number);
+      const k = eio(clamp((t - a) / (b - a)));
+      m.style.left = `${lerp(x0, x1, k) - 15}px`; m.style.top = `${lerp(y0, y1, k) - 15}px`;
+      m.style.opacity = t < a - .05 || t > b + .35 ? 0 : Math.min(clamp((t - a + .05) / .25), 1 - clamp((t - b) / .35));
+    }
+    //  강조 테두리 — data-focus="시작,끝"
+    for (const f of focuses) {
+      const [a, b] = f.dataset.focus.split(',').map(Number);
+      f.style.opacity = Math.min(eo(clamp((t - a) / .4)), 1 - clamp((t - b) / .35));
+    }
+    //  자막 — 투명도만 0.12초, 위아래로 움직이지 않음
+    const i = SUBS.findIndex(([a, b]) => t >= a - .12 && t < b + .12);
+    if (i !== subIdx) { subIdx = i; if (i >= 0) subEl.innerHTML = esc(SUBS[i][2]).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>'); }
+    if (i < 0) subEl.parentElement.style.opacity = 0;
+    else { const [a, b] = SUBS[i]; subEl.parentElement.style.opacity = Math.min(clamp((t - a + .12) / .12), clamp((b + .12 - t) / .12)); }
+  }
+  window.render = render;
+  window.DUR = DUR;
+  render(+(new URLSearchParams(location.search).get('t') || 0));
+</script>
+</body></html>

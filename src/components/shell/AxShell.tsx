@@ -121,7 +121,7 @@ const NAV_GROUPS: NavGroup[] = [
 /** 메인 운영 메뉴와 같은 무게로 보이면 안 되는 것들 — 사이드바 하단에 따로 둔다. */
 const NAV_UTILITY: NavItem[] = [
   { href: "/ax/coach", label: "AX 코치", icon: <Compass size={17} />, hint: "실증 14일 · 오늘의 미션" },
-  { href: "/ax/howto", label: "사용 방법 영상", icon: <CirclePlay size={17} />, hint: "KPJK AX 사용 방법 · 3분 43초", id: "nav-howto" },
+  { href: "/ax/howto", label: "사용 방법 영상", icon: <CirclePlay size={17} />, hint: "KPJK AX 사용 방법 · 3분 35초", id: "nav-howto" },
   { href: "/ax/settings", label: "설정", icon: <Settings size={17} />, id: "tut-nav-settings" },
   { href: "/ax/why", label: "Why AX", icon: <BookOpen size={17} />, hint: "기획의도", id: "tut-nav-why" },
 ];

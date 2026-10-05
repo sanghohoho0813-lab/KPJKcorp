@@ -364,6 +364,21 @@ html[data-motion="reduce"] .card-hover:hover .hover-pop { transform: none; }
 html[data-motion="reduce"] .coach-glow { animation: none; }
 @media (prefers-reduced-motion: reduce) { .coach-glow { animation: none; } }
 
+/* 세로(9:16) 영상 — 전체 화면에서도 잘리거나 늘어나지 않게.
+   브라우저 기본값(전체 화면 = 화면 전체를 채움)에 페이지의 둥근 모서리·채우기(cover)가 남으면
+   가로 모니터에서 영상 위아래가 잘린다. 전체 화면에서는 비율 그대로 가운데, 남는 좌우는 검정.
+   (모르는 선택자가 섞이면 규칙 전체가 무시되므로 표준 / -webkit- 을 따로 쓴다) */
+.ax-video:fullscreen {
+  width: 100% !important; height: 100% !important; max-width: none !important; max-height: none !important;
+  aspect-ratio: auto !important; object-fit: contain !important; object-position: center !important;
+  border-radius: 0 !important; background: #000 !important;
+}
+.ax-video:-webkit-full-screen {
+  width: 100% !important; height: 100% !important; max-width: none !important; max-height: none !important;
+  aspect-ratio: auto !important; object-fit: contain !important; object-position: center !important;
+  border-radius: 0 !important; background: #000 !important;
+}
+
 /* Print-friendly hidden */
 .hide-scrollbar { scrollbar-width: none; }
 .hide-scrollbar::-webkit-scrollbar { display: none; }

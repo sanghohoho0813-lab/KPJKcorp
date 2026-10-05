@@ -92,7 +92,7 @@ export function VideoDetail({ src, poster, eyebrow, title, desc, duration, chapt
                 onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
                 onRateChange={(e) => setRate(e.currentTarget.playbackRate)}
                 onLoadedMetadata={(e) => { e.currentTarget.playbackRate = rate; }}
-                className="block aspect-[9/16] w-full rounded-[24px] bg-black object-cover"
+                className="ax-video block aspect-[9/16] w-full rounded-[24px] bg-black object-contain"
               >
                 브라우저가 영상 재생을 지원하지 않습니다. <a href={src} download>영상 내려받기</a>
               </video>
