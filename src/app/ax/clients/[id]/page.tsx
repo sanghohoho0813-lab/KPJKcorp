@@ -4,7 +4,7 @@ import { CancelDocRequestButton } from "@/components/domain/portal/CancelRequest
 import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Building2, EyeOff, Lock, CalendarDays, ChevronDown, ChevronRight, Eye, FileCheck2, FileText, FolderOpen, ListPlus, Mail, MapPin, MessageSquare, MessageSquareText, NotebookPen, Phone, Plus, Sparkles, UserRound, Pencil, Archive, ArchiveRestore, UserPlus } from "lucide-react";
+import { ArrowLeft, Building2, EyeOff, Lock, CalendarDays, ChevronDown, ChevronRight, Eye, FileCheck2, FileText, FolderOpen, ListPlus, Mail, PhoneCall, MapPin, MessageSquare, MessageSquareText, NotebookPen, Phone, Plus, Sparkles, UserRound, Pencil, Archive, ArchiveRestore, UserPlus } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { AxInsightButton } from "@/components/ai/AxInsight";
 import { useUi } from "@/lib/ui-store";
@@ -33,6 +33,7 @@ import { PortalStatus, useCompanyAlerts, SEVERITY_LABEL } from "@/components/dom
 import { CONSULT_AREA_LABEL, ENTITY_TYPES, companySummary, yearsSince } from "@/lib/company-options";
 import { DOC_SOURCE_LABEL } from "@/lib/docparse";
 import { shortCompanyName } from "@/lib/quick-task";
+import { ContactLine, LogContactModal, useContactStatus, useMayLogContact } from "@/components/domain/ContactLog";
 import { EXTRACT_METHOD_LABEL } from "@/lib/docextract";
 
 type TabKey = "overview" | "work" | "vault" | "docs" | "contract" | "consult" | "schedule" | "portal" | "journal" | "history";
@@ -73,6 +74,9 @@ export default function ClientCardPage() {
 
   const c = st.companies.find((x) => x.id === id);
   const alerts = useCompanyAlerts(c);
+  const contact = useContactStatus(c);
+  const mayLog = useMayLogContact();
+  const [logContact, setLogContact] = useState(false);
   const now = new Date();
   const nowIso = now.toISOString();
 
@@ -121,6 +125,9 @@ export default function ClientCardPage() {
     actions.push({ text: `업무: ${stripCompany(t.title, c.name)}`, detail: `${late ? `기한 ${daysBetween(t.dueDate, nowIso)}일 지남` : "오늘까지"}${who ? ` · ${who}` : ""}`, href: "/ax/tasks", tone: late ? "error" : "warning" });
   }
   if (upcoming[0]) actions.push({ text: `${relativeDay(upcoming[0].start)} ${fmtTime(upcoming[0].start)} ${upcoming[0].title}`, href: "/ax/schedule", tone: "info" });
+  // 연락 공백 — 이미 연락 업무가 잡혀 있으면 위 '업무' 줄로 보인다
+  if (mayLog && contact.due && contact.last && !st.tasks.some((t) => t.companyId === c.id && t.type === "후속연락" && (t.status === "todo" || t.status === "doing")))
+    actions.push({ text: `연락 ${contact.days}일 없음 — 연락하고 기록하기`, detail: `마지막: ${fmtDate(contact.last.at)} ${contact.last.how} · 기준 ${contact.cycle}일`, onClick: () => setLogContact(true), tone: "warning" });
   const toneRank = { error: 0, warning: 1, info: 2 } as const;
   actions.sort((a, b) => toneRank[a.tone] - toneRank[b.tone]);
 
@@ -164,6 +171,7 @@ export default function ClientCardPage() {
                   c.establishedAt && `설립 ${c.establishedAt.slice(0, 4)}년 (업력 ${yearsSince(c.establishedAt)}년)`,
                 ].filter(Boolean).join(" · ") || "기본 정보가 아직 없습니다 — 기업정보 수정에서 서류를 올리면 채워집니다."}
               </div>
+              <div className="mt-1.5 text-[0.85rem]"><ContactLine status={contact} /></div>
               {(c.bizCategory || c.bizItem) && <div className="mt-0.5 text-[0.82rem] text-ink-3">업태 {c.bizCategory ?? "-"} · 종목 {c.bizItem ?? "-"}{c.capital ? ` · 자본금 ${c.capital.toLocaleString("ko-KR")}원` : ""}</div>}
               {(c.interests?.length || c.leadSource) ? (
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -231,12 +239,13 @@ export default function ClientCardPage() {
 
       {/* 빠른 작업 — 이 기업에서 가장 자주 하는 일. 탭을 옮기지 않고 바로 창이 열린다 (기업은 미리 채워진다) */}
       <div className="hide-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-0.5" data-testid="client-quick-actions">
+        {mayLog && <QuickAction icon={<PhoneCall size={16} />} label="연락함" onClick={() => setLogContact(true)} />}
         {may("task.create") && <QuickAction icon={<ListPlus size={16} />} label="업무 추가" onClick={() => setNewTask(true)} />}
         {may("consultation.create") && <QuickAction icon={<NotebookPen size={16} />} label="상담 기록" onClick={() => setNewConsult(true)} />}
         {may("doc.request") && <QuickAction icon={<FileText size={16} />} label="자료 요청" onClick={() => (active[0] ? setNewDoc(active[0].id) : setCompanyDoc(true))} />}
         {may("schedule.create") && <QuickAction icon={<CalendarDays size={16} />} label="일정 등록" onClick={() => setNewSchedule(true)} />}
         <QuickAction icon={<MessageSquareText size={16} />} label="업무 일기" onClick={() => setTab("journal")} />
-        {c.contactPhone && <a href={`tel:${c.contactPhone.replace(/[^0-9+]/g, "")}`} className="pressable flex shrink-0 items-center gap-1.5 rounded-xl border border-line bg-surface px-3.5 py-2 text-[0.88rem] font-semibold text-ink-2 hover:border-accent hover:text-ink md:hidden"><Phone size={16} className="text-accent" />전화</a>}
+        {c.contactPhone && <a href={`tel:${c.contactPhone.replace(/[^0-9+]/g, "")}`} onClick={() => { if (mayLog) setLogContact(true); }} className="pressable flex shrink-0 items-center gap-1.5 rounded-xl border border-line bg-surface px-3.5 py-2 text-[0.88rem] font-semibold text-ink-2 hover:border-accent hover:text-ink md:hidden"><Phone size={16} className="text-accent" />전화</a>}
       </div>
 
       {/* Quick status */}
@@ -509,6 +518,7 @@ export default function ClientCardPage() {
       <NewConsultationModal open={newConsult} onClose={() => setNewConsult(false)} companyId={c.id} />
       <NewScheduleModal open={newSchedule} onClose={() => setNewSchedule(false)} companyId={c.id} projectId={active[0]?.id} />
       <CompanyDocRequestModal companyId={c.id} open={companyDoc} onClose={() => setCompanyDoc(false)} />
+      <LogContactModal company={c} open={logContact} onClose={() => setLogContact(false)} />
       <NewTaskModal open={newTask} onClose={() => setNewTask(false)} companyId={c.id} projectId={active[0]?.id} />
     </div>
   );

@@ -8,7 +8,9 @@ import { useStore } from "@/lib/store";
 import { AxInsightButton } from "@/components/ai/AxInsight";
 import { daysBetween, fmtDate, fmtRelative } from "@/lib/format";
 import { stageLabel } from "@/lib/stages";
-import { PageHeader, Badge, Button, SegmentedControl, EmptyState, Card } from "@/components/ui/ui";
+import { PageHeader, Badge, Button, SegmentedControl, EmptyState, Card, cx } from "@/components/ui/ui";
+import { ContactLine, useContactSources } from "@/components/domain/ContactLog";
+import { contactStatus } from "@/lib/contact";
 import { CompanyModal, useMay } from "@/components/domain/EntityModals";
 import { CompanyImportModal } from "@/components/domain/CompanyImport";
 import { StatusBoard } from "@/components/domain/client/StatusBoard";
@@ -22,13 +24,14 @@ function ClientsInner() {
   const params = useSearchParams();
   const [q, setQ] = useState("");
   const [view, setView] = useState<"card" | "table" | "board">(params.get("view") === "board" ? "board" : "card");
-  const [filter, setFilter] = useState<"all" | "mine" | "issue" | "archived">("all");
+  const [filter, setFilter] = useState<"all" | "mine" | "issue" | "contact" | "archived">(() => (params.get("filter") === "contact" ? "contact" : "all"));
   // 대시보드 "처음 시작하기"에서 오면 등록 창이 바로 열린다
   const [newOpen, setNewOpen] = useState(params.get("new") === "1");
   const [importOpen, setImportOpen] = useState(params.get("import") === "1");
   const may = useMay();
   const now = new Date().toISOString();
   const me = st.session?.userId;
+  const { src: contactSrc, cycle } = useContactSources();
 
   const rows = useMemo(() => {
     return st.companies
@@ -41,14 +44,18 @@ function ClientsInner() {
         const next = st.schedules.filter((s) => s.companyId === c.id && s.start >= now).sort((a, b) => a.start.localeCompare(b.start))[0];
         const last = st.activities.filter((a) => a.companyId === c.id).sort((a, b) => b.at.localeCompare(a.at))[0];
         const consultant = st.users.find((u) => u.id === c.consultantId);
-        return { c, projects, active, missing, overdue, openIq, next, last, consultant, hasIssue: overdue > 0 || openIq > 0 };
+        const contact = contactStatus(c, contactSrc, cycle);
+        return { c, projects, active, missing, overdue, openIq, next, last, consultant, contact, hasIssue: overdue > 0 || openIq > 0 };
       })
       // 보관된 기업은 "보관" 필터에서만 보인다.
       .filter((r) => (filter === "archived" ? !!r.c.archived : !r.c.archived))
-      .filter((r) => (filter === "mine" ? r.c.consultantId === me : filter === "issue" ? r.hasIssue : true))
+      .filter((r) => (filter === "mine" ? r.c.consultantId === me : filter === "issue" ? r.hasIssue : filter === "contact" ? r.contact.due : true))
+      // 연락 필요는 오래된 순으로 — 가장 오래 연락 안 한 기업부터
+      .sort((a, b) => (filter === "contact" ? (b.contact.days ?? 0) - (a.contact.days ?? 0) : 0))
       .filter((r) => !q || r.c.name.includes(q) || r.c.ceo.includes(q) || r.c.industry.includes(q) || r.c.contactName.includes(q) || r.c.bizNo.includes(q) || (r.c.region ?? "").includes(q) || (r.c.interests ?? []).some((k) => (CONSULT_AREA_LABEL[k] ?? "").includes(q)));
-  }, [st, q, filter, me, now]);
+  }, [st, q, filter, me, now, contactSrc, cycle]);
   const totalActive = st.companies.filter((c) => !c.archived).length;
+  const needContact = useMemo(() => st.companies.filter((c) => !c.archived && contactStatus(c, contactSrc, cycle).due).length, [st.companies, contactSrc, cycle]);
 
   return (
     <div>
@@ -64,7 +71,7 @@ function ClientsInner() {
       <SampleBanner className="mb-4" />
       <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center">
         <div className="md:w-80"><SearchBox value={q} onChange={setQ} placeholder="기업명, 대표, 업종, 지역, 관심 분야 검색" /></div>
-        <SegmentedControl size="sm" value={filter} onChange={setFilter} options={[{ key: "all", label: "전체" }, { key: "mine", label: "내 담당" }, { key: "issue", label: "확인 필요" }, { key: "archived", label: "보관" }]} />
+        <SegmentedControl size="sm" value={filter} onChange={setFilter} options={[{ key: "all", label: "전체" }, { key: "mine", label: "내 담당" }, { key: "issue", label: "확인 필요" }, { key: "contact", label: needContact ? `연락 필요 ${needContact}` : "연락 필요" }, { key: "archived", label: "보관" }]} />
       </div>
 
       {rows.length === 0 ? (
@@ -83,7 +90,7 @@ function ClientsInner() {
         <StatusBoard companies={rows.map((r) => r.c)} />
       ) : view === "card" ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {rows.map(({ c, active, missing, overdue, openIq, next, last, consultant }) => (
+          {rows.map(({ c, active, missing, overdue, openIq, next, last, consultant, contact }) => (
             <Link key={c.id} href={`/ax/clients/${c.id}`} className="card card-hover flex flex-col p-5">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
@@ -111,6 +118,7 @@ function ClientsInner() {
               <div className="mt-4 grid grid-cols-2 gap-2 border-t border-line pt-3 text-[0.78rem] text-ink-3">
                 <div>담당 <b className="text-ink-2">{consultant?.name}</b></div>
                 <div>다음 일정 <b className="text-ink-2">{next ? fmtDate(next.start) : "-"}</b></div>
+                <div className="col-span-2 truncate"><ContactLine status={{ ...contact, cycle }} /></div>
                 <div className="col-span-2 truncate">최근 활동 · {last ? `${last.text} (${fmtRelative(last.at)})` : "-"}</div>
               </div>
             </Link>
@@ -120,7 +128,7 @@ function ClientsInner() {
         <>
         {/* 모바일에서는 표를 가로로 밀지 않는다 — 한 기업 = 한 줄 카드 */}
         <div className="space-y-2 lg:hidden">
-          {rows.map(({ c, active, missing, overdue, openIq, next, consultant }) => (
+          {rows.map(({ c, active, missing, overdue, openIq, next, consultant, contact }) => (
             <Link key={c.id} href={`/ax/clients/${c.id}`} className="card card-hover block p-4">
               <div className="flex items-center gap-2">
                 <span className="tnum flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-shell text-[0.7rem] font-bold text-white">{c.code}</span>
@@ -132,6 +140,7 @@ function ClientsInner() {
               <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[0.78rem] text-ink-3">
                 {overdue > 0 ? <Badge tone="error">기한초과 {overdue}</Badge> : missing.length > 0 ? <Badge tone="warning">미제출 {missing.length}</Badge> : null}
                 {openIq > 0 && <Badge tone="error">미답변 {openIq}</Badge>}
+                {contact.due && <Badge tone="warning">연락 {contact.days}일 없음</Badge>}
                 <span className="ml-auto">담당 {consultant?.name} · 다음 {next ? fmtDate(next.start) : "-"}</span>
               </div>
             </Link>
@@ -139,19 +148,19 @@ function ClientsInner() {
         </div>
         <Card className="hidden lg:block">
           <table className="tbl">
-            <thead><tr><th>기업명</th><th>업종</th><th>담당</th><th>진행 프로젝트</th><th>현재 단계</th><th>미제출</th><th>문의</th><th>다음 일정</th><th>최초 상담</th></tr></thead>
+            <thead><tr><th>기업명</th><th>업종</th><th>담당</th><th>진행 프로젝트</th><th>현재 단계</th><th>미제출</th><th>문의</th><th>다음 일정</th><th>마지막 연락</th></tr></thead>
             <tbody>
-              {rows.map(({ c, active, missing, overdue, openIq, next, consultant }) => (
+              {rows.map(({ c, active, missing, overdue, openIq, next, consultant, contact }) => (
                 <tr key={c.id} className="row-clickable" onClick={() => router.push(`/ax/clients/${c.id}`)}>
                   <td className="font-semibold">{c.name}{c.sample && <Badge tone="info" className="ml-1.5">샘플</Badge>}</td>
-                  <td className="text-ink-2">{c.industry || <span className="text-ink-3">-</span>}</td>
+                  <td className="min-w-[7.5rem] text-ink-2">{c.industry || <span className="text-ink-3">-</span>}</td>
                   <td className="nowrap">{consultant?.name}</td>
                   <td>{active[0]?.name ?? <span className="text-ink-3">-</span>}{active.length > 1 && <span className="text-ink-3"> 외 {active.length - 1}</span>}</td>
                   <td>{active[0] ? <StageBadge stage={active[0].stage} /> : "-"}</td>
                   <td>{overdue ? <Badge tone="error">{missing.length} (초과 {overdue})</Badge> : missing.length ? <Badge tone="warning">{missing.length}</Badge> : <span className="text-ink-3">0</span>}</td>
                   <td>{openIq ? <Badge tone="error">{openIq}</Badge> : <span className="text-ink-3">0</span>}</td>
-                  <td className="tnum">{next ? fmtDate(next.start) : "-"}</td>
-                  <td className="tnum text-ink-3">{fmtDate(c.firstConsultDate)}</td>
+                  <td className="tnum nowrap">{next ? fmtDate(next.start) : "-"}</td>
+                  <td className={cx("tnum nowrap", contact.due ? "font-semibold text-error" : "text-ink-3")} title={contact.last ? `${fmtDate(contact.last.at)} · ${contact.last.how}` : undefined}>{contact.days === undefined ? "-" : contact.days === 0 ? "오늘" : `${contact.days}일 전`}</td>
                 </tr>
               ))}
             </tbody>

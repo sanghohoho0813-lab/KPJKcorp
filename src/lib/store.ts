@@ -48,6 +48,7 @@ import type {
 } from "./types";
 import { nowIso, uid, addDays, iso, daysBetween, fmtDate } from "./format";
 import { followKey, type FollowKind } from "./consult-followups";
+import { contactStatus } from "./contact";
 import { guessTaskType } from "./quick-task";
 import { CUSTOMER_STEPS, stageLabel, stageToCustomerStep } from "./stages";
 import { RULE_BY_KEY, ruleDays, ruleOn } from "./rules";
@@ -1161,6 +1162,22 @@ export const useStore = create<StoreState>()(
             const key = `doc_overdue_followup:${d.id}`;
             if (has(key)) continue;
             push({ companyId: d.companyId, projectId: d.projectId, title: `${c.name} ${d.name} 기한 ${over}일 초과 — 독촉`, type: "후속연락", dueDate: iso(addDays(now, 1, 18)), assigneeId: d.assigneeId, priority: "urgent", ruleKey: key, memo: "미제출 사유를 확인하고 필요하면 기한을 조정합니다." }, lbl("doc_overdue_followup"));
+          }
+        }
+
+        // 6) 고객 연락 N일(기본 21) 공백 → 연락. 열쇠에 마지막 연락일을 넣는다 — 연락하면 다음 공백은 새 업무가 된다
+        if (on("no_contact")) {
+          const n = N("no_contact");
+          const src = { consultations: st.consultations, inquiries: st.inquiries, schedules: st.schedules, tasks: st.tasks, journal: st.journal };
+          for (const c of st.companies) {
+            if (c.archived || !c.consultantId) continue;
+            const cs = contactStatus(c, src, n, now);
+            if (!cs.due || !cs.last) continue;
+            // 이미 잡혀 있는 후속연락이 있으면 그걸로 충분하다 — 업무를 쌓지 않는다
+            if (st.tasks.some((t) => t.companyId === c.id && t.type === "후속연락" && (t.status === "todo" || t.status === "doing"))) continue;
+            const key = `no_contact:${c.id}:${cs.last.at.slice(0, 10)}`;
+            if (has(key)) continue;
+            push({ companyId: c.id, title: `${c.name} 연락 ${cs.days}일 없음 — 진행 안내 · 안부 연락`, type: "후속연락", dueDate: iso(addDays(now, 1, 18)), assigneeId: c.consultantId, priority: "normal", ruleKey: key, memo: `마지막 연락: ${fmtDate(cs.last.at)} (${cs.last.how}). 진행 상황을 짧게 공유하고 다음 일정을 잡습니다.` }, lbl("no_contact"));
           }
         }
 

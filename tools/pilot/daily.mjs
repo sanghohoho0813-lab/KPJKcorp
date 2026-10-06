@@ -93,6 +93,32 @@ const { p: cli } = await ctxFor(b, 'mobile');
 await login(cli, ACC.c1, /\/portal/);
 await cli.goto(B + '/portal/documents', { waitUntil: 'domcontentloaded' }); await cli.waitForTimeout(2500);
 ok('7 고객 휴대폰 요청자료에 보임', await cli.getByText(DOC).first().isVisible());
+// 8) 고객 연락 공백 — 40일 연락 없는 기업 → 대표 화면이 열릴 때 규칙 업무 생성 → 컨설턴트 '연락함' → 업무 완료 · 서버 저장
+const gapId = `co_gap_${tag}`, gapName = `Pilot 연락공백 ${tag} (비식별)`;
+const conUid = sql(`select consultant_id from public.companies where id = '${co}'`);
+sql(`insert into public.companies (id, code, name, ceo, consultant_id, first_consult_date) values ('${gapId}', 'G${tag.slice(-2)}', '${gapName}', '시험대표', '${conUid}', now() - interval '40 days')`);
+const { p: ceo2 } = await ctxFor(b, 'pc');
+await login(ceo2, ACC.ceo, /\/ax\//);
+await ceo2.goto(B + '/ax/dashboard', { waitUntil: 'domcontentloaded' });
+const gapTask = await until(() => sql(`select rule_key || '|' || type || '|' || assignee_id::text || '|' || status from public.tasks where company_id = '${gapId}' and rule_key like 'no_contact:%'`), 20000);
+ok('8 서버: 연락 40일 공백 → 규칙 업무 (담당 컨설턴트 · 후속연락)', !!gapTask && gapTask.includes('|후속연락|' + conUid + '|todo'), gapTask);
+await con.goto(B + `/ax/clients/${gapId}`, { waitUntil: 'domcontentloaded' }); await con.waitForTimeout(2500);
+ok('8 컨설턴트 화면: 연락 공백 표시', /연락 40일 없음/.test(await con.getByTestId('contact-line').first().innerText().catch(() => '')));
+await con.getByTestId('client-quick-actions').getByRole('button', { name: '연락함' }).click(); await con.waitForTimeout(300);
+const ld = con.getByRole('dialog');
+await ld.getByRole('radio', { name: '전화' }).click();
+await ld.getByPlaceholder(/중간보고 일정 안내/).fill(`시험 통화 ${tag}`);
+await ld.getByRole('button', { name: '기록', exact: true }).click();
+ok('8 서버: 통화 기록 저장', !!(await until(() => sql(`select type from public.journal_entries where company_id = '${gapId}' and content = '[전화] 시험 통화 ${tag}'`) === 'call')));
+ok('8 서버: 연락 업무 완료로', !!(await until(() => sql(`select status from public.tasks where company_id = '${gapId}' and rule_key like 'no_contact:%'`) === 'done')));
+await con.reload({ waitUntil: 'domcontentloaded' }); await con.waitForTimeout(2500);
+ok('8 새로고침 뒤 마지막 연락 오늘', /마지막 연락 오늘/.test(await con.getByTestId('contact-line').first().innerText().catch(() => '')));
+await ceo2.goto(B + '/ax/clients?filter=contact', { waitUntil: 'domcontentloaded' }); await ceo2.waitForTimeout(2500);
+ok('8 대표 화면 연락 필요 목록에서 빠짐', (await ceo2.locator(`a[href="/ax/clients/${gapId}"]`).count()) === 0);
+sql(`delete from public.journal_entries where company_id = '${gapId}'`);
+sql(`delete from public.tasks where company_id = '${gapId}'`);
+sql(`delete from public.companies where id = '${gapId}'`);
+
 ok('6 페이지 오류 없음', [con, ceo].every((p) => p.errs.filter((e) => !/Failed to load resource|ERR_CERT/.test(e)).length === 0), [con, ceo].flatMap((p) => p.errs).slice(0, 2).join(' | '));
 // 시험 업무 정리
 sql(`delete from public.tasks where title in ('${T1.replace(/'/g, "''")}', '${T2}') or title like '%${tag}%'`);

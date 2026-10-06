@@ -16,7 +16,7 @@ let okN = 0, failN = 0;
 const ok = (name, cond, info = '') => { console.log(`${name}: ${cond ? 'OK' : 'FAIL'}${info ? ' ' + info : ''}`); cond ? okN++ : failN++; };
 
 const browser = await pw.chromium.launch({ executablePath: CHROME });
-async function session(kind) {
+async function session(kind, who = ['park@kpjk.co.kr', 'kpjk2026!']) {
   const mobile = kind === 'mobile';
   const ctx = await browser.newContext(mobile ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } : { viewport: { width: 1440, height: 900 } });
   await ctx.addInitScript(() => { try { localStorage.setItem('kpjk-test', '1'); } catch {} });
@@ -26,8 +26,8 @@ async function session(kind) {
   page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource|ERR_CERT/.test(m.text())) page.errs.push(m.text()); });
   await page.route('**/*', (r) => (r.request().url().startsWith(B) ? r.continue() : r.abort()));
   await page.goto(B + '/login', { waitUntil: 'networkidle' });
-  await page.getByLabel('아이디 (이메일)').fill('park@kpjk.co.kr');
-  await page.locator('input[type=password]').first().fill('kpjk2026!');
+  await page.getByLabel('아이디 (이메일)').fill(who[0]);
+  await page.locator('input[type=password]').first().fill(who[1]);
   await page.getByRole('button', { name: '로그인' }).click();
   await page.waitForURL('**/ax/**'); await sleep(1200);
   await page.getByRole('button', { name: /건너뛰기/ }).first().click({ timeout: 800 }).catch(() => {});
@@ -198,6 +198,60 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
   ok('5 휴대폰: 한 줄 등록', st.tasks.some((x) => x.title === '비앤테크 연구소 서류 검토' && x.companyId === 'co_b' && x.type === '자료검토'));
   for (const p of ['/ax/dashboard', '/ax/tasks', '/ax/clients/co_a', '/ax/clients/co_e', '/ax/documents']) { await go(page, p); ok(`5 휴대폰 가로 넘침 없음 ${p}`, (await overflow(page)) <= 0); }
   ok('5 휴대폰 페이지 오류 없음', page.errs.length === 0, page.errs.slice(0, 2).join(' | '));
+}
+
+// ---------- 고객 연락 공백 (대표 · PC) ----------
+{
+  const page = await session('pc', ['ceo@kpjk.co.kr', 'kpjk2026!']);
+  // 샘플 기업은 모두 이미 열린 후속연락 업무가 있어 규칙이 건너뛴다(정상). 에프물류의 열린 업무를 보류해 '연락 공백'을 만든다
+  await go(page, '/ax/tasks');
+  await page.getByRole('button', { name: '미완료', exact: true }).click();
+  await page.getByLabel('업무 검색').fill('에프물류'); await sleep(300);
+  for (let i = 0; i < 6; i++) {
+    const hold = page.locator('[data-group]').getByRole('button', { name: '보류', exact: true });
+    if (!(await hold.count())) break;
+    await hold.first().click(); await sleep(250);
+  }
+  ok('7 준비: 에프물류 열린 업무 없음', !(await dump(page)).tasks.some((t) => t.companyId === 'co_f' && (t.status === 'todo' || t.status === 'doing')));
+  await go(page, '/ax/settings');
+  const grp = page.getByRole('group', { name: '연락 규칙 기준일' });
+  ok('7 설정에 연락 공백 규칙 · 기본 21일', (await grp.getByRole('button', { name: '21일 · 기본' }).getAttribute('aria-pressed')) === 'true');
+  await grp.getByRole('button', { name: '7일', exact: true }).click(); await sleep(300);
+  await page.getByRole('button', { name: '지금 확인' }).click(); await sleep(500);
+  let st = await dump(page);
+  const nc = st.tasks.filter((t) => t.ruleKey?.startsWith('no_contact:'));
+  ok('7 기준 7일 → 연락 공백 업무 생성', nc.length >= 1, nc.map((t) => t.title).join(' / '));
+  ok('7 업무: 담당 컨설턴트 · 후속연락 · 마지막 연락 근거', nc.every((t) => t.type === '후속연락' && t.assigneeId === st.companies.find((c) => c.id === t.companyId)?.consultantId && /마지막 연락: .+\(.+\)/.test(t.memo ?? '')));
+  const perCo = new Set(nc.map((t) => t.companyId));
+  ok('7 기업마다 한 건 · 이미 후속연락이 잡힌 기업은 건너뜀', perCo.size === nc.length && nc.every((t) => st.tasks.filter((x) => x.companyId === t.companyId && x.type === '후속연락' && (x.status === 'todo' || x.status === 'doing')).length === 1));
+  await page.getByRole('button', { name: '지금 확인' }).click(); await sleep(400);
+  ok('7 다시 확인해도 중복 없음', (await dump(page)).tasks.filter((t) => t.ruleKey?.startsWith('no_contact:')).length === nc.length);
+
+  await go(page, '/ax/clients');
+  const lbl = await page.getByRole('button', { name: /^연락 필요/ }).innerText();
+  await page.getByRole('button', { name: /^연락 필요/ }).click(); await sleep(400);
+  const cards = page.locator('a[href^="/ax/clients/co_"]');
+  const n0 = await cards.count();
+  ok('7 기업고객 "연락 필요" 필터', n0 >= 1 && lbl.includes(String(n0)), `${lbl} / ${n0}`);
+  const target = nc[0].companyId;
+  await go(page, `/ax/clients/${target}`);
+  ok('7 기업 상세에 연락 공백 표시', /연락 \d+일 없음/.test(await page.getByTestId('contact-line').first().innerText()));
+  await page.getByTestId('client-quick-actions').getByRole('button', { name: '연락함' }).click(); await sleep(300);
+  const d = page.getByRole('dialog');
+  await d.getByRole('radio', { name: '카톡·문자' }).click();
+  await d.getByPlaceholder(/중간보고 일정 안내/).fill('진행 상황 공유, 다음 주 통화 약속');
+  await d.getByRole('button', { name: '기록', exact: true }).click(); await sleep(500);
+  st = await dump(page);
+  const j = st.journal.find((x) => x.companyId === target && x.type === 'call');
+  ok('7 연락함 → 업무 일기 통화 기록', j?.content === '[카톡·문자] 진행 상황 공유, 다음 주 통화 약속');
+  ok('7 열려 있던 연락 업무가 완료로', st.tasks.find((t) => t.id === nc[0].id)?.status === 'done');
+  ok('7 마지막 연락이 오늘로', /마지막 연락 오늘/.test(await page.getByTestId('contact-line').first().innerText()));
+  await go(page, '/ax/clients?filter=contact');
+  ok('7 연락 필요에서 빠짐', (await page.locator(`a[href="/ax/clients/${target}"]`).count()) === 0);
+  await go(page, '/ax/settings');
+  await page.getByRole('button', { name: '지금 확인' }).click(); await sleep(400);
+  ok('7 연락한 기업엔 새 업무 안 생김', (await dump(page)).tasks.filter((t) => t.ruleKey?.startsWith(`no_contact:${target}:`)).length === 1);
+  ok('7 페이지 오류 없음', page.errs.length === 0, page.errs.slice(0, 2).join(' | '));
 }
 
 await browser.close();

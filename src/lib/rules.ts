@@ -55,6 +55,13 @@ export const AUTO_RULES: AutoRuleDef[] = [
     why: "브리핑에는 올라오지만 업무함에 없으면 처리 여부가 기록되지 않았습니다.",
     days: { default: 3, options: [1, 2, 3, 5, 7] },
   },
+  {
+    key: "no_contact", short: "연락",
+    label: (n) => `고객 연락 ${n}일 공백 → 연락`,
+    when: (n) => `상담 · 문의 답변 · 미팅 · 후속 연락 · 통화 기록이 ${n}일 동안 없는 기업에 '연락' 업무 (이미 열린 후속연락 업무가 있으면 만들지 않음)`,
+    why: "고객은 연락이 끊긴 컨설턴트를 잊습니다. 진행이 멈춘 듯 보이면 재계약 · 추가 의뢰도 멈춥니다.",
+    days: { default: 21, options: [7, 14, 21, 30, 45, 60] },
+  },
 ];
 
 export const RULE_BY_KEY: Record<string, AutoRuleDef> = Object.fromEntries(AUTO_RULES.map((r) => [r.key, r]));
