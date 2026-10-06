@@ -86,7 +86,7 @@ export function ProposalPanel({ company }: { company: Company }) {
 
       <div className="mt-5 text-[0.85rem] font-bold">고객 화면에 올라간 제안 {live.length}</div>
       {live.length === 0 ? (
-        <div className="mt-2 rounded-xl border border-dashed border-line-2 py-6 text-center text-[0.85rem] text-ink-3">아직 올린 제안이 없습니다.</div>
+        <div className="mt-2 rounded-xl border border-dashed border-line-2 py-6 px-4 text-center text-[0.85rem] text-ink-3">아직 올린 제안이 없습니다. 위에서 분야를 고르고 이유를 적으면 고객 화면에 바로 올라갑니다.<br />기업정보 규칙으로 찾은 &lsquo;검토해 볼 과제&rsquo;는 제안하지 않아도 고객 화면에 근거와 함께 보입니다.</div>
       ) : (
         <div className="mt-2 divide-y divide-line rounded-xl border border-line">
           {live.map((o) => {

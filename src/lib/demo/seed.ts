@@ -7,7 +7,7 @@ import { addDays, iso } from "../format";
  * 실데이터 연결 시 이 파일만 교체한다 (UI 재작성 없음).
  */
 /** 샘플 내용의 판 — 샘플을 고치면 올린다. 데모 브라우저에 저장된 예전 샘플이 다음 접속 때 새 샘플로 바뀐다. */
-export const SEED_REV = "2026-10-06";
+export const SEED_REV = "2026-10-06b";
 
 export interface SeedData {
   users: User[];
@@ -444,6 +444,12 @@ export function buildSeed(now = new Date()): SeedData {
       note: "공정 개선 건으로 출원 1건 진행.",
       history: [{ at: d(-30, 11), status: "interest", by: "u_park" }, { at: d(-27, 10), status: "contacted", by: "u_park" }, { at: d(-24, 14), status: "approval_pending", by: "u_park" }, { at: d(-22, 9), status: "proposed", by: "u_admin" }, { at: d(-18, 16), status: "won", by: "u_park" }],
     },
+    {
+      id: "op_6", companyId: "co_a", serviceKey: "kpjk_가업승계", serviceName: "가업승계", source: "proposal", status: "proposed",
+      assigneeId: "u_park", createdAt: d(-3, 15), createdBy: "u_park", updatedAt: d(-3, 15),
+      reason: "초기 상담에서 3년 안에 2세 승계를 준비하신다고 하셨습니다. 경영진단이 끝나는 시점에 지분 이전 순서와 준비 항목을 함께 정리해 볼 수 있습니다.",
+      history: [{ at: d(-3, 15), status: "proposed", by: "u_park", note: "담당자 제안" }],
+    },
   ];
 
   /* ---------- 견적 (상담 → 견적 → 계약) ---------- */
@@ -514,6 +520,7 @@ export function buildSeed(now = new Date()): SeedData {
     { id: "ac_op2", type: "approval_requested", companyId: "co_e", actorId: "u_lee", actorRole: "consultant", at: d(-1, 9), text: "대표 승인 요청: 이플러스바이오(주) 법인 정비 연간 자문 제안" },
     { id: "ac_op3", type: "approval_requested", companyId: "co_c", actorId: "u_park", actorRole: "consultant", at: d(0, 9, 20), text: "대표 승인 요청: 씨엠푸드(주) 법인 경영자문 계약 할인 요청" },
     { id: "ac_qt1", type: "quote_sent", companyId: "co_a", projectId: "pj_a1", actorId: "u_park", actorRole: "consultant", at: d(-5, 10), text: "견적 발송: 경영진단 2차 — 원가 개선 실행지원" },
+    { id: "ac_op6", type: "opportunity_created", companyId: "co_a", actorId: "u_park", actorRole: "consultant", at: d(-3, 15), text: "고객에게 제안: 가업승계" },
     { id: "ac_qt2", type: "quote_responded", companyId: "co_b", projectId: "pj_b1", actorId: "c_b", actorRole: "client", at: d(-12, 16), text: "고객 회신: 연구소 사후관리 자문 — 수락" },
   ];
   const oppNotifs: Notification[] = [
