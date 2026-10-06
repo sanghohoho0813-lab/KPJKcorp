@@ -2,15 +2,16 @@
 
 import { CancelRequestButton, OnBehalfNote, useOnBehalf } from "@/components/domain/portal/CancelRequest";
 import { useEffect, useMemo, useState } from "react";
-import { MessageSquarePlus, Search } from "lucide-react";
+import { MessageSquarePlus } from "lucide-react";
 import { useStore, usePortalCompanyId, useCurrentUser } from "@/lib/store";
 import { profileOfCompany, programsForCompany, type ProgramMatch } from "@/lib/programs";
-import { fetchBizinfo, openOnly } from "@/lib/programs-client";
+import { fetchBizinfo, newestFetch, openOnly } from "@/lib/programs-client";
 import { OPP_STATUS } from "@/lib/services";
 import type { SupportProgram } from "@/lib/types";
-import { Badge, Button, Card, EmptyState, PageHeader, Textarea } from "@/components/ui/ui";
+import { Badge, Button, Card, PageHeader, Textarea } from "@/components/ui/ui";
 import { Modal } from "@/components/ui/overlay";
 import { ProgramCard, MATCH_NOTE } from "@/components/domain/programs/ProgramCard";
+import { MatchStatus } from "@/components/domain/programs/MatchStatus";
 
 /** 고객: 우리 회사 기본 정보에 맞는 지원사업 공고 + 담당 컨설턴트에게 물어보기 */
 export default function PortalPrograms() {
@@ -62,7 +63,7 @@ export default function PortalPrograms() {
         </section>
       )}
       {sent.length + matches.length === 0 ? (
-        <Card><EmptyState icon={<Search size={28} />} title="지금 맞는 공고가 없습니다" desc="새 공고가 나오면 담당 컨설턴트가 이 화면과 알림으로 알려 드립니다." /></Card>
+        <MatchStatus audience="client" checked={programs.length} companies={[c]} lastAt={newestFetch(programs)} />
       ) : matches.length > 0 && (
         <section className="space-y-2.5">
           {sent.length > 0 && <h2 className="pt-2 text-[1rem] font-bold">회사 조건에 맞는 공고 <span className="text-ink-3">{matches.length}</span></h2>}

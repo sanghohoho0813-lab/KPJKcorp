@@ -5,6 +5,7 @@ import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ArrowRight, Building2, Check, Percent, ShieldCheck, TrendingUp, X, Play } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { AxInsightButton } from "@/components/ai/AxInsight";
 import { OPP_PIPELINE, OPP_STATUS, oppNextStatus } from "@/lib/services";
 import { fmtDateTime, fmtRelative, fmtWon } from "@/lib/format";
 import type { Approval, Opportunity, OpportunityStatus } from "@/lib/types";
@@ -231,7 +232,7 @@ function OpportunitiesInner() {
       <PageHeader
         title="승인 · 매출기회"
         desc="대표 확인이 필요한 건과, 고객 관심이 매출로 이어지는 과정을 한 곳에서 봅니다."
-        badge={pending.length ? <Badge tone="error">승인대기 {pending.length}</Badge> : <Badge tone="success">승인대기 없음</Badge>}
+        badge={<>{pending.length ? <Badge tone="error">승인대기 {pending.length}</Badge> : <Badge tone="success">승인대기 없음</Badge>}<AxInsightButton topic="opportunities" /></>}
       />
       <Tabs
         tabs={[

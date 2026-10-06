@@ -5,6 +5,7 @@ import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ClipboardList, FileSignature, Plus, Receipt, ShieldCheck, Sparkles, Pencil } from "lucide-react";
 import { useStore, quoteNet } from "@/lib/store";
+import { AxInsightButton } from "@/components/ai/AxInsight";
 import { useUi } from "@/lib/ui-store";
 import { fmtDate, fmtDateTime, fmtWon } from "@/lib/format";
 import { AiReadyBadge, Badge, Button, Card, PageHeader, Tabs, EmptyState } from "@/components/ui/ui";
@@ -33,6 +34,7 @@ function ConsultationsInner() {
     <div>
       <PageHeader
         title={may("finance.view") ? "상담 · 견적 · 계약" : may("quote.create") ? "상담 · 견적" : "상담 기록"}
+        badge={<AxInsightButton topic="consultations" />}
         desc="상담에서 정한 내용이 견적이 되고, 고객이 수락하면 계약으로 이어집니다. 할인은 발송 전에 대표 승인을 거칩니다."
         actions={tab === "quote"
           ? <Button variant="accent" icon={<Plus size={16} />} onClick={() => setNewQuote(true)}>견적 작성</Button>

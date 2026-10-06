@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { Sparkles } from "lucide-react";
 import { useStore, useCurrentUser } from "@/lib/store";
+import { AxInsightButton } from "@/components/ai/AxInsight";
 import { useUi } from "@/lib/ui-store";
 import { buildBrief, briefSummaryCounts } from "@/lib/brief";
 import { useNow } from "@/lib/hooks";
@@ -28,7 +29,7 @@ export default function BriefPage() {
 
   return (
     <div>
-      <PageHeader title={<span className="flex items-center gap-2"><Sparkles size={26} className="text-accent" /> AI 브리핑</span>} desc={`${fmtFull(now)} ${fmtClock(now).slice(0, 5)} 기준 · ${user?.name} ${user?.title}님을 위한 오늘의 업무 브리핑`} actions={<AiReadyBadge onClick={() => openAi({ title: "오늘의 업무 브리핑 — AI 적용 설명", key: "brief" })} />} />
+      <PageHeader title={<span className="flex items-center gap-2"><Sparkles size={26} className="text-accent" /> AI 업무 브리핑</span>} desc={`${fmtFull(now)} ${fmtClock(now).slice(0, 5)} 기준 · ${user?.name} ${user?.title}님을 위한 오늘의 업무 브리핑`} actions={<div className="flex items-center gap-2"><AxInsightButton topic="brief" /><AiReadyBadge onClick={() => openAi({ title: "오늘의 업무 브리핑 — AI 적용 설명", key: "brief" })} /></div>} />
       <CeoSummaryCard className="mb-5" />
       {/* 모바일: 숫자 타일 7개가 화면을 다 먹지 않게 한 줄 칩으로. 이 화면의 본체는 목록이다. */}
       <div className="mb-4 flex flex-wrap gap-1.5 md:hidden">

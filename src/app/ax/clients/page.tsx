@@ -5,6 +5,7 @@ import { Suspense, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Building2, ChevronRight, FileSpreadsheet, LayoutGrid, List, Plus, Table2 } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { AxInsightButton } from "@/components/ai/AxInsight";
 import { daysBetween, fmtDate, fmtRelative } from "@/lib/format";
 import { stageLabel } from "@/lib/stages";
 import { PageHeader, Badge, Button, SegmentedControl, EmptyState, Card } from "@/components/ui/ui";
@@ -51,7 +52,7 @@ function ClientsInner() {
 
   return (
     <div>
-      <PageHeader title="기업고객" desc="기업고객 단위로 상담·계약·프로젝트·자료·일정·문의를 연결합니다." badge={<Badge>{st.companies.filter((c) => !c.archived).length}개 기업</Badge>} actions={
+      <PageHeader title="기업고객" desc="기업고객 단위로 상담·계약·프로젝트·자료·일정·문의를 연결합니다." badge={<><Badge>{st.companies.filter((c) => !c.archived).length}개 기업</Badge><AxInsightButton topic="clients" /></>} actions={
         <div className="flex flex-wrap items-center gap-2">
           <SegmentedControl value={view} onChange={setView} options={[{ key: "card", label: <span className="flex items-center gap-1"><LayoutGrid size={14} /> 카드</span> }, { key: "table", label: <span className="flex items-center gap-1"><List size={14} /> 목록</span> }, { key: "board", label: <span className="flex items-center gap-1"><Table2 size={14} /> 현황표</span> }]} />
           {/* 비어 있을 때는 빈 상태 카드 안의 버튼 하나만 둔다 — 같은 버튼이 두 개면 어느 쪽을 눌러야 할지 고민하게 된다 */}

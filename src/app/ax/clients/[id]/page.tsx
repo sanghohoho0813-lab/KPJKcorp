@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Building2, EyeOff, Lock, CalendarDays, ChevronRight, Eye, FileCheck2, FileText, FolderOpen, Mail, MapPin, MessageSquare, MessageSquareText, Phone, Plus, Sparkles, UserRound, Pencil, Archive, ArchiveRestore, UserPlus } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { AxInsightButton } from "@/components/ai/AxInsight";
 import { useUi } from "@/lib/ui-store";
 import { daysBetween, fmtDate, fmtDateTime, fmtSize, relativeDay, fmtRelative, fmtTime } from "@/lib/format";
 import { stageLabel } from "@/lib/stages";
@@ -179,6 +180,7 @@ export default function ClientCardPage() {
               )}
               {may("project.create") && <Button size="sm" variant="outline" icon={<Plus size={15} />} onClick={() => setNewProject(true)}>프로젝트 등록</Button>}
               <Button size="sm" variant="outline" icon={<Eye size={15} />} onClick={() => { setPreview(c.id); router.push("/portal"); }}>고객 화면 보기</Button>
+              <AxInsightButton topic="client" />
               <Button size="sm" variant="outline" icon={<MessageSquareText size={15} />} onClick={() => openDraft({ kind: "progress_update", ctx: { companyName: c.name, contactName: c.contactName, consultantName: consultant?.name, stage: active[0] ? stageLabel(active[0].stage) : "-", note: upcoming[0]?.title } })}>진행 안내 초안</Button>
             </div>
           </div>

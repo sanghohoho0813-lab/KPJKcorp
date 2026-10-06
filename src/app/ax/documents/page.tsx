@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { BellRing, FolderOpen, MessageSquareText, Pencil } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { AxInsightButton } from "@/components/ai/AxInsight";
 import { useUi } from "@/lib/ui-store";
 import { daysBetween, fmtDate, fmtSize, relativeDay } from "@/lib/format";
 import type { DocStatus, DocumentRequest } from "@/lib/types";
@@ -55,7 +56,7 @@ function DocumentsInner() {
 
   return (
     <div>
-      <PageHeader title="자료관리" desc="고객이 Portal에서 제출한 자료가 여기에 도착합니다. 마감 임박·보완필요 항목을 먼저 처리하고, 완성된 결과자료는 결과자료 탭에서 공유 이력을 확인합니다." actions={top === "requests" ? <Button variant="primary" icon={<BellRing size={16} />} onClick={() => setRemind(true)}>리마인드 대상 {remindTargets.length}</Button> : undefined} />
+      <PageHeader title="자료관리" badge={<AxInsightButton topic="documents" />} desc="고객이 Portal에서 제출한 자료가 여기에 도착합니다. 마감 임박·보완필요 항목을 먼저 처리하고, 완성된 결과자료는 결과자료 탭에서 공유 이력을 확인합니다." actions={top === "requests" ? <Button variant="primary" icon={<BellRing size={16} />} onClick={() => setRemind(true)}>리마인드 대상 {remindTargets.length}</Button> : undefined} />
       <Tabs tabs={[{ key: "requests", label: "요청자료", count: counts.missing + counts.waiting + counts.revision }, { key: "results", label: "결과자료", count: st.results.length }]} value={top} onChange={setTop} />
       {top === "results" ? <div className="mt-5"><ResultsGrid /><p className="mt-3 text-[0.8rem] text-ink-3">결과자료를 공유하면 고객 Portal 완료자료에 표시되고 알림이 전송됩니다. 등록은 프로젝트 상세에서 합니다.</p></div>
       : all.length === 0 ? (

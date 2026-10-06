@@ -4,7 +4,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { recordError } from "./error-log";
 import { clearCarryover, loadCarryover, sameCompany, stashLocalCompanies } from "./local-carryover";
-import { buildSeed, type SeedData } from "./demo/seed";
+import { buildSeed, SEED_REV, type SeedData } from "./demo/seed";
 import type {
   OrgInfo,
   User,
@@ -64,6 +64,8 @@ import { loadAll, ORG_SETTING_KEYS, pendingWrites, pushChanges, pushSettings, re
 export interface StoreState extends SeedData {
   hydrated: boolean;
   seededAt: string;
+  /** 데모 샘플 판 — 샘플 내용이 바뀌면(SEED_REV) 저장된 예전 샘플을 새 샘플로 바꾼다 (데모에서만) */
+  seedRev?: string;
   session: Session | null;
   settings: Settings;
   toasts: { id: string; text: string; tone?: "success" | "error" | "info" }[];
@@ -499,7 +501,7 @@ export const useStore = create<StoreState>()(
       ...buildSeed(),
       hydrated: false,
       serverMode: false,
-      seededAt: nowIso(),
+      seededAt: nowIso(), seedRev: SEED_REV,
       session: null,
       settings: DEFAULT_SETTINGS,
       toasts: [],
@@ -515,7 +517,7 @@ export const useStore = create<StoreState>()(
         // 운영 모드에서는 절대 초기화하지 않는다. 실제 데이터가 들어오기 시작하면 이 한 줄이 전부를 지킨다.
         if (get().serverMode || get().settings.liveMode) return;
         const age = Date.now() - new Date(get().seededAt).getTime();
-        if (age > 20 * 3600 * 1000) set({ ...buildSeed(), seededAt: nowIso(), session: get().session, settings: get().settings });
+        if (age > 20 * 3600 * 1000 || get().seedRev !== SEED_REV) set({ ...buildSeed(), seededAt: nowIso(), seedRev: SEED_REV, session: get().session, settings: get().settings });
       },
 
       /**
@@ -2521,7 +2523,7 @@ export const useStore = create<StoreState>()(
         try { window.localStorage.removeItem("kpjk-auth"); } catch { /* 저장소 막힘 */ }
         setDemoForced(true);
         loadingFromServer = true;
-        set({ ...buildSeed(), seededAt: nowIso(), session: null, serverMode: false, syncError: undefined, settings: { ...get().settings, liveMode: false } });
+        set({ ...buildSeed(), seededAt: nowIso(), seedRev: SEED_REV, session: null, serverMode: false, syncError: undefined, settings: { ...get().settings, liveMode: false } });
         loadingFromServer = false;
       },
 
@@ -2562,7 +2564,7 @@ export const useStore = create<StoreState>()(
         // 운영 모드에서는 잠긴다. 초기화하려면 먼저 운영 모드를 꺼야 하고, 그 전환도 기록에 남는다.
         if (st.settings.liveMode) return;
         if (deny(st, "data.manage", "데모 초기화", set)) return;
-        set({ ...buildSeed(), seededAt: nowIso(), session: st.session, settings: { ...st.settings }, toasts: [] });
+        set({ ...buildSeed(), seededAt: nowIso(), seedRev: SEED_REV, session: st.session, settings: { ...st.settings }, toasts: [] });
       },
 
       // ---------- 샘플 지우기 · 다시 보기 ----------

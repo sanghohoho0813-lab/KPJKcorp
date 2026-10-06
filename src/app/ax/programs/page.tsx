@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, Building2, Copy, Download, Link2, Phone, Plus, Trash2, UserPlus, X } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { AxInsightButton } from "@/components/ai/AxInsight";
 import { useMay } from "@/components/domain/EntityModals";
 import { CATEGORY_LABEL, PROGRAM_CATEGORIES, matchPrograms, matchProgram, profileOfCompany, type MatchProfile } from "@/lib/programs";
 import { fetchBizinfo, lastSync, markSynced, newestFetch, openOnly, syncOnServer, type LiveStatus } from "@/lib/programs-client";
@@ -15,6 +16,7 @@ import { Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select, Tabs
 import { Chip } from "@/components/ui/chips";
 import { Modal } from "@/components/ui/overlay";
 import { ProgramCard, MATCH_NOTE } from "@/components/domain/programs/ProgramCard";
+import { MatchStatus } from "@/components/domain/programs/MatchStatus";
 
 type Tab = "programs" | "companies" | "leads";
 const LEAD_STATUS: Record<LeadStatus, { label: string; tone: "accent" | "info" | "success" | "neutral" }> = {
@@ -120,7 +122,7 @@ export default function ProgramsPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="지원사업 매칭" badge={<Badge tone="accent">베타</Badge>}
+      <PageHeader title="지원사업 매칭" badge={<><Badge tone="accent">베타</Badge><AxInsightButton topic="programs" /></>}
         desc="공고를 고객·가망고객의 조건과 맞춰 봅니다. 자격 판정이 아니라 '검토해 볼 공고'와 그 근거입니다."
         actions={may("program.manage") ? <>
           <Button variant="outline" icon={<Download size={15} />} onClick={() => void sync(true)} disabled={busy}>{busy ? "불러오는 중…" : "기업마당에서 불러오기"}</Button>
@@ -154,7 +156,9 @@ export default function ProgramsPage() {
           </div>
           <p className="text-[0.78rem] text-ink-3">{MATCH_NOTE}</p>
           {shown.length === 0 ? (
-            <Card><EmptyState icon={<Bell size={28} />} title={programs.length ? "조건에 맞는 공고가 없습니다" : "아직 공고가 없습니다"} desc={programs.length ? "필터를 '전체'로 바꿔 보세요." : "기업마당에서 불러오거나 공고를 직접 추가하세요."} /></Card>
+            q.trim() || filter !== "matched"
+              ? <Card><EmptyState icon={<Bell size={28} />} title="조건에 맞는 공고가 없습니다" desc={programs.length ? "검색어를 지우거나 필터를 '전체'로 바꿔 보세요." : "기업마당에서 불러오거나 공고를 직접 추가하세요."} /></Card>
+              : <MatchStatus checked={programs.length} companies={companies} lastAt={Math.max(newestFetch(st.programs), Date.parse(lastSync() ?? "") || 0)} live={busy ? "loading" : live} />
           ) : shown.map((p) => {
             const info = byProgram.get(p.id) ?? { companies: [], leads: 0 };
             const pending = info.companies.filter((c) => !p.notified.includes(c.id));

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { AlertTriangle, ArrowRight, BookOpen, CalendarDays, FolderOpen, MessageSquare, ShieldCheck, Sparkles, TrendingUp } from "lucide-react";
 import { useStore, useCurrentUser } from "@/lib/store";
+import { AxInsightButton } from "@/components/ai/AxInsight";
 import { useUi } from "@/lib/ui-store";
 import { buildBrief, briefSummaryCounts } from "@/lib/brief";
 import { daysBetween, isSameDay, fmtRelative, fmtFull, fmtWon } from "@/lib/format";
@@ -48,9 +49,9 @@ export default function DashboardPage() {
           <h1 className="text-[1.75rem] font-bold md:text-[2rem]">오늘 확인할 일</h1>
           <p className="mt-1 text-[0.95rem] text-ink-2">{user?.name} {user?.title}님, {isConsultant ? "담당 고객 기준으로" : "회사 전체 기준으로"} 먼저 봐야 할 이슈를 우선순위로 정리했습니다.</p>
         </div>
-        <Link href="/ax/why" className="pressable hidden items-center gap-1.5 rounded-lg px-3 py-2 text-[0.85rem] font-semibold text-ink-2 hover:bg-surface-2 md:flex">
+        <div className="flex items-center gap-1.5"><AxInsightButton topic="dashboard" /><Link href="/ax/why" className="pressable hidden items-center gap-1.5 rounded-lg px-3 py-2 text-[0.85rem] font-semibold text-ink-2 hover:bg-surface-2 md:flex">
           <BookOpen size={16} /> 왜 이 AX를 만들었나요? <ArrowRight size={14} className="arrow-slide" />
-        </Link>
+        </Link></div>
       </div>
 
       <FirstRunOrCoach />

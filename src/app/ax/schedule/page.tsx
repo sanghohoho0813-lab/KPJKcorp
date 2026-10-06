@@ -4,6 +4,7 @@ import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { CalendarDays, ChevronLeft, ChevronRight, List, Plus } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { AxInsightButton } from "@/components/ai/AxInsight";
 import { SCHEDULE_TYPE } from "@/lib/stages";
 import { isSameDay, fmtTime } from "@/lib/format";
 import { Badge, Button, Card, PageHeader, SegmentedControl, Tabs, cx, EmptyState } from "@/components/ui/ui";
@@ -56,7 +57,7 @@ function ScheduleInner() {
 
   return (
     <div>
-      <PageHeader title="일정 · 공지" desc="상담·미팅·자료 제출기한·후속연락 일정과, 고객에게 알리는 공지를 관리합니다. 모든 일정은 기업·프로젝트와 연결됩니다." actions={tab === "notice" ? undefined : <><SegmentedControl value={view} onChange={setView} options={[{ key: "list", label: <span className="flex items-center gap-1"><List size={14} /> 목록</span> }, { key: "calendar", label: <span className="flex items-center gap-1"><CalendarDays size={14} /> 달력</span> }]} /><Button variant="accent" icon={<Plus size={16} />} onClick={() => setOpen(true)}>일정 등록</Button></>} />
+      <PageHeader title="일정 · 공지" badge={<AxInsightButton topic="schedule" />} desc="상담·미팅·자료 제출기한·후속연락 일정과, 고객에게 알리는 공지를 관리합니다. 모든 일정은 기업·프로젝트와 연결됩니다." actions={tab === "notice" ? undefined : <><SegmentedControl value={view} onChange={setView} options={[{ key: "list", label: <span className="flex items-center gap-1"><List size={14} /> 목록</span> }, { key: "calendar", label: <span className="flex items-center gap-1"><CalendarDays size={14} /> 달력</span> }]} /><Button variant="accent" icon={<Plus size={16} />} onClick={() => setOpen(true)}>일정 등록</Button></>} />
       <Tabs tabs={[{ key: "schedule", label: "일정" }, { key: "notice", label: "고객 공지", count: liveNotices }]} value={tab} onChange={setTab} />
       <div className="mt-5" />
       {tab === "notice" ? <NoticeManager /> : <>

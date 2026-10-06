@@ -6,6 +6,9 @@ import { addDays, iso } from "../format";
  * 모든 날짜는 "오늘" 기준 상대값으로 생성되어 시연이 항상 현재처럼 보인다.
  * 실데이터 연결 시 이 파일만 교체한다 (UI 재작성 없음).
  */
+/** 샘플 내용의 판 — 샘플을 고치면 올린다. 데모 브라우저에 저장된 예전 샘플이 다음 접속 때 새 샘플로 바뀐다. */
+export const SEED_REV = "2026-10-06";
+
 export interface SeedData {
   users: User[];
   companies: Company[];
@@ -261,6 +264,150 @@ export function buildSeed(now = new Date()): SeedData {
     { id: "nt_7", audience: "internal", companyId: "co_d", title: "자료 기한 초과: 디원건설", body: "표준 보고양식 적용 결과 (2주차) 마감 2일 지남", at: d(0, 7), read: false, href: "/ax/documents" },
   ];
 
+  /* ---------- 회사별 이야기 보강 — 6개가 서로 다른 단계에 있게 ----------
+   *  A 에이정밀   : 검토(중간 보고 직전) · 승계 준비
+   *  B 비앤테크   : 자료수집 — 고객 회신 대기
+   *  C 씨엠푸드   : 결과작성 — 사업계획서 초안 공유, 연간 자문 계약 진행
+   *  D 디원건설   : 진행 중 — 자료 지연 · 매출 감소 · 중도금 연체(경고 예시)
+   *  E 이플러스바이오: 상담 초기 — 제안·승인 대기, 첫 자료 요청
+   *  F 에프물류   : 완료 → 사후관리 — 추가 과제(인사노무) 탐색
+   * 숫자는 모두 샘플 회사의 예시 값이다(화면에 "샘플"·"예시"로 표시). 실제 고객·실적이 아니다. */
+  const Y = now.getFullYear();
+  const fin = (rows: [number, number, number?][]) => rows.map(([year, revenue, operatingProfit]) => ({ year, revenue, ...(operatingProfit !== undefined ? { operatingProfit } : {}), source: "재무제표(예시)" }));
+  const more: Record<string, Partial<Company>> = {
+    co_a: { corpNo: "000000-0000001" },
+    co_b: { entityType: "corporation", establishedAt: "2017-03-15", bizCategory: "정보통신업", bizItem: "응용 소프트웨어 개발", region: "서울", corpNo: "000000-0000002", contractStartedAt: d(-18).slice(0, 10),
+      financials: fin([[Y - 3, 5_100_000_000, 310_000_000], [Y - 2, 5_900_000_000, 420_000_000], [Y - 1, 6_800_000_000, 560_000_000]]) },
+    co_c: { entityType: "corporation", establishedAt: "2012-06-01", bizCategory: "제조업", bizItem: "소스·간편식 제조", region: "충북", corpNo: "000000-0000003", contractStartedAt: d(-55).slice(0, 10),
+      financials: fin([[Y - 3, 12_800_000_000, 610_000_000], [Y - 2, 14_100_000_000, 720_000_000], [Y - 1, 15_000_000_000, 790_000_000]]) },
+    co_d: { entityType: "corporation", establishedAt: "2004-09-20", bizCategory: "건설업", bizItem: "건축공사업", region: "대전", corpNo: "000000-0000004", contractStartedAt: d(-60).slice(0, 10),
+      financials: fin([[Y - 3, 28_100_000_000, 1_120_000_000], [Y - 2, 27_400_000_000, 830_000_000], [Y - 1, 26_000_000_000, 540_000_000]]) },
+    co_e: { entityType: "corporation", establishedAt: "2024-05-10", bizCategory: "제조업", bizItem: "바이오 소재", region: "인천", corpNo: "000000-0000005",
+      financials: fin([[Y - 1, 3_500_000_000]]) },
+    co_f: { entityType: "corporation", establishedAt: "2010-02-01", bizCategory: "운수 및 창고업", bizItem: "화물자동차 운송", region: "경기", corpNo: "000000-0000006", contractStartedAt: d(-115).slice(0, 10),
+      financials: fin([[Y - 3, 8_100_000_000, 290_000_000], [Y - 2, 8_600_000_000, 350_000_000], [Y - 1, 9_200_000_000, 470_000_000]]) },
+  };
+  for (const c of companies) Object.assign(c, more[c.id] ?? {});
+  // 서류 확인 기록 — 담당자가 서류에서 회사 정보를 읽어 반영한 기록(파일 자체는 넣지 않는다). D·E는 아직 확인 전
+  const docRead = (days: number, corp = true) => ({
+    bizReg: { fileName: "사업자등록증.pdf", size: 210_000, readAt: d(days), method: "pdf_text" as const, fields: ["bizNo", "ceo", "address", "bizCategory", "bizItem"] },
+    ...(corp ? { corpReg: { fileName: "법인등기부등본.pdf", size: 480_000, readAt: d(days), method: "pdf_text" as const, fields: ["corpNo", "establishedAt"] } } : {}),
+  });
+  const docsOf: Record<string, Company["docs"]> = { co_a: docRead(-38), co_c: docRead(-50), co_f: docRead(-112), co_b: docRead(-3, false) };
+  for (const c of companies) if (docsOf[c.id]) c.docs = docsOf[c.id];
+
+  // 계약 금액·종료일 — 종료일이 가까운 계약은 "계약 만료 전 갱신 협의" 규칙 업무가 실제로 만들어진다
+  const ctMore: Record<string, Partial<Contract>> = {
+    ct_a1: { amount: 18_000_000, endDate: d(20).slice(0, 10) }, ct_a2: { amount: 6_000_000, endDate: d(-20).slice(0, 10) },
+    ct_b1: { amount: 7_500_000, endDate: d(40).slice(0, 10) }, ct_c1: { amount: 15_000_000, endDate: d(9).slice(0, 10) },
+    ct_c2: { amount: 12_000_000 }, ct_d1: { amount: 20_000_000, endDate: d(12).slice(0, 10) }, ct_f1: { amount: 16_000_000, endDate: d(-30).slice(0, 10) },
+  };
+  for (const k of contracts) Object.assign(k, ctMore[k.id] ?? {});
+
+  consultations.push(
+    { id: "cs_b2", companyId: "co_b", projectId: "pj_b1", date: d(-9, 11), consultantId: "u_lee", type: "후속상담", channel: "전화",
+      notes: "최수진 팀장 통화. 연구전담요원 후보 5명 중 2명의 재직증명·학위증명 회신이 늦어지는 중. 평면도는 이번 주 안에 전달 예정. 계약직 개발자 포함 여부 재확인.",
+      summary: { core: ["후보 5명 중 2명 증빙 회신 지연", "평면도 이번 주 전달 예정"], requirements: ["증빙 회신 일정 확정"], promises: ["누락 증빙 목록 다시 정리해 송부"], documents: ["재직증명서", "학위증명서", "사무실 평면도"], nextAction: "누락 증빙 회신 확인 후 요건 판정" } },
+    { id: "cs_c3", companyId: "co_c", projectId: "pj_c1", date: d(-20, 15), consultantId: "u_park", type: "대표미팅", channel: "방문",
+      notes: "기관별 요건 비교표 설명. 시설자금 위주로 준비하기로 결정. 사업계획서 목차 합의, 재무 파트는 회계법인 자료 수령 후 작성.",
+      summary: { core: ["시설자금 중심으로 준비 결정", "사업계획서 목차 합의"], requirements: ["재무 추정은 보수적으로"], promises: ["초안 2주 내 공유"], documents: ["회계법인 결산 확정본"], nextAction: "사업계획서 초안 작성" } },
+    { id: "cs_d2", companyId: "co_d", projectId: "pj_d1", date: d(-30, 10), consultantId: "u_jung", type: "정기미팅", channel: "방문",
+      notes: "표준 보고양식 1주차 적용 점검. 현장 3곳 중 2곳은 양식대로 제출, 1곳은 기존 카톡 보고 유지. 현장소장 대상 10분 설명회 필요. 원가 집계 누락 항목(장비 임차료) 확인.",
+      summary: { core: ["3곳 중 2곳 표준양식 적용", "장비 임차료 원가 누락 확인"], requirements: ["현장소장 설명회", "누락 항목 집계 기준 정리"], promises: ["설명 자료 1장 제공"], documents: ["2주차 적용 결과"], nextAction: "2주차 적용 결과 수령 후 개선안 정리" } },
+    { id: "cs_f1", companyId: "co_f", projectId: "pj_f1", date: d(-122, 14), consultantId: "u_jung", type: "초기상담", channel: "방문",
+      notes: "윤태호 대표. 배차는 담당자 기억에, 정산은 월말 수기 대사에 의존. 정산 오류로 화주 문의가 잦음. 배차·정산 프로세스 개선 요청.",
+      summary: { core: ["배차가 담당자 기억에 의존", "월말 정산 수기 대사로 오류 잦음"], requirements: ["배차·정산 표준 프로세스"], promises: ["현황 진단 후 개선안"], documents: ["배차 일지 3개월", "정산 내역"], nextAction: "계약 및 자료 요청" } },
+    { id: "cs_f2", companyId: "co_f", projectId: "pj_f1", date: d(-28, 16), consultantId: "u_jung", type: "정기미팅", channel: "화상",
+      notes: "사후관리 1차 점검. 정산 표준양식 v2 정착. 정산 관련 화주 문의 감소 체감. 인력 54명으로 늘며 근로계약·취업규칙 정비 필요성 언급.",
+      summary: { core: ["정산 표준양식 정착", "인력 증가로 인사노무 정비 필요"], requirements: ["근로계약·취업규칙 점검"], promises: ["인사노무 점검 범위 안내"], documents: ["사후관리 운영 지표"], nextAction: "2차 정기 점검 및 인사노무 제안 검토" } },
+  );
+
+  docRequests.push(
+    { id: "dr_c5", projectId: "pj_c1", companyId: "co_c", name: "정책자금 신청서 날인본", description: "최종 신청서에 대표이사 날인 (초안 확정 후 양식 제공)", requestedAt: d(-2), dueDate: d(6), status: "planned", assigneeId: "u_park", files: [] },
+    { id: "dr_d5", projectId: "pj_d1", companyId: "co_d", name: "9월 현장 원가 집계표", description: "표준양식으로 집계한 9월 현장별 원가", requestedAt: d(-10), dueDate: d(-1), status: "submitted", assigneeId: "u_jung", submittedAt: d(-2), files: [{ id: "f_d5", fileName: "9월_현장원가_집계.xlsx", size: 230_000, uploadedAt: d(-2), uploadedBy: "c_d", version: 1 }] },
+    { id: "dr_e1", projectId: "pj_e1", companyId: "co_e", name: "사업자등록증", description: "최신 사업자등록증 사본", requestedAt: d(-2), dueDate: d(4, 18), status: "requested", assigneeId: "u_lee", files: [] },
+    { id: "dr_e2", projectId: "pj_e1", companyId: "co_e", name: "정관", description: "현재 정관 전문 (최근 변경분 포함)", requestedAt: d(-2), dueDate: d(4, 18), status: "requested", assigneeId: "u_lee", files: [] },
+    { id: "dr_e3", projectId: "pj_e1", companyId: "co_e", name: "주주명부", description: "주주별 주식 수 · 지분율", requestedAt: d(-2), dueDate: d(4, 18), status: "submitted", assigneeId: "u_lee", submittedAt: d(-1, 15), files: [{ id: "f_e3", fileName: "주주명부_2026.pdf", size: 180_000, uploadedAt: d(-1, 15), uploadedBy: "c_e", version: 1 }] },
+    { id: "dr_f3", projectId: "pj_f1", companyId: "co_f", name: "사후관리 운영 지표 (3개월)", description: "월별 정산 오류 건수 · 배차 지연 건수 — 개선 후 변화 확인용", requestedAt: d(-5), dueDate: d(5), status: "requested", assigneeId: "u_jung", files: [] },
+  );
+
+  schedules.push(
+    { id: "sc_14", companyId: "co_e", projectId: "pj_e1", title: "이플러스바이오 정관·사업자등록증 제출기한", type: "doc_due", start: d(4, 18), assigneeId: "u_lee", visibleToClient: true },
+    { id: "sc_15", companyId: "co_d", projectId: "pj_d1", title: "디원건설 현장소장 표준양식 설명회", type: "meeting", start: d(3, 16), end: d(3, 16, 30), location: "디원건설 대전 본사 (화상 병행)", assigneeId: "u_jung", visibleToClient: true },
+    { id: "sc_16", companyId: "co_b", projectId: "pj_b1", title: "비앤테크 연구전담요원 증빙 회신 기한", type: "doc_due", start: d(2, 18), assigneeId: "u_lee", visibleToClient: true },
+  );
+
+  tasks.push(
+    { id: "tk_13", companyId: "co_e", projectId: "pj_e1", title: "이플러스바이오 주주명부 검토", type: "자료검토", dueDate: d(1, 18), assigneeId: "u_lee", status: "todo", priority: "normal", createdAt: d(-1, 15), source: "auto" },
+    { id: "tk_14", companyId: "co_d", projectId: "pj_d1", title: "디원건설 문의 답변 — 휴대폰 보고 입력", type: "문의응대", dueDate: d(0, 18), assigneeId: "u_jung", status: "todo", priority: "urgent", createdAt: d(-2, 9), source: "auto" },
+    { id: "tk_15", companyId: "co_d", projectId: "pj_d1", title: "디원건설 9월 현장 원가 집계표 검토", type: "자료검토", dueDate: d(1, 18), assigneeId: "u_jung", status: "doing", priority: "normal", createdAt: d(-2, 10), source: "auto" },
+    { id: "tk_16", companyId: "co_b", projectId: "pj_b1", title: "비앤테크 연구공간 현장 확인 준비", type: "미팅준비", dueDate: d(3, 18), assigneeId: "u_lee", status: "todo", priority: "normal", createdAt: d(-1) },
+    { id: "tk_17", companyId: "co_c", projectId: "pj_c1", title: "씨엠푸드 사업계획서 초안 공유", type: "보고서", dueDate: d(-2, 18), assigneeId: "u_park", status: "done", priority: "normal", createdAt: d(-8), completedAt: d(-2, 17) },
+    { id: "tk_18", companyId: "co_f", projectId: "pj_f1", title: "에프물류 인사노무 점검 범위 안내", type: "후속연락", dueDate: d(4, 18), assigneeId: "u_jung", status: "todo", priority: "low", createdAt: d(-2) },
+  );
+
+  inquiries.push(
+    { id: "iq_5", companyId: "co_d", projectId: "pj_d1", title: "현장 보고를 휴대폰으로 입력할 수 있나요?", category: "기타", createdAt: d(-2, 8, 40), createdBy: "c_d", status: "open", assigneeId: "u_jung",
+      messages: [{ id: "m_8", authorId: "c_d", authorRole: "client", body: "현장소장님들이 엑셀 양식을 PC에서만 작성할 수 있어 보고가 늦어집니다. 휴대폰으로 입력하는 방법이 있을까요?", createdAt: d(-2, 8, 40) }] },
+    { id: "iq_6", companyId: "co_e", projectId: "pj_e1", title: "벤처기업확인을 받으면 무엇이 달라지나요?", category: "진행상황", createdAt: d(-2, 10), createdBy: "c_e", status: "answered", assigneeId: "u_lee",
+      messages: [
+        { id: "m_9", authorId: "c_e", authorRole: "client", body: "벤처기업확인을 받으면 회사 입장에서 무엇이 달라지는지, 지금 준비해야 할 것이 있는지 궁금합니다.", createdAt: d(-2, 10) },
+        { id: "m_10", authorId: "u_lee", authorRole: "consultant", body: "확인 유형별 요건이 달라 먼저 회사 현황을 보고 맞는 유형을 정리해 드리겠습니다. 정관·주주명부·사업자등록증을 요청자료에 올려 주시면 사전 점검표로 안내드리겠습니다.", createdAt: d(-2, 14) },
+      ] },
+    { id: "iq_7", companyId: "co_f", projectId: "pj_f1", title: "사후관리 기간이 끝난 뒤에도 문의할 수 있나요?", category: "기타", createdAt: d(-7, 15), createdBy: "c_f", status: "answered", assigneeId: "u_jung",
+      messages: [
+        { id: "m_11", authorId: "c_f", authorRole: "client", body: "사후관리 기간이 끝난 뒤에도 정산 양식 관련해서 문의드려도 될까요?", createdAt: d(-7, 15) },
+        { id: "m_12", authorId: "u_jung", authorRole: "consultant", body: "네, 이 화면의 문의하기로 계속 남겨 주시면 됩니다. 기간 종료 전 2차 점검에서 이후 관리 방법도 함께 정리하겠습니다.", createdAt: d(-7, 17) },
+      ] },
+  );
+
+  results.push(
+    { id: "rs_5", projectId: "pj_c1", companyId: "co_c", name: "정책자금 사업계획서 초안 v1", kind: "보고서", sharedAt: d(-2, 17), sharedBy: "u_park", size: 2_700_000, description: "재무 파트 제외 초안 — 대표 검토용. 의견은 문의하기로 남겨 주세요." },
+    { id: "rs_6", projectId: "pj_b1", companyId: "co_b", name: "연구소 설립 요건 체크리스트", kind: "체크리스트", sharedAt: d(-15, 10), sharedBy: "u_lee", size: 160_000, description: "연구전담요원 · 연구공간 · 신고서류 요건 점검표" },
+    { id: "rs_7", projectId: "pj_d1", companyId: "co_d", name: "현장 보고 표준양식 v1", kind: "체크리스트", sharedAt: d(-35, 15), sharedBy: "u_jung", size: 140_000, description: "현장별 주간 원가·공정 보고 표준양식과 작성 예시" },
+    { id: "rs_8", projectId: "pj_e1", companyId: "co_e", name: "벤처기업확인 사전 점검표", kind: "체크리스트", sharedAt: d(-1, 16), sharedBy: "u_lee", size: 120_000, description: "확인 유형별 요건과 준비 서류 — 상담 내용 기준 1차 점검" },
+  );
+
+  activities.push(
+    { id: "ac_b1", type: "portal_login", companyId: "co_b", actorId: "c_b", actorRole: "client", at: d(-1, 9, 5), text: "고객 Portal 접속" },
+    { id: "ac_b2", type: "result_downloaded", companyId: "co_b", projectId: "pj_b1", actorId: "c_b", actorRole: "client", at: d(-14, 9), text: "결과자료 열람: 연구소 설립 요건 체크리스트" },
+    { id: "ac_b3", type: "result_shared", companyId: "co_b", projectId: "pj_b1", actorId: "u_lee", actorRole: "consultant", at: d(-15, 10), text: "결과자료 공유: 연구소 설립 요건 체크리스트" },
+    { id: "ac_b4", type: "consultation_logged", companyId: "co_b", projectId: "pj_b1", actorId: "u_lee", actorRole: "consultant", at: d(-9, 11, 30), text: "후속상담 기록 (전화)" },
+    { id: "ac_c1", type: "consultation_logged", companyId: "co_c", projectId: "pj_c1", actorId: "u_park", actorRole: "consultant", at: d(-62, 12), text: "씨엠푸드 초기상담 기록" },
+    { id: "ac_c2", type: "contract_signed", companyId: "co_c", projectId: "pj_c1", actorId: "c_c", actorRole: "client", at: d(-55, 10), text: "정책자금 준비 컨설팅 계약 서명" },
+    { id: "ac_c3", type: "document_uploaded", companyId: "co_c", projectId: "pj_c1", actorId: "c_c", actorRole: "client", at: d(-47, 14), text: "고객 제출: 재무제표 3년" },
+    { id: "ac_c4", type: "result_shared", companyId: "co_c", projectId: "pj_c1", actorId: "u_park", actorRole: "consultant", at: d(-2, 17), text: "결과자료 공유: 정책자금 사업계획서 초안 v1" },
+    { id: "ac_c5", type: "portal_login", companyId: "co_c", actorId: "c_c", actorRole: "client", at: d(-1, 10, 40), text: "고객 Portal 접속" },
+    { id: "ac_c6", type: "result_downloaded", companyId: "co_c", projectId: "pj_c1", actorId: "c_c", actorRole: "client", at: d(-1, 10, 42), text: "결과자료 열람: 정책자금 사업계획서 초안 v1" },
+    { id: "ac_d1", type: "contract_signed", companyId: "co_d", projectId: "pj_d1", actorId: "c_d", actorRole: "client", at: d(-60, 15), text: "운영개선 컨설팅 계약 서명" },
+    { id: "ac_d2", type: "result_shared", companyId: "co_d", projectId: "pj_d1", actorId: "u_jung", actorRole: "consultant", at: d(-35, 15), text: "결과자료 공유: 현장 보고 표준양식 v1" },
+    { id: "ac_d3", type: "result_downloaded", companyId: "co_d", projectId: "pj_d1", actorId: "c_d", actorRole: "client", at: d(-34, 8, 30), text: "결과자료 열람: 현장 보고 표준양식 v1" },
+    { id: "ac_d4", type: "inquiry_created", companyId: "co_d", projectId: "pj_d1", actorId: "c_d", actorRole: "client", at: d(-2, 8, 40), text: "고객 문의: 현장 보고를 휴대폰으로 입력할 수 있나요?" },
+    { id: "ac_d5", type: "document_uploaded", companyId: "co_d", projectId: "pj_d1", actorId: "c_d", actorRole: "client", at: d(-2, 10), text: "고객 제출: 9월 현장 원가 집계표" },
+    { id: "ac_d6", type: "task_created", companyId: "co_d", projectId: "pj_d1", actorId: "u_admin", actorRole: "system", at: d(-2, 10), text: "자동 생성: 9월 현장 원가 집계표 검토 Task" },
+    { id: "ac_e1", type: "inquiry_created", companyId: "co_e", projectId: "pj_e1", actorId: "c_e", actorRole: "client", at: d(-2, 10), text: "고객 문의: 벤처기업확인을 받으면 무엇이 달라지나요?" },
+    { id: "ac_e2", type: "inquiry_answered", companyId: "co_e", projectId: "pj_e1", actorId: "u_lee", actorRole: "consultant", at: d(-2, 14), text: "문의 답변: 벤처기업확인 관련" },
+    { id: "ac_e3", type: "document_requested", companyId: "co_e", projectId: "pj_e1", actorId: "u_lee", actorRole: "consultant", at: d(-2, 15), text: "자료 3건 요청 (사업자등록증 · 정관 · 주주명부)" },
+    { id: "ac_e4", type: "document_uploaded", companyId: "co_e", projectId: "pj_e1", actorId: "c_e", actorRole: "client", at: d(-1, 15), text: "고객 제출: 주주명부" },
+    { id: "ac_e5", type: "task_created", companyId: "co_e", projectId: "pj_e1", actorId: "u_admin", actorRole: "system", at: d(-1, 15), text: "자동 생성: 주주명부 검토 Task" },
+    { id: "ac_e6", type: "result_shared", companyId: "co_e", projectId: "pj_e1", actorId: "u_lee", actorRole: "consultant", at: d(-1, 16), text: "결과자료 공유: 벤처기업확인 사전 점검표" },
+    { id: "ac_f1", type: "contract_signed", companyId: "co_f", projectId: "pj_f1", actorId: "c_f", actorRole: "client", at: d(-115, 11), text: "운영개선 컨설팅 계약 서명" },
+    { id: "ac_f2", type: "consultation_logged", companyId: "co_f", projectId: "pj_f1", actorId: "u_jung", actorRole: "consultant", at: d(-28, 17), text: "사후관리 1차 정기 점검 기록" },
+    { id: "ac_f3", type: "result_downloaded", companyId: "co_f", projectId: "pj_f1", actorId: "c_f", actorRole: "client", at: d(-29, 9), text: "결과자료 열람: 운영개선 최종 보고서" },
+    { id: "ac_f4", type: "portal_login", companyId: "co_f", actorId: "c_f", actorRole: "client", at: d(-5, 13), text: "고객 Portal 접속" },
+    { id: "ac_f5", type: "document_requested", companyId: "co_f", projectId: "pj_f1", actorId: "u_jung", actorRole: "consultant", at: d(-5, 10), text: "자료 요청: 사후관리 운영 지표 (3개월)" },
+    { id: "ac_a27", type: "result_downloaded", companyId: "co_a", projectId: "pj_a2", actorId: "c_a", actorRole: "client", at: d(-21, 9), text: "결과자료 열람: 메인비즈 인증 신청서 최종본" },
+  );
+
+  notifications.push(
+    { id: "nt_8", audience: "client", companyId: "co_c", title: "결과자료가 공유되었습니다", body: "정책자금 사업계획서 초안 v1을 완료자료에서 확인하세요.", at: d(-2, 17), read: true, href: "/portal/results" },
+    { id: "nt_9", audience: "client", companyId: "co_d", title: "자료 기한이 지났습니다", body: "표준 보고양식 적용 결과 (2주차) — 기한이 지났습니다. 올려 주시면 바로 검토합니다.", at: d(0, 7), read: false, href: "/portal/documents" },
+    { id: "nt_10", audience: "client", companyId: "co_e", title: "새 자료 요청 3건", body: "사업자등록증 · 정관 · 주주명부를 요청자료에서 올려 주세요.", at: d(-2, 15), read: true, href: "/portal/documents" },
+    { id: "nt_11", audience: "client", companyId: "co_f", title: "새 자료 요청: 사후관리 운영 지표", body: "다음 정기 점검 전에 올려 주세요.", at: d(-5, 10), read: false, href: "/portal/documents" },
+    { id: "nt_12", audience: "internal", companyId: "co_d", title: "새 문의: 디원건설", body: "현장 보고를 휴대폰으로 입력할 수 있나요?", at: d(-2, 8, 40), read: false, href: "/ax/inquiries" },
+    { id: "nt_13", audience: "internal", companyId: "co_e", title: "새 자료 도착: 이플러스바이오", body: "주주명부가 제출되었습니다.", at: d(-1, 15), read: false, href: "/ax/documents" },
+  );
+
   activities.sort((a, b) => b.at.localeCompare(a.at));
   notifications.sort((a, b) => b.at.localeCompare(a.at));
   /* ---------- 매출기회 (고객 관심 → 내부 기회) ---------- */
@@ -380,15 +527,49 @@ export function buildSeed(now = new Date()): SeedData {
   // 고객 관리 — 샘플 기업에만. 금액·서류 파일은 넣지 않는다(지어낸 숫자·가짜 서류를 만들지 않는다)
   const companyVaults: CompanyVault[] = [];
   const companyFiles: CompanyFile[] = [];
-  const payments: Payment[] = [];
+  // 수금 — 샘플 계약의 예시 금액(대표만 보는 계약·수금 탭). 디원건설 중도금은 기한이 지나 "연체" 경고 예시가 된다
+  const ymd = (n: number) => d(n).slice(0, 10);
+  const CT: Record<string, string> = { co_a: d(-40), co_b: d(-18), co_c: d(-55), co_d: d(-60), co_f: d(-115) };
+  const payments: Payment[] = [
+    { id: "pm_a1", companyId: "co_a", createdAt: CT["co_a"], projectId: "pj_a1", kind: "deposit", label: "계약금", amount: 9_000_000, dueDate: ymd(-40), receivedAt: ymd(-39), note: "샘플 금액" },
+    { id: "pm_a2", companyId: "co_a", createdAt: CT["co_a"], projectId: "pj_a1", kind: "interim", label: "잔금 (최종 보고 후)", amount: 9_000_000, dueDate: ymd(14), note: "샘플 금액" },
+    { id: "pm_b1", companyId: "co_b", createdAt: CT["co_b"], projectId: "pj_b1", kind: "deposit", label: "계약금", amount: 3_750_000, dueDate: ymd(-18), receivedAt: ymd(-17), note: "샘플 금액" },
+    { id: "pm_b2", companyId: "co_b", createdAt: CT["co_b"], projectId: "pj_b1", kind: "interim", label: "잔금 (설립 신고 후)", amount: 3_750_000, dueDate: ymd(30), note: "샘플 금액" },
+    { id: "pm_c1", companyId: "co_c", createdAt: CT["co_c"], projectId: "pj_c1", kind: "deposit", label: "착수금", amount: 7_500_000, dueDate: ymd(-55), receivedAt: ymd(-54), note: "샘플 금액" },
+    { id: "pm_c2", companyId: "co_c", createdAt: CT["co_c"], projectId: "pj_c1", kind: "success", label: "성공보수 (승인 시 · 금액 미정)", note: "승인 결과에 따라 계약서 기준으로 정산" },
+    { id: "pm_d1", companyId: "co_d", createdAt: CT["co_d"], projectId: "pj_d1", kind: "deposit", label: "계약금", amount: 10_000_000, dueDate: ymd(-60), receivedAt: ymd(-59), note: "샘플 금액" },
+    { id: "pm_d2", companyId: "co_d", createdAt: CT["co_d"], projectId: "pj_d1", kind: "interim", label: "중도금 (중간 점검 후)", amount: 6_000_000, dueDate: ymd(-6), note: "샘플 금액 · 입금 확인 필요" },
+    { id: "pm_f1", companyId: "co_f", createdAt: CT["co_f"], projectId: "pj_f1", kind: "deposit", label: "계약금", amount: 8_000_000, dueDate: ymd(-115), receivedAt: ymd(-114), note: "샘플 금액" },
+    { id: "pm_f2", companyId: "co_f", createdAt: CT["co_f"], projectId: "pj_f1", kind: "interim", label: "잔금", amount: 8_000_000, dueDate: ymd(-30), receivedAt: ymd(-29), note: "샘플 금액" },
+  ];
   const journal: JournalEntry[] = [
     { id: "jn_a1", companyId: "co_a", type: "call", content: "대표님 통화 — 중간 보고 일정은 다음 주 초로 잡기로 함. 매출채권 자료는 경리 담당이 준비 중.", entryDate: d(-2).slice(0, 10), authorId: "u_park", createdAt: d(-2, 16) },
     { id: "jn_a2", companyId: "co_a", type: "decision", content: "원가 진단 범위를 본사 공장 1곳으로 한정. 2공장은 다음 단계에서 별도 논의.", entryDate: d(-12).slice(0, 10), pinned: true, authorId: "u_park", createdAt: d(-12, 11) },
   ];
+  journal.push(
+    { id: "jn_b1", companyId: "co_b", type: "blocker", content: "연구전담요원 후보 2명 학위증명 회신 지연 — 다음 주까지 안 오면 후보 교체안 제시.", entryDate: d(-3).slice(0, 10), pinned: true, authorId: "u_lee", createdAt: d(-3, 17) },
+    { id: "jn_c1", companyId: "co_c", type: "decision", content: "시설자금 중심으로 신청 범위 확정. 운전자금은 다음 분기 별도 검토.", entryDate: d(-20).slice(0, 10), pinned: true, authorId: "u_park", createdAt: d(-20, 17) },
+    { id: "jn_c2", companyId: "co_c", type: "call", content: "대표님 통화 — 초안 잘 받았고 이번 주 금요일까지 의견 주기로 함.", entryDate: d(-1).slice(0, 10), authorId: "u_park", createdAt: d(-1, 11) },
+    { id: "jn_d1", companyId: "co_d", type: "blocker", content: "현장 1곳이 아직 카톡 보고 유지. 설명회 후에도 안 바뀌면 관리이사님께 직접 요청.", entryDate: d(-9).slice(0, 10), pinned: true, authorId: "u_jung", createdAt: d(-9, 18) },
+    { id: "jn_e1", companyId: "co_e", type: "idea", content: "투자 유치 일정이 잡히면 정관 정비와 벤처확인을 같은 흐름으로 묶어 제안.", entryDate: d(-3).slice(0, 10), authorId: "u_lee", createdAt: d(-3, 12) },
+    { id: "jn_f1", companyId: "co_f", type: "win", content: "사후관리 1차 점검 — 정산 표준양식 정착 확인. 대표님 만족, 다른 운수업체 소개 의향 언급.", entryDate: d(-28).slice(0, 10), pinned: true, authorId: "u_jung", createdAt: d(-28, 18) },
+  );
+
+  notices.push(
+    { id: "nc_c1", companyId: "co_c", title: "사업계획서 초안을 올렸습니다", body: "완료자료에서 초안 v1을 확인하실 수 있습니다. 재무 파트는 결산 확정본을 받은 뒤 채워 넣겠습니다.\n의견은 문의하기에 남겨 주시면 다음 버전에 반영합니다.", pinned: true, publishedAt: d(-2, 17, 10), authorId: "u_park" },
+    { id: "nc_f1", companyId: "co_f", title: "사후관리 2차 정기 점검 안내", body: "다음 주 점검에서 정산 오류·배차 지연 건수를 함께 봅니다. 요청자료의 '사후관리 운영 지표'를 미리 올려 주세요.", publishedAt: d(-5, 10), authorId: "u_jung" },
+  );
+
   // 진행 상태 — 연구소 건은 고객 서류 회신을 기다리는 중(9일째 → "회신 지연" 경고 예시)
   for (const p of projects) {
     if (p.id === "pj_b1") { p.workStatus = "waiting_client"; p.waitingSince = d(-9); p.nextStep = "연구전담요원 재직증명 회신 받기"; }
     if (p.id === "pj_a1") { p.workStatus = "in_progress"; p.nextStep = "원가구조 진단 결과 1차 정리"; }
+    if (p.id === "pj_c1") { p.workStatus = "in_progress"; p.nextStep = "대표 의견 반영 후 재무 파트 작성"; }
+    if (p.id === "pj_c2") { p.workStatus = "waiting_client"; p.waitingSince = d(-1); p.nextStep = "연간 자문 계약서 서명 회신 받기"; }
+    if (p.id === "pj_d1") { p.workStatus = "waiting_client"; p.waitingSince = d(-12); p.nextStep = "2주차 표준양식 적용 결과 받기"; }
+    if (p.id === "pj_e1") { p.workStatus = "in_progress"; p.nextStep = "정관 · 사업자등록증 받은 뒤 자문 범위 확정"; }
+    if (p.id === "pj_f1") { p.workStatus = "in_progress"; p.nextStep = "2차 정기 점검 — 개선 전후 운영 지표 비교"; }
+    if (p.id === "pj_a2") { p.workStatus = "done"; }
   }
 
   return { users, companies, consultations, contracts, projects, docRequests, schedules, tasks, inquiries, results, opportunities, quotes, approvals, surveys, notices, companyVaults, companyFiles, journal, payments, activities: allActivities, notifications: allNotifications, programs: [], leads: [] };

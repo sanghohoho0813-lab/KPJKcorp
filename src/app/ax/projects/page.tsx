@@ -5,6 +5,7 @@ import { useMemo, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Columns3, KanbanSquare, List, Plus } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { AxInsightButton } from "@/components/ai/AxInsight";
 import { INTERNAL_STAGES, KANBAN_STAGES, stageLabel } from "@/lib/stages";
 import { daysBetween, fmtDate, relativeDay } from "@/lib/format";
 import type { InternalStage } from "@/lib/types";
@@ -49,7 +50,7 @@ function ProjectsInner() {
 
   return (
     <div>
-      <PageHeader title="프로젝트 운영 Board" desc="상담부터 완료까지 컨설팅 단계별 병목을 확인합니다." badge={<Badge>총 {st.projects.filter((p) => !p.archived).length}개</Badge>} actions={
+      <PageHeader title="프로젝트 운영 Board" desc="상담부터 완료까지 컨설팅 단계별 병목을 확인합니다." badge={<><Badge>총 {st.projects.filter((p) => !p.archived).length}개</Badge><AxInsightButton topic="projects" /></>} actions={
         <div className="flex flex-wrap items-center gap-2">
           <SegmentedControl value={view} onChange={setView} options={[{ key: "board", label: <span className="flex items-center gap-1"><Columns3 size={14} /> Board</span> }, { key: "list", label: <span className="flex items-center gap-1"><List size={14} /> 목록</span> }]} />
           {may("project.create") && <Button variant="accent" icon={<Plus size={16} />} onClick={() => setNewOpen(true)}>프로젝트 등록</Button>}

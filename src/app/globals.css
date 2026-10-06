@@ -80,7 +80,7 @@
   --radius-card: 16px;
   --radius-btn: 10px;
   /* 글자가 커지면 사이드바도 같이 넓어져야 라벨이 줄바꿈되지 않는다. 단 상한을 둔다. */
-  --sidebar-w: clamp(280px, 15rem, 344px);
+  --sidebar-w: clamp(300px, 16.25rem, 368px);
   /* 모바일 하단 Nav 높이 — 하단 고정 바가 서로 겹치지 않게 기준으로 쓴다 */
   --bottomnav-h: calc(4rem + env(safe-area-inset-bottom));
   --header-h: clamp(64px, 3.4rem, 86px);

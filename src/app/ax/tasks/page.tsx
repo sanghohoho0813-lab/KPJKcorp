@@ -5,6 +5,7 @@ import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { CheckSquare, Pencil, Plus } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { AxInsightButton } from "@/components/ai/AxInsight";
 import { daysBetween, fmtDate, isSameDay } from "@/lib/format";
 import type { Task, TaskStatus } from "@/lib/types";
 import { Badge, Button, Card, EmptyState, KpiCard, PageHeader, SegmentedControl, Tabs, cx } from "@/components/ui/ui";
@@ -49,6 +50,7 @@ function TasksInner() {
     <div>
       <PageHeader
         title="업무함"
+        badge={<AxInsightButton topic="tasks" />}
         desc="내가 처리할 업무와 고객 문의를 한 곳에서 봅니다. 고객이 자료를 제출하거나 문의를 남기면 여기에 자동으로 생깁니다."
         actions={tab === "task" ? <Button variant="accent" icon={<Plus size={16} />} onClick={() => setOpen(true)}>업무 등록</Button> : undefined}
       />
