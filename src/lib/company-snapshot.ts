@@ -241,3 +241,47 @@ export function parseMoneyKo(input: string): number | undefined {
   v = Math.round(v);
   return neg ? -v : v;
 }
+
+/* ---------------- 인증 현황 ---------------- */
+
+/** 담당자가 고를 수 있는 흔한 인증·확인 이름 (직접 입력도 된다) */
+export const CERT_CATALOG = ["벤처기업확인", "이노비즈", "메인비즈", "기업부설연구소", "연구개발전담부서", "ISO 9001", "ISO 14001", "ISO 45001", "HACCP", "뿌리기업 확인", "여성기업 확인", "소재·부품·장비 전문기업", "우수물류기업"];
+
+export type CertState = "valid" | "expiring" | "expired" | "no_expiry";
+export interface CertView { name: string; acquiredAt?: string; expiresAt?: string; note?: string; state: CertState; daysLeft?: number }
+
+const normCert = (s: string) => s.replace(/\s|\(.*?\)/g, "").toLowerCase();
+/** 유효기간이 이 날 수 안으로 들어오면 "갱신 준비" */
+export const CERT_RENEW_DAYS = 120;
+
+/** 보유 인증 — 유효기간으로 상태를 계산한다 (갱신 임박 · 만료) */
+export function certView(c: Company, today = todayLocal()): CertView[] {
+  const t = Date.parse(today);
+  return (c.certifications ?? []).filter((x) => x.name?.trim()).map((x): CertView => {
+    if (!x.expiresAt) return { ...x, state: "no_expiry" as const };
+    const daysLeft = Math.round((Date.parse(x.expiresAt.slice(0, 10)) - t) / 864e5);
+    return { ...x, daysLeft, state: daysLeft < 0 ? "expired" as const : daysLeft <= CERT_RENEW_DAYS ? "expiring" as const : "valid" as const };
+  }).sort((a, b) => (a.daysLeft ?? 9e9) - (b.daysLeft ?? 9e9));
+}
+
+/**
+ * 검토해 볼 인증 — 기업정보 규칙으로 고른다. 자격 판정이 아니다("검토해 볼 수 있습니다").
+ * 근거(업종·업력)를 함께 돌려준다. 이미 가진 것은 빼고, 최대 3개.
+ */
+export function certSuggestions(c: Company, now = new Date()): { name: string; why: string; basis: string }[] {
+  const held = new Set((c.certifications ?? []).map((x) => normCert(x.name)));
+  const has = (n: string) => held.has(normCert(n));
+  const text = `${c.industry ?? ""} ${c.bizCategory ?? ""} ${c.bizItem ?? ""}`;
+  const tech = /제조|정보|소프트웨어|IT|바이오|연구|전자|화학|소재|부품|기계/.test(text);
+  const ops = /제조|건설|건축|운수|운송|물류|식품/.test(text);
+  const est = c.establishedAt ? Date.parse(c.establishedAt) : NaN;
+  const age = Number.isFinite(est) ? Math.floor((now.getTime() - est) / (365.25 * 864e5)) : undefined;
+  const ind = (c.industry || c.bizCategory || "").trim();
+  const out: { name: string; why: string; basis: string }[] = [];
+  // 기업부설연구소는 KPJK 컨설팅 분야라 '다음으로 검토할 성장과제'(lib/growth)에서 근거와 함께 따로 보인다 — 여기서 겹쳐 내지 않는다
+  if (tech && !has("벤처기업확인")) out.push({ name: "벤처기업확인", why: "연구개발·혁신성장 등 확인 유형별 요건을 검토해 볼 수 있습니다.", basis: `업종 ${ind}` });
+  if (tech && age !== undefined && age >= 3 && !has("이노비즈")) out.push({ name: "이노비즈", why: "업력 3년 이상 기술 기반 기업은 기술혁신형 중소기업 확인 요건을 검토해 볼 수 있습니다.", basis: `업력 ${age}년` });
+  if (age !== undefined && age >= 3 && !has("메인비즈")) out.push({ name: "메인비즈", why: "업력 3년 이상 기업은 경영혁신형 중소기업 확인 요건을 검토해 볼 수 있습니다.", basis: `업력 ${age}년` });
+  if (ops && !has("ISO 9001")) out.push({ name: "ISO 9001", why: "품질경영 체계를 문서로 갖추면 거래처·입찰에서 요구할 때 대응할 수 있습니다.", basis: `업종 ${ind}` });
+  return out.slice(0, 3);
+}

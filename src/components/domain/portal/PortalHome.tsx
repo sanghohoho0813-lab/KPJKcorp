@@ -159,7 +159,7 @@ export function PortalHub({ company: c, board }: { company: Company; board: Boar
 
 export function GrowthJourney({ board }: { board: Board }) {
   const lanes = [
-    { key: "done", title: "완료한 과제", items: board.completed.map((x) => ({ label: x.area, href: "/portal/results", note: x.doneAt ? `${fmtDate(x.doneAt)} 완료` : "완료" })), dot: "bg-success", empty: "아직 없습니다" },
+    { key: "done", title: "완료한 성장과제", items: board.completed.map((x) => ({ label: x.area, href: "/portal/results", note: x.doneAt ? `${fmtDate(x.doneAt)} 완료` : "완료" })), dot: "bg-success", empty: "아직 없습니다" },
     { key: "active", title: "진행 중", items: board.active.map((x) => ({ label: x.area, href: `/portal/projects?p=${x.project!.id}`, note: `${x.stepLabel} · ${x.progress}%` })), dot: "bg-accent", empty: "진행 중인 과제 없음" },
     { key: "next", title: "다음으로 검토", items: [...board.review, ...board.proposed, ...board.suggested].map((x) => ({ label: x.area, href: "/portal/services", note: x.statusLabel ?? "" })), dot: "bg-ink-3", empty: "담당 컨설턴트가 함께 정합니다" },
   ];

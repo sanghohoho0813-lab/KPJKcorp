@@ -269,6 +269,8 @@ alter table public.companies add column if not exists custom_fields   jsonb;   -
 -- 고객 화면 "우리 회사 한눈에" (2026-10-03): 연도별 재무(담당자가 재무제표를 보고 입력) · 계약 시작일
 alter table public.companies add column if not exists financials          jsonb not null default '[]'::jsonb;
 alter table public.companies add column if not exists contract_started_at date;
+-- 보유 인증·확인 (2026-10-06) — [{name, acquiredAt, expiresAt, note}] · 고객 화면 "인증 현황"
+alter table public.companies add column if not exists certifications       jsonb not null default '[]'::jsonb;
 
 alter table public.projects add column if not exists work_status  text
   check (work_status in ('not_started','in_progress','waiting_client','done','on_hold','not_applicable'));
@@ -1524,7 +1526,7 @@ create view public.client_companies with (security_barrier = true) as
          employee_band, revenue_band, company_phone, website, interests, sample, created_at, updated_at,
          ceo_gender, biz_items_extra,
          -- 우리 회사 한눈에: 재무(연도별) · 계약 시작일 · 근거 서류 확인일만(서류 정보 docs 자체는 내부 전용)
-         financials, contract_started_at,
+         financials, contract_started_at, certifications,
          jsonb_strip_nulls(jsonb_build_object('bizReg', docs->'bizReg'->>'readAt', 'corpReg', docs->'corpReg'->>'readAt')) as doc_checks
     from public.companies
    where public.kpjk_is_client() and id = public.kpjk_my_company();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MessageSquare, Plus, Send } from "lucide-react";
 import { useStore, usePortalCompanyId } from "@/lib/store";
 import { fmtDateTime, fmtRelative } from "@/lib/format";
@@ -22,6 +22,14 @@ export default function PortalInquiriesPage() {
   const [projectId, setProjectId] = useState<string>("");
   const [body, setBody] = useState("");
   const [follow, setFollow] = useState("");
+  // 다른 화면의 "물어보기"(예: 검토해 볼 인증)에서 왔으면 제목을 채운 새 문의 창을 바로 연다 — ?new=제목
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("new");
+    if (!q) return;
+    const t = setTimeout(() => { setTitle(q.slice(0, 80)); setCategory("기타"); setOpen(true); }, 0);
+    window.history.replaceState(null, "", window.location.pathname);
+    return () => clearTimeout(t);
+  }, []);
   const c = st.companies.find((x) => x.id === companyId);
   const projects = st.projects.filter((p) => p.companyId === companyId && p.clientVisible && !p.archived);
   const list = st.inquiries.filter((i) => i.companyId === companyId).sort((a, b) => b.createdAt.localeCompare(a.createdAt));

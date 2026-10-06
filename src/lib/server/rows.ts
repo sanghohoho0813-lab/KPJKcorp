@@ -97,6 +97,7 @@ export const companyFromRow = (r: Row): Company => ({
   customFields: u(r.custom_fields as Company["customFields"] | null),
   financials: Array.isArray(r.financials) && (r.financials as unknown[]).length ? (r.financials as Company["financials"]) : undefined,
   contractStartedAt: u(r.contract_started_at as string | null),
+  certifications: Array.isArray(r.certifications) && (r.certifications as unknown[]).length ? (r.certifications as Company["certifications"]) : undefined,
   docChecks: r.doc_checks && typeof r.doc_checks === "object" && Object.keys(r.doc_checks as object).length ? (r.doc_checks as Company["docChecks"]) : undefined,
 });
 
@@ -141,6 +142,7 @@ export const companyToRow = (x: Partial<Company> & { id?: string }): Row => ({
   ...(x.customFields !== undefined && { custom_fields: n(x.customFields) }),
   ...(x.financials !== undefined && { financials: x.financials ?? [] }),
   ...(x.contractStartedAt !== undefined && { contract_started_at: ymdOrNull(x.contractStartedAt) }),
+  ...(x.certifications !== undefined && { certifications: x.certifications ?? [] }),
 });
 
 /* --------------------------------- 프로젝트 ------------------------------- */

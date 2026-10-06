@@ -50,7 +50,7 @@ import { AiReadyModal, DraftModal } from "@/components/ai/AiModals";
 import { Toaster } from "@/components/ui/Toaster";
 import { ServerBanner } from "./ServerBanner";
 import { ReLoginDialog } from "./ReLoginDialog";
-import { LivePopups } from "./LivePopups";
+import { LivePopups, UnreadTitle } from "./LivePopups";
 import { PasswordNudge } from "@/components/domain/MyPassword";
 import { DraftDock } from "./DraftDock";
 import { Modal, Sheet, Confirm, Drawer } from "@/components/ui/overlay";
@@ -596,6 +596,7 @@ export function AxShell({ children }: { children: ReactNode }) {
           <ReLoginDialog />
           <ViewAsBanner />
           <LivePopups audience="internal" />
+          <UnreadTitle audience="internal" />
           <PasswordNudge href="/ax/settings?open=account" />
           {ready ? <div key={pathname} className="anim-page">{children}</div> : <PageSkeleton />}
         </main>

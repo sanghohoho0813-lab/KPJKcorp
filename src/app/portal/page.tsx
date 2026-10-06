@@ -11,8 +11,9 @@ import { CompanySnapshot, GrowthQuests } from "@/components/domain/portal/Compan
 
 /**
  * 고객 홈 — 우리 회사 성장 공간.
- * 위에서부터: 우리 회사 현재 상태(담당 컨설턴트·다음 일정) → 우리 회사 한눈에(숫자) → 성장 체크리스트 → 성장 플랫폼 메뉴판 → 지금 할 일 · 최근 안내
- * → 성장 여정(완료→진행→다음) → 맞는 지원사업 → 다음으로 검토할 과제 → 완료 이력.
+ * 대표가 매일 들어와 1분 안에 보는 순서: 우리 회사 현재 상태(담당 컨설턴트·다음 일정) → 우리 회사 한눈에(매출·업력·임직원·인증)
+ * → 성장 체크리스트 | 지금 할 일 · 최근 안내 → 성장 여정(완료→진행→다음 검토) → 앞으로 검토할 과제(근거) → 맞는 지원사업
+ * → 완료한 성장과제 · 진행 이력 → 성장 플랫폼 메뉴판.
  */
 export default function PortalHome() {
   const st = useStore();
@@ -40,18 +41,23 @@ export default function PortalHome() {
         </Card>
       )}
       <PortalHero company={c} board={board} displayName={displayName} />
-      {/* 우리 회사 한눈에 — 업력·매출 추이·임직원·계약 일차를 숫자로, 그다음 할 일을 체크리스트로 */}
+      {/* 우리 회사 한눈에 — 최근 매출·업력·임직원·보유 인증을 큰 숫자로, 아래에 매출 추이와 인증 현황 */}
       <CompanySnapshot company={c} board={board} />
-      <GrowthQuests company={c} board={board} limit={4} />
-      <PortalHub company={c} board={board} />
-      <div className="grid gap-5 lg:grid-cols-[1.3fr_1fr]">
-        <NowActions actions={board.actions} companyId={c.id} />
-        <RecentUpdates companyId={c.id} />
+      {/* 다음 단계 — 왼쪽: 성장 체크리스트 / 오른쪽: 지금 할 일 · 최근 안내 */}
+      <div className="grid gap-5 lg:grid-cols-[1.15fr_1fr] lg:items-start">
+        <GrowthQuests company={c} board={board} limit={3} />
+        <div className="space-y-5">
+          <NowActions actions={board.actions} companyId={c.id} />
+          <RecentUpdates companyId={c.id} />
+        </div>
       </div>
       <GrowthJourney board={board} />
-      <ProgramsPreview company={c} />
+      {/* 앞으로 검토하면 좋은 과제 — 근거(기업정보·진행 이력)와 함께 */}
       <NextGrowth board={board} companyId={c.id} />
+      <ProgramsPreview company={c} />
+      {/* 우리 회사가 어떻게 운영되고 있는지 — 완료한 과제와 최근 진행 이력(단계 변경·검토 완료·결과 공유) */}
       <GrowthHistory board={board} companyId={c.id} />
+      <PortalHub company={c} board={board} />
     </div>
   );
 }

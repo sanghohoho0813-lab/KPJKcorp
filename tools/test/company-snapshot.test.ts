@@ -1,5 +1,5 @@
 // 고객 화면 "우리 회사 한눈에" — 매출 추이 · 일차 · 고객에게 보이는 칸 · 성장 체크리스트. 시험용 값은 지어낸 것.
-import { parseMoneyKo, clientFacts, companyQuests, dayNumber, fmtMoneyKo, fmtPct, questLevel, revenueTrend, yoyOf, finSeries } from "../../src/lib/company-snapshot";
+import { certSuggestions, certView, parseMoneyKo, clientFacts, companyQuests, dayNumber, fmtMoneyKo, fmtPct, questLevel, revenueTrend, yoyOf, finSeries } from "../../src/lib/company-snapshot";
 import type { Company } from "../../src/lib/types";
 let fail = 0;
 const ok = (c: boolean, m: string) => { console.log((c ? "OK  " : "FAIL") + " " + m); if (!c) fail++; };
@@ -52,5 +52,15 @@ ok(questLevel(q1.map((q) => ({ ...q, done: true }))).level === 5, "전부 완료
 ok(parseMoneyKo("420억") === 42_000_000_000 && parseMoneyKo("12억 3,000만") === 1_230_000_000 && parseMoneyKo("8500만원") === 85_000_000, "억·만 읽기");
 ok(parseMoneyKo("3억 2천만") === 320_000_000 && parseMoneyKo("1,234,567,890") === 1_234_567_890 && parseMoneyKo("-3억") === -300_000_000, "천만·쉼표·음수");
 ok(parseMoneyKo("") === undefined && parseMoneyKo("모름") === undefined && parseMoneyKo("12억쯤") === undefined, "못 읽는 값은 비움(짐작하지 않음)");
+
+// 6) 인증 현황 — 유효기간으로 상태 계산, 검토해 볼 인증은 이미 가진 것 제외·최대 3개
+ok(certView(base).length === 0, "인증 없음 → 빈 목록 (지어내지 않음)");
+const cv = certView({ ...base, certifications: [{ name: "메인비즈", expiresAt: "2029-01-01" }, { name: "ISO 9001", expiresAt: "2026-12-01" }, { name: "HACCP", expiresAt: "2026-09-01" }, { name: "벤처기업확인" }, { name: "  " }] }, "2026-10-06");
+ok(cv.map((x) => x.state).join(",") === "expired,expiring,valid,no_expiry", "만료·갱신 임박(120일)·유효·기한 없음, 급한 순 " + cv.map((x) => x.state).join(","));
+ok(cv[1].daysLeft === 56 && cv.length === 4, "남은 날 56일 · 빈 이름 제외");
+const sg = certSuggestions({ ...base, establishedAt: "2019-03-05" }, new Date("2026-10-06"));
+ok(sg.length === 3 && sg[0].name === "벤처기업확인" && sg.every((x) => /검토해 볼 수 있습니다|대응할 수 있습니다/.test(x.why)), "제조 7년차 → 후보 3개, 판정 아닌 검토 표현 " + sg.map((x) => x.name).join(","));
+ok(!certSuggestions({ ...base, certifications: [{ name: "벤처 기업확인" }] }, new Date("2026-10-06")).some((x) => x.name === "벤처기업확인"), "이미 가진 인증은 띄어쓰기가 달라도 제외");
+ok(!certSuggestions({ ...base, industry: "도소매", establishedAt: "2025-06-01" }, new Date("2026-10-06")).length, "근거 없으면 후보 없음");
 
 if (fail) { console.log(`\n실패 ${fail}`); process.exit(1); } else console.log("\n전부 통과");

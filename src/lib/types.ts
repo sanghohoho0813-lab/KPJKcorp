@@ -112,6 +112,18 @@ export interface Company {
   contractStartedAt?: string;
   /** 고객 계정이 읽는 근거 서류 확인일만 (서버의 고객용 보기가 docs 대신 준다 — 읽기 전용) */
   docChecks?: Partial<Record<CompanyDocKind, string>>;
+  /** 보유 인증·확인 — 담당자가 인증서를 보고 입력한다(지어내지 않는다). 고객 화면 "인증 현황"에 그대로 보인다 */
+  certifications?: Certification[];
+}
+
+/** 인증·확인 한 건 — 예: 벤처기업확인 · 이노비즈 · 메인비즈 · 기업부설연구소 · ISO 9001 */
+export interface Certification {
+  name: string;
+  /** 취득일 YYYY-MM-DD */
+  acquiredAt?: string;
+  /** 유효기간 끝 YYYY-MM-DD — 있으면 갱신 시기를 알려 준다 */
+  expiresAt?: string;
+  note?: string;
 }
 
 /** 한 해의 재무 숫자 (원 단위). 모르는 칸은 비워 둔다 */

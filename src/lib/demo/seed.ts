@@ -7,7 +7,7 @@ import { addDays, iso } from "../format";
  * 실데이터 연결 시 이 파일만 교체한다 (UI 재작성 없음).
  */
 /** 샘플 내용의 판 — 샘플을 고치면 올린다. 데모 브라우저에 저장된 예전 샘플이 다음 접속 때 새 샘플로 바뀐다. */
-export const SEED_REV = "2026-10-06b";
+export const SEED_REV = "2026-10-06c";
 
 export interface SeedData {
   users: User[];
@@ -288,6 +288,16 @@ export function buildSeed(now = new Date()): SeedData {
       financials: fin([[Y - 3, 8_100_000_000, 290_000_000], [Y - 2, 8_600_000_000, 350_000_000], [Y - 1, 9_200_000_000, 470_000_000]]) },
   };
   for (const c of companies) Object.assign(c, more[c.id] ?? {});
+  // 보유 인증 (샘플 예시) — 유효기간이 가까운 것은 고객 화면에 "갱신 준비"로 보인다. 이플러스바이오는 아직 없음(창업 초기)
+  const ymd0 = (n: number) => d(n).slice(0, 10);
+  const certs: Record<string, Company["certifications"]> = {
+    co_a: [{ name: "메인비즈", acquiredAt: ymd0(-20), expiresAt: ymd0(1075) }, { name: "ISO 9001", acquiredAt: "2021-05-10", expiresAt: ymd0(95) }],
+    co_b: [{ name: "벤처기업확인", acquiredAt: "2024-06-03", expiresAt: "2027-06-02" }],
+    co_c: [{ name: "HACCP", acquiredAt: "2019-08-20", expiresAt: ymd0(300) }],
+    co_d: [{ name: "ISO 9001", acquiredAt: "2015-03-02", expiresAt: ymd0(410) }, { name: "ISO 14001", acquiredAt: "2018-11-15", expiresAt: ymd0(40) }],
+    co_f: [{ name: "ISO 9001", acquiredAt: "2022-03-02", expiresAt: ymd0(515) }],
+  };
+  for (const c of companies) if (certs[c.id]) c.certifications = certs[c.id];
   // 서류 확인 기록 — 담당자가 서류에서 회사 정보를 읽어 반영한 기록(파일 자체는 넣지 않는다). D·E는 아직 확인 전
   const docRead = (days: number, corp = true) => ({
     bizReg: { fileName: "사업자등록증.pdf", size: 210_000, readAt: d(days), method: "pdf_text" as const, fields: ["bizNo", "ceo", "address", "bizCategory", "bizItem"] },
