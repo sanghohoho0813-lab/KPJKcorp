@@ -273,7 +273,8 @@ export function ActivityFeed({ items, limit, showCompany }: { items: Activity[];
 }
 
 /* ---------- Schedule item ---------- */
-export function ScheduleItem({ s, showCompany, client, onEdit }: { s: Schedule; showCompany?: boolean; client?: boolean; onEdit?: (id: string) => void }) {
+/** compact — 좁은 칸(대시보드 옆 칸)용: 오른쪽 날짜 열을 빼고 날짜를 설명 줄에 붙인다. 제목이 눌려 잘리지 않게 */
+export function ScheduleItem({ s, showCompany, client, onEdit, compact }: { s: Schedule; showCompany?: boolean; client?: boolean; onEdit?: (id: string) => void; compact?: boolean }) {
   const companies = useStore((s) => s.companies);
   const t = SCHEDULE_TYPE[s.type];
   return (
@@ -287,13 +288,13 @@ export function ScheduleItem({ s, showCompany, client, onEdit }: { s: Schedule; 
         {/* 모바일에서는 시간 열을 빼면 200px 남짓이라 제목이 절반쯤 잘린다. 두 줄까지 허용한다. */}
         <div className="line-clamp-2 font-semibold md:line-clamp-1">{s.title}</div>
         <div className="text-[0.8rem] text-ink-3">
-          {t.label}
+          {compact && `${fmtDate(s.start)} · `}{t.label}
           {s.location ? ` · ${s.location}` : ""}
           {showCompany && s.companyId ? ` · ${companies.find((c) => c.id === s.companyId)?.name}` : ""}
           {!client && !s.visibleToClient ? " · 내부" : ""}
         </div>
       </div>
-      <span className="hidden text-[0.78rem] text-ink-3 sm:block">{fmtDateTime(s.start)}</span>
+      {!compact && <span className="hidden text-[0.78rem] text-ink-3 sm:block">{fmtDateTime(s.start)}</span>}
       {onEdit && (
         <button onClick={() => onEdit(s.id)} aria-label={`${s.title} 수정`} className="pressable shrink-0 icon-btn text-ink-3 hover:bg-surface-2 hover:text-ink">
           <Pencil size={15} />

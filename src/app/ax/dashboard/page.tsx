@@ -14,6 +14,7 @@ import { AiReadyBadge, Card, KpiCard, SectionTitle, Badge, IconTile, cx } from "
 import { BriefList, ScheduleItem } from "@/components/domain/domain";
 import { FirstRunOrCoach } from "@/components/domain/FirstRun";
 import { CeoSummaryCard, OpsStrip } from "@/components/domain/CeoSummary";
+import { TodayTasksCard } from "@/components/domain/TodayTasks";
 
 export default function DashboardPage() {
   const st = useStore();
@@ -35,7 +36,8 @@ export default function DashboardPage() {
   const delayed = active.filter((p) => daysBetween(p.stageChangedAt, now.toISOString()) >= 7 || daysBetween(now.toISOString(), p.dueDate) < 0).length;
 
   // 대표가 막고 있는 것 — 다른 무엇보다 먼저 보여야 팀이 멈추지 않는다.
-  const pendingApprovals = st.approvals.filter((a) => a.status === "pending").sort((a, b) => a.requestedAt.localeCompare(b.requestedAt));
+  // 컨설턴트에게는 내가 올린 것만 — 다른 사람 요청은 내가 할 수 있는 일이 없다
+  const pendingApprovals = st.approvals.filter((a) => a.status === "pending" && (!isConsultant || a.requestedBy === st.session?.userId)).sort((a, b) => a.requestedAt.localeCompare(b.requestedAt));
   const isAdmin = st.session?.role === "admin";
   const hasCompanies = st.companies.some((c) => !c.archived);
   const newOpps = st.opportunities.filter((o) => o.status === "interest" && (!assigneeId || o.assigneeId === assigneeId));
@@ -58,7 +60,7 @@ export default function DashboardPage() {
 
       {/* 첫 화면 숫자는 "지금 문제가 있는 것"만. 상태 숫자는 각 메뉴에서 본다. */}
       <div id="tut-kpi" className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
-        <KpiCard label={isAdmin ? "내 승인 대기" : "대표 승인 대기"} value={pendingApprovals.length} sub={pendingApprovals.length ? (isAdmin ? "지금 확인 필요" : "대표 확인 대기 중") : "대기 없음"} href="/ax/opportunities?tab=approvals" tone={pendingApprovals.length ? "error" : undefined} icon={<IconTile color="var(--mod-alert)" size={32}><ShieldCheck size={16} /></IconTile>} />
+        <KpiCard label={isAdmin ? "내 승인 대기" : isConsultant ? "내 요청 · 승인 대기" : "대표 승인 대기"} value={pendingApprovals.length} sub={pendingApprovals.length ? (isAdmin ? "지금 확인 필요" : "대표 확인 대기 중") : "대기 없음"} href="/ax/opportunities?tab=approvals" tone={pendingApprovals.length ? "error" : undefined} icon={<IconTile color="var(--mod-alert)" size={32}><ShieldCheck size={16} /></IconTile>} />
         <KpiCard label="자료 검토 대기" value={docWaiting} sub={counts.docs ? `기한 이슈 ${counts.docs}건` : "기한 이슈 없음"} href="/ax/documents" tone={counts.docs ? "error" : undefined} icon={<IconTile color="var(--mod-doc)" size={32}><FolderOpen size={16} /></IconTile>} />
         <KpiCard label="미답변 문의" value={openInquiries} sub={openInquiries ? "답변 필요" : "모두 답변됨"} href="/ax/tasks?tab=inquiry" tone={openInquiries ? "error" : undefined} icon={<IconTile color="var(--mod-customer)" size={32}><MessageSquare size={16} /></IconTile>} />
         <KpiCard label="지연 프로젝트" value={delayed} sub={delayed ? "대표 확인 필요" : "정상"} href="/ax/projects?filter=delayed" tone={delayed ? "error" : undefined} icon={<IconTile color="var(--mod-alert)" size={32}><AlertTriangle size={16} /></IconTile>} />
@@ -70,7 +72,7 @@ export default function DashboardPage() {
       {pendingApprovals.length > 0 && (
         <Card className="border-accent/50 p-5">
           <SectionTitle action={<Link href="/ax/opportunities?tab=approvals" className="link-more">전체 보기 →</Link>}>
-            <span className="flex items-center gap-2"><ShieldCheck size={18} className="text-accent" /> {isAdmin ? "대표님 확인이 필요합니다" : "대표 승인 대기"}</span>
+            <span className="flex items-center gap-2"><ShieldCheck size={18} className="text-accent" /> {isAdmin ? "대표님 확인이 필요합니다" : isConsultant ? "내 요청 · 대표 승인 대기" : "대표 승인 대기"}</span>
           </SectionTitle>
           <div className="divide-y divide-line">
             {pendingApprovals.slice(0, 3).map((ap, i) => {
@@ -98,6 +100,8 @@ export default function DashboardPage() {
 
       <div className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
         <div className="space-y-6">
+          {/* 오늘 할 업무 — 여기서 바로 체크하고 바로 적는다 (업무함까지 가지 않게) */}
+          {hasCompanies && <TodayTasksCard />}
           {hasCompanies && <CeoSummaryCard />}
           <Card id="tut-brief" className="p-5">
             <SectionTitle action={<div className="flex items-center gap-2"><AiReadyBadge onClick={() => openAi({ title: "오늘의 업무 브리핑 — AI 적용 설명", key: "brief" })} /><Link href="/ax/brief" className="link-more">전체 보기 →</Link></div>}>
@@ -128,7 +132,7 @@ export default function DashboardPage() {
             <SectionTitle action={<Link href="/ax/schedule" className="link-more">일정 →</Link>}>
               <span className="flex items-center gap-2"><CalendarDays size={18} className="text-ink-3" /> 이번 주 일정 {todaySchedules.length > 0 && <Badge tone="accent">오늘 {todaySchedules.length}</Badge>}</span>
             </SectionTitle>
-            {weekSchedules.length === 0 ? <div className="py-6 text-center text-[0.9rem] text-ink-3">이번 주 일정이 없습니다.</div> : <div className="divide-y divide-line">{weekSchedules.slice(0, 7).map((s, i) => <div key={s.id} className={i >= 4 ? "hidden md:block" : undefined}><ScheduleItem s={s} showCompany /></div>)}</div>}
+            {weekSchedules.length === 0 ? <div className="py-6 text-center text-[0.9rem] text-ink-3">이번 주 일정이 없습니다.</div> : <div className="divide-y divide-line">{weekSchedules.slice(0, 7).map((s, i) => <div key={s.id} className={i >= 4 ? "hidden md:block" : undefined}><ScheduleItem s={s} showCompany compact /></div>)}</div>}
           </Card>
         </div>
       </div>

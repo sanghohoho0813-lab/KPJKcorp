@@ -107,15 +107,15 @@ function DocumentsInner() {
                   const overdue = (d.status === "requested" || d.status === "revision") && daysBetween(d.dueDate, now) > 0;
                   return (
                     <tr key={d.id} className={cx("row-clickable", overdue && "bg-error-bg/30")} onClick={() => setReview(d)}>
-                      <td className="font-semibold"><Link href={`/ax/clients/${d.companyId}`} onClick={(e) => e.stopPropagation()} className="hover:text-accent">{c?.name}</Link></td>
-                      <td><div className="font-semibold">{d.name}</div>{d.files.length > 0 && <div className="text-[0.75rem] text-ink-3">{d.files[d.files.length - 1].fileName} · {fmtSize(d.files[d.files.length - 1].size)}</div>}</td>
-                      <td className="text-ink-2">{st.projects.find((p) => p.id === d.projectId)?.name}</td>
+                      <td className="nowrap font-semibold"><Link href={`/ax/clients/${d.companyId}`} onClick={(e) => e.stopPropagation()} className="hover:text-accent">{c?.name}</Link></td>
+                      <td className="min-w-[13rem]"><div className="font-semibold">{d.name}</div>{d.files.length > 0 && <div className="max-w-[18rem] truncate text-[0.75rem] text-ink-3">{d.files[d.files.length - 1].fileName} · {fmtSize(d.files[d.files.length - 1].size)}</div>}</td>
+                      <td className="max-w-[11rem] text-[0.88rem] text-ink-2">{st.projects.find((p) => p.id === d.projectId)?.name}</td>
                       <td><DocStatusBadge status={d.status} /></td>
                       <td className="nowrap"><DueText iso={d.dueDate} pending={d.status === "requested" || d.status === "revision"} /></td>
                       <td className="tnum nowrap text-ink-2">{d.submittedAt ? fmtDate(d.submittedAt) : "-"}</td>
                       <td className="nowrap">{consultant?.name}</td>
                       <td onClick={(e) => e.stopPropagation()}>
-                        <div className="flex justify-end gap-1">
+                        <div className="flex justify-end gap-1 whitespace-nowrap">
                           {(d.status === "requested" || d.status === "revision") && (
                             <Button size="sm" variant="ghost" icon={<MessageSquareText size={14} />} onClick={() => openDraft({ kind: d.status === "revision" ? "revision_reminder" : "doc_reminder", ctx: { companyName: c?.name, contactName: c?.contactName, consultantName: consultant?.name, docName: d.name, dueText: `${fmtDate(d.dueDate)} (${relativeDay(d.dueDate)})`, note: d.reviewNote } })}>안내 초안</Button>
                           )}

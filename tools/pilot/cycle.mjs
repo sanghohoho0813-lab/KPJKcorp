@@ -135,7 +135,7 @@ await step('8 단계 2 · 3 + 메시지', async () => {
 
 await step('9 일정 공개', async () => {
   await ceo.goto(`${B}/ax/clients/${coId}?tab=schedule`, { waitUntil: 'domcontentloaded' }); await ceo.waitForTimeout(1500);
-  await ceo.getByRole('button', { name: '일정 등록' }).click(); await ceo.waitForTimeout(500);
+  await ceo.getByRole('button', { name: '일정 등록' }).last().click(); await ceo.waitForTimeout(500);
   await dlg(ceo).getByLabel('제목').fill('중간 보고 미팅');
   await dlg(ceo).getByRole('button', { name: '등록', exact: true }).click(); await ceo.waitForTimeout(3000);
   await cli.goto(`${B}/portal/schedule`, { waitUntil: 'domcontentloaded' });

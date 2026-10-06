@@ -2,9 +2,9 @@
 
 import { CancelDocRequestButton } from "@/components/domain/portal/CancelRequest";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Building2, EyeOff, Lock, CalendarDays, ChevronRight, Eye, FileCheck2, FileText, FolderOpen, Mail, MapPin, MessageSquare, MessageSquareText, Phone, Plus, Sparkles, UserRound, Pencil, Archive, ArchiveRestore, UserPlus } from "lucide-react";
+import { ArrowLeft, Building2, EyeOff, Lock, CalendarDays, ChevronDown, ChevronRight, Eye, FileCheck2, FileText, FolderOpen, ListPlus, Mail, MapPin, MessageSquare, MessageSquareText, NotebookPen, Phone, Plus, Sparkles, UserRound, Pencil, Archive, ArchiveRestore, UserPlus } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { AxInsightButton } from "@/components/ai/AxInsight";
 import { useUi } from "@/lib/ui-store";
@@ -15,7 +15,7 @@ import type { DocumentRequest, Schedule } from "@/lib/types";
 import { Badge, Button, Card, EmptyState, IconTile, KpiCard, SectionTitle, Stat, Tabs, AiReadyBadge, cx } from "@/components/ui/ui";
 import { ActivityFeed, DocStatusBadge, InquiryStatusBadge, ScheduleItem, StageBadge, StageProgressBar, DueText } from "@/components/domain/domain";
 import { ReviewDocModal } from "@/components/domain/DocActions";
-import { CompanyDocRequestModal, NewDocRequestModal, NewScheduleModal } from "@/components/domain/CreateModals";
+import { CompanyDocRequestModal, NewDocRequestModal, NewScheduleModal, NewTaskModal } from "@/components/domain/CreateModals";
 import { ProposalPanel } from "@/components/domain/client/ProposalPanel";
 import { GrowthRequests } from "@/components/domain/client/GrowthRequests";
 import { CompanyModal, ProjectModal, useMay } from "@/components/domain/EntityModals";
@@ -29,9 +29,10 @@ import { VaultTab } from "@/components/domain/client/VaultTab";
 import { WorkTab } from "@/components/domain/client/WorkTab";
 import { JournalTab } from "@/components/domain/client/JournalTab";
 import { MoneySection } from "@/components/domain/client/MoneySection";
-import { CompanyAlertsCard, PortalStatus } from "@/components/domain/client/PortalStatus";
+import { PortalStatus, useCompanyAlerts, SEVERITY_LABEL } from "@/components/domain/client/PortalStatus";
 import { CONSULT_AREA_LABEL, ENTITY_TYPES, companySummary, yearsSince } from "@/lib/company-options";
 import { DOC_SOURCE_LABEL } from "@/lib/docparse";
+import { shortCompanyName } from "@/lib/quick-task";
 import { EXTRACT_METHOD_LABEL } from "@/lib/docextract";
 
 type TabKey = "overview" | "work" | "vault" | "docs" | "contract" | "consult" | "schedule" | "portal" | "journal" | "history";
@@ -65,8 +66,13 @@ export default function ClientCardPage() {
   const [newConsult, setNewConsult] = useState(false);
   const [newSchedule, setNewSchedule] = useState(false);
   const [companyDoc, setCompanyDoc] = useState(false);
+  const [newTask, setNewTask] = useState(false);
+  // 휴대폰에서는 머리글의 번호·연락처 줄을 접어 둔다 — 열자마자 할 일이 보이게
+  const [moreInfo, setMoreInfo] = useState(false);
+  const [showAllTodo, setShowAllTodo] = useState(false);
 
   const c = st.companies.find((x) => x.id === id);
+  const alerts = useCompanyAlerts(c);
   const now = new Date();
   const nowIso = now.toISOString();
 
@@ -99,11 +105,24 @@ export default function ClientCardPage() {
   const { projects, active, consultations, contracts, docs, missing, waiting, schedules, upcoming, inquiries, results, activities, opps, consultant } = data;
   const openIq = inquiries.filter((i) => i.status === "open");
 
-  const actions: { text: string; href?: string; onClick?: () => void; tone: "error" | "warning" | "info" }[] = [];
+  // 지금 할 일 — 이 기업에서 처리할 것을 한 목록으로 (마감·만료·연체 경고 + 자료·문의·업무·일정). 급한 것부터.
+  const actions: { text: string; detail?: string; href?: string; onClick?: () => void; tone: "error" | "warning" | "info" }[] = [];
+  for (const a of alerts) actions.push({ text: a.title, detail: a.detail ? `${a.detail} · ${SEVERITY_LABEL[a.severity]}` : SEVERITY_LABEL[a.severity], onClick: () => setTab(a.tab === "money" ? (may("finance.view") ? "contract" : "overview") : a.tab), tone: a.severity === "critical" ? "error" : a.severity === "warning" ? "warning" : "info" });
   for (const d of missing) actions.push({ text: `${d.name} ${daysBetween(d.dueDate, nowIso) > 0 ? "기한 초과 — 재요청" : "제출 대기"}`, onClick: () => setReviewReq(d), tone: daysBetween(d.dueDate, nowIso) > 0 ? "error" : "warning" });
   for (const d of waiting) actions.push({ text: `${d.name} 검토 필요`, onClick: () => setReviewReq(d), tone: "info" });
   for (const i of openIq) actions.push({ text: `문의 답변: ${i.title}`, href: `/ax/inquiries?focus=${i.id}`, tone: "error" });
+  // 이 기업 업무 중 오늘까지 해야 할 것 (누가 맡았든 — 기업 단위로 놓치지 않게)
+  // 자료 도착 · 문의로 자동 생긴 업무는 위의 "검토 필요" · "문의 답변" 줄과 같은 일이다 — 두 번 보이지 않게 뺀다
+  const dupOfAbove = (t: (typeof st.tasks)[number]) => t.source === "auto" && ((t.type === "자료검토" && waiting.length > 0) || (t.type === "문의응대" && openIq.length > 0));
+  const dueTasks = st.tasks.filter((t) => t.companyId === c.id && (t.status === "todo" || t.status === "doing") && daysBetween(t.dueDate, nowIso) >= 0 && !dupOfAbove(t)).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  for (const t of dueTasks.slice(0, 4)) {
+    const late = daysBetween(t.dueDate, nowIso) > 0;
+    const who = st.users.find((u) => u.id === t.assigneeId)?.name;
+    actions.push({ text: `업무: ${stripCompany(t.title, c.name)}`, detail: `${late ? `기한 ${daysBetween(t.dueDate, nowIso)}일 지남` : "오늘까지"}${who ? ` · ${who}` : ""}`, href: "/ax/tasks", tone: late ? "error" : "warning" });
+  }
   if (upcoming[0]) actions.push({ text: `${relativeDay(upcoming[0].start)} ${fmtTime(upcoming[0].start)} ${upcoming[0].title}`, href: "/ax/schedule", tone: "info" });
+  const toneRank = { error: 0, warning: 1, info: 2 } as const;
+  actions.sort((a, b) => toneRank[a.tone] - toneRank[b.tone]);
 
   const unpaid = st.payments.filter((x) => x.companyId === c.id && !x.receivedAt).length;
   const tabs: { key: TabKey; label: string; count?: number }[] = [
@@ -136,7 +155,7 @@ export default function ClientCardPage() {
                 {c.archived && <Badge tone="neutral">보관됨</Badge>}
                 {active[0] && <StageBadge stage={active[0].stage} />}
               </div>
-              <div className="mt-1 text-[0.9rem] text-ink-2">
+              <div className={cx("mt-1 text-[0.9rem] text-ink-2", !moreInfo && "line-clamp-2 sm:line-clamp-none")}>
                 {[
                   ENTITY_TYPES.find((t) => t.key === c.entityType)?.label,
                   companySummary(c),
@@ -152,7 +171,7 @@ export default function ClientCardPage() {
                   {c.leadSource && <Badge tone="neutral">유입 · {c.leadSource}</Badge>}
                 </div>
               ) : null}
-              <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-1.5 text-[0.85rem] sm:grid-cols-2 md:grid-cols-3">
+              <div className={cx("mt-3 grid-cols-1 gap-x-6 gap-y-1.5 text-[0.85rem] sm:grid sm:grid-cols-2 md:grid-cols-3", moreInfo ? "grid" : "hidden")} data-testid="client-contact">
                 <span className="flex items-center gap-1.5 text-ink-2"><UserRound size={14} className="shrink-0 text-ink-3" /> <span className="shrink-0">대표</span> <b className="text-ink">{c.ceo}</b></span>
                 <span className="flex items-center gap-1.5 text-ink-2"><UserRound size={14} className="shrink-0 text-ink-3" /> <span className="shrink-0">담당자</span> <b className="text-ink">{c.contactName} {c.contactTitle}</b></span>
                 <span className="flex items-center gap-1.5 text-ink-2"><Phone size={14} className="text-ink-3" /> {c.contactPhone || <span className="text-ink-3">연락처 없음</span>}{c.companyPhone ? <span className="text-ink-3"> · 대표 {c.companyPhone}</span> : null}</span>
@@ -168,11 +187,15 @@ export default function ClientCardPage() {
                   </span>
                 )}
               </div>
+              <button type="button" onClick={() => setMoreInfo((v) => !v)} aria-expanded={moreInfo} className="pressable mt-2 inline-flex items-center gap-1 rounded-lg py-1 text-[0.85rem] font-semibold text-ink-2 sm:hidden">
+                {moreInfo ? "접기" : "연락처 · 번호 · 주소 보기"} <ChevronDown size={15} className={cx("transition-transform", moreInfo && "rotate-180")} />
+              </button>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2 lg:flex-col lg:items-end">
-            <div className="flex items-center gap-2 rounded-xl bg-surface-2 px-3 py-2 text-[0.85rem]"><span className="text-ink-3">담당 컨설턴트</span><b>{consultant?.name} {consultant?.title}</b></div>
-            <div className="flex flex-wrap gap-2">
+          <div className="flex min-w-0 flex-col gap-2 lg:items-end">
+            <div className={cx("items-center gap-2 self-start rounded-xl bg-surface-2 px-3 py-2 text-[0.85rem] lg:self-auto", moreInfo ? "flex" : "hidden sm:flex")}><span className="text-ink-3">담당 컨설턴트</span><b>{consultant?.name} {consultant?.title}</b></div>
+            {/* 휴대폰: 관리 버튼을 한 줄로 밀어 보기 (세 줄로 쌓이면 할 일이 화면 밖으로 밀린다) */}
+            <div className="hide-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 lg:justify-end [&>*]:shrink-0">
               {may("company.update") && <Button size="sm" variant="outline" icon={<Pencil size={15} />} onClick={() => setEditCompany(true)}>기업정보 수정</Button>}
               {may("company.archive") && (
                 c.archived
@@ -206,8 +229,19 @@ export default function ClientCardPage() {
         {c.memo && <div className="mt-4 rounded-xl bg-soft/50 px-4 py-3 text-[0.88rem] text-ink-2"><b className="text-ink">메모</b> · {c.memo}</div>}
       </Card>
 
+      {/* 빠른 작업 — 이 기업에서 가장 자주 하는 일. 탭을 옮기지 않고 바로 창이 열린다 (기업은 미리 채워진다) */}
+      <div className="hide-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-0.5" data-testid="client-quick-actions">
+        {may("task.create") && <QuickAction icon={<ListPlus size={16} />} label="업무 추가" onClick={() => setNewTask(true)} />}
+        {may("consultation.create") && <QuickAction icon={<NotebookPen size={16} />} label="상담 기록" onClick={() => setNewConsult(true)} />}
+        {may("doc.request") && <QuickAction icon={<FileText size={16} />} label="자료 요청" onClick={() => (active[0] ? setNewDoc(active[0].id) : setCompanyDoc(true))} />}
+        {may("schedule.create") && <QuickAction icon={<CalendarDays size={16} />} label="일정 등록" onClick={() => setNewSchedule(true)} />}
+        <QuickAction icon={<MessageSquareText size={16} />} label="업무 일기" onClick={() => setTab("journal")} />
+        {c.contactPhone && <a href={`tel:${c.contactPhone.replace(/[^0-9+]/g, "")}`} className="pressable flex shrink-0 items-center gap-1.5 rounded-xl border border-line bg-surface px-3.5 py-2 text-[0.88rem] font-semibold text-ink-2 hover:border-accent hover:text-ink md:hidden"><Phone size={16} className="text-accent" />전화</a>}
+      </div>
+
       {/* Quick status */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      {/* 휴대폰에서는 아래 "지금 할 일"이 같은 내용을 더 구체적으로 보여 준다 */}
+      <div className="hidden grid-cols-2 gap-3 md:grid md:grid-cols-4">
         <KpiCard label="진행 프로젝트" value={active.length} sub={active[0]?.name ?? "없음"} icon={<IconTile color="var(--mod-ops)" size={30}><FolderOpen size={15} /></IconTile>} />
         <KpiCard label="자료 미제출 · 검토대기" value={<>{missing.length}<span className="text-[1rem] text-ink-3"> / {waiting.length}</span></>} sub={missing.some((d) => daysBetween(d.dueDate, nowIso) > 0) ? "기한 초과 있음" : "기한 내"} tone={missing.some((d) => daysBetween(d.dueDate, nowIso) > 0) ? "error" : undefined} icon={<IconTile color="var(--mod-doc)" size={30}><FileText size={15} /></IconTile>} />
         <KpiCard label="다음 일정" value={upcoming[0] ? fmtDate(upcoming[0].start) : "-"} sub={upcoming[0]?.title ?? "예정 일정 없음"} icon={<IconTile color="var(--mod-schedule)" size={30}><CalendarDays size={15} /></IconTile>} />
@@ -217,15 +251,27 @@ export default function ClientCardPage() {
       <Tabs tabs={tabs} value={tab} onChange={setTab} id="tut-client-tabs" />
 
       {tab === "overview" && (
-        <div className="space-y-5">
-          <CompanyAlertsCard company={c} onOpen={(t) => setTab(t === "money" ? (may("finance.view") ? "contract" : "overview") : t)} />
-          <ProfileCard company={c} />
-          <FinancialsCard key={c.id} company={c} />
-          <CertificationsCard key={`cert-${c.id}`} company={c} />
-        </div>
-      )}
-      {tab === "overview" && (
-        <div className="grid gap-5 xl:grid-cols-[1.4fr_1fr]">
+        <div className="grid gap-5 xl:grid-cols-[1fr_1.3fr] xl:items-start">
+          {/* 왼쪽(휴대폰은 맨 위): 이 기업에서 지금 할 일 · 최근 고객 활동 */}
+          <div className="space-y-5">
+            <Card className="p-5" id="client-todo">
+              <SectionTitle action={actions.length ? <span className="text-[0.8rem] font-semibold text-ink-3">{actions.length}건</span> : undefined}>지금 할 일</SectionTitle>
+              {actions.length === 0 ? <div className="text-[0.9rem] text-success">지금 처리할 일이 없습니다. 마감·자료·문의·업무가 생기면 여기에 모입니다.</div> : (
+                <div className="space-y-1.5">
+                  {actions.slice(0, showAllTodo ? undefined : 7).map((a, i) => {
+                    const cls = `pressable flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-left text-[0.88rem] font-semibold ${a.tone === "error" ? "bg-error-bg text-error" : a.tone === "warning" ? "bg-warning-bg text-warning" : "bg-info-bg text-info"}`;
+                    const body = <><span className="min-w-0 flex-1"><span className="block">{a.text}</span>{a.detail && <span className="block text-[0.75rem] font-medium opacity-80">{a.detail}</span>}</span><ChevronRight size={15} className="shrink-0" /></>;
+                    return a.href ? <Link key={i} href={a.href} className={cls}>{body}</Link> : <button key={i} onClick={a.onClick} className={cls}>{body}</button>;
+                  })}
+                  {actions.length > 7 && <button type="button" onClick={() => setShowAllTodo((v) => !v)} className="pressable w-full rounded-xl py-1.5 text-[0.82rem] font-semibold text-ink-3 hover:text-ink">{showAllTodo ? "접기" : `${actions.length - 7}건 더 보기`}</button>}
+                </div>
+              )}
+            </Card>
+            <Card className="p-5">
+              <SectionTitle>최근 고객 활동</SectionTitle>
+              <ActivityFeed items={activities.filter((a) => a.actorRole === "client")} limit={4} />
+            </Card>
+          </div>
           <div className="space-y-5">
             <Card className="p-5">
               <SectionTitle>현재 진행 프로젝트</SectionTitle>
@@ -266,31 +312,14 @@ export default function ClientCardPage() {
               ) : <div className="text-[0.9rem] text-ink-3">상담 기록이 없습니다.</div>}
             </Card>
           </div>
-          <div className="space-y-5">
-            <Card className="p-5">
-              <SectionTitle>필요한 Action</SectionTitle>
-              {actions.length === 0 ? <div className="text-[0.9rem] text-success">지금 필요한 Action이 없습니다.</div> : (
-                <div className="space-y-1.5">
-                  {actions.map((a, i) => {
-                    const cls = `pressable flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-left text-[0.88rem] font-semibold ${a.tone === "error" ? "bg-error-bg text-error" : a.tone === "warning" ? "bg-warning-bg text-warning" : "bg-info-bg text-info"}`;
-                    return a.href ? <Link key={i} href={a.href} className={cls}>{a.text}<ChevronRight size={15} /></Link> : <button key={i} onClick={a.onClick} className={cls}>{a.text}<ChevronRight size={15} /></button>;
-                  })}
-                </div>
-              )}
-            </Card>
-            <Card className="p-5">
-              <SectionTitle>미제출 자료</SectionTitle>
-              {missing.length === 0 ? <div className="text-[0.9rem] text-ink-3">미제출 자료가 없습니다.</div> : missing.map((d) => (
-                <button key={d.id} onClick={() => setReviewReq(d)} className="flex w-full items-center justify-between border-b border-line py-2 text-left text-[0.88rem] last:border-0 hover:bg-surface-2/60">
-                  <span className="font-semibold">{d.name}</span><span className="flex items-center gap-2"><DocStatusBadge status={d.status} /><DueText iso={d.dueDate} /></span>
-                </button>
-              ))}
-            </Card>
-            <Card className="p-5">
-              <SectionTitle>최근 고객 활동</SectionTitle>
-              <ActivityFeed items={activities.filter((a) => a.actorRole === "client")} limit={4} />
-            </Card>
-          </div>
+        </div>
+      )}
+      {/* 회사 정보 — 신청서에 옮겨 적을 번호 · 재무 · 인증. 할 일 아래에 둔다 */}
+      {tab === "overview" && (
+        <div className="space-y-5" id="client-profile">
+          <ProfileCard company={c} />
+          <FinancialsCard key={c.id} company={c} />
+          <CertificationsCard key={`cert-${c.id}`} company={c} />
         </div>
       )}
 
@@ -480,6 +509,7 @@ export default function ClientCardPage() {
       <NewConsultationModal open={newConsult} onClose={() => setNewConsult(false)} companyId={c.id} />
       <NewScheduleModal open={newSchedule} onClose={() => setNewSchedule(false)} companyId={c.id} projectId={active[0]?.id} />
       <CompanyDocRequestModal companyId={c.id} open={companyDoc} onClose={() => setCompanyDoc(false)} />
+      <NewTaskModal open={newTask} onClose={() => setNewTask(false)} companyId={c.id} projectId={active[0]?.id} />
     </div>
   );
 }
@@ -523,3 +553,17 @@ function SummaryBlock({ title, items }: { title: string; items: string[] }) {
 }
 
 export { Stat };
+
+function QuickAction({ icon, label, onClick }: { icon: ReactNode; label: string; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className="pressable flex shrink-0 items-center gap-1.5 rounded-xl border border-line bg-surface px-3.5 py-2 text-[0.88rem] font-semibold text-ink-2 hover:border-accent hover:text-ink">
+      <span className="text-accent">{icon}</span>{label}
+    </button>
+  );
+}
+
+/** 업무 제목 앞의 기업 이름을 뗀다 — 기업 상세 안에서는 같은 이름이 반복될 뿐이다 */
+function stripCompany(title: string, name: string) {
+  for (const n of [name, shortCompanyName(name)]) if (n && title.startsWith(n)) return title.slice(n.length).trimStart() || title;
+  return title;
+}

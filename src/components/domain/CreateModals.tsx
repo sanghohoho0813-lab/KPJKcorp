@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useStore } from "@/lib/store";
 import { Modal } from "@/components/ui/overlay";
-import { Button, Field, Input, Select, Textarea } from "@/components/ui/ui";
+import { Button, Field, Input, Select, Textarea, cx } from "@/components/ui/ui";
+import { guessCompany, guessTaskType } from "@/lib/quick-task";
 import type { ScheduleType, Task } from "@/lib/types";
 import { SCHEDULE_TYPE } from "@/lib/stages";
 import { addDays } from "@/lib/format";
@@ -132,6 +133,13 @@ export function NewTaskModal({ open, onClose, companyId, projectId }: { open: bo
   const [priority, setPriority] = useState<Task["priority"]>("normal");
   const [assignee, setAssignee] = useState(session?.userId ?? "u_park");
   const [cid, setCid] = useState(companyId ?? "");
+  // 사용자가 직접 고른 칸은 제목을 바꿔도 덮어쓰지 않는다
+  const [touched, setTouched] = useState({ type: false, cid: false });
+  const onTitle = (v: string) => {
+    setTitle(v);
+    if (!touched.type) setType(v.trim() ? guessTaskType(v) : "후속연락");
+    if (!companyId && !touched.cid) setCid(guessCompany(v, companies) ?? "");
+  };
   const submit = () => {
     if (!title.trim()) {
       toast("업무 제목을 입력해 주세요.", "error");
@@ -141,19 +149,20 @@ export function NewTaskModal({ open, onClose, companyId, projectId }: { open: bo
     create({ title: title.trim(), type, dueDate: new Date(`${due}T18:00:00`).toISOString(), priority, assigneeId: assignee, companyId: cid || undefined, projectId }, session?.userId ?? "u_admin");
     toast("업무가 등록되었습니다.");
     setTitle("");
+    setTouched({ type: false, cid: false });
     onClose();
   };
   return (
     <Modal open={open} onClose={onClose} title="업무 등록" size="sm" footer={<><Button variant="ghost" onClick={onClose}>취소</Button><Button variant="accent" onClick={submit}>등록</Button></>}>
       <div className="space-y-3">
-        <Field label="제목"><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="예: 비앤테크 미제출 자료 후속 연락" autoFocus /></Field>
+        <Field label="제목" hint="기업 이름을 넣으면 기업이, 낱말(전화·검토·미팅…)로 유형이 자동으로 골라집니다"><Input value={title} onChange={(e) => onTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); submit(); } }} placeholder="예: 비앤테크 미제출 자료 후속 연락" autoFocus /></Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="유형"><Select value={type} onChange={(e) => setType(e.target.value as Task["type"])}>{["후속연락", "자료검토", "내부작업", "문의응대", "미팅준비", "보고서", "기타"].map((k) => <option key={k}>{k}</option>)}</Select></Field>
-          <Field label="기한"><Input type="date" value={due} onChange={(e) => setDue(e.target.value)} /></Field>
+          <Field label="유형"><Select value={type} onChange={(e) => { setType(e.target.value as Task["type"]); setTouched((t) => ({ ...t, type: true })); }}>{["후속연락", "자료검토", "내부작업", "문의응대", "미팅준비", "보고서", "기타"].map((k) => <option key={k}>{k}</option>)}</Select></Field>
+          <Field label="기한"><Input type="date" value={due} onChange={(e) => setDue(e.target.value)} /><span className="mt-1 flex gap-1">{[["오늘", 0], ["내일", 1], ["1주 뒤", 7]].map(([l, n]) => <button key={l} type="button" onClick={() => setDue(localDateInput(addDays(new Date(), n as number)))} className={cx("pressable rounded-md px-2 py-0.5 text-[0.75rem] font-semibold", due === localDateInput(addDays(new Date(), n as number)) ? "bg-soft text-accent-strong" : "text-ink-3 hover:bg-surface-2")}>{l}</button>)}</span></Field>
           <Field label="우선순위"><Select value={priority} onChange={(e) => setPriority(e.target.value as Task["priority"])}><option value="urgent">긴급</option><option value="normal">보통</option><option value="low">낮음</option></Select></Field>
           <Field label="담당자"><Select value={assignee} onChange={(e) => setAssignee(e.target.value)}>{users.filter((u) => u.role !== "client").map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</Select></Field>
         </div>
-        {!companyId && <Field label="기업"><Select value={cid} onChange={(e) => setCid(e.target.value)}><option value="">내부</option>{companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>}
+        {!companyId && <Field label="기업"><Select value={cid} onChange={(e) => { setCid(e.target.value); setTouched((t) => ({ ...t, cid: true })); }}><option value="">내부</option>{companies.filter((c) => !c.archived || c.id === cid).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>}
       </div>
     </Modal>
   );

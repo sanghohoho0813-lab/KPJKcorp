@@ -12,6 +12,7 @@ import {
   CONSULT_AREAS, CONTACT_TITLES, EMPLOYEE_BANDS, ENTITY_TYPES, INDUSTRY_CHIPS, industryOf, LEAD_SOURCES, REGIONS, REVENUE_BANDS,
   bandOfEmployees, formatBizNo, formatCorpNo, formatPhone, regionOfAddress,
 } from "@/lib/company-options";
+import { legalBaseName } from "@/lib/quick-task";
 import { DOC_SOURCE_LABEL, PARSED_LABEL, PARSED_ORDER, bizNoValid, corpNoValid, kindLine, parseBusinessDoc, parseExtracted, parseKindLines, type BizKind, type ParsedDoc, type ParsedKey } from "@/lib/docparse";
 import { ACCEPT_DOC, EXTRACT_METHOD_LABEL, extractTextFromFile, type ExtractMethod } from "@/lib/docextract";
 import { Modal } from "@/components/ui/overlay";
@@ -105,9 +106,16 @@ function CompanyModalInner({ open, companyId, onClose, onCreated }: { open: bool
   const validate = () => {
     const e: Partial<Record<keyof CompanyForm, string>> = {};
     if (!f.name.trim()) e.name = "기업명은 필수입니다.";
-    else if (st.companies.some((c) => c.id !== companyId && c.name.trim() === f.name.trim())) e.name = "같은 이름의 기업이 이미 있습니다.";
+    else {
+      // "에이정밀" 과 "에이정밀(주)" 처럼 법인 표기 · 띄어쓰기만 다른 것도 같은 기업으로 본다
+      const same = st.companies.find((c) => c.id !== companyId && legalBaseName(c.name) === legalBaseName(f.name));
+      if (same) e.name = `같은 이름의 기업이 이미 있습니다 — ${same.name}${same.archived ? " (보관됨)" : ""}`;
+    }
+    const biz = f.bizNo.replace(/\D/g, "");
+    const dupBiz = biz.length === 10 ? st.companies.find((c) => c.id !== companyId && (c.bizNo ?? "").replace(/\D/g, "") === biz) : undefined;
     if (!f.ceo.trim()) e.ceo = "대표자명은 필수입니다.";
     if (f.bizNo && f.bizNo.replace(/\D/g, "").length !== 10) e.bizNo = "사업자번호는 숫자 10자리입니다.";
+    else if (dupBiz) e.bizNo = `같은 사업자번호로 이미 등록된 기업이 있습니다 — ${dupBiz.name}${dupBiz.archived ? " (보관됨)" : ""}`;
     if (f.corpNo && f.corpNo.replace(/\D/g, "").length !== 13) e.corpNo = "법인등록번호는 숫자 13자리입니다.";
     if (f.contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.contactEmail.trim())) e.contactEmail = "이메일 형식이 아닙니다.";
     if (f.employees < 0) e.employees = "0 이상이어야 합니다.";

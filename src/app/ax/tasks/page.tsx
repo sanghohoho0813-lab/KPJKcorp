@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { CheckSquare, Pencil, Plus } from "lucide-react";
+import { CheckSquare, Pencil, Plus, Search } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { AxInsightButton } from "@/components/ai/AxInsight";
 import { daysBetween, fmtDate, isSameDay } from "@/lib/format";
@@ -14,8 +14,11 @@ import { NewTaskModal } from "@/components/domain/CreateModals";
 import { EditTaskModal, useMay } from "@/components/domain/EntityModals";
 import { ruleOfTask } from "@/lib/rules";
 import { InquiryConsole } from "@/components/domain/InquiryConsole";
+import { QuickTaskBar } from "@/components/domain/QuickTaskBar";
+import { DUE_BUCKET_LABEL, dueBucket, type DueBucket } from "@/lib/quick-task";
 
-type Filter = "today" | "open" | "overdue" | "done" | "all";
+type Filter = "today" | "open" | "overdue" | "hold" | "done" | "all";
+const BUCKETS: DueBucket[] = ["overdue", "today", "tomorrow", "week", "later"];
 
 function TasksInner() {
   const st = useStore();
@@ -26,6 +29,7 @@ function TasksInner() {
   const [filter, setFilter] = useState<Filter>("today");
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  const [q, setQ] = useState("");
   const may = useMay();
   const now = new Date();
   const nowIso = now.toISOString();
@@ -35,15 +39,34 @@ function TasksInner() {
   const today = openTasks.filter((t) => isSameDay(t.dueDate, now) || daysBetween(t.dueDate, nowIso) > 0);
   const overdue = openTasks.filter((t) => daysBetween(t.dueDate, nowIso) > 0);
   const done = all.filter((t) => t.status === "done");
+  const held = all.filter((t) => t.status === "hold");
 
-  const rows = (filter === "today" ? today : filter === "open" ? openTasks : filter === "overdue" ? overdue : filter === "done" ? done : all).slice().sort((a, b) => {
-    const pr = (t: Task) => (t.priority === "urgent" ? 0 : t.priority === "normal" ? 1 : 2);
-    return pr(a) - pr(b) || a.dueDate.localeCompare(b.dueDate);
-  });
+  // 검색 — 제목 · 기업명 · 메모. 업무가 수백 건이 되어도 한 번에 찾는다
+  const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const companyName = (id?: string) => (id ? st.companies.find((x) => x.id === id)?.name ?? "" : "");
+  const hit = (t: Task) => !words.length || words.every((w) => `${t.title} ${companyName(t.companyId)} ${t.memo ?? ""} ${t.type}`.toLowerCase().includes(w));
+  const pr = (t: Task) => (t.priority === "urgent" ? 0 : t.priority === "normal" ? 1 : 2);
+  const rows = (filter === "today" ? today : filter === "open" ? openTasks : filter === "overdue" ? overdue : filter === "hold" ? held : filter === "done" ? done : all)
+    .filter(hit)
+    .slice()
+    .sort((a, b) => (filter === "done" ? (b.completedAt ?? "").localeCompare(a.completedAt ?? "") : pr(a) - pr(b) || a.dueDate.localeCompare(b.dueDate)));
+  // 미완료 · 전체는 기한으로 묶어 본다 (기한 초과 → 오늘 → 내일 → 7일 안 → 그 뒤 → 보류 · 완료)
+  const grouped = filter === "open" || filter === "all";
+  const groups: { key: string; label: string; items: Task[] }[] = grouped
+    ? [
+        ...BUCKETS.map((b) => ({ key: b, label: DUE_BUCKET_LABEL[b], items: rows.filter((t) => (t.status === "todo" || t.status === "doing") && dueBucket(t.dueDate, now) === b) })),
+        { key: "hold", label: "보류", items: rows.filter((t) => t.status === "hold") },
+        { key: "done", label: "완료", items: rows.filter((t) => t.status === "done").sort((a, b) => (b.completedAt ?? "").localeCompare(a.completedAt ?? "")) },
+      ].filter((g) => g.items.length)
+    : [{ key: "all", label: "", items: rows }];
 
   const setStatus = (t: Task, s: TaskStatus) => {
-    update(t.id, s, st.session?.userId ?? "u_admin");
-    if (s === "done") toast(`완료 처리: ${t.title}`);
+    const before = t.status;
+    const by = st.session?.userId ?? "u_admin";
+    update(t.id, s, by);
+    // 체크를 잘못 눌러 목록에서 사라져도 바로 되돌릴 수 있게
+    if (s === "done") toast(`완료: ${t.title}`, "success", { label: "되돌리기", run: () => update(t.id, before, by) });
+    else if (s === "hold") toast(`보류: ${t.title}`, "info", { label: "되돌리기", run: () => update(t.id, before, by) });
   };
 
   return (
@@ -75,17 +98,27 @@ function TasksInner() {
         <KpiCard label="미완료 전체" value={openTasks.length} sub={`자동 생성 ${openTasks.filter((t) => t.source === "auto").length}건`} />
         <KpiCard label="완료" value={done.length} sub="누적" />
       </div>
-      <div className="mb-4"><SegmentedControl size="sm" value={filter} onChange={setFilter} options={[{ key: "today", label: "오늘" }, { key: "open", label: "미완료" }, { key: "overdue", label: "기한 초과" }, { key: "done", label: "완료" }, { key: "all", label: "전체" }]} /></div>
+      {may("task.create") && <QuickTaskBar className="mb-4" />}
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+        <SegmentedControl size="sm" value={filter} onChange={setFilter} options={[{ key: "today", label: "오늘" }, { key: "open", label: "미완료" }, { key: "overdue", label: "기한 초과" }, ...(held.length || filter === "hold" ? [{ key: "hold" as Filter, label: `보류 ${held.length}` }] : []), { key: "done", label: "완료" }, { key: "all", label: "전체" }]} />
+        <label className="relative sm:ml-auto sm:w-64">
+          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-3" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="업무 · 기업 검색" aria-label="업무 검색" className="h-10 w-full rounded-[10px] border border-line-2 bg-surface pl-9 pr-3 text-[0.9rem] placeholder:text-ink-3 focus:border-accent" />
+        </label>
+      </div>
       <Card className="overflow-hidden">
-        {rows.length === 0 ? <EmptyState icon={<CheckSquare size={30} />} title="해당 조건의 업무가 없습니다" desc={filter === "today" ? "오늘 처리할 업무를 모두 마쳤습니다." : undefined} /> : (
+        {rows.length === 0 ? <EmptyState icon={<CheckSquare size={30} />} title={words.length ? `‘${q.trim()}’에 맞는 업무가 없습니다` : "해당 조건의 업무가 없습니다"} desc={words.length ? "검색어를 줄이거나 ‘전체’에서 찾아보세요." : filter === "today" ? "오늘 처리할 업무를 모두 마쳤습니다." : undefined} /> : groups.map((g) => (
+          <div key={g.key} data-group={g.key}>
+            {grouped && <div className={cx("border-b border-line bg-surface-2/60 px-4 py-1.5 text-[0.8rem] font-bold md:px-5", g.key === "overdue" ? "text-error" : "text-ink-2")}>{g.label} <span className="font-semibold text-ink-3">{g.items.length}</span></div>}
           <div className="divide-y divide-line">
-            {rows.map((t) => {
+            {g.items.map((t) => {
               const c = st.companies.find((x) => x.id === t.companyId);
               const isDone = t.status === "done";
               const actions = (
                 <>
-                  {!isDone && t.status !== "doing" && <Button size="sm" variant="ghost" onClick={() => setStatus(t, "doing")}>시작</Button>}
-                  {!isDone && t.status !== "hold" && <Button size="sm" variant="ghost" onClick={() => setStatus(t, "hold")}>보류</Button>}
+                  {t.status === "todo" && <Button size="sm" variant="ghost" onClick={() => setStatus(t, "doing")}>시작</Button>}
+                  {t.status === "hold" ? <Button size="sm" variant="ghost" onClick={() => setStatus(t, "todo")}>다시 시작</Button>
+                    : !isDone && <Button size="sm" variant="ghost" onClick={() => setStatus(t, "hold")}>보류</Button>}
                 </>
               );
               return (
@@ -128,7 +161,8 @@ function TasksInner() {
               );
             })}
           </div>
-        )}
+          </div>
+        ))}
       </Card>
       </>}
       <EditTaskModal open={!!editId} taskId={editId} onClose={() => setEditId(null)} />

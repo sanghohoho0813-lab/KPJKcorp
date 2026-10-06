@@ -61,6 +61,8 @@ import { currentServerUser, reauthenticate, serverSignIn as authSignIn, serverSi
 import { noteSignOut, type SignOutReason } from "./signout-notice";
 import { loadAll, ORG_SETTING_KEYS, pendingWrites, pushChanges, pushSettings, resetLoadCache, retryOutbox, setOutboxOwner, unsavedCount, writeSeq, type ServerSettings } from "./server/sync";
 
+export interface ToastAction { label: string; run: () => void }
+
 export interface StoreState extends SeedData {
   hydrated: boolean;
   seededAt: string;
@@ -68,7 +70,7 @@ export interface StoreState extends SeedData {
   seedRev?: string;
   session: Session | null;
   settings: Settings;
-  toasts: { id: string; text: string; tone?: "success" | "error" | "info" }[];
+  toasts: { id: string; text: string; tone?: "success" | "error" | "info"; action?: ToastAction }[];
 
   // session
   /** 자격증명 확인 후 로그인. 실패 사유를 그대로 돌려준다. */
@@ -80,7 +82,8 @@ export interface StoreState extends SeedData {
   /** 보기 전환 — 대표 계정만. 컨설턴트·사무직원 화면으로 보거나(권한도 그 역할로 줄어든다) 대표로 돌아온다 */
   switchView: (role: "admin" | "consultant" | "staff") => boolean;
   setSettings: (patch: Partial<Settings>) => void;
-  toast: (text: string, tone?: "success" | "error" | "info") => void;
+  /** action — "되돌리기"처럼 안내 옆 버튼 하나. 있으면 조금 더 오래(6초) 보인다 */
+  toast: (text: string, tone?: "success" | "error" | "info", action?: ToastAction) => void;
   dismissToast: (id: string) => void;
   setHydrated: () => void;
   reseedIfStale: () => void;
@@ -582,10 +585,10 @@ export const useStore = create<StoreState>()(
         set({ session: { ...s, portalPreviewCompanyId: companyId } });
       },
       setSettings: (patch) => set({ settings: { ...get().settings, ...patch } }),
-      toast: (text, tone = "success") => {
+      toast: (text, tone = "success", action) => {
         const id = uid("t");
-        set({ toasts: [...get().toasts, { id, text, tone }] });
-        setTimeout(() => get().dismissToast(id), 3200);
+        set({ toasts: [...get().toasts, { id, text, tone, action }] });
+        setTimeout(() => get().dismissToast(id), action ? 6000 : 3200);
       },
       dismissToast: (id) => set({ toasts: get().toasts.filter((t) => t.id !== id) }),
 

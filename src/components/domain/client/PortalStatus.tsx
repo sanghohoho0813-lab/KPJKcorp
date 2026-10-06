@@ -60,14 +60,21 @@ export function PortalStatus({ company, onMakeAccount }: { company: Company; onM
 /** 이 기업에서 지금 챙길 것 — 마감 지남 · 회신 지연 · 서류 만료 · 수금 연체 */
 const NO_PAYMENTS: never[] = [];
 
-export function CompanyAlertsCard({ company, onOpen }: { company: Company; onOpen: (tab: OpsAlert["tab"]) => void }) {
+/** 기업 상세 "지금 할 일"에서도 같은 목록을 쓴다 — company가 아직 없으면 빈 목록 */
+export function useCompanyAlerts(company?: Company): OpsAlert[] {
   const projects = useStore((s) => s.projects);
-  const vault = useStore((s) => s.companyVaults.find((v) => v.companyId === company.id));
+  const vault = useStore((s) => (company ? s.companyVaults.find((v) => v.companyId === company.id) : undefined));
   const files = useStore((s) => s.companyFiles);
   const fin = useMay()("finance.view");
   const allPayments = useStore((s) => s.payments);
+  if (!company) return [];
   const payments = fin ? allPayments : NO_PAYMENTS;
-  const alerts = companyAlerts({ company, projects: projects.filter((p) => p.companyId === company.id), vault, files: files.filter((f) => f.companyId === company.id), payments: payments.filter((p) => p.companyId === company.id) });
+  return companyAlerts({ company, projects: projects.filter((p) => p.companyId === company.id), vault, files: files.filter((f) => f.companyId === company.id), payments: payments.filter((p) => p.companyId === company.id) });
+}
+export { SEVERITY_LABEL };
+
+export function CompanyAlertsCard({ company, onOpen }: { company: Company; onOpen: (tab: OpsAlert["tab"]) => void }) {
+  const alerts = useCompanyAlerts(company);
   if (!alerts.length) return null;
   return (
     <Card className="p-5" id="company-alerts">

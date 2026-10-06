@@ -68,7 +68,7 @@ ok('서버: 진행 중 메시지 알림', sql(`select count(*) from notification
 
 // 3) 일정: 내부로 → 한 번 눌러 공개
 await ceo.goto(`${B}/ax/clients/${coId}?tab=schedule`, { waitUntil: 'domcontentloaded' }); await ceo.waitForTimeout(1500);
-await ceo.getByRole('button', { name: '일정 등록' }).click(); await ceo.waitForTimeout(500);
+await ceo.getByRole('button', { name: '일정 등록' }).last().click(); await ceo.waitForTimeout(500);
 await dialog(ceo).getByLabel('제목').fill('실사 현장 대표 미팅');
 await dialog(ceo).getByLabel('고객 Portal에 표시').uncheck();
 await dialog(ceo).getByRole('button', { name: '등록', exact: true }).click(); await ceo.waitForTimeout(3000);

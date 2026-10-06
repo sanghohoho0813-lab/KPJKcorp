@@ -4,6 +4,7 @@
 
 | 파일 | 하는 일 |
 |---|---|
+| `daily.mjs` | 매일 쓰는 흐름 41항목 — 대시보드 한 줄 업무 등록·완료·되돌리기, 업무함 검색·기한 묶음·보류, 기업 상세 '지금 할 일'·빠른 작업, 중복 기업 등록 막기, 휴대폰 |
 | `run.mjs` | PC(1440px)·휴대폰(390px) 각각 새 브라우저로 검수 항목 8개를 실행 → `out/results.json` + 화면 캡처 |
 | `report.mjs` | `results.json` 과 캡처로 A4 PDF 작성 → `out/KPJK_AX_1차완료보고_최종검수요청_날짜.pdf` |
 
@@ -12,6 +13,7 @@
 ```bash
 npm run build && npm start          # 다른 터미널
 node tools/acceptance/run.mjs       # 약 3분
+node tools/acceptance/daily.mjs     # 약 1분
 node tools/acceptance/report.mjs    # 약 10초
 ```
 
