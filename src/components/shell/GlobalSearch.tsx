@@ -96,7 +96,7 @@ export function GlobalSearch() {
     if (!hits.length) return;
     if (e.key === "ArrowDown") { e.preventDefault(); setCursor((c) => Math.min(hits.length - 1, c + 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setCursor((c) => Math.max(0, c - 1)); }
-    else if (e.key === "Enter") { e.preventDefault(); const h = hits[cursor]; if (h) go(h); }
+    else if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); const h = hits[cursor]; if (h) go(h); }
   };
 
   // 선택 항목이 보이도록 스크롤

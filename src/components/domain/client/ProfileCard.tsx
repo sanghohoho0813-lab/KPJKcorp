@@ -181,7 +181,7 @@ function EditLine({ row, onSave, onCancel, onRemove }: { row: ProfileRow; onSave
       <div className="flex items-center gap-1.5">
         <Input autoFocus value={v} onChange={(e) => setV(e.target.value)} placeholder={row.placeholder}
           inputMode={row.edit === "number" || row.numberKind ? "numeric" : undefined} aria-label={row.label}
-          onKeyDown={(e) => { if (e.key === "Enter") onSave(v); if (e.key === "Escape") onCancel(); }} />
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) onSave(v); if (e.key === "Escape") onCancel(); }} />
         <Button size="sm" variant="accent" onClick={() => onSave(v)}>저장</Button>
         <button type="button" onClick={onCancel} className="pressable icon-btn text-ink-3" aria-label="취소"><X size={15} /></button>
       </div>
@@ -207,7 +207,7 @@ function CustomFieldForm({ company, group, onDone }: { company: Company; group: 
     <div className="space-y-1.5 px-3 py-2.5">
       <div className="text-[0.8rem] font-semibold">{GROUP_LABEL[group]}에 칸 만들기</div>
       <Input autoFocus value={label} onChange={(e) => setLabel(e.target.value)} placeholder="칸 이름 — 예: 공장 등록번호" aria-label="칸 이름" />
-      <Input value={value} onChange={(e) => setValue(e.target.value)} placeholder="내용" aria-label="칸 내용" onKeyDown={(e) => { if (e.key === "Enter") add(); }} />
+      <Input value={value} onChange={(e) => setValue(e.target.value)} placeholder="내용" aria-label="칸 내용" onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) add(); }} />
       <p className="text-[0.75rem] text-ink-3">비밀번호·주민등록번호는 여기에도 적지 않습니다.</p>
       <div className="flex justify-end gap-1.5">
         <Button size="sm" variant="ghost" onClick={onDone}>취소</Button>

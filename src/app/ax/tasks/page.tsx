@@ -15,6 +15,7 @@ import { EditTaskModal, useMay } from "@/components/domain/EntityModals";
 import { ruleOfTask } from "@/lib/rules";
 import { InquiryConsole } from "@/components/domain/InquiryConsole";
 import { QuickTaskBar } from "@/components/domain/QuickTaskBar";
+import { isConsultTask } from "@/lib/consult-followups";
 import { DUE_BUCKET_LABEL, dueBucket, type DueBucket } from "@/lib/quick-task";
 
 type Filter = "today" | "open" | "overdue" | "hold" | "done" | "all";
@@ -132,7 +133,7 @@ function TasksInner() {
                     <div className="flex flex-wrap items-center gap-2">
                       <PriorityBadge priority={t.priority} />
                       <span className={cx("font-semibold", isDone && "line-through")}>{t.title}</span>
-                      {t.ruleKey ? <Badge tone="info" >규칙 · {ruleOfTask(t.ruleKey)?.short ?? "자동"}</Badge> : t.source === "auto" && <Badge tone="info">자동</Badge>}
+                      {isConsultTask(t) ? <Badge tone="info">상담 후속</Badge> : t.ruleKey ? <Badge tone="info" >규칙 · {ruleOfTask(t.ruleKey)?.short ?? "자동"}</Badge> : t.source === "auto" && <Badge tone="info">자동</Badge>}
                     </div>
                     <div className="mt-0.5 flex flex-wrap gap-x-2 text-[0.8rem] text-ink-3">
                       <span>{t.type}</span>

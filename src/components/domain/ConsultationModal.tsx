@@ -5,8 +5,10 @@ import { Plus, Trash2, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 import type { Consultation } from "@/lib/types";
 import { addDays, iso } from "@/lib/format";
+import { defaultPicked, followItems, type FollowItem } from "@/lib/consult-followups";
 import { Button, Field, Input, Select, Textarea, cx } from "@/components/ui/ui";
 import { Confirm, Modal } from "@/components/ui/overlay";
+import { can } from "@/lib/permissions";
 
 function localDateTimeInput(d: Date) {
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -48,7 +50,8 @@ function ListInput({ label, hint, items, onChange, placeholder }: { label: strin
         <Input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
+          // 한글 조합 중 Enter는 글자 확정이다 — 그때 넣으면 마지막 글자가 잘리거나 칸에 남는다
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); add(); } }}
           placeholder={placeholder}
         />
         <Button type="button" variant="outline" icon={<Plus size={15} />} onClick={add}>추가</Button>
@@ -66,6 +69,7 @@ export function NewConsultationModal(props: { open: boolean; onClose: () => void
 function ConsultationModalInner({ open, onClose, companyId, projectId, consultationId }: { open: boolean; onClose: () => void; companyId?: string; projectId?: string; consultationId?: string | null }) {
   const st = useStore();
   const create = useStore((s) => s.createConsultation);
+  const makeFollowUps = useStore((s) => s.createConsultFollowUps);
   const update = useStore((s) => s.updateConsultation);
   const remove = useStore((s) => s.deleteConsultation);
   const toast = useStore((s) => s.toast);
@@ -84,12 +88,18 @@ function ConsultationModalInner({ open, onClose, companyId, projectId, consultat
   const [documents, setDocuments] = useState<string[]>(editing?.summary.documents ?? []);
   const [nextAction, setNextAction] = useState(editing?.summary.nextAction ?? "");
   const [confirmDel, setConfirmDel] = useState(false);
-  const [makeTask, setMakeTask] = useState(true);
+  // 저장하면 함께 만들 것 — 체크를 바꾼 항목만 기억한다 (나머지는 기본값: 업무 켬 · 자료 요청 끔)
+  const [picked, setPicked] = useState<Record<string, boolean>>({});
   const [taskDue, setTaskDue] = useState(() => localDateInput(addDays(new Date(), 3)));
+  const [docDue, setDocDue] = useState(() => localDateInput(addDays(new Date(), 7)));
 
   const cid = companyId ?? company;
   const c = st.companies.find((x) => x.id === cid);
   const projects = st.projects.filter((p) => p.companyId === cid);
+  const items = followItems({ nextAction, promises, documents }, editing?.id, { tasks: st.tasks, docRequests: st.docRequests, companyId: cid });
+  const isPicked = (it: FollowItem) => !it.done && (picked[it.key] ?? defaultPicked(it));
+  const chosen = items.filter(isPicked);
+  const mayDoc = can(st.session?.role, "doc.request");
 
   const reset = () => {
     setNotes(""); setCore([]); setRequirements([]); setPromises([]); setDocuments([]); setNextAction("");
@@ -99,35 +109,24 @@ function ConsultationModalInner({ open, onClose, companyId, projectId, consultat
   const submit = () => {
     if (!cid) { toast("기업을 선택해 주세요.", "error"); return; }
     if (!notes.trim() && core.length === 0) { toast("상담 내용 또는 핵심 내용을 입력해 주세요.", "error"); return; }
+    if (chosen.some((x) => x.kind !== "doc") && !taskDue) { toast("후속 업무 기한을 넣어 주세요.", "error"); return; }
+    if (chosen.some((x) => x.kind === "doc") && !docDue) { toast("자료 제출 기한을 넣어 주세요.", "error"); return; }
+    const summary = { core, requirements, promises, documents, nextAction: nextAction.trim() };
+    let id: string | undefined;
     if (editing) {
-      update(editing.id, {
-        projectId: project || undefined,
-        date: new Date(date).toISOString(),
-        type,
-        channel,
-        notes: notes.trim(),
-        summary: { core, requirements, promises, documents, nextAction: nextAction.trim() },
-      }, me);
-      toast("상담 기록을 수정했습니다.");
-      onClose();
-      return;
+      update(editing.id, { projectId: project || undefined, date: new Date(date).toISOString(), type, channel, notes: notes.trim(), summary }, me);
+      id = editing.id;
+    } else {
+      id = create({ companyId: cid, projectId: project || undefined, date: new Date(date).toISOString(), consultantId: c?.consultantId ?? me, type, channel, notes: notes.trim(), summary }, me);
     }
-    create(
-      {
-        companyId: cid,
-        projectId: project || undefined,
-        date: new Date(date).toISOString(),
-        consultantId: c?.consultantId ?? me,
-        type,
-        channel,
-        notes: notes.trim(),
-        summary: { core, requirements, promises, documents, nextAction: nextAction.trim() },
-      },
-      me,
-      makeTask && nextAction.trim() ? { create: true, dueDate: iso(new Date(`${taskDue}T18:00:00`)) } : undefined,
-    );
-    toast(makeTask && nextAction.trim() ? "상담 기록을 저장하고 후속 업무를 등록했습니다." : "상담 기록을 저장했습니다.");
-    reset();
+    if (!id) return;
+    // 상담에서 정한 것 → 업무 · 자료 요청 (이미 만든 것은 건너뛴다 — 수정해서 다시 저장해도 겹치지 않는다)
+    const made = chosen.length
+      ? makeFollowUps(id, chosen.map((x) => ({ kind: x.kind, text: x.text })), { task: iso(new Date(`${taskDue}T18:00:00`)), doc: iso(new Date(`${docDue}T18:00:00`)) }, me)
+      : { tasks: 0, docs: 0 };
+    const extra = [made.tasks ? `후속 업무 ${made.tasks}건` : "", made.docs ? `고객 자료 요청 ${made.docs}건` : ""].filter(Boolean).join(" · ");
+    toast(`${editing ? "상담 기록을 수정했습니다" : "상담 기록을 저장했습니다"}${extra ? ` · ${extra}` : ""}`);
+    if (!editing) reset();
     onClose();
   };
 
@@ -191,20 +190,43 @@ function ConsultationModalInner({ open, onClose, companyId, projectId, consultat
         </Field>
       </div>
 
-      {/* 후속 업무 자동 등록은 최초 작성에서만. 수정할 때마다 업무가 또 생기면 중복이 쌓인다. */}
-      <div className={cx("mt-3 rounded-xl border px-4 py-3", editing && "hidden", nextAction.trim() ? "border-accent/50 bg-soft/50" : "border-line bg-surface-2")}>
-        <label className="flex items-center gap-2 text-[0.88rem] font-semibold">
-          <input type="checkbox" checked={makeTask} onChange={(e) => setMakeTask(e.target.checked)} className="h-4 w-4 accent-[var(--theme-accent)]" />
-          다음 Action을 후속 업무로 등록
-        </label>
-        <p className="mt-1 text-[0.8rem] text-ink-3">
-          {nextAction.trim() ? "저장하면 담당자의 업무 목록에 추가되고, 기한이 지나면 브리핑에 자동으로 올라옵니다." : "다음 Action을 입력하면 활성화됩니다."}
-        </p>
-        {makeTask && nextAction.trim() && (
-          <div className="mt-2 max-w-[220px]">
-            <Field label="업무 기한"><Input type="date" value={taskDue} onChange={(e) => setTaskDue(e.target.value)} /></Field>
+      {/* 저장하면 함께 만들 것 — 상담에서 정한 것을 업무 · 자료 요청으로. 무엇이 만들어질지 미리 보이고 고를 수 있다 */}
+      <div className={cx("mt-3 rounded-xl border px-4 py-3", chosen.length ? "border-accent/50 bg-soft/50" : "border-line bg-surface-2")} data-testid="consult-followups">
+        <div className="text-[0.88rem] font-bold">저장하면 함께 만들 것</div>
+        {items.length === 0 ? (
+          <p className="mt-1 text-[0.8rem] text-ink-3">다음 Action · 우리가 약속한 것 · 필요 자료를 적으면, 저장할 때 담당자 업무와 고객 자료 요청으로 바로 만들 수 있습니다.</p>
+        ) : (
+          <ul className="mt-2 space-y-1.5">
+            {items.map((it) => {
+              const off = it.done || (it.kind === "doc" && !mayDoc);
+              return (
+                <li key={it.key}>
+                  <label className={cx("flex items-start gap-2.5 rounded-lg px-1 py-1 text-[0.88rem]", off ? "opacity-60" : "cursor-pointer")}>
+                    <input type="checkbox" disabled={off} checked={isPicked(it)} onChange={(e) => setPicked((p) => ({ ...p, [it.key]: e.target.checked }))} className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--theme-accent)]" data-follow={it.kind} />
+                    <span className="min-w-0 flex-1">
+                      <span className={cx("mr-1.5 inline-block rounded px-1.5 py-0.5 align-[1px] text-[0.72rem] font-bold", it.kind === "doc" ? "bg-info-bg text-info" : "bg-surface text-ink-2")}>{it.kind === "next" ? "업무" : it.kind === "promise" ? "약속 → 업무" : "고객 자료 요청"}</span>
+                      <span className="font-semibold">{it.text}</span>
+                      <span className="ml-1.5 text-[0.75rem] text-ink-3">{it.done ? (it.kind === "doc" ? "이미 요청 중" : "이미 등록됨") : it.kind === "doc" ? (mayDoc ? "고객 화면 · 알림" : "자료 요청 권한 없음") : it.type}</span>
+                    </span>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {(chosen.some((x) => x.kind !== "doc") || chosen.some((x) => x.kind === "doc")) && (
+          <div className="mt-2 flex flex-wrap gap-3">
+            {chosen.some((x) => x.kind !== "doc") && (
+              <div className="w-[200px]"><Field label="업무 기한"><Input type="date" value={taskDue} onChange={(e) => setTaskDue(e.target.value)} aria-label="후속 업무 기한" /></Field>
+                <span className="mt-1 flex gap-1">{([["내일", 1], ["3일 뒤", 3], ["1주 뒤", 7]] as const).map(([l, n]) => <button key={l} type="button" onClick={() => setTaskDue(localDateInput(addDays(new Date(), n)))} className={cx("pressable rounded-md px-2 py-0.5 text-[0.75rem] font-semibold", taskDue === localDateInput(addDays(new Date(), n)) ? "bg-soft text-accent-strong" : "text-ink-3 hover:bg-surface")}>{l}</button>)}</span>
+              </div>
+            )}
+            {chosen.some((x) => x.kind === "doc") && (
+              <div className="w-[200px]"><Field label="자료 제출 기한"><Input type="date" value={docDue} onChange={(e) => setDocDue(e.target.value)} aria-label="자료 제출 기한" /></Field></div>
+            )}
           </div>
         )}
+        {chosen.length > 0 && <p className="mt-2 text-[0.78rem] text-ink-3">업무는 담당 컨설턴트 업무함에, 자료 요청은 고객 화면 요청자료에 올라가고 고객에게 알림이 갑니다. 이미 만든 항목은 다시 만들지 않습니다.</p>}
       </div>
     </Modal>
       <Confirm

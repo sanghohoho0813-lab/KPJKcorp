@@ -46,7 +46,9 @@ import type {
   Task,
   TaskStatus,
 } from "./types";
-import { nowIso, uid, addDays, iso, daysBetween } from "./format";
+import { nowIso, uid, addDays, iso, daysBetween, fmtDate } from "./format";
+import { followKey, type FollowKind } from "./consult-followups";
+import { guessTaskType } from "./quick-task";
 import { CUSTOMER_STEPS, stageLabel, stageToCustomerStep } from "./stages";
 import { RULE_BY_KEY, ruleDays, ruleOn } from "./rules";
 import { emptyVault, slotLabel, slotsOf } from "./vault";
@@ -183,7 +185,10 @@ export interface StoreState extends SeedData {
   deleteSchedule: (id: string, byUserId: string) => void;
   updateTask: (id: string, patch: Partial<Omit<Task, "id" | "createdAt">>, byUserId: string) => void;
   deleteTask: (id: string, byUserId: string) => void;
-  createConsultation: (data: Omit<Consultation, "id">, byUserId: string, followUp?: { create: boolean; dueDate: string }) => void;
+  /** 만든 상담 id 를 돌려준다 (권한 없으면 undefined) — 후속 업무를 이어 만들 때 쓴다 */
+  createConsultation: (data: Omit<Consultation, "id">, byUserId: string, followUp?: { create: boolean; dueDate: string }) => string | undefined;
+  /** 상담 기록 → 후속 업무(다음 Action · 약속) · 고객 자료 요청. 이미 만든 것은 건너뛴다. 만든 개수를 돌려준다 */
+  createConsultFollowUps: (consultationId: string, picks: { kind: FollowKind; text: string }[], due: { task: string; doc: string }, byUserId: string) => { tasks: number; docs: number };
   createInquiry: (data: { companyId: string; projectId?: string; title: string; category: Inquiry["category"]; body: string }, byUserId: string) => void;
   replyInquiry: (inquiryId: string, body: string, byUserId: string, role: Role) => void;
   closeInquiry: (inquiryId: string, byUserId: string) => void;
@@ -1371,7 +1376,7 @@ export const useStore = create<StoreState>()(
       // ---------- 상담 기록 ----------
       createConsultation: (data, byUserId, followUp) => {
         const st = get();
-        if (deny(st, "consultation.create", "상담 기록", set)) return;
+        if (deny(st, "consultation.create", "상담 기록", set)) return undefined;
         const company = st.companies.find((c) => c.id === data.companyId);
         const cs: Consultation = { ...data, id: uid("cs") };
         // 상담에서 정한 "다음 Action"이 업무로 넘어가지 않으면 결국 기억에 의존하게 된다.
@@ -1399,8 +1404,46 @@ export const useStore = create<StoreState>()(
             ...st.activities,
           ],
         });
+        return cs.id;
       },
 
+      createConsultFollowUps: (consultationId, picks, due, byUserId) => {
+        const st = get();
+        const cs = st.consultations.find((x) => x.id === consultationId);
+        if (!cs) return { tasks: 0, docs: 0 };
+        const company = st.companies.find((c) => c.id === cs.companyId);
+        const when = `${fmtDate(cs.date)} ${cs.type}`;
+        const now = nowIso();
+        const newTasks: Task[] = [];
+        const acts: Activity[] = [];
+        const taskPicks = picks.filter((p) => p.kind !== "doc" && p.text.trim());
+        if (taskPicks.length && !deny(st, "task.create", "상담 후속 업무", set)) {
+          for (const p of taskPicks) {
+            const text = p.text.trim();
+            const key = followKey(cs.id, p.kind, text);
+            if (st.tasks.some((t) => t.ruleKey === key) || newTasks.some((t) => t.ruleKey === key)) continue;
+            const g = guessTaskType(text);
+            newTasks.push({
+              id: uid("tk"), companyId: cs.companyId, projectId: cs.projectId,
+              title: `${company?.name ?? ""} ${p.kind === "promise" ? "약속: " : ""}${text}`.trim(),
+              type: g === "기타" ? "후속연락" : g, dueDate: due.task, assigneeId: cs.consultantId, status: "todo", priority: "normal",
+              createdAt: now, source: "auto", ruleKey: key,
+              memo: `${when} 상담에서 ${p.kind === "promise" ? "약속한 것" : "정한 다음 Action"}`,
+            });
+            acts.push(makeActivity({ type: "task_created", companyId: cs.companyId, projectId: cs.projectId, actorId: "system", actorRole: "system", text: `상담 후속 업무: ${text}`, meta: { consultationId: cs.id } }));
+          }
+          if (newTasks.length) set({ tasks: [...newTasks, ...st.tasks], activities: [...acts, ...st.activities] });
+        }
+        // 자료 요청은 고객 화면 · 알림까지 가는 일이라 기존 자료 요청 경로를 그대로 쓴다 (권한 · 프로젝트 연결 · 알림)
+        let docs = 0;
+        const norm = (x: string) => x.replace(/\s+/g, "");
+        for (const p of picks.filter((x) => x.kind === "doc" && x.text.trim())) {
+          const name = p.text.trim();
+          if (get().docRequests.some((d) => d.companyId === cs.companyId && d.status !== "done" && norm(d.name) === norm(name))) continue;
+          if (get().requestCompanyDoc(cs.companyId, { name, description: `${when} 상담에서 말씀드린 자료입니다. 카카오톡으로 보내셔도 되고, 이 화면에서 바로 올리셔도 됩니다.`, dueDate: due.doc }, byUserId)) docs++;
+        }
+        return { tasks: newTasks.length, docs };
+      },
       // ---------- SECONDARY CLOSED LOOP ----------
       createInquiry: (data, byUserId) => {
         const st = get();

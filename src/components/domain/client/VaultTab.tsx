@@ -292,7 +292,7 @@ function AddSlotForm({ companyId }: { companyId: string }) {
     <Card className="p-4">
       <div className="mb-2 flex items-center gap-2 font-bold"><Plus size={16} className="text-ink-3" /> 서류 칸 추가</div>
       <div className="flex flex-wrap items-end gap-2">
-        <label className="min-w-[12rem] flex-1 text-[0.8rem] text-ink-2">서류 이름<Input className="mt-1" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="예: 법인인감증명서, 특허 명세서" onKeyDown={(e) => { if (e.key === "Enter") submit(); }} /></label>
+        <label className="min-w-[12rem] flex-1 text-[0.8rem] text-ink-2">서류 이름<Input className="mt-1" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="예: 법인인감증명서, 특허 명세서" onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) submit(); }} /></label>
         <label className="w-32 text-[0.8rem] text-ink-2">유효기간(개월)<Input className="mt-1" inputMode="numeric" value={months} onChange={(e) => setMonths(e.target.value.replace(/\D/g, ""))} placeholder="없음" /></label>
         <Button variant="outline" onClick={submit} disabled={!label.trim()}>서류 칸 추가</Button>
       </div>

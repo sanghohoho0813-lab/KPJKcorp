@@ -154,7 +154,7 @@ function WorkCard({ project: p, may }: { project: Project; may: boolean }) {
           <label className="block text-[0.8rem] text-ink-2">다음에 할 일
             <Input className="mt-1" value={next} disabled={!may} onChange={(e) => setNext(e.target.value)} placeholder="예: 연구전담요원 재직증명 회신 받기" aria-label={`${p.name} 다음에 할 일`}
               onBlur={() => { if (next.trim() !== (p.nextStep ?? "")) setWork(p.id, { nextStep: next }, me); }}
-              onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) (e.target as HTMLInputElement).blur(); }} />
           </label>
           <Link href={`/ax/projects/${p.id}`} className="link-more text-[0.8rem]">프로젝트 자세히 →</Link>
         </div>

@@ -66,8 +66,36 @@ await ceo.getByLabel('업무 검색').fill(tag); await ceo.waitForTimeout(400);
 const txt = (await ceo.locator('main').innerText().catch(() => '')) || '';
 ok('5 대표 업무함에서도 두 업무가 보임', txt.includes(T1) && txt.includes(T2));
 
+// 7) 상담 기록 → 후속 업무 · 고객 자료 요청 (서버 저장 · 다시 저장해도 중복 없음 · 고객 화면)
+const NA = `제안서 ${tag} 송부 후 전화`, PR = `시뮬레이션 ${tag} 전달`, DOC = `주주명부 ${tag}`;
+await con.goto(B + `/ax/clients/${co}`, { waitUntil: 'domcontentloaded' }); await con.waitForTimeout(2000);
+await con.getByTestId('client-quick-actions').getByRole('button', { name: '상담 기록' }).click(); await con.waitForTimeout(400);
+const cd = con.getByRole('dialog');
+await cd.getByPlaceholder(/김민석 대표와 원가구조/).fill(`[${tag}] 실서버 상담 기록`);
+const li = cd.getByPlaceholder('한 줄씩 입력 후 Enter');
+await li.nth(2).click(); await con.keyboard.type(PR); await con.keyboard.press('Enter');
+await li.nth(3).click(); await con.keyboard.type(DOC); await con.keyboard.press('Enter');
+await cd.getByPlaceholder('예: 제안서 송부 및 계약 협의').fill(NA);
+await cd.getByTestId('consult-followups').locator('input[data-follow=doc]').check();
+await cd.getByRole('button', { name: '저장', exact: true }).click();
+const csN = await until(() => sql(`select count(*) from public.tasks where rule_key like 'cs:%' and (title like '%${NA}%' or title like '%약속: ${PR}%')`) === '2' ? '2' : '');
+ok('7 서버: 상담 후속 업무 2건 (다음 Action · 약속)', csN === '2');
+const drRow = await until(() => sql(`select status from public.document_requests where company_id = '${co}' and name = '${DOC}'`));
+ok('7 서버: 고객 자료 요청 저장', drRow === 'requested', drRow);
+ok('7 서버: 상담 기록 저장', sql(`select count(*) from public.consultations where notes = '[${tag}] 실서버 상담 기록'`) === '1');
+await con.goto(B + '/ax/consultations', { waitUntil: 'domcontentloaded' }); await con.waitForTimeout(1800);
+await con.getByRole('button', { name: '상담기록 수정' }).first().click(); await con.waitForTimeout(400);
+const ed = con.getByRole('dialog');
+ok('7 수정 창: 이미 만든 것 잠김', (await ed.getByTestId('consult-followups').locator('input[data-follow]:disabled').count()) === 3);
+await ed.getByRole('button', { name: '저장', exact: true }).click(); await con.waitForTimeout(3000);
+ok('7 다시 저장해도 서버 중복 없음', sql(`select count(*) from public.tasks where rule_key like 'cs:%' and (title like '%${NA}%' or title like '%${PR}%')`) === '2' && sql(`select count(*) from public.document_requests where name = '${DOC}'`) === '1');
+const { p: cli } = await ctxFor(b, 'mobile');
+await login(cli, ACC.c1, /\/portal/);
+await cli.goto(B + '/portal/documents', { waitUntil: 'domcontentloaded' }); await cli.waitForTimeout(2500);
+ok('7 고객 휴대폰 요청자료에 보임', await cli.getByText(DOC).first().isVisible());
 ok('6 페이지 오류 없음', [con, ceo].every((p) => p.errs.filter((e) => !/Failed to load resource|ERR_CERT/.test(e)).length === 0), [con, ceo].flatMap((p) => p.errs).slice(0, 2).join(' | '));
 // 시험 업무 정리
-sql(`delete from public.tasks where title in ('${T1.replace(/'/g, "''")}', '${T2}')`);
+sql(`delete from public.tasks where title in ('${T1.replace(/'/g, "''")}', '${T2}') or title like '%${tag}%'`);
+sql(`delete from public.document_requests where name = '주주명부 ${tag}'`);
 await b.close();
 process.exit(summary() ? 1 : 0);

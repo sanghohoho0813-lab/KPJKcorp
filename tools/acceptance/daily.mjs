@@ -134,6 +134,49 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
   ok('4 등록되지 않음', (await dump(page)).companies.filter((c) => /에이정밀/.test(c.name)).length === 1);
   await page.getByRole('dialog').getByRole('button', { name: /닫기/ }).first().click().catch(() => {}); await sleep(300);
 
+  // ---------- 상담 기록 → 후속 업무 · 자료 요청 ----------
+  await go(page, '/ax/clients/co_a');
+  await page.getByTestId('client-quick-actions').getByRole('button', { name: '상담 기록' }).click(); await sleep(400);
+  const cd = page.getByRole('dialog');
+  await cd.getByPlaceholder(/김민석 대표와 원가구조/).fill('중간보고 뒤 절세 방향 논의');
+  const lists = cd.getByPlaceholder('한 줄씩 입력 후 Enter');
+  await lists.nth(2).click(); await page.keyboard.type('다음 주 화요일까지 절세 시뮬레이션 전달'); await page.keyboard.press('Enter');
+  await lists.nth(3).click(); await page.keyboard.type('주주명부'); await page.keyboard.press('Enter');
+  await cd.getByPlaceholder('예: 제안서 송부 및 계약 협의').fill('제안서 송부 후 대표님께 전화');
+  await sleep(200);
+  const fb = cd.getByTestId('consult-followups');
+  const chk = async (k) => fb.locator(`input[data-follow=${k}]`).first().isChecked();
+  ok('6 저장 전에 만들 것 미리 보임 (다음 Action · 약속 · 자료)', (await fb.locator('input[data-follow]').count()) === 3, await fb.innerText().then((t) => t.replace(/\n/g, ' ').slice(0, 120)));
+  ok('6 기본: 업무 켜짐 · 고객 자료 요청 꺼짐', (await chk('next')) && (await chk('promise')) && !(await chk('doc')));
+  await fb.locator('input[data-follow=doc]').check();
+  let s0 = await dump(page);
+  const tasks0 = s0.tasks.length, docs0 = s0.docRequests.length;
+  await cd.getByRole('button', { name: '저장', exact: true }).click(); await sleep(600);
+  let s1 = await dump(page);
+  const csT = s1.tasks.filter((x) => x.ruleKey?.startsWith('cs:'));
+  const nextT = csT.find((x) => x.title.includes('제안서 송부 후 대표님께 전화'));
+  const promT = csT.find((x) => x.title.includes('약속: 다음 주 화요일까지 절세 시뮬레이션 전달'));
+  ok('6 저장 한 번 → 업무 2건 (다음 Action · 약속)', s1.tasks.length === tasks0 + 2 && !!nextT && !!promT);
+  ok('6 업무: 이 기업 · 담당 컨설턴트 · 유형 자동 · 기한 3일 뒤', nextT?.companyId === 'co_a' && nextT?.assigneeId === 'u_park' && nextT?.type === '후속연락' && Math.round((new Date(nextT.dueDate) - Date.now()) / 864e5) === 3, JSON.stringify(nextT && { t: nextT.type, a: nextT.assigneeId }));
+  ok('6 업무 메모에 어느 상담에서 나왔는지', /상담에서 정한 다음 Action/.test(nextT?.memo ?? '') && /상담에서 약속한 것/.test(promT?.memo ?? ''));
+  const dr = s1.docRequests.find((d) => d.companyId === 'co_a' && d.name === '주주명부');
+  ok('6 고객 자료 요청 1건 + 고객 알림', s1.docRequests.length === docs0 + 1 && dr?.status === 'requested' && s1.notifications.some((n) => n.audience === 'client' && n.companyId === 'co_a' && /주주명부/.test(n.body)));
+  ok('6 한글 목록 입력이 잘리지 않음', s1.consultations[0]?.summary.promises[0] === '다음 주 화요일까지 절세 시뮬레이션 전달' && s1.consultations[0]?.summary.documents[0] === '주주명부');
+  // 수정해서 다시 저장 — 이미 만든 것은 다시 안 만들고, 새로 적은 약속만
+  await go(page, '/ax/consultations');
+  await page.getByRole('button', { name: '상담기록 수정' }).first().click(); await sleep(400);
+  const ed = page.getByRole('dialog');
+  ok('6 수정 창이 방금 기록', (await ed.locator('textarea').first().inputValue()) === '중간보고 뒤 절세 방향 논의');
+  const efb = ed.getByTestId('consult-followups');
+  ok('6 이미 만든 항목은 표시되고 잠김', (await efb.locator('input[data-follow]:disabled').count()) === 3 && /이미 등록됨/.test(await efb.innerText()) && /이미 요청 중/.test(await efb.innerText()));
+  await ed.getByPlaceholder('한 줄씩 입력 후 Enter').nth(2).click(); await page.keyboard.type('계약서 초안 공유'); await page.keyboard.press('Enter');
+  await ed.getByRole('button', { name: '저장', exact: true }).click(); await sleep(600);
+  const s2 = await dump(page);
+  ok('6 다시 저장해도 중복 없음 · 새 약속만 1건', s2.tasks.length === s1.tasks.length + 1 && s2.tasks.some((x) => x.title.includes('약속: 계약서 초안 공유')) && s2.docRequests.length === s1.docRequests.length);
+  await go(page, '/ax/tasks');
+  await page.getByRole('button', { name: '미완료', exact: true }).click(); await page.getByLabel('업무 검색').fill('제안서 송부 후'); await sleep(300);
+  ok('6 업무함에 상담 후속 표시', await page.locator('[data-group]').getByText('상담 후속').first().isVisible());
+
   for (const p of ['/ax/dashboard', '/ax/tasks', '/ax/clients/co_a', '/ax/documents']) { await go(page, p); ok(`5 PC 가로 넘침 없음 ${p}`, (await overflow(page)) <= 0); }
   ok('5 PC 페이지 오류 없음', page.errs.length === 0, page.errs.slice(0, 2).join(' | '));
 }

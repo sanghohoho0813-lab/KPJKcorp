@@ -8,6 +8,7 @@ for f in tools/test/*.test.ts; do npx tsx "$f" || echo "FAIL: $f"; done
 
 | 파일 | 확인하는 것 |
 |---|---|
+| `consult-followups.test.ts` | 상담 기록 → 후속 업무 · 자료 요청 — 만들 항목(다음 Action · 약속 · 필요 자료), 기본 체크, 이미 만든 것 다시 안 만들기 |
 | `quick-task.test.ts` | 업무 한 줄 등록 — 제목에서 기업·업무 유형 찾기(법인 표기·띄어쓰기·보관 기업), 빠른 기한, 기한 묶음, 중복 검사용 이름 |
 | `xlsx.test.ts` | 엑셀 쓰기→읽기 왕복, 특수문자·줄바꿈, CSV 따옴표, EUC-KR(한국어 엑셀 CSV), 날짜 일련번호 |
 | `company-import.test.ts` | 머리글 별칭 인식, 제목 줄 건너뛰기, 검사 규칙, 기존·파일 내 중복, 날짜·인원 해석 |
