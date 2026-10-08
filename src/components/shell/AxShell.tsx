@@ -32,6 +32,7 @@ import {
   Sparkles,
   TrendingUp,
   Route,
+  Clapperboard,
 } from "lucide-react";
 import { useStore, useCurrentUser } from "@/lib/store";
 import { can, ROLE_LABEL, type Permission } from "@/lib/permissions";
@@ -140,8 +141,10 @@ const NAV_GROUPS: NavGroup[] = [
 const NAV_UTILITY: NavItem[] = [
   { href: "/ax/howto", label: "사용 방법 영상", short: "사용 방법", icon: <CirclePlay size={18} />, hint: "KPJK AX 사용 방법 · 3분 35초", id: "nav-howto" },
   { href: "/ax/video", label: "실사용 영상", icon: <MonitorPlay size={18} />, hint: "KPJK AX 소개 영상 · 3분 57초", id: "nav-video" },
-  { href: "/ax/settings", label: "설정", icon: <Settings size={18} />, id: "tut-nav-settings" },
+  // 두 칸 격자라 순서가 곧 자리다 — 보완 설명 영상이 실사용 영상 바로 아래(오른쪽 칸)에 오도록 Why AX를 왼쪽에 둔다
   { href: "/ax/why", label: "Why AX", icon: <BookOpen size={18} />, hint: "AX 설명 — 왜 만들었나 · 기획의도", id: "tut-nav-why" },
+  { href: "/ax/supplement", label: "보완 설명 영상", short: "보완 설명", icon: <Clapperboard size={18} />, hint: "실사 이후 대표 보완 설명 · 2분 50초", id: "nav-supplement" },
+  { href: "/ax/settings", label: "설정", icon: <Settings size={18} />, id: "tut-nav-settings" },
 ];
 
 /** Routes already reachable from the mobile bottom bar — excluded from 더보기. */
@@ -602,7 +605,7 @@ export function AxShell({ children }: { children: ReactNode }) {
         </main>
       </div>
       {/* 영상 페이지에서는 영상과 설명을 가리지 않게 승인 알림 띠를 숨긴다 */}
-      {pathname !== "/ax/video" && pathname !== "/ax/howto" && <QuickApproveBar />}
+      {pathname !== "/ax/video" && pathname !== "/ax/howto" && pathname !== "/ax/supplement" && <QuickApproveBar />}
       {ready && !inFrame && <DraftDock />}
       <MobileNav />
       <MoreSheet />

@@ -1,7 +1,7 @@
 # KPJK AX 영상 V3.1 (실사용 릴스 · 사용 방법) — 9:16, 자막, 실제 화면
 
 `VIDEO_STYLE_GUIDE_V3_1_FINAL.md`(스타일 가이드 V3.1) 기준으로 두 영상을 다시 만든 도구입니다.
-결과물: `public/media/kpjk-ax-reel.mp4` (3분 57초) · `public/media/kpjk-ax-howto.mp4` (3분 35초).
+결과물: `public/media/kpjk-ax-reel.mp4` (3분 57초) · `public/media/kpjk-ax-howto.mp4` (3분 35초) · `public/media/kpjk-ax-supplement.mp4` (2분 50초, 보완 설명 영상).
 
 | 파일 | 하는 일 |
 |---|---|
@@ -33,3 +33,20 @@ node ../render.mjs $PWD/comp.html $PWD/voice.wav $PWD/out.mp4 <DUR> 600 && bash 
 - 글꼴: `comp.tpl.html` 은 `/root/.fonts/PretendardVariable.ttf` 를 직접 읽습니다. 다른 컴퓨터에서는 그 경로만 바꿉니다.
 - 휴대폰 틀은 본문 영역(높이 1080px)에 실제 비율로 들어가도록 폭 490px(단독) · 380px(PC와 함께)입니다.
 - 화면 속 기업·인물·공고는 모두 데모 예시 데이터이고, 장면마다 "예시 데이터" 표기가 붙습니다.
+
+## 보완 설명 영상 (벤처 실사 이후)
+
+대표 육성(3분 14초 → 1.13배속 · 쉼 축소 → 2분 47초, -14.0 LUFS)으로 만든 18장면 영상. 페이지: `/ax/supplement` (사이드바 하단, 실사용 영상 바로 아래).
+
+- 대본(자막): `supplement/chunks.txt` — 받아쓰기와 글자 일치 100%, 0.9초 미만 자막 없음
+- 장면표: `supplement/build.py` — 문제 → 방향 → 개발 주체(대표 직접 주도 · 외부 개발사 구현) → 9월 17일 이후 개선(실제 화면 4장면) → 시험 → 목표 → 단계적 계획 · 현재 단계 → 첨부 안내
+- 캡처: `capture-supplement.mjs` (`f-` 접두어, 기존 `cap/meta.json` 에 더함)
+- 화면 숫자는 대본에서 말한 것만(약 8년 · 9월 17일 · 10월 7일). 시험 건수 · 커밋 수처럼 대본에 없는 숫자는 넣지 않았다.
+
+```bash
+bash audio.sh supplement <원본.wav>        # → supplement/voice_pre.wav → volume 보정 → voice.wav
+cd supplement && python3 ../asr.py <faster-whisper 경로> voice.wav asr.json "KPJK, AX, 벤처기업확인, 기술평가, 실사" && python3 ../subs.py
+cd .. && OUT=$PWD/cap node capture-supplement.mjs
+cd supplement && python3 build.py && node ../render.mjs $PWD/comp.html $PWD/voice.wav $PWD/out.mp4 170.07 600 && bash ../verify.sh out.mp4
+```
+

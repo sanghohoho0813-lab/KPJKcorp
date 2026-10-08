@@ -7,7 +7,7 @@ import { cx } from "@/components/ui/ui";
 /**
  * 영상 상세 페이지 (9:16 세로 영상 · 자막 포함 원본).
  * 영상이 주인공이다: 한 화면 안에서 영상 + 장면 바로가기 + 재생 속도까지 끝나게, 길게 스크롤되지 않게 둔다.
- * 사용처: /ax/video (실사용 영상), /ax/howto (사용 방법 영상)
+ * 사용처: /ax/video (실사용 영상), /ax/howto (사용 방법 영상), /ax/supplement (보완 설명 영상)
  */
 export type Chapter = { at: number; label: string };
 
