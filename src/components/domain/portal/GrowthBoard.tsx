@@ -74,7 +74,7 @@ export function NowActions({ actions, companyId }: { actions: NowAction[]; compa
   const docs = useStore((s) => s.docRequests);
   const [upload, setUpload] = useState<DocumentRequest | null>(null);
   return (
-    <Card className="p-5" id="tut-p-actions">
+    <Card className="scroll-mt-20 p-5" id="tut-p-actions">
       <div className="mb-3 flex items-center justify-between"><h2 className="text-[1.1rem] font-bold">지금 해야 할 일</h2><span className="text-[0.8rem] text-ink-3">누르면 바로 할 수 있습니다</span></div>
       {actions.length === 0 ? (
         <div className="flex items-center gap-2 rounded-xl bg-success-bg px-4 py-3 text-[0.9rem] font-semibold text-success"><CheckCircle2 size={18} /> 지금 하실 일은 없습니다. 담당 컨설턴트가 진행하고 있습니다.</div>
@@ -140,7 +140,7 @@ export function NextGrowth({ board, companyId, compact, only, title }: { board: 
     setAsk(null); setNote("");
   };
   return (
-    <Card className="p-5" id={only ? "portal-suggested-growth" : "portal-next-growth"}>
+    <Card className="scroll-mt-20 p-5" id={only ? "portal-suggested-growth" : "portal-next-growth"}>
       <div className="mb-1 flex items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-[1.1rem] font-bold"><Sparkles size={18} className="text-accent" /> {title ?? "다음으로 검토할 성장과제"}</h2>
         {!only && <Link href="/portal/services" className="link-more whitespace-nowrap">분야 전체 →</Link>}
@@ -151,7 +151,7 @@ export function NextGrowth({ board, companyId, compact, only, title }: { board: 
       ) : (
         <div className={cx("grid gap-3", !compact && "md:grid-cols-2")}>
           {items.map((it) => (
-            <div key={`${it.state}-${it.area}`} className={cx("rounded-xl border p-4", it.state === "review" ? "border-line bg-surface-2" : it.state === "proposed" ? "border-accent/40" : "border-line")} data-growth-next={it.area} data-growth-state={it.state}>
+            <div key={`${it.state}-${it.area}`} className={cx("rounded-xl border p-3.5 md:p-4", it.state === "review" ? "border-line bg-surface-2" : it.state === "proposed" ? "border-accent/40" : "border-line")} data-growth-next={it.area} data-growth-state={it.state}>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-bold">{it.area}</span>
                 {it.state === "review" && it.opportunity ? <Badge tone={OPP_STATUS[it.opportunity.status].tone}>{OPP_STATUS[it.opportunity.status].clientLabel}</Badge>
@@ -163,8 +163,8 @@ export function NextGrowth({ board, companyId, compact, only, title }: { board: 
                 <div className="mt-2 flex flex-wrap items-center gap-x-2 text-[0.8rem] text-ink-3">{fmtRelative(it.opportunity!.createdAt)} 요청 · 담당 컨설턴트가 확인하고 있습니다.<CancelRequestButton opp={it.opportunity!} className="-ml-1" /></div>
               ) : it.service && (
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <Button size="sm" variant="outline" icon={<ThumbsUp size={14} />} onClick={() => { setAsk({ it, kind: "interest" }); setNote(""); }}>검토하고 싶어요</Button>
-                  <Button size="sm" variant="accent" icon={<MessageSquarePlus size={14} />} onClick={() => { setAsk({ it, kind: "request" }); setNote(""); }}>상담 요청</Button>
+                  <Button size="sm" variant="outline" icon={<ThumbsUp size={14} className="hidden sm:block" />} onClick={() => { setAsk({ it, kind: "interest" }); setNote(""); }}>검토하고 싶어요</Button>
+                  <Button size="sm" variant="accent" icon={<MessageSquarePlus size={14} className="hidden sm:block" />} onClick={() => { setAsk({ it, kind: "request" }); setNote(""); }}>상담 요청</Button>
                 </div>
               )}
             </div>
@@ -191,12 +191,15 @@ function historyText(a: { type: string; text: string; meta?: Record<string, unkn
 }
 
 /** 완료한 성장과제와 이력 — 지금까지 함께 한 것 */
-export function GrowthHistory({ board, companyId }: { board: NonNullable<ReturnType<typeof useGrowth>>; companyId: string }) {
+export function useGrowthHistory(companyId: string) {
   const acts = useStore((s) => s.activities);
-  const history = useMemo(() => acts.filter((a) => a.companyId === companyId && ["project_stage_changed", "document_reviewed", "result_shared", "contract_signed", "inquiry_answered"].includes(a.type)).sort((a, b) => b.at.localeCompare(a.at)).slice(0, 6), [acts, companyId]);
+  return useMemo(() => acts.filter((a) => a.companyId === companyId && ["project_stage_changed", "document_reviewed", "result_shared", "contract_signed", "inquiry_answered"].includes(a.type)).sort((a, b) => b.at.localeCompare(a.at)).slice(0, 6), [acts, companyId]);
+}
+export function GrowthHistory({ board, companyId }: { board: NonNullable<ReturnType<typeof useGrowth>>; companyId: string }) {
+  const history = useGrowthHistory(companyId);
   if (!board.completed.length && !history.length) return null;
   return (
-    <Card className="p-5" id="growth-history">
+    <Card className="scroll-mt-20 p-5" id="growth-history">
       <h2 className="mb-3 flex items-center gap-2 text-[1.1rem] font-bold"><CheckCircle2 size={18} className="text-success" /> 완료한 성장과제 · 이력</h2>
       {board.completed.length > 0 && (
         <div className="mb-4 space-y-2">

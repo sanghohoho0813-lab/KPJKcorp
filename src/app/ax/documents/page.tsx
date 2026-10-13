@@ -97,38 +97,47 @@ function DocumentsInner() {
               );
             })}
           </div>
+          {/* PC: 표 대신 한 줄 목록 — 칸이 좁아져도 버튼이 잘리거나 프로젝트명이 네 줄로 꺾이지 않는다 */}
           <div className="hidden lg:block">
-            <table className="tbl">
-              <thead><tr><th>기업명</th><th>자료명</th><th>프로젝트</th><th>상태</th><th>마감</th><th>제출</th><th>담당자</th><th></th></tr></thead>
-              <tbody>
-                {rows.map((d) => {
-                  const c = st.companies.find((x) => x.id === d.companyId);
-                  const consultant = st.users.find((u) => u.id === d.assigneeId);
-                  const overdue = (d.status === "requested" || d.status === "revision") && daysBetween(d.dueDate, now) > 0;
-                  return (
-                    <tr key={d.id} className={cx("row-clickable", overdue && "bg-error-bg/30")} onClick={() => setReview(d)}>
-                      <td className="nowrap font-semibold"><Link href={`/ax/clients/${d.companyId}`} onClick={(e) => e.stopPropagation()} className="hover:text-accent">{c?.name}</Link></td>
-                      <td className="min-w-[13rem]"><div className="font-semibold">{d.name}</div>{d.files.length > 0 && <div className="max-w-[18rem] truncate text-[0.75rem] text-ink-3">{d.files[d.files.length - 1].fileName} · {fmtSize(d.files[d.files.length - 1].size)}</div>}</td>
-                      <td className="max-w-[11rem] text-[0.88rem] text-ink-2">{st.projects.find((p) => p.id === d.projectId)?.name}</td>
-                      <td><DocStatusBadge status={d.status} /></td>
-                      <td className="nowrap"><DueText iso={d.dueDate} pending={d.status === "requested" || d.status === "revision"} /></td>
-                      <td className="tnum nowrap text-ink-2">{d.submittedAt ? fmtDate(d.submittedAt) : "-"}</td>
-                      <td className="nowrap">{consultant?.name}</td>
-                      <td onClick={(e) => e.stopPropagation()}>
-                        <div className="flex justify-end gap-1 whitespace-nowrap">
-                          {(d.status === "requested" || d.status === "revision") && (
-                            <Button size="sm" variant="ghost" icon={<MessageSquareText size={14} />} onClick={() => openDraft({ kind: d.status === "revision" ? "revision_reminder" : "doc_reminder", ctx: { companyName: c?.name, contactName: c?.contactName, consultantName: consultant?.name, docName: d.name, dueText: `${fmtDate(d.dueDate)} (${relativeDay(d.dueDate)})`, note: d.reviewNote } })}>안내 초안</Button>
-                          )}
-                          {(d.status === "submitted" || d.status === "reviewing") && <Button size="sm" variant="accent" onClick={() => setReview(d)}>검토</Button>}
-                          {(d.status === "done" || d.status === "planned") && <Button size="sm" variant="outline" onClick={() => setReview(d)}>보기</Button>}
-                          {may("doc.update") && DOC_EDITABLE.includes(d.status) && <Button size="sm" variant="ghost" icon={<Pencil size={14} />} onClick={() => setEditDoc(d.id)}>수정</Button>}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div className="grid grid-cols-[5.5rem_minmax(0,1fr)_8rem_5rem_11.5rem] items-center gap-x-4 border-b border-line bg-surface-2 px-5 py-2.5 text-[0.8rem] font-semibold text-ink-2">
+              <span>상태</span><span>자료 · 기업 · 프로젝트</span><span>마감 · 제출</span><span>담당</span><span />
+            </div>
+            <ul className="divide-y divide-line">
+              {rows.map((d) => {
+                const c = st.companies.find((x) => x.id === d.companyId);
+                const consultant = st.users.find((u) => u.id === d.assigneeId);
+                const pending = d.status === "requested" || d.status === "revision";
+                const overdue = pending && daysBetween(d.dueDate, now) > 0;
+                const file = d.files[d.files.length - 1];
+                return (
+                  <li key={d.id} data-doc-row={d.id} onClick={() => setReview(d)}
+                    className={cx("grid cursor-pointer grid-cols-[5.5rem_minmax(0,1fr)_8rem_5rem_11.5rem] items-center gap-x-4 px-5 py-3 transition-colors hover:bg-surface-2", overdue && "bg-error-bg/30")}>
+                    <div><DocStatusBadge status={d.status} /></div>
+                    <div className="min-w-0">
+                      <div className="truncate font-semibold" title={d.name}>{d.name}</div>
+                      <div className="truncate text-[0.85rem] text-ink-2">
+                        <Link href={`/ax/clients/${d.companyId}`} onClick={(e) => e.stopPropagation()} className="font-medium text-ink hover:text-accent">{c?.name}</Link>
+                        <span className="text-ink-3"> · {st.projects.find((p) => p.id === d.projectId)?.name}</span>
+                        {file && <span className="text-ink-3"> · {file.fileName} ({fmtSize(file.size)})</span>}
+                      </div>
+                    </div>
+                    <div className="whitespace-nowrap">
+                      <DueText iso={d.dueDate} pending={pending} />
+                      {d.submittedAt && <div className="tnum text-[0.8rem] text-ink-3">제출 {fmtDate(d.submittedAt)}</div>}
+                    </div>
+                    <div className="truncate">{consultant?.name}</div>
+                    <div onClick={(e) => e.stopPropagation()} className="flex justify-end gap-1 whitespace-nowrap">
+                      {pending && (
+                        <Button size="sm" variant="ghost" icon={<MessageSquareText size={14} />} onClick={() => openDraft({ kind: d.status === "revision" ? "revision_reminder" : "doc_reminder", ctx: { companyName: c?.name, contactName: c?.contactName, consultantName: consultant?.name, docName: d.name, dueText: `${fmtDate(d.dueDate)} (${relativeDay(d.dueDate)})`, note: d.reviewNote } })}>안내 초안</Button>
+                      )}
+                      {(d.status === "submitted" || d.status === "reviewing") && <Button size="sm" variant="accent" onClick={() => setReview(d)}>검토</Button>}
+                      {(d.status === "done" || d.status === "planned") && <Button size="sm" variant="outline" onClick={() => setReview(d)}>보기</Button>}
+                      {may("doc.update") && DOC_EDITABLE.includes(d.status) && <Button size="sm" variant="ghost" icon={<Pencil size={14} />} onClick={() => setEditDoc(d.id)}>수정</Button>}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
           </div>
           </>
         )}

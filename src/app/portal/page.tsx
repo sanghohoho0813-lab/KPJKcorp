@@ -4,16 +4,16 @@ import Link from "next/link";
 import { Pin } from "lucide-react";
 import { useStore, usePortalCompanyId, useCurrentUser } from "@/lib/store";
 import { Card } from "@/components/ui/ui";
-import { GrowthHistory, NextGrowth, NowActions, useGrowth } from "@/components/domain/portal/GrowthBoard";
-import { GrowthJourney, PortalHero, PortalHub, ProgramsPreview, RecentUpdates } from "@/components/domain/portal/PortalHome";
+import { GrowthHistory, NextGrowth, NowActions, useGrowth, useGrowthHistory } from "@/components/domain/portal/GrowthBoard";
+import { PortalHero, PortalHub, ProgramsPreview, RecentUpdates } from "@/components/domain/portal/PortalHome";
 import { NoticeList, liveNoticesFor } from "@/components/domain/Notices";
 import { CompanySnapshot, GrowthQuests } from "@/components/domain/portal/CompanySnapshot";
 
 /**
  * 고객 홈 — 우리 회사 성장 공간.
- * 대표가 매일 들어와 1분 안에 보는 순서: 우리 회사 현재 상태(담당 컨설턴트·다음 일정) → 우리 회사 한눈에(매출·업력·임직원·인증)
- * → 성장 체크리스트 | 지금 할 일 · 최근 안내 → 성장 여정(완료→진행→다음 검토) → 앞으로 검토할 과제(근거) → 맞는 지원사업
- * → 완료한 성장과제 · 진행 이력 → 성장 플랫폼 메뉴판.
+ * 대표가 휴대폰으로 1분 안에 보는 순서: 우리 회사 현재 상태(진행 중 과제·담당 컨설턴트) → 지금 해야 할 일 · 최근 안내
+ * → 우리 회사 한눈에(숫자) → 성장 체크리스트 → 다음으로 검토할 과제(근거) → 맞는 지원사업 → 완료한 과제·이력 → 바로 가기(휴대폰).
+ * 같은 목록을 두 번 두지 않는다 — 진행 중은 위 카드, 다음 검토는 과제 카드, 완료는 이력에만.
  */
 export default function PortalHome() {
   const st = useStore();
@@ -22,12 +22,15 @@ export default function PortalHome() {
   const c = st.companies.find((x) => x.id === companyId);
   // 성장과제 판 — 기업정보·프로젝트·제안·요청자료·견적·결과·일정을 한 흐름으로 (lib/growth)
   const board = useGrowth(c);
+  const history = useGrowthHistory(companyId ?? "");
   if (!c || !board) return null;
   const isClient = st.session?.role === "client";
   const displayName = isClient ? `${user?.name} ${user?.title}` : `${c.contactName} ${c.contactTitle}`;
   const now = new Date().toISOString();
   // 고정 공지는 맨 위 — 담당자가 "꼭 읽어 주세요"라고 표시한 것이다
   const pinned = liveNoticesFor(st.notices, c.id, now).filter((n) => n.pinned);
+  // PC: 체크리스트 옆에 이력 — 이력이 없으면 체크리스트를 넓게
+  const hasHistory = board.completed.length > 0 || history.length > 0;
 
   return (
     <div className="space-y-5 md:space-y-6">
@@ -41,22 +44,20 @@ export default function PortalHome() {
         </Card>
       )}
       <PortalHero company={c} board={board} displayName={displayName} />
-      {/* 우리 회사 한눈에 — 최근 매출·업력·임직원·보유 인증을 큰 숫자로, 아래에 매출 추이와 인증 현황 */}
-      <CompanySnapshot company={c} board={board} />
-      {/* 다음 단계 — 왼쪽: 성장 체크리스트 / 오른쪽: 지금 할 일 · 최근 안내 */}
+      {/* 먼저 할 일 — 왼쪽: 지금 해야 할 일 / 오른쪽: 최근 안내 */}
       <div className="grid gap-5 lg:grid-cols-[1.15fr_1fr] lg:items-start">
-        <GrowthQuests company={c} board={board} limit={3} />
-        <div className="space-y-5">
-          <NowActions actions={board.actions} companyId={c.id} />
-          <RecentUpdates companyId={c.id} />
-        </div>
+        <NowActions actions={board.actions} companyId={c.id} />
+        <RecentUpdates companyId={c.id} />
       </div>
-      <GrowthJourney board={board} />
-      {/* 앞으로 검토하면 좋은 과제 — 근거(기업정보·진행 이력)와 함께 */}
-      <NextGrowth board={board} companyId={c.id} />
-      <ProgramsPreview company={c} />
-      {/* 우리 회사가 어떻게 운영되고 있는지 — 완료한 과제와 최근 진행 이력(단계 변경·검토 완료·결과 공유) */}
-      <GrowthHistory board={board} companyId={c.id} />
+      {/* 우리 회사 한눈에 — 최근 매출·업력·임직원·보유 인증. 휴대폰에서는 매출 막대·인증 목록을 접어 둔다 */}
+      <CompanySnapshot company={c} board={board} collapsible />
+      {/* 휴대폰: 체크리스트 → 다음 검토 과제 → 지원사업 → 이력 / PC: 체크리스트 | 이력, 그 아래 다음 검토 과제 */}
+      <div className="grid gap-5 lg:grid-cols-[1.15fr_1fr] lg:items-start">
+        <div className={hasHistory ? "lg:col-start-1 lg:row-start-1" : "lg:col-span-2"}><GrowthQuests company={c} board={board} limit={3} /></div>
+        <div className="lg:col-span-2"><NextGrowth board={board} companyId={c.id} /></div>
+        <div className="empty:hidden lg:col-span-2"><ProgramsPreview company={c} /></div>
+        {hasHistory && <div className="lg:col-start-2 lg:row-start-1"><GrowthHistory board={board} companyId={c.id} /></div>}
+      </div>
       <PortalHub company={c} board={board} />
     </div>
   );

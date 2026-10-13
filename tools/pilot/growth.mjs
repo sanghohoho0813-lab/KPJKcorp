@@ -16,7 +16,8 @@ await login(cli, ACC.c1, /\/portal/);
 await login(ceo, ACC.ceo, /\/ax\//);
 await cli.goto(B + '/portal', { waitUntil: 'domcontentloaded' }); await cli.waitForTimeout(2500);
 let t = await body(cli);
-ok('1 홈: 우리 회사 현재 상태', t.includes(`${CO1} 현재 상태`) && t.includes('업력 14년') && t.includes('법인'));
+// 업력은 '우리 회사 한눈에' 칸에 (설립 2012-03-02 → 업력 14년 = 15년차) — 위 카드에는 업종·형태·지역만
+ok('1 홈: 우리 회사 현재 상태', t.includes(`${CO1} 현재 상태`) && /15\s*년차/.test(await cli.getByTestId('tile-age').innerText()) && t.includes('법인'));
 // 앞선 시험(loop·link)에 따라 요청 중인 자료가 달라진다 — 서버에서 요청 중인 자료 이름을 읽어 그중 하나가 보이는지 본다(3건까지 + "그 밖의 요청자료")
 const openDocs = sql(`select name from document_requests where company_id='${coId}' and status in ('requested','revision')`).split('\n').filter(Boolean);
 const na = await cli.getByTestId('now-actions').innerText();

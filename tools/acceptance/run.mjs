@@ -192,7 +192,7 @@ async function runViewport(browser, kind) {
     await go('/ax/documents');
     const row = mobile
       ? page.locator('button').filter({ hasText: '매출채권 연령표' }).filter({ hasText: '에이정밀' }).first()
-      : page.locator('tr').filter({ hasText: '매출채권 연령표' }).filter({ hasText: '에이정밀' }).first();
+      : page.locator('[data-doc-row]').filter({ hasText: '매출채권 연령표' }).filter({ hasText: '에이정밀' }).first();
     await row.click(); await sleep(800);
     await page.getByRole('button', { name: '검토 완료' }).click(); await sleep(900);
     st = await dump();

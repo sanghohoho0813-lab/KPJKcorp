@@ -34,6 +34,7 @@ function SettingsInner() {
   const params = useSearchParams();
   const openId = params.get("open");
   const [confirm, setConfirm] = useState(false);
+  const [permOpen, setPermOpen] = useState(false);
   const [permTab, setPermTab] = useState<"admin" | "consultant" | "staff" | "client">(session?.role === "consultant" || session?.role === "staff" ? session.role : "admin");
 
   return (
@@ -41,31 +42,47 @@ function SettingsInner() {
       <PageHeader title="설정" desc={serverMode ? "화면 · 권한 · 데이터 · 서버 연결 · AI 상태를 관리합니다. 모든 설정은 즉시 반영됩니다." : "화면 · 권한 · 데모 · 데이터 · AI 상태를 관리합니다. 모든 설정은 즉시 반영됩니다."} />
       {/* 모바일: 섹션 8개를 전부 펼치면 한 화면이 10,000px가 된다. 제목만 보이고, 누른 것만 펼친다. */}
       <SectionCtx.Provider value={openId}>
-      <div className="grid gap-5 xl:grid-cols-2">
-        <Section id="display" icon={<Palette size={18} className="text-ink-3" />} title="화면">
-          <div className="mb-2 text-[0.85rem] font-semibold text-ink-2">테마 (KPJK Signature + 7종)</div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 2xl:grid-cols-5">
-            {THEMES.map((t) => {
-              const active = settings.theme === t.key;
-              return (
-                <button key={t.key} onClick={() => { setSettings({ theme: t.key }); toast(`테마: ${t.name}`); }} className={cx("pressable rounded-xl border-2 p-2.5 text-left transition-colors", active ? "border-accent bg-soft/50" : "border-line hover:border-line-2")} aria-pressed={active}>
-                  <div className="flex gap-1">{t.colors.map((c, i) => <span key={i} className="h-5 flex-1 rounded-sm" style={{ background: c }} />)}</div>
-                  <div className="mt-1.5 flex items-center justify-between gap-1"><span className="text-[0.75rem] font-bold leading-tight">{t.name}</span>{active && <Check size={14} className="text-accent" />}</div>
-                </button>
-              );
-            })}
-          </div>
-          <div className="mt-5 grid gap-4 md:grid-cols-2">
-            <div><div className="mb-1.5 text-[0.85rem] font-semibold text-ink-2">글자 크기</div><FontScalePicker /></div>
-            <div><div className="mb-1.5 text-[0.85rem] font-semibold text-ink-2">모션 줄이기</div><SegmentedControl value={settings.reduceMotion ? "on" : "off"} onChange={(k) => setSettings({ reduceMotion: k === "on" })} options={[{ key: "off", label: "Off" }, { key: "on", label: "On" }]} /></div>
-          </div>
-          <div className="mt-4 text-[0.78rem] text-ink-3">테마는 Sidebar·CTA·강조색만 바꾸며 본문·표·폼의 가독성은 항상 고정됩니다. 오류/위험 색은 의미상 고정입니다.</div>
-        </Section>
-
-        <Section id="account" icon={<KeyRound size={18} className="text-ink-3" />} title="내 계정 · 비밀번호">
-          <MyPasswordForm />
-        </Section>
-
+      <SectionNav serverMode={serverMode} />
+      {/* PC: 두 칸으로 나누되 키가 비슷한 것끼리 — 사용자/권한(표가 넓다)과 향후 확장은 한 줄 전체 */}
+      <div className="space-y-5">
+      <div className="grid gap-5 xl:grid-cols-2 xl:items-start">
+        <div className="space-y-5">
+          <Section id="display" icon={<Palette size={18} className="text-ink-3" />} title="화면">
+            <div className="mb-2 text-[0.85rem] font-semibold text-ink-2">테마 (KPJK Signature + 7종)</div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 2xl:grid-cols-5">
+              {THEMES.map((t) => {
+                const active = settings.theme === t.key;
+                return (
+                  <button key={t.key} onClick={() => { setSettings({ theme: t.key }); toast(`테마: ${t.name}`); }} className={cx("pressable rounded-xl border-2 p-2.5 text-left transition-colors", active ? "border-accent bg-soft/50" : "border-line hover:border-line-2")} aria-pressed={active}>
+                    <div className="flex gap-1">{t.colors.map((c, i) => <span key={i} className="h-5 flex-1 rounded-sm" style={{ background: c }} />)}</div>
+                    <div className="mt-1.5 flex items-center justify-between gap-1"><span className="text-[0.75rem] font-bold leading-tight">{t.name}</span>{active && <Check size={14} className="text-accent" />}</div>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <div><div className="mb-1.5 text-[0.85rem] font-semibold text-ink-2">글자 크기</div><FontScalePicker /></div>
+              <div><div className="mb-1.5 text-[0.85rem] font-semibold text-ink-2">모션 줄이기</div><SegmentedControl value={settings.reduceMotion ? "on" : "off"} onChange={(k) => setSettings({ reduceMotion: k === "on" })} options={[{ key: "off", label: "Off" }, { key: "on", label: "On" }]} /></div>
+            </div>
+            <div className="mt-4 text-[0.78rem] text-ink-3">테마는 Sidebar·CTA·강조색만 바꾸며 본문·표·폼의 가독성은 항상 고정됩니다. 오류/위험 색은 의미상 고정입니다.</div>
+          </Section>
+        </div>
+        <div className="space-y-5">
+          <Section id="account" icon={<KeyRound size={18} className="text-ink-3" />} title="내 계정 · 비밀번호">
+            <MyPasswordForm />
+          </Section>
+          <Section id="demo" icon={<HelpCircle size={18} className="text-ink-3" />} title={serverMode ? "안내 · 시연" : "데모"}>
+            <div className="mb-3 flex flex-wrap items-center gap-2"><DemoBadge /><span className="text-[0.85rem] text-ink-2">{serverMode ? <>현재 상태: <b>서버 운영</b> · 데이터는 서버에 저장되며, 로그인한 계정의 권한만큼 보입니다</> : settings.liveMode ? <>현재 상태: <b>운영</b> · 데모 초기화는 잠겨 있습니다 (데이터 섹션에서 데모 모드로 돌리면 풀립니다)</> : <>현재 상태: <b>DEMO</b> · 실제 데이터를 넣기 전에 데이터 섹션에서 운영 모드를 켜세요</>}</span></div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" icon={<HelpCircle size={16} />} onClick={() => openTutorial("ax")}>튜토리얼 다시 보기</Button>
+              <Button variant="outline" icon={<Play size={16} />} onClick={openPresentation}>시연 모드</Button>
+              {/* 서버 운영 중에는 데모 초기화가 의미 없다 — 버튼 자체를 보이지 않는다 */}
+              {!serverMode && <Button variant="danger" icon={<RotateCcw size={16} />} disabled={!!settings.liveMode} title={settings.liveMode ? "운영 모드에서는 잠깁니다" : undefined} onClick={() => setConfirm(true)}>데모 초기화</Button>}
+            </div>
+            {!serverMode && <div className="mt-3 text-[0.78rem] text-ink-3">데모 초기화는 Action 상태·고객 제출·문의·알림을 초기값으로 되돌립니다. 마지막 Seed: {fmtDateTime(seededAt)}{settings.liveMode ? " · 운영 모드라 자동 초기화되지 않습니다." : " · 20시간이 지나면 날짜가 오늘 기준으로 자동 갱신됩니다."}</div>}
+          </Section>
+        </div>
+      </div>
         <Section id="users" icon={<ShieldCheck size={18} className="text-ink-3" />} title="사용자 / 권한">
           <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl bg-surface-2 px-4 py-3 text-[0.85rem]">
             <span className="text-ink-2">현재 로그인</span>
@@ -85,6 +102,13 @@ function SettingsInner() {
             <div className="mb-5 rounded-xl bg-surface-2 px-4 py-3 text-[0.85rem] text-ink-2">계정 관리는 대표 계정에서만 가능합니다.</div>
           )}
 
+          {/* 권한 표(기능 30여 개)는 늘 볼 필요가 없다 — 접어 두고 필요할 때 연다 */}
+          <button type="button" onClick={() => setPermOpen((v) => !v)} aria-expanded={permOpen} data-testid="perm-toggle"
+            className="pressable flex min-h-11 w-full items-center justify-between gap-2 rounded-xl border border-line px-4 text-left hover:bg-surface-2">
+            <span><b className="text-[0.92rem]">역할별 권한 표</b> <span className="text-[0.8rem] text-ink-3">기능 {PERMISSION_ROWS.length}개 · 대표 · 컨설턴트 · 사무직원 · 고객</span></span>
+            <ChevronDown size={18} className={cx("shrink-0 text-ink-3 transition-transform", permOpen && "rotate-180")} />
+          </button>
+          {permOpen && <div className="mt-3">
           <div className="mb-2 text-[0.85rem] font-semibold text-ink-2">Permission Matrix</div>
           <p className="mb-2 text-[0.78rem] leading-relaxed text-ink-3">
             이 표는 설명이 아니라 <b className="text-ink-2">실제 규칙</b>입니다. <code className="rounded bg-surface-2 px-1">src/lib/permissions.ts</code>의 정책에서 직접 그려지며,
@@ -105,56 +129,47 @@ function SettingsInner() {
               </tbody>
             </table>
           </div>
+          </div>}
           <div className="mt-3 text-[0.78rem] text-ink-3">{serverMode
             ? "서버 연결 중 — 화면의 권한 검사에 더해, 같은 규칙을 서버 데이터베이스의 접근 정책(Supabase Auth + RLS)이 한 번 더 검사합니다. 화면을 우회해도 서버가 막습니다."
             : "한계 — 데모 모드에서는 이 검사가 브라우저 안에서 이루어집니다. 개발자도구로 우회하는 것은 막지 못하므로 업무 규칙이지 보안 경계가 아닙니다. 서버(Supabase Auth + RLS)에 연결하면 같은 정책을 서버에서 한 번 더 검사합니다."}</div>
         </Section>
-
-        <Section id="rules" icon={<Repeat size={18} className="text-ink-3" />} title="자동 업무 규칙">
-          <AutoRulesPanel />
-        </Section>
-
-        <Section id="demo" icon={<HelpCircle size={18} className="text-ink-3" />} title={serverMode ? "안내 · 시연" : "데모"}>
-          <div className="mb-3 flex flex-wrap items-center gap-2"><DemoBadge /><span className="text-[0.85rem] text-ink-2">{serverMode ? <>현재 상태: <b>서버 운영</b> · 데이터는 서버에 저장되며, 로그인한 계정의 권한만큼 보입니다</> : settings.liveMode ? <>현재 상태: <b>운영</b> · 데모 초기화는 잠겨 있습니다 (데이터 섹션에서 데모 모드로 돌리면 풀립니다)</> : <>현재 상태: <b>DEMO</b> · 실제 데이터를 넣기 전에 데이터 섹션에서 운영 모드를 켜세요</>}</span></div>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" icon={<HelpCircle size={16} />} onClick={() => openTutorial("ax")}>튜토리얼 다시 보기</Button>
-            <Button variant="outline" icon={<Play size={16} />} onClick={openPresentation}>시연 모드</Button>
-            {/* 서버 운영 중에는 데모 초기화가 의미 없다 — 버튼 자체를 보이지 않는다 */}
-            {!serverMode && <Button variant="danger" icon={<RotateCcw size={16} />} disabled={!!settings.liveMode} title={settings.liveMode ? "운영 모드에서는 잠깁니다" : undefined} onClick={() => setConfirm(true)}>데모 초기화</Button>}
-          </div>
-          {!serverMode && <div className="mt-3 text-[0.78rem] text-ink-3">데모 초기화는 Action 상태·고객 제출·문의·알림을 초기값으로 되돌립니다. 마지막 Seed: {fmtDateTime(seededAt)}{settings.liveMode ? " · 운영 모드라 자동 초기화되지 않습니다." : " · 20시간이 지나면 날짜가 오늘 기준으로 자동 갱신됩니다."}</div>}
-        </Section>
-
-        <Section id="data" icon={<Database size={18} className="text-ink-3" />} title="데이터">
-          <DataPanel />
-          <ErrorLogPanel />
-        </Section>
-
-        <Section id="ai" icon={<Sparkles size={18} className="text-accent" />} title="AI">
-          <div className="space-y-2 text-[0.88rem]">
-            {[
-              { k: "brief", n: "AI-02 오늘의 업무 브리핑", m: "RULE + LLM", s: "규칙 동작 중" },
-              { k: "consult", n: "AI-01 상담 요약", m: "LLM", s: "AI READY" },
-              { k: "project", n: "AI-03 프로젝트 요약", m: "RULE", s: "규칙 동작 중" },
-              { k: "missing", n: "AI-04 자료 누락 체크", m: "RULE", s: "동작 중 (AI 아님)" },
-              { k: "draft", n: "AI-05 커뮤니케이션 초안", m: "템플릿", s: "동작 중" },
-            ].map((a) => (
-              <div key={a.k} className="flex items-center justify-between rounded-xl border border-line px-3 py-2.5"><div><div className="font-semibold">{a.n}</div><div className="text-[0.75rem] text-ink-3">{a.m} · {a.s}</div></div><AiReadyBadge label="설명" onClick={() => openAi({ title: a.n, key: a.k })} /></div>
-            ))}
-          </div>
-          <div className="mt-3 text-[0.78rem] text-ink-3">외부 LLM API 미연결 상태. 모든 AI 기능은 L1 Assist이며 경영·법률 판단을 자동 확정하지 않습니다. API Key 연결 시 상담 요약부터 실제 연결합니다.</div>
-        </Section>
-
-        <Section id="assets" icon={<Award size={18} className="text-ink-3" />} title="기술 · 사업화 자산">
-          <div className="grid gap-2 text-[0.88rem] md:grid-cols-2">
-            {[["특허", "해당없음"], ["벤처기업확인", "해당없음"], ["연구개발", "해당없음"], ["인증", "해당없음"]].map(([k, v]) => (
-              <div key={k} className="flex items-center justify-between rounded-xl bg-surface-2 px-3 py-2.5"><span className="font-semibold">{k}</span><Badge>{v}</Badge></div>
-            ))}
-          </div>
-          <div className="mt-3 text-[0.78rem] text-ink-3">실제 존재하는 자산만 표시합니다. 출원·확인이 이루어지면 이 곳에 정확한 상태를 기록합니다.</div>
-        </Section>
-
-        <Section id="next" title="향후 확장 (NEXT)" action={<NextBadge />} wide>
+      <div className="grid gap-5 xl:grid-cols-2 xl:items-start">
+        <div className="space-y-5">
+          <Section id="rules" icon={<Repeat size={18} className="text-ink-3" />} title="자동 업무 규칙">
+            <AutoRulesPanel />
+          </Section>
+          <Section id="ai" icon={<Sparkles size={18} className="text-accent" />} title="AI">
+            <div className="space-y-2 text-[0.88rem]">
+              {[
+                { k: "brief", n: "AI-02 오늘의 업무 브리핑", m: "RULE + LLM", s: "규칙 동작 중" },
+                { k: "consult", n: "AI-01 상담 요약", m: "LLM", s: "AI READY" },
+                { k: "project", n: "AI-03 프로젝트 요약", m: "RULE", s: "규칙 동작 중" },
+                { k: "missing", n: "AI-04 자료 누락 체크", m: "RULE", s: "동작 중 (AI 아님)" },
+                { k: "draft", n: "AI-05 커뮤니케이션 초안", m: "템플릿", s: "동작 중" },
+              ].map((a) => (
+                <div key={a.k} className="flex items-center justify-between rounded-xl border border-line px-3 py-2.5"><div><div className="font-semibold">{a.n}</div><div className="text-[0.75rem] text-ink-3">{a.m} · {a.s}</div></div><AiReadyBadge label="설명" onClick={() => openAi({ title: a.n, key: a.k })} /></div>
+              ))}
+            </div>
+            <div className="mt-3 text-[0.78rem] text-ink-3">외부 LLM API 미연결 상태. 모든 AI 기능은 L1 Assist이며 경영·법률 판단을 자동 확정하지 않습니다. API Key 연결 시 상담 요약부터 실제 연결합니다.</div>
+          </Section>
+        </div>
+        <div className="space-y-5">
+          <Section id="data" icon={<Database size={18} className="text-ink-3" />} title="데이터">
+            <DataPanel />
+            <ErrorLogPanel />
+          </Section>
+          <Section id="assets" icon={<Award size={18} className="text-ink-3" />} title="기술 · 사업화 자산">
+            <div className="grid gap-2 text-[0.88rem] md:grid-cols-2">
+              {[["특허", "출원 완료 · 10-2026-0177079"], ["벤처기업확인", "해당없음"], ["연구개발", "해당없음"], ["인증", "해당없음"]].map(([k, v]) => (
+                <div key={k} className="flex items-center justify-between gap-2 rounded-xl bg-surface-2 px-3 py-2.5"><span className="font-semibold">{k}</span><Badge tone={v === "해당없음" ? "neutral" : "info"}>{v}</Badge></div>
+              ))}
+            </div>
+            <div className="mt-3 text-[0.78rem] text-ink-3">실제 존재하는 자산만 표시합니다. 출원·확인이 이루어지면 이 곳에 정확한 상태를 기록합니다.</div>
+          </Section>
+        </div>
+      </div>
+        <Section id="next" title="향후 확장 (NEXT)" action={<NextBadge />}>
           <div className="grid gap-2 md:grid-cols-5">
             {NEXT_FEATURES.map((f) => (
               <button key={f.key} onClick={() => openNext(f.key)} className="pressable rounded-xl border border-dashed border-line-2 p-3 text-left hover:bg-surface-2"><div className="text-[0.88rem] font-bold">{f.title}</div><div className="mt-1 line-clamp-2 text-[0.75rem] text-ink-3">{f.desc}</div></button>
@@ -174,6 +189,18 @@ export default function SettingsPage() {
 
 const SectionCtx = createContext<string | null>(null);
 
+/** 구역 바로가기 (PC) — 휴대폰은 구역이 제목만 보이게 접혀 있어 그 자체가 목차다 */
+function SectionNav({ serverMode }: { serverMode: boolean }) {
+  const items: [string, string][] = [["display", "화면"], ["account", "내 계정"], ["demo", serverMode ? "안내 · 시연" : "데모"], ["users", "사용자 · 권한"], ["rules", "자동 업무 규칙"], ["ai", "AI"], ["data", "데이터"], ["assets", "기술 · 사업화 자산"], ["next", "향후 확장"]];
+  return (
+    <nav aria-label="설정 구역" className="mb-5 hidden flex-wrap gap-1.5 md:flex">
+      {items.map(([id, label]) => (
+        <a key={id} href={`#${id}`} className="pressable rounded-full border border-line bg-surface px-3 py-1.5 text-[0.82rem] font-semibold text-ink-2 hover:border-line-2 hover:text-ink">{label}</a>
+      ))}
+    </nav>
+  );
+}
+
 /**
  * 설정 카드 한 장. md 미만에서는 제목만 보이는 접이식이고, md 이상에서는 평소 카드다.
  * `/ax/settings?open=users` 처럼 열어 둘 섹션을 주소로 받는다 — 대시보드 "처음 시작하기"가 이 주소로 보낸다.
@@ -185,7 +212,7 @@ function Section({ id, icon, title, action, wide, children }: { id: string; icon
     if (openId === id) document.getElementById(id)?.scrollIntoView({ block: "start" });
   }, [openId, id]);
   return (
-    <Card id={id} className={cx("scroll-mt-4 p-5", wide && "xl:col-span-2")}>
+    <Card id={id} className={cx("scroll-mt-20 p-5", wide && "xl:col-span-2")}>
       <div className="flex items-center justify-between gap-2 md:mb-3">
         <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-controls={`${id}-body`} className="pressable -mx-2 -my-1.5 flex min-h-11 min-w-0 flex-1 items-center justify-between gap-2 rounded-lg px-2 text-left hover:bg-surface-2 md:pointer-events-none md:my-0 md:min-h-0 md:hover:bg-transparent">
           <h2 className="flex min-w-0 items-center gap-2 text-[1.15rem] font-bold">{icon} <span className="truncate">{title}</span></h2>

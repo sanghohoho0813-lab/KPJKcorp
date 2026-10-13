@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ArrowDownRight, ArrowRight, ArrowUpRight, BadgeCheck, Building2, Check, ClipboardCopy, FileCheck2, Lock, Minus, Sparkles, TrendingUp, Users } from "lucide-react";
+import { ArrowDownRight, ArrowRight, ArrowUpRight, BadgeCheck, Building2, Check, ChevronDown, ClipboardCopy, FileCheck2, Lock, Minus, Sparkles, TrendingUp, Users } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { EMPLOYEE_BANDS } from "@/lib/company-options";
 import { DOC_SOURCE_LABEL } from "@/lib/docparse";
@@ -39,7 +39,8 @@ function useQuests(c: Company, board: Board) {
 
 /* ------------------------------ 숫자 4칸 + 매출 추이 ------------------------------ */
 
-export function CompanySnapshot({ company: c, board, showFactsLink = true }: { company: Company; board: Board; showFactsLink?: boolean }) {
+export function CompanySnapshot({ company: c, board, showFactsLink = true, collapsible }: { company: Company; board: Board; showFactsLink?: boolean; /** 휴대폰에서 매출 추이·인증 현황을 접어 둔다(홈) */ collapsible?: boolean }) {
+  const [more, setMore] = useState(!collapsible);
   const today = todayLocal();
   const age = businessAge(c, today);
   const trend = revenueTrend(c);
@@ -88,7 +89,14 @@ export function CompanySnapshot({ company: c, board, showFactsLink = true }: { c
           hot={certs.some((x) => x.state === "expiring" || x.state === "expired")} className="col-span-2 border-t lg:col-span-1 lg:border-t-0" />
       </div>
 
-      <div className="grid gap-4 border-t border-line p-5 md:p-6 lg:grid-cols-[1.35fr_1fr]">
+      {/* 홈 휴대폰: 숫자 4칸만 먼저 — 매출 막대·인증 목록은 눌러서 펼친다(PC는 늘 펼침) */}
+      {!more && (
+        <button type="button" onClick={() => setMore(true)} data-testid="snapshot-more"
+          className="pressable flex min-h-12 w-full items-center justify-center gap-1.5 border-t border-line text-[0.88rem] font-semibold text-ink-2 hover:text-ink lg:hidden">
+          연도별 매출 · 인증 현황 보기 <ChevronDown size={16} />
+        </button>
+      )}
+      <div className={cx("grid gap-4 border-t border-line p-5 md:p-6 lg:grid-cols-[1.35fr_1fr]", !more && "hidden lg:grid")}>
         <RevenueBars company={c} bare />
         <CertPanel company={c} />
       </div>
@@ -234,14 +242,6 @@ export function GrowthQuests({ company: c, board, limit }: { company: Company; b
         </div>
       </div>
       <p className="mt-2.5 text-[0.76rem] text-ink-3">기록(회사 정보·요청 자료·과제·일정·재무)을 보고 정해진 규칙으로 다음 할 일을 자동으로 정리합니다. 자금 가능 여부 같은 판단은 하지 않습니다.</p>
-
-      {level.next && (
-        <Link href={level.next.href} className="mt-3 flex items-center gap-3 rounded-2xl bg-soft/70 px-4 py-3 ring-1 ring-accent/25 hover:bg-soft" data-testid="next-quest">
-          <span className="text-[0.72rem] font-extrabold tracking-wide text-accent-strong">다음 할 일</span>
-          <span className="min-w-0 flex-1 truncate text-[0.95rem] font-bold">{level.next.title}</span>
-          <ArrowRight size={16} className="shrink-0 text-accent-strong" />
-        </Link>
-      )}
 
       <ul className="mt-3 divide-y divide-line rounded-2xl border border-line">
         {shown.map((q) => <QuestRow key={q.key} q={q} />)}

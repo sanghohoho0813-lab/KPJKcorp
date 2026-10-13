@@ -44,6 +44,7 @@ try {
   ok('2 고객: 최근 매출 42억', /42억 원/.test(t), t.match(/\d+억[^\n]*/)?.[0]);
   ok('2 고객: 전년 대비 +9.1%', /전년 대비 \+9\.1%/.test(t));
   ok('2 고객: 계약 15일차', /15\s*일차/.test(t), t.match(/\d+\s*일차/)?.[0]);
+  await c.getByTestId('snapshot-more').click(); await c.waitForTimeout(300); // 휴대폰 홈: 매출 막대·인증은 접혀 있다
   ok('2 고객: 연도별 막대 2개', (await c.getByTestId('revenue-bars').getByRole('listitem').count()) === 2);
   await c.getByTestId('growth-quests').getByRole('button', { name: /더 보기/ }).click().catch(() => {});
   ok('2 고객: "전년보다 매출 키우기" 완료', (await c.getByTestId('quest-growth').getAttribute('data-done')) === '1');

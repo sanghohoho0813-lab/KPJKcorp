@@ -137,7 +137,7 @@ await hl(page, null);
 
 /* ───────────── S5 검토 완료 ───────────── */
 await go(page, '/ax/documents'); await clear(); await park(1250, 200);
-const docRow = page.locator('tr').filter({ hasText: V.doc }).filter({ hasText: V.companyName }).first();
+const docRow = page.locator('[data-doc-row]').filter({ hasText: V.doc }).filter({ hasText: V.companyName }).first();
 await rec.shot(page, 's5-review', async () => {
   await sleep(250);
   await cap(page, '내부 AX · 자료 검토', '담당자는 <b>방금 올라온 파일</b>을 열어 확인하고');

@@ -177,7 +177,7 @@ await rec.shot(page, 't6-review', async () => {
   await hl(page, null);
   await mouse.click(page.getByRole('link', { name: /자료관리/ }).first(), { ms: 650 });
   await sleep(1100);
-  const dRow = page.locator('tr').filter({ hasText: DOC }).first();
+  const dRow = page.locator('[data-doc-row]').filter({ hasText: DOC }).first();
   await mouse.click(dRow, { ms: 650 });
   await sleep(500);
   await cap(page, '⑥ 검토', '파일을 확인하고 <b>검토 완료</b> 또는 <b>보완 요청</b>', false, 'top');

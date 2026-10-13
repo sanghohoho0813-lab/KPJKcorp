@@ -7,7 +7,7 @@ import { hashPassword } from "@/lib/auth";
 import { createServerUser, sendPasswordReset, setServerUserActive, updateServerUser } from "@/lib/server/auth";
 import type { Role, User } from "@/lib/types";
 import { Confirm, Modal } from "@/components/ui/overlay";
-import { Badge, Button, Field, Input, Select } from "@/components/ui/ui";
+import { Badge, Button, Field, Input, Select, cx } from "@/components/ui/ui";
 
 import { ROLE_LABEL } from "@/lib/permissions";
 
@@ -330,6 +330,29 @@ export function UserAdmin() {
   const activeAdmins = st.users.filter((u) => u.role === "admin" && u.active !== false).length;
   const order: Role[] = ["admin", "consultant", "staff", "client"];
   const rows = [...st.users].sort((a, b) => order.indexOf(a.role) - order.indexOf(b.role) || a.name.localeCompare(b.name));
+  const actions = (u: User) => {
+    const off = u.active === false;
+    const lastAdmin = u.role === "admin" && !off && activeAdmins <= 1;
+    return (
+      <>
+        <Button size="sm" variant="ghost" onClick={() => setModalFor(u.id)}>수정</Button>
+        <Button size="sm" variant="ghost" onClick={() => setPwFor(u)}>비밀번호</Button>
+        {off ? (
+          <Button size="sm" variant="outline" onClick={() => { void setActive(u.id, true, me).then(() => toast(`${u.name} 계정을 다시 사용합니다.`)); }}>재개</Button>
+        ) : (
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={u.id === me || lastAdmin}
+            title={u.id === me ? "본인 계정은 중지할 수 없습니다" : lastAdmin ? "마지막 대표 계정은 중지할 수 없습니다" : undefined}
+            onClick={() => setConfirmOff(u)}
+          >
+            중지
+          </Button>
+        )}
+      </>
+    );
+  };
 
   return (
     <>
@@ -340,42 +363,41 @@ export function UserAdmin() {
         </span>
         <Button size="sm" variant="accent" icon={<UserPlus size={15} />} onClick={() => setCreating(true)}>계정 만들기</Button>
       </div>
-      <div className="overflow-x-auto rounded-xl border border-line">
+      {/* 휴대폰: 한 사람 = 한 줄 카드 / PC: 표 (관리 버튼이 두 줄로 꺾이지 않게 칸 너비를 정해 둔다) */}
+      <div className="divide-y divide-line rounded-xl border border-line md:hidden">
+        {rows.map((u) => {
+          const company = st.companies.find((c) => c.id === u.companyId);
+          const off = u.active === false;
+          return (
+            <div key={u.id} className={cx("px-3.5 py-3", off && "opacity-55")}>
+              <div className="flex items-center gap-2">
+                <span className="min-w-0 flex-1 truncate font-semibold">{u.name} <span className="font-normal text-ink-3">{u.title}</span></span>
+                <span className="shrink-0 text-[0.8rem] text-ink-2">{ROLE_LABEL[u.role]}</span>
+                {off ? <span className="shrink-0 text-[0.8rem] font-semibold text-error">중지</span> : <span className="shrink-0 text-[0.8rem] font-semibold text-success">사용</span>}
+              </div>
+              <div className="mt-0.5 truncate text-[0.8rem] text-ink-3">{company ? `${company.name} · ` : ""}{u.email}</div>
+              <div className="-ml-2 mt-1 flex flex-wrap gap-1">{actions(u)}</div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="hidden overflow-x-auto rounded-xl border border-line md:block">
         <table className="tbl tbl-compact">
-          <thead><tr><th>이름</th><th>아이디</th><th>역할</th><th>상태</th><th className="text-right">관리</th></tr></thead>
+          <thead><tr><th className="w-[27%]">이름</th><th className="w-[27%]">아이디</th><th className="w-[12%]">역할</th><th className="w-[8%]">상태</th><th className="w-[26%] text-right">관리</th></tr></thead>
           <tbody>
             {rows.map((u) => {
               const company = st.companies.find((c) => c.id === u.companyId);
               const off = u.active === false;
-              const lastAdmin = u.role === "admin" && !off && activeAdmins <= 1;
               return (
                 <tr key={u.id} className={off ? "opacity-55" : undefined}>
                   <td>
                     <div className="font-semibold">{u.name} <span className="font-normal text-ink-3">{u.title}</span></div>
                     {company && <div className="text-[0.78rem] text-ink-3">{company.name}</div>}
                   </td>
-                  <td className="text-ink-2">{u.email}</td>
+                  <td className="break-all text-ink-2">{u.email}</td>
                   <td>{ROLE_LABEL[u.role]}</td>
                   <td>{off ? <span className="font-semibold text-error">중지</span> : <span className="font-semibold text-success">사용</span>}</td>
-                  <td>
-                    <div className="flex flex-wrap justify-end gap-1">
-                      <Button size="sm" variant="ghost" onClick={() => setModalFor(u.id)}>수정</Button>
-                      <Button size="sm" variant="ghost" onClick={() => setPwFor(u)}>비밀번호</Button>
-                      {off ? (
-                        <Button size="sm" variant="outline" onClick={() => { void setActive(u.id, true, me).then(() => toast(`${u.name} 계정을 다시 사용합니다.`)); }}>재개</Button>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          disabled={u.id === me || lastAdmin}
-                          title={u.id === me ? "본인 계정은 중지할 수 없습니다" : lastAdmin ? "마지막 대표 계정은 중지할 수 없습니다" : undefined}
-                          onClick={() => setConfirmOff(u)}
-                        >
-                          중지
-                        </Button>
-                      )}
-                    </div>
-                  </td>
+                  <td><div className="flex flex-wrap justify-end gap-1">{actions(u)}</div></td>
                 </tr>
               );
             })}
