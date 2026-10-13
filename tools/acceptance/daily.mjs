@@ -43,6 +43,10 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
   await go(page, '/ax/dashboard');
   const card = page.locator('#today-tasks');
   ok('1 대시보드에 오늘 할 업무', await card.isVisible());
+  const kpiToday = Number((await page.locator('#kpi-today').innerText()).match(/\d+/)?.[0]);
+  const listToday = Number((await card.innerText()).match(/오늘 할 업무\s*(\d+)건/)?.[1]);
+  ok('1 대시보드 첫 칸 "오늘 할 업무" 숫자 = 목록 건수', kpiToday === listToday && kpiToday > 0, `${kpiToday} / ${listToday}`);
+  ok('1 오늘 할 업무가 첫 화면(900px) 안', (await card.evaluate((e) => e.getBoundingClientRect().top)) < 900);
   const before = (await dump(page)).tasks.length;
   const input = card.getByLabel('새 업무 제목');
   await input.fill('에이정밀 대표님께 결과보고 일정 전화');
@@ -233,6 +237,9 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
   const cards = page.locator('a[href^="/ax/clients/co_"]');
   const n0 = await cards.count();
   ok('7 기업고객 "연락 필요" 필터', n0 >= 1 && lbl.includes(String(n0)), `${lbl} / ${n0}`);
+  await go(page, '/ax/dashboard');
+  const kpiContact = Number((await page.locator('#kpi-contact').innerText()).match(/\d+/)?.[0]);
+  ok('7 대시보드 "연락 필요" 숫자 = 목록', kpiContact === n0, `${kpiContact} / ${n0}`);
   const target = nc[0].companyId;
   await go(page, `/ax/clients/${target}`);
   ok('7 기업 상세에 연락 공백 표시', /연락 \d+일 없음/.test(await page.getByTestId('contact-line').first().innerText()));
