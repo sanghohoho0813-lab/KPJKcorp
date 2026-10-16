@@ -4,6 +4,7 @@
 //  3) 기업 상세: '지금 할 일'이 회사 정보보다 먼저 · 빠른 작업(업무 추가) → 할 일 목록에 바로
 //  4) 같은 기업 중복 등록 막기 (이름 표기 차이 · 사업자번호)
 //  5) 휴대폰: 기업 상세 첫 화면에 할 일이 보이는지 · 가로 넘침 · 페이지 오류
+//  8) 정책자금 준비 서류: 묶음 요청(알림 한 번) → 고객 홈 한 줄 → 파일 여러 개 제출 → 검토 발급일 → 서류함·고객 준비됨
 // 실행: npm run build && npm start (데모 모드) → node tools/acceptance/daily.mjs
 import fs from 'fs';
 
@@ -259,6 +260,96 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
   await page.getByRole('button', { name: '지금 확인' }).click(); await sleep(400);
   ok('7 연락한 기업엔 새 업무 안 생김', (await dump(page)).tasks.filter((t) => t.ruleKey?.startsWith(`no_contact:${target}:`)).length === 1);
   ok('7 페이지 오류 없음', page.errs.length === 0, page.errs.slice(0, 2).join(' | '));
+}
+
+// ---------- 정책자금 준비 서류 (대표 PC → 고객 → 대표 검토 · 발급일 → 고객 준비됨) ----------
+{
+  const page = await session('pc', ['ceo@kpjk.co.kr', 'kpjk2026!']);
+  const storeKey = () => page.evaluate(() => Object.keys(localStorage).find((k) => { try { return !!JSON.parse(localStorage.getItem(k) ?? 'null')?.state; } catch { return false; } }));
+  const relogin = async (id, pwd, to) => {
+    const k = await storeKey();
+    await page.evaluate((key) => { const s = JSON.parse(localStorage.getItem(key)); s.state.session = null; localStorage.setItem(key, JSON.stringify(s)); }, k);
+    await page.goto(B + '/login', { waitUntil: 'networkidle' });
+    await page.getByLabel('아이디 (이메일)').fill(id);
+    await page.locator('input[type=password]').first().fill(pwd);
+    await page.getByRole('button', { name: '로그인' }).click();
+    await page.waitForURL(to); await sleep(1200);
+    await page.getByRole('button', { name: /건너뛰기/ }).first().click({ timeout: 800 }).catch(() => {});
+    await page.getByLabel(/튜토리얼 닫기|이용 안내 닫기/).click({ timeout: 800 }).catch(() => {});
+  };
+  const dlg = () => page.locator('[role=dialog]:visible').last();
+  await go(page, '/ax/clients/co_a');
+  ok('8 기업 상세 빠른 작업에 정책자금 서류', await page.getByTestId('client-quick-actions').getByRole('button', { name: '정책자금 서류' }).isVisible());
+  await go(page, '/ax/clients/co_a?tab=vault');
+  const badge0 = await page.getByTestId('policy-ready').innerText();
+  await page.getByRole('button', { name: '정책자금 준비 서류 요청' }).click(); await sleep(400);
+  const plan = dlg().getByTestId('policy-plan');
+  ok('8 요청 창: 서류 목록', (await plan.locator('[data-policy]').count()) >= 8, badge0);
+  ok('8 신청 직전 서류(납세증명)는 기본 꺼짐', !(await plan.locator('[data-policy=taxCert] input').isChecked()));
+  const s0 = await dump(page);
+  const btn = dlg().getByRole('button', { name: /개 요청$/ });
+  const n = Number((await btn.innerText()).match(/(\d+)개/)?.[1] ?? 0);
+  await btn.click(); await sleep(600);
+  const s1 = await dump(page);
+  const added = s1.docRequests.filter((d) => !s0.docRequests.some((x) => x.id === d.id));
+  const notes = s1.notifications.filter((x) => !s0.notifications.some((y) => y.id === x.id) && x.audience === 'client');
+  ok('8 요청 N건 · 모두 정책자금 준비 표시', n >= 3 && added.length === n && added.every((d) => d.companyId === 'co_a' && d.description.startsWith('정책자금 준비 서류 — ')), `${n}건`);
+  ok('8 고객 알림은 한 번', notes.length === 1 && notes[0].title === `정책자금 준비 서류 ${n}개를 요청드렸습니다` && notes[0].href.endsWith('#policy-docs'));
+  const vault1 = s1.companyVaults.find((v) => v.companyId === 'co_a');
+  ok('8 서류함에 없던 칸은 만듦', added.every((d) => [...['사업자등록증', '법인등기부등본', '대표자 신분증 사본', '공동인증서', '중소기업 확인서', '대표자 건강보험 자격득실확인서'], ...(vault1?.customSlots ?? []).map((c) => c.label)].includes(d.name)));
+  await page.getByRole('button', { name: '정책자금 준비 서류 요청' }).click(); await sleep(400);
+  ok('8 다시 열면 요청한 서류는 잠김', (await dlg().getByTestId('policy-plan').locator('input:disabled').count()) >= n);
+  await dlg().getByRole('button', { name: '취소' }).click(); await sleep(300);
+
+  // 고객: 홈에 한 줄 → 자료제출 카드 → 파일 두 개를 한 번에
+  await relogin('ceo@a-precision.demo', 'client2026!', /\/portal/);
+  await go(page, '/portal');
+  const na = await page.getByTestId('now-actions').innerText();
+  ok('8 고객 홈: 준비 서류는 한 줄', na.includes(`정책자금 서류 ${n}개 올리기`) && !added.some((d) => na.includes(`${d.name} 올리기`)), na.replace(/\n/g, ' / ').slice(0, 160));
+  await page.getByTestId('now-actions').getByText(`정책자금 서류 ${n}개 올리기`).click(); await sleep(1200);
+  ok('8 누르면 자료제출의 준비 서류 카드로', /\/portal\/documents#policy-docs/.test(page.url()) && await page.locator('#policy-docs').isVisible());
+  ok('8 준비 0/N', (await page.getByTestId('policy-count').innerText()) === `준비 0/${n}`);
+  const fin = page.locator('[data-policy-doc=finStmt]');
+  ok('8 발급처 안내가 보임', /홈택스 › 민원증명 › 표준재무제표증명/.test(await fin.innerText()));
+  await fin.getByRole('button', { name: '올리기' }).click(); await sleep(400);
+  await dlg().getByRole('button', { name: '데모용 샘플 파일 사용' }).click();
+  await dlg().getByRole('button', { name: '데모용 샘플 파일 사용' }).click(); await sleep(200);
+  await dlg().getByRole('button', { name: '2개 제출하기' }).click(); await sleep(700);
+  let st = await dump(page);
+  const finReq = st.docRequests.find((d) => d.id === added.find((x) => x.name.startsWith('표준재무제표증명'))?.id);
+  ok('8 파일 두 개를 한 번에 제출', finReq?.status === 'submitted' && finReq.files.length === 2 && finReq.files.map((f) => f.version).join() === '1,2');
+  ok('8 담당자 검토 업무는 한 건', st.tasks.filter((t) => t.title.includes('표준재무제표증명') && t.source === 'auto').length === 1);
+  await page.locator('[data-policy-doc=insList]').getByRole('button', { name: '올리기' }).click(); await sleep(400);
+  await dlg().getByRole('button', { name: '데모용 샘플 파일 사용' }).click(); await sleep(200);
+  await dlg().getByRole('button', { name: '제출하기', exact: true }).click(); await sleep(700);
+  ok('8 제출하면 확인 중', (await page.locator('[data-policy-doc=insList]').getAttribute('data-state')) === 'checking');
+
+  // 대표: 검토 — 유효기간 있는 서류는 발급일을 넣는다 → 서류함 칸에 발급일
+  await relogin('ceo@kpjk.co.kr', 'kpjk2026!', /\/ax\//);
+  await go(page, '/ax/documents');
+  const issued = new Date(Date.now() - 6 * 864e5); const ymd = `${issued.getFullYear()}-${String(issued.getMonth() + 1).padStart(2, '0')}-${String(issued.getDate()).padStart(2, '0')}`;
+  await page.locator('[data-doc-row]').filter({ hasText: '4대보험 사업장 가입자 명부' }).first().click(); await sleep(400);
+  ok('8 유효기간 있는 서류 검토: 발급일 칸', await dlg().getByTestId('review-issued').isVisible());
+  await dlg().getByTestId('review-issued').fill(ymd);
+  await dlg().getByRole('button', { name: '검토 완료' }).click(); await sleep(500);
+  await page.locator('[data-doc-row]').filter({ hasText: '표준재무제표증명' }).first().click(); await sleep(400);
+  ok('8 유효기간 없는 서류는 발급일 칸 없음', (await dlg().getByTestId('review-issued').count()) === 0);
+  await dlg().getByRole('button', { name: '검토 완료' }).click(); await sleep(500);
+  st = await dump(page);
+  const v2 = st.companyVaults.find((v) => v.companyId === 'co_a');
+  const insSlot = v2.customSlots.find((c) => c.label === '4대보험 사업장 가입자 명부');
+  ok('8 서류함: 받음 · 발급일 · 유효 1개월', !!insSlot && v2.slots[insSlot.key]?.received === true && v2.slots[insSlot.key]?.issuedAt === ymd && insSlot.validMonths === 1);
+  await go(page, '/ax/clients/co_a?tab=vault');
+  const badge1 = await page.getByTestId('policy-ready').innerText();
+  ok('8 서류함 정책자금 준비 숫자가 늘어남', Number(badge1.match(/(\d+)\//)[1]) === Number(badge0.match(/(\d+)\//)[1]) + 2, `${badge0} → ${badge1}`);
+
+  // 고객: 준비됨 2 · 휴대폰 가로 넘침 없음
+  await relogin('ceo@a-precision.demo', 'client2026!', /\/portal/);
+  await go(page, '/portal/documents');
+  ok('8 고객 화면 준비 2/N', (await page.getByTestId('policy-count').innerText()) === `준비 2/${n}`);
+  await page.setViewportSize({ width: 390, height: 844 }); await sleep(500);
+  ok('8 휴대폰 자료제출 가로 넘침 없음', (await overflow(page)) <= 0);
+  ok('8 페이지 오류 없음', page.errs.length === 0, page.errs.slice(0, 2).join(' | '));
 }
 
 await browser.close();

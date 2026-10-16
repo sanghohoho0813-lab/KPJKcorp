@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FileText, FolderUp, Upload } from "lucide-react";
 import { useStore, usePortalCompanyId } from "@/lib/store";
 import { daysBetween, fmtDate, fmtDateTime, fmtSize, relativeDay } from "@/lib/format";
@@ -9,6 +9,8 @@ import { Badge, Button, Card, EmptyState, KpiCard, PageHeader, SegmentedControl,
 import { Modal } from "@/components/ui/overlay";
 import { DocStatusBadge } from "@/components/domain/domain";
 import { UploadModal } from "@/components/domain/DocActions";
+import { PolicyDocsCard } from "@/components/domain/portal/PolicyDocsCard";
+import { isPolicyRequest } from "@/lib/policy-docs";
 
 export default function PortalDocumentsPage() {
   const st = useStore();
@@ -23,7 +25,19 @@ export default function PortalDocumentsPage() {
   const reviewing = docs.filter((d) => d.status === "reviewing");
   const revision = docs.filter((d) => d.status === "revision");
   const order = { revision: 0, requested: 1, submitted: 2, reviewing: 3, done: 4, planned: 5 } as const;
-  const rows = docs.filter((d) => filter === "all" ? true : filter === "todo" ? d.status === "requested" || d.status === "revision" : d.status === "done" || d.status === "submitted" || d.status === "reviewing").sort((a, b) => order[a.status] - order[b.status] || a.dueDate.localeCompare(b.dueDate));
+  // 정책자금 준비 서류(미리 모아 두는 묶음)는 위 카드에서 따로 — 아래 목록은 그 밖의 요청자료
+  const hasPolicy = docs.some(isPolicyRequest);
+  const others = docs.filter((d) => !isPolicyRequest(d));
+  const rows = others.filter((d) => filter === "all" ? true : filter === "todo" ? d.status === "requested" || d.status === "revision" : d.status === "done" || d.status === "submitted" || d.status === "reviewing").sort((a, b) => order[a.status] - order[b.status] || a.dueDate.localeCompare(b.dueDate));
+  // 기한이 급한 다른 요청이 있으면 그 목록을 먼저, 아니면 준비 서류 카드를 먼저
+  const otherUrgent = others.some((d) => d.status === "revision" || (d.status === "requested" && daysBetween(now, d.dueDate) <= 3));
+  // 알림·홈에서 "#policy-docs"로 들어오면 카드가 그려진 뒤 그 자리로
+  useEffect(() => {
+    if (typeof window === "undefined" || window.location.hash !== "#policy-docs") return;
+    const t = setTimeout(() => document.getElementById("policy-docs")?.scrollIntoView({ block: "start" }), 120);
+    return () => clearTimeout(t);
+  }, [hasPolicy]);
+  const policyCard = hasPolicy && companyId ? <div className="mb-5"><PolicyDocsCard companyId={companyId} onUpload={setUpload} onView={setView} /></div> : null;
 
   return (
     <div>
@@ -34,9 +48,11 @@ export default function PortalDocumentsPage() {
         <KpiCard label="검토중" value={reviewing.length} sub="담당 컨설턴트 확인 중" />
         <KpiCard label="보완필요" value={revision.length} sub="재제출 필요" tone={revision.length ? "error" : undefined} />
       </div>
-      <div className="mb-4"><SegmentedControl size="sm" value={filter} onChange={setFilter} options={[{ key: "all", label: "전체" }, { key: "todo", label: `제출 필요 ${todo.length}` }, { key: "done", label: "제출됨" }]} /></div>
+      {!otherUrgent && policyCard}
+      {hasPolicy && <h2 className="mb-2 text-[1.05rem] font-bold">그 밖의 요청자료</h2>}
+      <div className="mb-4"><SegmentedControl size="sm" value={filter} onChange={setFilter} options={[{ key: "all", label: "전체" }, { key: "todo", label: `제출 필요 ${others.filter((d) => d.status === "requested" || d.status === "revision").length}` }, { key: "done", label: "제출됨" }]} /></div>
       <Card className="overflow-hidden" id="tut-p-docs">
-        {rows.length === 0 ? <EmptyState icon={<FolderUp size={30} />} title="요청된 자료가 없습니다" desc="담당 컨설턴트가 자료를 요청하면 여기에 표시됩니다." /> : (
+        {rows.length === 0 ? <EmptyState icon={<FolderUp size={30} />} title={hasPolicy ? "그 밖의 요청자료가 없습니다" : "요청된 자료가 없습니다"} desc="담당 컨설턴트가 자료를 요청하면 여기에 표시됩니다." /> : (
           <div className="divide-y divide-line">
             {rows.map((d) => {
               const overdue = (d.status === "requested" || d.status === "revision") && daysBetween(d.dueDate, now) > 0;
@@ -63,6 +79,7 @@ export default function PortalDocumentsPage() {
           </div>
         )}
       </Card>
+      {otherUrgent && <div className="mt-5">{policyCard}</div>}
       <UploadModal req={upload} open={!!upload} onClose={() => setUpload(null)} />
       <Modal open={!!view} onClose={() => setView(null)} title={view?.name} size="sm">
         {view && (

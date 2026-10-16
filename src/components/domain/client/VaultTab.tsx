@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Download, ExternalLink, Eye, FileText, FolderOpen, Lock, Plus, Send, Trash2, Upload } from "lucide-react";
+import { CheckCircle2, Download, ExternalLink, Eye, FileText, FolderOpen, Landmark, Lock, Plus, Send, Trash2, Upload } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { can } from "@/lib/permissions";
 import type { Company, CompanyFile, DocumentRequest } from "@/lib/types";
@@ -13,6 +13,7 @@ import { fmtDate, relativeDay } from "@/lib/format";
 import { Badge, Button, Card, EmptyState, Input, Select, cx } from "@/components/ui/ui";
 import { Confirm, Modal } from "@/components/ui/overlay";
 import { BulkUploadModal } from "./BulkUpload";
+import { PolicyDocsModal, usePolicyPlan } from "./PolicyDocs";
 
 /**
  * 기업 서류함 — 어떤 서류를 받았고 언제 만료되는지. 올린 파일은 바로 열어 보고 내려받는다.
@@ -51,17 +52,25 @@ export function VaultTab({ company }: { company: Company }) {
   // 아직 없거나 만료(임박)인데 고객에게 요청하지 않은 칸 — 파일 없이 받는 공동인증서는 제외
   const missing = statuses.filter((s) => !s.meta.noFile && (!s.received || s.expired || s.expiringSoon) && !OPEN_REQ.includes(linkedRequest(reqs, company.id, s.meta.label)?.status ?? ""));
   const [confirmMany, setConfirmMany] = useState(false);
+  // 정책자금 준비 — 공통 서류가 몇 개나 쓸 수 있는 상태인지 (자격 판단 아님)
+  const plan = usePolicyPlan(company);
+  const policyReady = plan.filter((r) => r.state === "usable" || r.state === "expiring").length;
+  const [policyOpen, setPolicyOpen] = useState(false);
 
   return (
     <div className="space-y-4" id="vault-tab">
       <Card className="p-4">
-        <div className="flex flex-wrap items-center gap-3">
+        {/* 설명과 버튼을 따로 묶는다 — 한 줄에 섞으면 휴대폰에서 설명이 한 글자 폭으로 눌린다 */}
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2"><span className="text-[1.05rem] font-bold">서류함</span><Badge tone={usable === statuses.length ? "success" : "neutral"}>확보 {usable}/{statuses.length}</Badge><Badge>파일 {files.length}</Badge></div>
+            <div className="flex flex-wrap items-center gap-2"><span className="text-[1.05rem] font-bold">서류함</span><Badge tone={usable === statuses.length ? "success" : "neutral"}>확보 {usable}/{statuses.length}</Badge><Badge>파일 {files.length}</Badge><span data-testid="policy-ready" className="inline-flex"><Badge tone={policyReady === plan.length ? "success" : "info"}>정책자금 준비 {policyReady}/{plan.length}</Badge></span></div>
             <p className="mt-0.5 text-[0.8rem] text-ink-3">발급일을 넣으면 유효기간이 지났는지 먼저 알려 드립니다. 서류함 자체는 내부 전용이고, <b className="text-ink-2">고객에게 요청</b>한 서류만 고객 화면 요청자료에 나타납니다.</p>
           </div>
-          {mayRequest && missing.length > 0 && <Button variant="outline" icon={<Send size={16} />} onClick={() => setConfirmMany(true)}>빈 서류 {missing.length}개 고객에게 요청</Button>}
-          {may && <Button variant="accent" icon={<Upload size={16} />} onClick={() => setBulk({})}>한꺼번에 올리기</Button>}
+          <div className="flex flex-wrap gap-2">
+            {mayRequest && <Button variant="outline" icon={<Landmark size={16} />} onClick={() => setPolicyOpen(true)}>정책자금 준비 서류 요청</Button>}
+            {mayRequest && missing.length > 0 && <Button variant="outline" icon={<Send size={16} />} onClick={() => setConfirmMany(true)}>빈 서류 {missing.length}개 고객에게 요청</Button>}
+            {may && <Button variant="accent" icon={<Upload size={16} />} onClick={() => setBulk({})}>한꺼번에 올리기</Button>}
+          </div>
         </div>
         {!serverMode && <p className="mt-2 rounded-lg bg-surface-2 px-3 py-1.5 text-[0.75rem] text-ink-3">서버 연결 전: 원본 파일은 이 브라우저에만 보관됩니다.</p>}
       </Card>
@@ -97,6 +106,7 @@ export function VaultTab({ company }: { company: Company }) {
           toast(`${n}개 서류를 고객에게 요청했습니다. 고객 화면에 알림이 갑니다.`);
         }} />
       <BulkUploadModal company={company} vault={vault} open={!!bulk} initialSlot={bulk?.slot} onClose={() => setBulk(null)} />
+      <PolicyDocsModal company={company} open={policyOpen} onClose={() => setPolicyOpen(false)} />
       <PreviewModal file={preview} onClose={() => setPreview(null)} />
     </div>
   );

@@ -122,14 +122,18 @@ export interface StoreState extends SeedData {
   setConsultantScope: (scope: "all" | "own", byUserId: string) => Promise<{ ok: boolean; reason?: string }>;
 
   // closed loop actions
-  uploadDocument: (requestId: string, file: { fileName: string; size: number; storagePath?: string }, byUserId: string) => void;
-  reviewDocument: (requestId: string, outcome: "done" | "revision" | "reviewing", note: string | undefined, byUserId: string) => void;
+  /** 파일 여러 개를 한 번에 낼 수 있다 (재무제표 3년치·여러 장 찍은 서류) — 서버에는 파일 줄 N개 + 요청 상태 한 번 */
+  uploadDocument: (requestId: string, file: { fileName: string; size: number; storagePath?: string } | { fileName: string; size: number; storagePath?: string }[], byUserId: string) => void;
+  /** issuedAt — 검토 완료 때 담당자가 본 발급일. 같은 이름의 서류함 칸에 남아 유효기간을 알려 준다 */
+  reviewDocument: (requestId: string, outcome: "done" | "revision" | "reviewing", note: string | undefined, byUserId: string, issuedAt?: string) => void;
   changeProjectStage: (projectId: string, stage: InternalStage, byUserId: string) => void;
   /** 고객 단계(자료 요청·검토·진행·완료)로 바꾸면서 고객에게 메시지와 요청 서류를 한 번에 보낸다. 알림은 1건. */
   sendProjectStep: (projectId: string, stage: InternalStage, opts: { message?: string; docs?: string[]; dueDate?: string }, byUserId: string) => { docs: number } | null;
   createDocRequest: (projectId: string, data: { name: string; description: string; dueDate: string }, byUserId: string) => void;
   /** 기업에 바로 자료 요청 (서류함 칸에서) — 진행 중인 프로젝트가 있으면 거기에 붙이고, 없으면 기업에만 붙인다 */
   requestCompanyDoc: (companyId: string, data: { name: string; description: string; dueDate: string }, byUserId: string) => string | null;
+  /** 정책자금 준비 서류 묶음 요청 — 서류함 칸이 없으면 만들고, 요청 N건에 고객 알림은 한 번 */
+  requestPolicyDocs: (companyId: string, items: { label: string; description: string; validMonths?: number }[], dueDate: string, byUserId: string) => number;
 
   // ---- 기업고객 / 프로젝트 등록·수정 ----
   createCompany: (data: Omit<Company, "id" | "code">, byUserId: string) => string | null;
@@ -609,14 +613,16 @@ export const useStore = create<StoreState>()(
         if (deny(st, "doc.submit", `자료 제출 (${req.name})`, set)) return;
         const project = st.projects.find((p) => p.id === req.projectId);
         const company = st.companies.find((c) => c.id === req.companyId);
-        const version = req.files.length + 1;
+        const list = Array.isArray(file) ? file : [file];
+        if (!list.length) return;
+        const version = req.files.length + list.length;
         const now = nowIso();
         const updated: DocumentRequest = {
           ...req,
           status: "submitted",
           submittedAt: now,
           reviewNote: undefined,
-          files: [...req.files, { id: uid("f"), fileName: file.fileName, size: file.size, uploadedAt: now, uploadedBy: byUserId, version, storagePath: file.storagePath }],
+          files: [...req.files, ...list.map((f, i) => ({ id: uid("f"), fileName: f.fileName, size: f.size, uploadedAt: now, uploadedBy: byUserId, version: req.files.length + 1 + i, storagePath: f.storagePath }))],
         };
         const docRequests = st.docRequests.map((r) => (r.id === requestId ? updated : r));
 
@@ -653,7 +659,7 @@ export const useStore = create<StoreState>()(
           activities: [
             makeActivity({ type: "task_created", companyId: req.companyId, projectId: req.projectId, actorId: "system", actorRole: "system", text: `자동 생성: ${req.name} 검토 Task` }),
             ...projActs,
-            makeActivity({ type: "document_uploaded", companyId: req.companyId, projectId: req.projectId, actorId: byUserId, actorRole: "client", text: `고객 제출: ${req.name} (v${version})`, meta: { fileName: file.fileName } }),
+            makeActivity({ type: "document_uploaded", companyId: req.companyId, projectId: req.projectId, actorId: byUserId, actorRole: "client", text: `고객 제출: ${req.name} (v${version}${list.length > 1 ? ` · 파일 ${list.length}개` : ""})`, meta: { fileName: list.map((f) => f.fileName).join(", ") } }),
             ...st.activities,
           ],
           notifications: [
@@ -664,7 +670,7 @@ export const useStore = create<StoreState>()(
         });
       },
 
-      reviewDocument: (requestId, outcome, note, byUserId) => {
+      reviewDocument: (requestId, outcome, note, byUserId, issuedAt) => {
         const st = get();
         const req = st.docRequests.find((r) => r.id === requestId);
         if (!req) return;
@@ -688,9 +694,12 @@ export const useStore = create<StoreState>()(
         let companyVaults = st.companyVaults;
         if (outcome === "done") {
           const v = st.companyVaults.find((x) => x.companyId === req.companyId) ?? emptyVault(req.companyId);
-          const slot = slotsOf(v).find((m) => m.label === req.name && !m.noFile);
-          if (slot && !v.slots[slot.key]?.received) {
-            const nv = { ...v, slots: { ...v.slots, [slot.key]: { ...(v.slots[slot.key] ?? {}), received: true, note: v.slots[slot.key]?.note ?? "고객 Portal 로 제출", updatedAt: now } }, updatedAt: now };
+          const slot = slotsOf(v).find((m) => m.label.replace(/\s+/g, "") === req.name.replace(/\s+/g, "") && !m.noFile);
+          const issued = issuedAt && /^\d{4}-\d{2}-\d{2}$/.test(issuedAt) ? issuedAt : undefined;
+          // 새로 받은 서류면 "받음", 다시 낸 서류(갱신)는 발급일만 새로 — 있는 메모는 그대로
+          if (slot && (!v.slots[slot.key]?.received || issued)) {
+            const prev = v.slots[slot.key] ?? { received: false };
+            const nv = { ...v, slots: { ...v.slots, [slot.key]: { ...prev, received: true, ...(issued ? { issuedAt: issued } : {}), note: prev.note ?? "고객 Portal 로 제출", updatedAt: now } }, updatedAt: now };
             companyVaults = [...st.companyVaults.filter((x) => x.companyId !== req.companyId), nv];
           }
         }
@@ -762,6 +771,36 @@ export const useStore = create<StoreState>()(
           notifications: [makeNotification({ audience: "client", companyId, title: "새 자료 요청이 등록되었습니다", body: `${data.name} — 요청자료에서 바로 올려 주세요. 카카오톡으로 보내셔도 됩니다.`, href: "/portal/documents" }), ...st.notifications],
         });
         return req.id;
+      },
+
+      requestPolicyDocs: (companyId, items, dueDate, byUserId) => {
+        const st = get();
+        const c = st.companies.find((x) => x.id === companyId);
+        if (!c || !items.length) return 0;
+        if (deny(st, "doc.request", `정책자금 준비 서류 요청 (${c.name})`, set)) return 0;
+        // 서류함에 같은 이름의 칸이 없으면 만든다 — 검토 완료 때 그 칸이 "받음"이 되고 유효기간이 계산된다
+        const cur = st.companyVaults.find((v) => v.companyId === companyId) ?? emptyVault(companyId);
+        const have = new Set(slotsOf(cur).map((m) => m.label.replace(/\s+/g, "")));
+        const add = items.filter((it) => !have.has(it.label.replace(/\s+/g, "")));
+        const mayVault = can(st.session?.role, "vault.write");
+        const vault = add.length && mayVault
+          ? { ...cur, customSlots: [...cur.customSlots, ...add.map((it, i) => ({ key: `cd_${Date.now().toString(36)}${i}${Math.random().toString(36).slice(2, 5)}`, label: it.label, validMonths: it.validMonths }))], updatedAt: nowIso() }
+          : undefined;
+        const p = st.projects.find((x) => x.companyId === companyId && !x.archived && x.clientVisible && x.stage !== "done" && x.stage !== "aftercare");
+        const now = nowIso();
+        const reqs: DocumentRequest[] = items.map((it) => ({ id: uid("dr"), projectId: p?.id ?? "", companyId, name: it.label, description: it.description, requestedAt: now, dueDate, status: "requested", assigneeId: p?.consultantId ?? c.consultantId, files: [] }));
+        set({
+          docRequests: [...reqs, ...st.docRequests],
+          ...(vault ? { companyVaults: [...st.companyVaults.filter((v) => v.companyId !== companyId), vault] } : {}),
+          activities: [
+            ...reqs.map((r) => makeActivity({ type: "document_requested", companyId, projectId: p?.id, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `자료 요청: ${r.name} (정책자금 준비)` })),
+            ...(vault ? [makeActivity({ type: "vault_updated", companyId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `서류함: 정책자금 준비 칸 ${add.length}개 만듦` })] : []),
+            ...st.activities,
+          ],
+          // 서류가 여럿이어도 알림은 한 번 — 고객 휴대폰에 알림이 줄줄이 오지 않게
+          notifications: [makeNotification({ audience: "client", companyId, title: `정책자금 준비 서류 ${reqs.length}개를 요청드렸습니다`, body: "공고가 나오면 바로 신청할 수 있게 미리 모아 두는 서류입니다. 자료제출에서 발급 방법을 보고 하나씩 올려 주세요.", href: "/portal/documents#policy-docs" }), ...st.notifications],
+        });
+        return reqs.length;
       },
 
       createDocRequest: (projectId, data, byUserId) => {

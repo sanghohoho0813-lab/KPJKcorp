@@ -15,6 +15,7 @@ import type { Company, DocumentRequest, Opportunity, Project, Quote, ResultFile,
 import { KPJK_SERVICES, OPP_STATUS, type ServiceDef } from "./services";
 import { CUSTOMER_STEPS, stageProgress, stageToCustomerStep } from "./stages";
 import { yearsSince } from "./company-options";
+import { isPolicyRequest } from "./policy-docs";
 
 export interface GrowthCtx {
   company: Company;
@@ -142,9 +143,13 @@ export function growthBoard(ctx: GrowthCtx) {
   // 지금 해야 할 일 — 고객이 눌러야 다음이 진행되는 것
   const now7 = new Date(now.getTime() + 7 * 864e5).toISOString();
   const actions: NowAction[] = [];
-  const docs = ctx.docRequests.filter((d) => d.companyId === c.id && (d.status === "requested" || d.status === "revision")).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  const openDocs = ctx.docRequests.filter((d) => d.companyId === c.id && (d.status === "requested" || d.status === "revision")).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  // 정책자금 준비 서류(미리 모아 두는 서류)가 여럿이면 한 줄로 — 홈이 서류 이름으로 가득 차지 않게
+  const policy = openDocs.filter(isPolicyRequest);
+  const docs = policy.length >= 2 ? openDocs.filter((d) => !isPolicyRequest(d)) : openDocs;
   for (const d of docs.slice(0, 3)) actions.push({ key: `doc_${d.id}`, kind: "doc", title: d.status === "revision" ? `${d.name} 보완해서 다시 올리기` : `${d.name} 올리기`, sub: d.dueDate < nowIso ? "기한 지남" : `기한 ${d.dueDate.slice(5, 10).replace("-", "/")}`, href: "/portal/documents", urgent: d.status === "revision" || d.dueDate < nowIso });
   if (docs.length > 3) actions.push({ key: "doc_more", kind: "doc", title: `그 밖의 요청자료 ${docs.length - 3}건`, href: "/portal/documents" });
+  if (policy.length >= 2) actions.push({ key: "doc_policy", kind: "doc", title: `정책자금 서류 ${policy.length}개 올리기`, sub: policy.some((d) => d.status === "revision") ? "보완 요청이 있습니다" : "공고 전에 미리 모아 둡니다", href: "/portal/documents#policy-docs", urgent: policy.some((d) => d.status === "revision" || d.dueDate < nowIso) });
   for (const q of ctx.quotes.filter((x) => x.companyId === c.id && x.status === "sent")) actions.push({ key: `q_${q.id}`, kind: "quote", title: `${q.title} — 회신하기`, sub: "이대로 진행 / 조금 더 생각", href: "/portal/services" });
   for (const p of proposed.slice(0, 2)) actions.push({ key: `pr_${p.area}`, kind: "proposal", title: `담당자 제안: ${p.area} — 검토하기`, sub: p.reason?.slice(0, 40), href: "/portal/services" });
   const nextMeet = ctx.schedules.filter((s) => s.companyId === c.id && s.visibleToClient && s.start >= nowIso && s.start <= now7).sort((a, b) => a.start.localeCompare(b.start))[0];
