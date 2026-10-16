@@ -7,7 +7,7 @@ import { useStore, useCurrentUser } from "@/lib/store";
 import { AxInsightButton } from "@/components/ai/AxInsight";
 import { useUi } from "@/lib/ui-store";
 import { buildBrief, briefSummaryCounts } from "@/lib/brief";
-import { daysBetween, isSameDay, fmtRelative, fmtFull, fmtWon } from "@/lib/format";
+import { daysBetween, daysLate, isSameDay, fmtRelative, fmtFull, fmtWon } from "@/lib/format";
 import { OPP_STATUS } from "@/lib/services";
 import { useNow } from "@/lib/hooks";
 import { AiReadyBadge, Card, KpiCard, SectionTitle, Badge, IconTile, cx } from "@/components/ui/ui";
@@ -37,8 +37,8 @@ export default function DashboardPage() {
   // 오늘 할 업무(내 것) — 기한 초과 포함. 대표가 아닌 사람의 첫 칸
   const me = st.session?.userId;
   const myOpen = st.tasks.filter((t) => t.assigneeId === me && (t.status === "todo" || t.status === "doing"));
-  const overdueMine = myOpen.filter((t) => daysBetween(t.dueDate, now.toISOString()) > 0 && !isSameDay(t.dueDate, now)).length;
-  const todayMine = myOpen.filter((t) => isSameDay(t.dueDate, now) || daysBetween(t.dueDate, now.toISOString()) > 0);
+  const overdueMine = myOpen.filter((t) => daysLate(t.dueDate, now) > 0).length;
+  const todayMine = myOpen.filter((t) => daysLate(t.dueDate, now) >= 0);
   // 연락 필요 — 설정의 '고객 연락 공백' 기준일을 넘긴 기업 (가까운 미팅이 잡힌 곳은 빼고)
   const { src: contactSrc, cycle } = useContactSources();
   const contactDue = useMemo(() => st.companies.filter((c) => !c.archived && (!assigneeId || c.consultantId === assigneeId) && contactStatus(c, contactSrc, cycle, now).due).length, [st.companies, assigneeId, contactSrc, cycle, now]);

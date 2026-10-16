@@ -161,7 +161,7 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
   const nextT = csT.find((x) => x.title.includes('제안서 송부 후 대표님께 전화'));
   const promT = csT.find((x) => x.title.includes('약속: 다음 주 화요일까지 절세 시뮬레이션 전달'));
   ok('6 저장 한 번 → 업무 2건 (다음 Action · 약속)', s1.tasks.length === tasks0 + 2 && !!nextT && !!promT);
-  ok('6 업무: 이 기업 · 담당 컨설턴트 · 유형 자동 · 기한 3일 뒤', nextT?.companyId === 'co_a' && nextT?.assigneeId === 'u_park' && nextT?.type === '후속연락' && Math.round((new Date(nextT.dueDate) - Date.now()) / 864e5) === 3, JSON.stringify(nextT && { t: nextT.type, a: nextT.assigneeId }));
+  ok('6 업무: 이 기업 · 담당 컨설턴트 · 유형 자동 · 기한 3일 뒤', nextT?.companyId === 'co_a' && nextT?.assigneeId === 'u_park' && nextT?.type === '후속연락' && new Date(nextT.dueDate).toDateString() === new Date(Date.now() + 3 * 864e5).toDateString(), JSON.stringify(nextT && { t: nextT.type, a: nextT.assigneeId }));
   ok('6 업무 메모에 어느 상담에서 나왔는지', /상담에서 정한 다음 Action/.test(nextT?.memo ?? '') && /상담에서 약속한 것/.test(promT?.memo ?? ''));
   const dr = s1.docRequests.find((d) => d.companyId === 'co_a' && d.name === '주주명부');
   ok('6 고객 자료 요청 1건 + 고객 알림', s1.docRequests.length === docs0 + 1 && dr?.status === 'requested' && s1.notifications.some((n) => n.audience === 'client' && n.companyId === 'co_a' && /주주명부/.test(n.body)));

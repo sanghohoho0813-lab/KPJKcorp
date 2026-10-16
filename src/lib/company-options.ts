@@ -23,6 +23,9 @@ export const REGIONS = ["서울", "경기", "인천", "부산", "대구", "대�
 export function regionOfAddress(address: string | undefined): string | undefined {
   if (!address) return undefined;
   const a = address.replace(/\s+/g, "");
+  // 전남광주통합특별시(2026~) — 구(區)는 옛 광주광역시 자리, 시·군은 옛 전라남도 자리다. 지원사업 지역 맞추기가 이 구분을 쓴다
+  const merged = a.match(/^전남광주통합특별시(\S+?(구|시|군))/);
+  if (merged) return merged[2] === "구" ? "광주" : "전남";
   const MAP: [RegExp, string][] = [
     [/^서울/, "서울"], [/^경기/, "경기"], [/^인천/, "인천"], [/^부산/, "부산"], [/^대구/, "대구"], [/^대전/, "대전"],
     [/^광주/, "광주"], [/^울산/, "울산"], [/^세종/, "세종"], [/^강원/, "강원"], [/^충청북도|^충북/, "충북"], [/^충청남도|^충남/, "충남"],

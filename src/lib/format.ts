@@ -95,6 +95,15 @@ export function relativeDay(isoStr: string, now = new Date()) {
   return `${-diff}일 지남`;
 }
 
+/**
+ * 업무 기한이 달력으로 며칠 지났는지 — 오늘 0, 어제 1, 내일 -1. 시각은 보지 않는다.
+ * daysBetween(시간차 반올림)으로 "오늘까지"를 가리면 새벽에는 오늘 18시 업무가 빠지고, 밤에는 오늘 아침 업무가 "기한 지남"이 된다.
+ */
+export function daysLate(dueIso: string, now: Date | string = new Date()): number {
+  const day = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  return Math.round((day(typeof now === "string" ? new Date(now) : now) - day(new Date(dueIso))) / 864e5);
+}
+
 export function daysBetween(aIso: string, bIso: string) {
   return Math.round((new Date(bIso).getTime() - new Date(aIso).getTime()) / 86400000);
 }

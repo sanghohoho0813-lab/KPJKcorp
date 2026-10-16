@@ -1,5 +1,5 @@
 import type { Activity, Company, DocumentRequest, Inquiry, Project, Quote, Schedule, Task, User } from "./types";
-import { daysBetween, isSameDay, relativeDay, fmtTime } from "./format";
+import { daysBetween, daysLate, isSameDay, relativeDay, fmtTime } from "./format";
 import { stageLabel } from "./stages";
 
 /**
@@ -226,7 +226,7 @@ export function buildBrief(input: BriefInput): BriefItem[] {
 
   // 6. Overdue tasks
   for (const t of tasks.filter((t) => (t.status === "todo" || t.status === "doing") && mine(t))) {
-    const days = daysBetween(t.dueDate, nowIso);
+    const days = daysLate(t.dueDate, nowIso);
     if (days > 0) {
       items.push({
         id: `b_task_${t.id}`,

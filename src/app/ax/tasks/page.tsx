@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { CheckSquare, Pencil, Plus, Search } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { AxInsightButton } from "@/components/ai/AxInsight";
-import { daysBetween, fmtDate, isSameDay } from "@/lib/format";
+import { daysLate, fmtDate } from "@/lib/format";
 import type { Task, TaskStatus } from "@/lib/types";
 import { Badge, Button, Card, EmptyState, KpiCard, PageHeader, SegmentedControl, Tabs, cx } from "@/components/ui/ui";
 import { DueText, PriorityBadge, TaskStatusBadge } from "@/components/domain/domain";
@@ -33,12 +33,11 @@ function TasksInner() {
   const [q, setQ] = useState("");
   const may = useMay();
   const now = new Date();
-  const nowIso = now.toISOString();
   const me = st.session?.role === "consultant" ? st.session.userId : undefined;
   const all = useMemo(() => st.tasks.filter((t) => !me || t.assigneeId === me), [st.tasks, me]);
   const openTasks = all.filter((t) => t.status === "todo" || t.status === "doing");
-  const today = openTasks.filter((t) => isSameDay(t.dueDate, now) || daysBetween(t.dueDate, nowIso) > 0);
-  const overdue = openTasks.filter((t) => daysBetween(t.dueDate, nowIso) > 0);
+  const today = openTasks.filter((t) => daysLate(t.dueDate, now) >= 0);
+  const overdue = openTasks.filter((t) => daysLate(t.dueDate, now) > 0);
   const done = all.filter((t) => t.status === "done");
   const held = all.filter((t) => t.status === "hold");
 

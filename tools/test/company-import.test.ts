@@ -28,4 +28,25 @@ const tmplMap = mapHeaders(t[0].rows[0] as string[]);
 ok(tmplMap.every((k, i) => k === IMPORT_FIELDS[i].key), "template header round-trips");
 const ex = t[1].rows[t[1].rows.length - 1];
 ok(ex.length === IMPORT_FIELDS.length, "example row width " + ex.length);
+// 업태·종목 여러 줄 · 사업자등록증 확인일 · 업종 자동 · 통합특별시 지역 (비식별 예시)
+{
+  const hdr = ["상호", "대표자", "업태", "종목", "그 외 업태·종목", "사업장 소재지", "사업자등록증 확인일", "직책"];
+  const rs = [hdr,
+    ["가나스포츠(주)", "갑대표", "제조업", "운동기구", "도매 및 소매업 - 운동기구\n도매 및 소매업 — 전자상거래 소매업", "경기도 고양시 일산동구 예시로 1", "2026-09-28", ""],
+    ["다라네일", "을대표", "서비스업", "네일샵", "", "전남광주통합특별시 북구 예시로 5", "", "대표"],
+    ["마바카페", "병대표", "음식점업", "커피 전문점", "", "전남광주통합특별시 나주시 예시길 3", "2026-10-01", ""],
+    ["사아상사", "정대표", "", "", "", "", "2026.13.01", ""],
+  ];
+  const m2 = mapHeaders(rs[0]);
+  ok(JSON.stringify(m2) === JSON.stringify(["name", "ceo", "bizCategory", "bizItem", "bizItemsExtra", "address", "bizRegCheckedAt", "contactTitle"]), "new columns mapped " + JSON.stringify(m2));
+  const [g, h, i, j] = buildImportRows(rs, 0, m2, { companies: [], users: [], me: "u_me", nowIso: "2026-09-29T00:00:00.000Z" });
+  ok(g.status === "ok" && g.data.bizItemsExtra === "도매 및 소매업 — 운동기구\n도매 및 소매업 — 전자상거래 소매업", "extra kinds normalized: " + JSON.stringify(g.data.bizItemsExtra));
+  ok(g.data.industry === "제조업" && h.data.industry === "교육·서비스" && i.data.industry === "숙박·음식", "industry from 업태: " + [g.data.industry, h.data.industry, i.data.industry]);
+  ok(g.data.docs?.bizReg?.method === "manual" && g.data.docs.bizReg.readAt.slice(0, 10) <= "2026-09-28" && g.data.docs.bizReg.fields.includes("bizItemsExtra") && !g.data.docs.bizReg.fields.includes("corpNo"), "bizReg check recorded: " + JSON.stringify(g.data.docs));
+  ok(!h.data.docs, "no check date → no docs");
+  ok(h.data.region === "광주" && i.data.region === "전남", "merged region: " + h.data.region + " / " + i.data.region);
+  ok(h.data.contactTitle === "대표", "sole proprietor title kept");
+  ok(i.status === "error" && /오늘 뒤/.test(i.problems.join()), "future check date rejected: " + i.problems);
+  ok(j.status === "error" && /확인일을 날짜로/.test(j.problems.join()), "bad check date: " + j.problems);
+}
 process.exit(fail ? 1 : 0);

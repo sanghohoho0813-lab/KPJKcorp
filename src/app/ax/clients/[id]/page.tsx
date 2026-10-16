@@ -8,7 +8,7 @@ import { ArrowLeft, Building2, EyeOff, Lock, CalendarDays, ChevronDown, ChevronR
 import { useStore } from "@/lib/store";
 import { AxInsightButton } from "@/components/ai/AxInsight";
 import { useUi } from "@/lib/ui-store";
-import { daysBetween, fmtDate, fmtDateTime, fmtSize, relativeDay, fmtRelative, fmtTime } from "@/lib/format";
+import { daysBetween, daysLate, fmtDate, fmtDateTime, fmtSize, relativeDay, fmtRelative, fmtTime } from "@/lib/format";
 import { stageLabel } from "@/lib/stages";
 import { OPP_STATUS } from "@/lib/services";
 import type { DocumentRequest, Schedule } from "@/lib/types";
@@ -118,11 +118,11 @@ export default function ClientCardPage() {
   // 이 기업 업무 중 오늘까지 해야 할 것 (누가 맡았든 — 기업 단위로 놓치지 않게)
   // 자료 도착 · 문의로 자동 생긴 업무는 위의 "검토 필요" · "문의 답변" 줄과 같은 일이다 — 두 번 보이지 않게 뺀다
   const dupOfAbove = (t: (typeof st.tasks)[number]) => t.source === "auto" && ((t.type === "자료검토" && waiting.length > 0) || (t.type === "문의응대" && openIq.length > 0));
-  const dueTasks = st.tasks.filter((t) => t.companyId === c.id && (t.status === "todo" || t.status === "doing") && daysBetween(t.dueDate, nowIso) >= 0 && !dupOfAbove(t)).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  const dueTasks = st.tasks.filter((t) => t.companyId === c.id && (t.status === "todo" || t.status === "doing") && daysLate(t.dueDate, nowIso) >= 0 && !dupOfAbove(t)).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
   for (const t of dueTasks.slice(0, 4)) {
-    const late = daysBetween(t.dueDate, nowIso) > 0;
+    const late = daysLate(t.dueDate, nowIso) > 0;
     const who = st.users.find((u) => u.id === t.assigneeId)?.name;
-    actions.push({ text: `업무: ${stripCompany(t.title, c.name)}`, detail: `${late ? `기한 ${daysBetween(t.dueDate, nowIso)}일 지남` : "오늘까지"}${who ? ` · ${who}` : ""}`, href: "/ax/tasks", tone: late ? "error" : "warning" });
+    actions.push({ text: `업무: ${stripCompany(t.title, c.name)}`, detail: `${late ? `기한 ${daysLate(t.dueDate, nowIso)}일 지남` : "오늘까지"}${who ? ` · ${who}` : ""}`, href: "/ax/tasks", tone: late ? "error" : "warning" });
   }
   if (upcoming[0]) actions.push({ text: `${relativeDay(upcoming[0].start)} ${fmtTime(upcoming[0].start)} ${upcoming[0].title}`, href: "/ax/schedule", tone: "info" });
   // 연락 공백 — 이미 연락 업무가 잡혀 있으면 위 '업무' 줄로 보인다
@@ -163,16 +163,18 @@ export default function ClientCardPage() {
                 {active[0] && <StageBadge stage={active[0].stage} />}
               </div>
               <div className={cx("mt-1 text-[0.9rem] text-ink-2", !moreInfo && "line-clamp-2 sm:line-clamp-none")}>
-                {[
+                {/* 항목마다 한 덩어리 — 줄이 바뀌어도 번호가 "110111-" / "0918646"처럼 쪼개지지 않게 */}
+                {([
                   ENTITY_TYPES.find((t) => t.key === c.entityType)?.label,
-                  companySummary(c),
+                  ...companySummary(c).split(" · "),
                   c.bizNo && `사업자번호 ${c.bizNo}`,
                   c.corpNo && `법인번호 ${c.corpNo}`,
                   c.establishedAt && `설립 ${c.establishedAt.slice(0, 4)}년 (업력 ${yearsSince(c.establishedAt)}년)`,
-                ].filter(Boolean).join(" · ") || "기본 정보가 아직 없습니다 — 기업정보 수정에서 서류를 올리면 채워집니다."}
+                ].filter(Boolean) as string[]).map((x, i) => <span key={x}>{i > 0 && " · "}<span className="whitespace-nowrap">{x}</span></span>)}
+                {!c.entityType && !companySummary(c) && !c.bizNo && !c.corpNo && !c.establishedAt && "기본 정보가 아직 없습니다 — 기업정보 수정에서 서류를 올리면 채워집니다."}
               </div>
               <div className="mt-1.5 text-[0.85rem]"><ContactLine status={contact} /></div>
-              {(c.bizCategory || c.bizItem) && <div className="mt-0.5 text-[0.82rem] text-ink-3">업태 {c.bizCategory ?? "-"} · 종목 {c.bizItem ?? "-"}{c.capital ? ` · 자본금 ${c.capital.toLocaleString("ko-KR")}원` : ""}</div>}
+              {(c.bizCategory || c.bizItem) && <div className="mt-0.5 text-[0.82rem] text-ink-3">업태 {c.bizCategory ?? "-"} · 종목 {c.bizItem ?? "-"}{c.bizItemsExtra ? <span title={c.bizItemsExtra}> · 외 업태 {c.bizItemsExtra.split("\n").filter(Boolean).length}개</span> : null}{c.capital ? ` · 자본금 ${c.capital.toLocaleString("ko-KR")}원` : ""}</div>}
               {(c.interests?.length || c.leadSource) ? (
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
                   {(c.interests ?? []).map((k) => <Badge key={k} tone="accent">{CONSULT_AREA_LABEL[k] ?? k}</Badge>)}

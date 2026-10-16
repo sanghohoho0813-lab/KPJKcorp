@@ -246,7 +246,8 @@ export interface CompanyDocMeta {
   fileName: string;
   size: number;
   readAt: string;
-  method: "pdf_text" | "ocr" | "paste";
+  /** manual = 담당자가 서류를 보고 옮겨 적음 (엑셀 일괄 등록의 "사업자등록증 확인일") */
+  method: "pdf_text" | "ocr" | "paste" | "manual";
   /** 이 서류에서 읽어 반영한 항목 키 */
   fields: string[];
 }

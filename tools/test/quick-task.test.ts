@@ -1,5 +1,6 @@
 // 업무 한 줄 등록 — 기업·유형 자동 인식, 기한 묶음. 시험용 기업명은 지어낸 것.
 import { legalBaseName, dueBucket, dueFromQuick, guessCompany, guessTaskType, shortCompanyName } from "../../src/lib/quick-task";
+import { daysBetween, daysLate } from "../../src/lib/format";
 let fail = 0;
 const ok = (c: boolean, m: string) => { console.log((c ? "OK  " : "FAIL") + " " + m); if (!c) fail++; };
 const cos = [
@@ -24,4 +25,13 @@ ok(new Date(dueFromQuick("today", now)).getHours() === 18 && new Date(dueFromQui
 ok(dueBucket(d(-1), now) === "overdue" && dueBucket(d(0, 8), now) === "today" && dueBucket(d(1), now) === "tomorrow" && dueBucket(d(7), now) === "week" && dueBucket(d(8), now) === "later", "기한 묶음 (날짜 기준)");
 ok(guessTaskType("에이정밀 대표님께 결과보고 일정 전화") === "후속연락" && guessTaskType("결과보고 미팅 준비") === "미팅준비" && guessTaskType("결과보고서 검토") === "자료검토", "행동 낱말 우선 (전화·미팅·검토 > 보고)");
 ok(legalBaseName("주식회사 에이정밀") === legalBaseName("에이정밀(주)") && legalBaseName("에이정밀(본사)") !== legalBaseName("에이정밀(지점)"), "중복 검사: 법인 표기만 무시, 구분 괄호는 유지");
+// "오늘까지" 판단은 달력 날짜로 — 새벽에 오늘 18시 업무가 빠지거나, 밤에 오늘 아침 업무가 '기한 지남'이 되면 안 된다
+{
+  const at = (day: number, h: number, m = 0) => new Date(2026, 9, day, h, m);
+  const due18 = at(16, 18).toISOString(), due9 = at(16, 9).toISOString(), dueYest18 = at(15, 18).toISOString();
+  ok(daysBetween(due18, at(16, 4, 30).toISOString()) === -1 && daysLate(due18, at(16, 4, 30)) === 0, "새벽 04:30 — 오늘 18시 업무는 '오늘'(옛 계산은 내일로 봄)");
+  ok(daysBetween(due9, at(16, 22).toISOString()) === 1 && daysLate(due9, at(16, 22)) === 0, "밤 22시 — 오늘 09시 업무는 아직 '오늘'(옛 계산은 기한 지남)");
+  ok(daysLate(dueYest18, at(16, 5)) === 1 && daysLate(at(18, 18).toISOString(), at(16, 5)) === -2, "어제 18시 → 1일 지남 · 모레 → -2");
+  ok(daysLate(due18, at(16, 23, 59).toISOString()) === 0, "문자열 시각도 받는다");
+}
 if (fail) { console.log(`\n실패 ${fail}`); process.exit(1); } else console.log("\n전부 통과");

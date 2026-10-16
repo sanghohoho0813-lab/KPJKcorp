@@ -26,10 +26,11 @@ export interface ExtractOptions {
 
 export type ProgressFn = (ratio: number, label: string) => void;
 
-export const EXTRACT_METHOD_LABEL: Record<ExtractMethod | "paste", string> = {
+export const EXTRACT_METHOD_LABEL: Record<ExtractMethod | "paste" | "manual", string> = {
   pdf_text: "PDF 글자 추출",
   ocr: "사진 글자 인식(OCR)",
   paste: "붙여넣기",
+  manual: "서류 보고 입력",
 };
 
 export const ACCEPT_DOC = ".pdf,image/png,image/jpeg,image/webp";

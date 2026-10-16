@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Check, ListChecks } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { daysBetween, isSameDay } from "@/lib/format";
+import { daysLate, isSameDay } from "@/lib/format";
 import type { Task } from "@/lib/types";
 import { Card, SectionTitle, cx } from "@/components/ui/ui";
 import { DueText, PriorityBadge } from "@/components/domain/domain";
@@ -22,10 +22,9 @@ export function TodayTasksCard({ limit = 5 }: { limit?: number }) {
   const toast = useStore((s) => s.toast);
   const may = useMay();
   const now = new Date();
-  const nowIso = now.toISOString();
   const pr = (t: Task) => (t.priority === "urgent" ? 0 : t.priority === "normal" ? 1 : 2);
   const mine = tasks
-    .filter((t) => t.assigneeId === me && (t.status === "todo" || t.status === "doing") && (isSameDay(t.dueDate, now) || daysBetween(t.dueDate, nowIso) > 0))
+    .filter((t) => t.assigneeId === me && (t.status === "todo" || t.status === "doing") && daysLate(t.dueDate, now) >= 0)
     .sort((a, b) => pr(a) - pr(b) || a.dueDate.localeCompare(b.dueDate));
   const doneToday = tasks.filter((t) => t.assigneeId === me && t.status === "done" && t.completedAt && isSameDay(t.completedAt, now)).length;
 

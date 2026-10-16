@@ -1,6 +1,6 @@
 import { isRealDate } from "./format";
 import type { Company, EntityType, User } from "./types";
-import { REGIONS, bandOfEmployees, formatBizNo, formatCorpNo, formatPhone, regionOfAddress } from "./company-options";
+import { REGIONS, bandOfEmployees, formatBizNo, formatCorpNo, formatPhone, industryOf, regionOfAddress } from "./company-options";
 import { excelSerialToDate, type SheetData } from "./xlsx";
 
 /**
@@ -14,9 +14,9 @@ import { excelSerialToDate, type SheetData } from "./xlsx";
  */
 
 export type ImportField =
-  | "name" | "ceo" | "bizNo" | "corpNo" | "entityType" | "industry" | "bizCategory" | "bizItem" | "establishedAt"
+  | "name" | "ceo" | "bizNo" | "corpNo" | "entityType" | "industry" | "bizCategory" | "bizItem" | "bizItemsExtra" | "establishedAt"
   | "address" | "region" | "companyPhone" | "contactName" | "contactTitle" | "contactPhone" | "contactEmail"
-  | "employees" | "revenue" | "website" | "firstConsultDate" | "consultant" | "leadSource" | "memo";
+  | "employees" | "revenue" | "website" | "firstConsultDate" | "consultant" | "leadSource" | "memo" | "bizRegCheckedAt";
 
 export const IMPORT_FIELDS: { key: ImportField; label: string; required?: boolean; hint?: string; aliases: string[] }[] = [
   { key: "name", label: "기업명", required: true, aliases: ["기업명", "회사명", "상호", "상호명", "법인명", "업체명", "고객사", "고객사명", "기업", "회사"] },
@@ -24,9 +24,11 @@ export const IMPORT_FIELDS: { key: ImportField; label: string; required?: boolea
   { key: "bizNo", label: "사업자번호", hint: "숫자 10자리", aliases: ["사업자번호", "사업자등록번호", "사업자no", "사업자등록no", "사업자"] },
   { key: "corpNo", label: "법인등록번호", hint: "숫자 13자리", aliases: ["법인등록번호", "법인번호"] },
   { key: "entityType", label: "사업자 형태", hint: "법인 / 개인 / 기타", aliases: ["사업자형태", "사업자구분", "법인구분", "법인개인", "법인/개인", "구분"] },
-  { key: "industry", label: "업종", aliases: ["업종", "산업", "산업분류"] },
+  { key: "industry", label: "업종", hint: "비우면 업태에서", aliases: ["업종", "산업", "산업분류"] },
   { key: "bizCategory", label: "업태", aliases: ["업태"] },
   { key: "bizItem", label: "종목", aliases: ["종목"] },
+  // 사업자등록증에 업태·종목이 여러 줄인 회사가 많다 — 등록 화면과 같은 모양("업태 — 종목", 한 칸에 줄마다)
+  { key: "bizItemsExtra", label: "그 외 업태·종목", hint: "줄마다 업태 — 종목", aliases: ["그외업태종목", "추가업태종목", "기타업태종목", "업태종목추가", "그외업태", "추가업태"] },
   { key: "establishedAt", label: "설립일", hint: "2019-03-05", aliases: ["설립일", "설립일자", "개업일", "개업일자", "개업연월일", "설립연월일"] },
   { key: "address", label: "주소", aliases: ["주소", "사업장주소", "소재지", "사업장소재지", "본점주소", "회사주소"] },
   { key: "region", label: "지역", hint: "서울·경기 등 — 비우면 주소에서", aliases: ["지역", "시도", "지역구분"] },
@@ -42,6 +44,8 @@ export const IMPORT_FIELDS: { key: ImportField; label: string; required?: boolea
   { key: "consultant", label: "담당 컨설턴트", hint: "이름 — 비우면 등록하는 사람", aliases: ["담당컨설턴트", "컨설턴트", "담당컨설턴트명", "영업담당", "내부담당자"] },
   { key: "leadSource", label: "유입 경로", aliases: ["유입경로", "유입", "경로", "소개경로"] },
   { key: "memo", label: "메모", aliases: ["메모", "비고", "특이사항", "참고", "메모사항"] },
+  // 담당자가 사업자등록증을 보고 옮겨 적었다면 그 날 — 기업 상세 "사업자등록증 확인"·고객 체크리스트 "근거 서류 확인"에 남는다
+  { key: "bizRegCheckedAt", label: "사업자등록증 확인일", hint: "서류를 보고 옮겨 적은 날", aliases: ["사업자등록증확인일", "사업자등록증확인", "등록증확인일", "서류확인일"] },
 ];
 
 const FIELD_OF = new Map<string, ImportField>();
@@ -127,6 +131,13 @@ function toCount(raw: string) {
   return /^\d+(\.0+)?$/.test(s) ? Math.round(Number(s)) : NaN;
 }
 
+/** "제조업 — 운동기구 / 도매 및 소매업 - 전자상거래" 처럼 적힌 칸 → 줄마다 "업태 — 종목" (등록 화면과 같은 모양) */
+function extraKinds(raw: string): string | undefined {
+  const lines = raw.split(/\r?\n|;/).map((l) => l.trim()).filter(Boolean)
+    .map((l) => (/\s—\s/.test(l) ? l : l.replace(/\s*[-–:]\s*/, " — ")).replace(/\s+/g, " ").trim());
+  return lines.length ? lines.join("\n") : undefined;
+}
+
 /** 표(머리글 줄 포함)를 검사해 등록할 행 목록으로 */
 export function buildImportRows(rows: string[][], headerRow: number, mapping: (ImportField | null)[], ctx: ImportCtx): ImportRow[] {
   const existingBiz = new Set(ctx.companies.map((c) => (c.bizNo ?? "").replace(/\D/g, "")).filter((b) => b.length === 10));
@@ -166,6 +177,10 @@ export function buildImportRows(rows: string[][], headerRow: number, mapping: (I
     const est = get("establishedAt");
     const establishedAt = toDate(est);
     if (est && !establishedAt) problems.push(`설립일을 날짜로 읽지 못했습니다 ("${est}")`);
+    const chk = get("bizRegCheckedAt");
+    const chkDate = toDate(chk);
+    if (chk && !chkDate) problems.push(`사업자등록증 확인일을 날짜로 읽지 못했습니다 ("${chk}")`);
+    else if (chkDate && chkDate > ctx.nowIso.slice(0, 10)) problems.push(`사업자등록증 확인일이 오늘 뒤입니다 ("${chk}")`);
     const fc = get("firstConsultDate");
     const fcDate = toDate(fc);
     if (fc && !fcDate) problems.push(`최초 상담일을 날짜로 읽지 못했습니다 ("${fc}")`);
@@ -198,9 +213,11 @@ export function buildImportRows(rows: string[][], headerRow: number, mapping: (I
 
     const contactName = get("contactName");
     const t = get("contactTitle");
+    const bizItemsExtra = extraKinds(get("bizItemsExtra"));
     const data: Omit<Company, "id" | "code"> = {
       name, ceo,
-      industry: get("industry"),
+      // 등록 화면과 같다: 업종을 비우면 업태(첫 번째)로 고른다. 맞는 칩이 없으면 비워 둔다
+      industry: get("industry") || industryOf(get("bizCategory")) || "",
       bizNo: bizDigits.length === 10 ? formatBizNo(bizDigits) : get("bizNo"),
       // 등록 화면과 같은 기본값: 담당자를 비우면 대표가 담당자
       contactName: contactName || ceo,
@@ -218,12 +235,18 @@ export function buildImportRows(rows: string[][], headerRow: number, mapping: (I
       establishedAt,
       bizCategory: get("bizCategory") || undefined,
       bizItem: get("bizItem") || undefined,
+      bizItemsExtra,
       region,
       employeeBand: employees > 0 ? bandOfEmployees(employees) : undefined,
       companyPhone: get("companyPhone") ? formatPhone(get("companyPhone")) : undefined,
       website: get("website") || undefined,
       leadSource: get("leadSource") || undefined,
     };
+    if (chkDate) {
+      // 파일은 없다 — "무엇을 언제 어떻게 확인했는지"만 (등록 화면에서 서류를 읽었을 때와 같은 기록)
+      const read: (keyof typeof data)[] = ["name", "bizNo", "corpNo", "ceo", "establishedAt", "address", "bizCategory", "bizItem", "bizItemsExtra"];
+      data.docs = { bizReg: { fileName: "사업자등록증", size: 0, readAt: new Date(`${chkDate}T09:00:00`).toISOString(), method: "manual", fields: read.filter((k) => !!data[k]) } };
+    }
     const isDup = problems.some((p) => p.includes("이미 등록") || p.includes("번째 줄과"));
     const status: ImportStatus = problems.length ? (isDup && problems.length === 1 ? "duplicate" : "error") : "ok";
     if (status === "ok" && name) {
@@ -255,7 +278,7 @@ export function companyTemplateSheets(): SheetData[] {
         [],
         ["예시 (이 줄은 등록되지 않습니다)"],
         cols.map((c) => c.label),
-        ["예시기업(주)", "홍길동", "123-45-67890", "", "법인", "제조업", "제조", "금속가공", "2019-03-05", "서울특별시 중구 예시로 1", "", "02-000-0000", "", "", "010-0000-0000", "example@example.com", "12", "30억", "", "", "", "지인·고객 소개", ""],
+        ["예시기업(주)", "홍길동", "123-45-67890", "", "법인", "제조업", "제조업", "금속가공", "도매 및 소매업 — 금속제품", "2019-03-05", "서울특별시 중구 예시로 1", "", "02-000-0000", "", "", "010-0000-0000", "example@example.com", "12", "30억", "", "", "", "지인·고객 소개", "", "2026-01-15"],
       ],
     },
   ];
