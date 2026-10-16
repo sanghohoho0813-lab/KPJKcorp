@@ -81,6 +81,51 @@ export function normalizeCompanyName(s: string) {
 
 export type ImportStatus = "ok" | "duplicate" | "error";
 
+/** 이미 있는 기업과 겹친 줄 — 그 기업의 "빈 칸만" 채울 수 있다 (있는 값은 덮어쓰지 않는다) */
+export interface ImportMatch {
+  id: string;
+  name: string;
+  /** 이름이 한 글자 다른 기업 — 같은 회사인지 사람이 고른다(기본 꺼짐) */
+  similar: boolean;
+  fill: Partial<Omit<Company, "id" | "code">>;
+  /** 비슷한 이름이면 상호를 이 줄(서류) 대로 고칠 수 있다 */
+  renameTo?: string;
+}
+
+export const FILL_LABEL: Record<string, string> = {
+  ceo: "대표자", bizNo: "사업자번호", corpNo: "법인등록번호", entityType: "사업자 형태", industry: "업종", bizCategory: "업태", bizItem: "종목", bizItemsExtra: "그 외 업태·종목",
+  establishedAt: "설립일", address: "주소", region: "지역", companyPhone: "대표번호", contactName: "담당자", contactTitle: "직책", contactPhone: "연락처", contactEmail: "이메일",
+  employees: "임직원 수", employeeBand: "임직원 규모", revenue: "매출", website: "홈페이지", leadSource: "유입 경로", memo: "메모", ceoBirth: "대표자 생년월일", capital: "자본금", docs: "서류 확인 기록",
+};
+const FILL_KEYS = ["ceo", "bizNo", "corpNo", "entityType", "industry", "bizCategory", "bizItem", "bizItemsExtra", "establishedAt", "address", "region", "companyPhone", "contactPhone", "contactEmail", "employees", "employeeBand", "revenue", "website", "leadSource", "memo", "ceoBirth", "capital"] as const;
+const isEmpty = (v: unknown) => v === undefined || v === null || v === "" || v === 0;
+
+function fillFrom(ex: Partial<Company>, data: Omit<Company, "id" | "code">, similar: boolean): ImportMatch | undefined {
+  if (!ex.id) return undefined;
+  const fill: Partial<Omit<Company, "id" | "code">> = {};
+  const put = fill as Record<string, unknown>;
+  for (const k of FILL_KEYS) if (isEmpty(ex[k]) && !isEmpty(data[k])) put[k] = data[k];
+  if (isEmpty(ex.contactName) && data.contactName) {
+    fill.contactName = data.contactName;
+    if (isEmpty(ex.contactTitle) && data.contactTitle) fill.contactTitle = data.contactTitle;
+  }
+  if (data.docs) {
+    const add = (Object.keys(data.docs) as (keyof NonNullable<Company["docs"]>)[]).filter((k) => !ex.docs?.[k] && data.docs?.[k]);
+    if (add.length) fill.docs = { ...(ex.docs ?? {}), ...Object.fromEntries(add.map((k) => [k, data.docs![k]])) };
+  }
+  const renameTo = similar && data.name && normalizeCompanyName(data.name) !== normalizeCompanyName(ex.name ?? "") ? data.name : undefined;
+  return { id: ex.id, name: ex.name ?? "", similar, fill, ...(renameTo ? { renameTo } : {}) };
+}
+
+/** 한 글자 차이(바뀜·빠짐·더함)인지 — "가나스웨이브" / "가나스에이브" */
+function oneEditApart(a: string, b: string) {
+  if (a === b || Math.abs(a.length - b.length) > 1) return false;
+  let i = 0;
+  while (i < a.length && i < b.length && a[i] === b[i]) i += 1;
+  if (a.length === b.length) return a.slice(i + 1) === b.slice(i + 1);
+  return a.length > b.length ? a.slice(i + 1) === b.slice(i) : a.slice(i) === b.slice(i + 1);
+}
+
 export interface ImportRow {
   /** 파일의 줄 번호(1부터, 엑셀에서 보이는 번호) */
   line: number;
@@ -90,13 +135,27 @@ export interface ImportRow {
   /** 등록은 되지만 알아 둘 것 (예: 컨설턴트 이름을 못 찾아 본인에게 배정) */
   notes: string[];
   data: Omit<Company, "id" | "code">;
+  files?: string[];
+  /** 이미 있는 기업과 겹쳤을 때 — 빈 칸 채우기 후보 */
+  match?: ImportMatch;
+}
+
+/** 표 밖에서 온 정보 — 서류(PDF·사진)에서 만든 줄이면 어떤 서류를 어떻게 읽었는지, 확인할 점 */
+export interface RowExtra {
+  problems?: string[];
+  notes?: string[];
+  data?: Partial<Omit<Company, "id" | "code">>;
+  /** 이 줄을 만든 파일 이름들 */
+  files?: string[];
 }
 
 export interface ImportCtx {
-  companies: Pick<Company, "name" | "bizNo" | "archived">[];
+  companies: (Pick<Company, "name" | "bizNo"> & Partial<Company>)[];
   users: Pick<User, "id" | "name" | "role" | "active">[];
   me: string;
   nowIso: string;
+  /** 표의 줄 번호(0부터, 머리글 포함) → 그 줄의 덧붙일 정보 */
+  extras?: Record<number, RowExtra>;
 }
 
 function toDate(raw: string): string | undefined {
@@ -140,8 +199,23 @@ function extraKinds(raw: string): string | undefined {
 
 /** 표(머리글 줄 포함)를 검사해 등록할 행 목록으로 */
 export function buildImportRows(rows: string[][], headerRow: number, mapping: (ImportField | null)[], ctx: ImportCtx): ImportRow[] {
-  const existingBiz = new Set(ctx.companies.map((c) => (c.bizNo ?? "").replace(/\D/g, "")).filter((b) => b.length === 10));
-  const existingName = new Set(ctx.companies.map((c) => normalizeCompanyName(c.name)));
+  type Existing = ImportCtx["companies"][number];
+  const bizOf = new Map<string, Existing>();
+  const nameOf = new Map<string, Existing>();
+  for (const c of ctx.companies) {
+    const b = (c.bizNo ?? "").replace(/\D/g, "");
+    if (b.length === 10 && !bizOf.has(b)) bizOf.set(b, c);
+    const nn = normalizeCompanyName(c.name);
+    if (!nameOf.has(nn)) nameOf.set(nn, c);
+  }
+  // 이름이 한 글자 다른 기업 — 사업자번호가 둘 다 있고 다르면 다른 회사로 본다. 너무 짧은 이름(3자 이하)은 보지 않는다
+  const nearName = (nn: string, biz: string) => nn.length < 4 ? undefined : ctx.companies.find((c) => {
+    if (c.archived) return false;
+    const cb = (c.bizNo ?? "").replace(/\D/g, "");
+    if (biz.length === 10 && cb.length === 10 && cb !== biz) return false;
+    const cn = normalizeCompanyName(c.name);
+    return cn.length >= 4 && oneEditApart(cn, nn);
+  });
   const seenBiz = new Map<string, number>();
   const seenName = new Map<string, number>();
   const staff = ctx.users.filter((u) => u.role !== "client" && u.active !== false);
@@ -202,13 +276,25 @@ export function buildImportRows(rows: string[][], headerRow: number, mapping: (I
       else notes.push(`컨설턴트 "${cname}"을 찾지 못해 등록하는 사람에게 배정합니다`);
     }
 
-    // 중복: 이미 있는 기업 또는 파일 안의 앞줄
+    // 중복: 이미 있는 기업 또는 파일 안의 앞줄. 이름이 한 글자만 다른 기업도 "같은 회사일 수 있음"으로 멈춰 세운다
+    let matchCo: Existing | undefined;
+    let similar = false;
     if (name && !problems.length) {
       const nn = normalizeCompanyName(name);
-      if (bizDigits && existingBiz.has(bizDigits)) problems.push("같은 사업자번호의 기업이 이미 등록되어 있습니다");
-      else if (existingName.has(nn)) problems.push("같은 이름의 기업이 이미 등록되어 있습니다");
+      if (bizDigits && bizOf.has(bizDigits)) { problems.push("같은 사업자번호의 기업이 이미 등록되어 있습니다"); matchCo = bizOf.get(bizDigits); }
+      else if (nameOf.has(nn)) {
+        matchCo = nameOf.get(nn);
+        // 이름은 같은데 사업자번호가 둘 다 있고 다르다 — 동명의 다른 회사일 수 있어 사람이 고른다
+        const cb = (matchCo?.bizNo ?? "").replace(/\D/g, "");
+        if (bizDigits.length === 10 && cb.length === 10 && cb !== bizDigits) { problems.push(`이름이 같은 기업 「${matchCo?.name}」이 이미 등록되어 있지만 사업자번호가 다릅니다 — 같은 회사인지 확인해 주세요`); similar = true; }
+        else problems.push("같은 이름의 기업이 이미 등록되어 있습니다");
+      }
       else if (bizDigits && seenBiz.has(bizDigits)) problems.push(`${seenBiz.get(bizDigits)}번째 줄과 사업자번호가 같습니다`);
       else if (seenName.has(nn)) problems.push(`${seenName.get(nn)}번째 줄과 기업명이 같습니다`);
+      else {
+        const near = nearName(nn, bizDigits);
+        if (near) { problems.push(`이름이 비슷한 기업 「${near.name}」이 이미 등록되어 있습니다 — 같은 회사인지 확인해 주세요`); matchCo = near; similar = true; }
+      }
     }
 
     const contactName = get("contactName");
@@ -247,13 +333,23 @@ export function buildImportRows(rows: string[][], headerRow: number, mapping: (I
       const read: (keyof typeof data)[] = ["name", "bizNo", "corpNo", "ceo", "establishedAt", "address", "bizCategory", "bizItem", "bizItemsExtra"];
       data.docs = { bizReg: { fileName: "사업자등록증", size: 0, readAt: new Date(`${chkDate}T09:00:00`).toISOString(), method: "manual", fields: read.filter((k) => !!data[k]) } };
     }
+    const ex = ctx.extras?.[r];
+    if (ex) {
+      problems.push(...(ex.problems ?? []));
+      notes.push(...(ex.notes ?? []));
+      if (ex.data) {
+        const docs = { ...(data.docs ?? {}), ...(ex.data.docs ?? {}) };
+        Object.assign(data, ex.data, { docs: Object.keys(docs).length ? docs : undefined });
+      }
+    }
     const isDup = problems.some((p) => p.includes("이미 등록") || p.includes("번째 줄과"));
     const status: ImportStatus = problems.length ? (isDup && problems.length === 1 ? "duplicate" : "error") : "ok";
     if (status === "ok" && name) {
       if (bizDigits) seenBiz.set(bizDigits, r + 1);
       seenName.set(normalizeCompanyName(name), r + 1);
     }
-    out.push({ line: r + 1, status, problems, notes, data });
+    const match = status === "duplicate" && matchCo ? fillFrom(matchCo, data, similar) : undefined;
+    out.push({ line: r + 1, status, problems, notes, data, ...(ex?.files ? { files: ex.files } : {}), ...(match ? { match } : {}) });
   }
   return out;
 }

@@ -34,6 +34,7 @@ export const EXTRACT_METHOD_LABEL: Record<ExtractMethod | "paste" | "manual", st
 };
 
 export const ACCEPT_DOC = ".pdf,image/png,image/jpeg,image/webp";
+export const IMAGE_EXT = /\.(png|jpe?g|webp|gif|bmp|heic|heif)$/i;
 export const MAX_DOC_BYTES = 15 * 1024 * 1024;
 
 async function loadPdfjs() {
@@ -227,7 +228,12 @@ export async function extractTextFromFile(file: File, onProgress?: ProgressFn, o
     if (!png) return { text, method: "pdf_text", pages };
     return { ...(await ocrImage(png, onProgress, opts)), method: "ocr", pages };
   }
-  if (!/^image\//.test(file.type)) throw new Error("PDF 또는 사진(JPG·PNG)만 읽을 수 있습니다.");
+  if (!/^image\//.test(file.type) && !IMAGE_EXT.test(file.name)) throw new Error("PDF 또는 사진(JPG·PNG)만 글자를 읽을 수 있습니다.");
   onProgress?.(0, "사진 여는 중");
+  // 아이폰 사진(HEIC)은 사파리 말고는 열지 못한다 — 엉뚱한 "못 읽음" 대신 방법을 알려 준다
+  if (/heic|heif/i.test(file.type) || /\.(heic|heif)$/i.test(file.name)) {
+    const can = typeof createImageBitmap === "function" && await createImageBitmap(file).then((b) => { b.close(); return true; }, () => false);
+    if (!can) throw new Error("아이폰 사진(HEIC)은 이 브라우저에서 열 수 없습니다. 휴대폰에서 바로 올리시거나(자동으로 JPG가 됩니다), 사진을 JPG로 저장해 올려 주세요.");
+  }
   return { ...(await ocrImage(file, onProgress, opts)), method: "ocr" };
 }

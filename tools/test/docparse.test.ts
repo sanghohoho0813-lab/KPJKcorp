@@ -1,6 +1,6 @@
 // 사업자등록증 · 등기부 글자에서 기업 정보 읽기. 값은 전부 지어낸 시험용이다(실제 고객 서류를 저장소에 두지 않는다).
 // 글자 모양은 2026-10-01 실제 그림 PDF 를 글자 인식했을 때 나온 깨짐을 그대로 흉내 냈다.
-import { parseBusinessDoc, parseExtracted, findBizKinds, bizNoValid, corpNoValid, parseKindLines } from "../../src/lib/docparse";
+import { parseBusinessDoc, parseExtracted, findBizKinds, bizNoValid, corpNoValid, parseKindLines, joinSyllables, detectDocSource } from "../../src/lib/docparse";
 import { industryOf } from "../../src/lib/company-options";
 
 let fail = 0;
@@ -90,6 +90,58 @@ eq("업종: 음식점업 → 숙박·음식", industryOf("음식점업, 도매 �
 eq("업종: 주업태 기준 (도매 먼저면 도매·소매)", industryOf("도매 및 소매업, 음식점업"), "도매·소매");
 eq("업종: 제조업", industryOf("제조업"), "제조업");
 eq("업종: 모르는 업태는 비움", industryOf("기타"), undefined);
+
+/* ---- 실제 서식에서 드러난 경우 (2026-10-16, 고객사 사업자등록증 8장 — 아래 값은 모두 지어낸 것) ---- */
+
+// 홈택스 PDF: 제목·라벨 글자 사이 공백, "대표자(대표유형)" 칸은 비고 이름이 다른 줄로, 업태·종목이 칸별 세로 목록
+const pdfLayout = [
+  "2026 년 01 월 05 일", "예 시 세 무 서 장", "사 업 자 등 록 증", "( 법인사업자 )", "등록번호 : 123-45-67890",
+  "법 인 명 ( 단 체 명 )  :  주식회사 가나커피", "대표자(대표유형)  :",
+  "개  업  연  월  일  :  2024 년 03 월 15 일  법 인 등 록 번 호  :  110111-1234567",
+  "사 업 장  소 재 지  :  서울특별시 중구 예시로4길 3(가나동)", "", "본  점  소  재  지  :  서울특별시 중구 예시로4길 3(가나동)", "",
+  "홍예시", "사 업 의  종 류  :", ":", ":", "", "업태  서비스업", "건설업", "음식점업", "", "종목  ", "가맹 사업, 외식서비스", "업", "인테리어 공사업", "", "휴게음식점", "",
+  "발  급  사  유  :  재발급",
+].join("\n");
+const pl = parseBusinessDoc(pdfLayout);
+eq("PDF 서식: 띄운 제목 → 사업자등록증", pl.source, "bizReg");
+eq("PDF 서식: 다른 줄로 떨어진 대표자", pl.ceo, "홍예시");
+eq("PDF 서식: 칸별 세로 업태·종목 → 짝지음", [pl.bizCategory, pl.bizItem, pl.bizItemsExtra], ["서비스업", "가맹 사업, 외식서비스", "건설업 — 인테리어 공사업\n음식점업 — 휴게음식점"]);
+eq("띄운 제목만 있어도 종류를 알아봄", detectDocSource("사 업 자 등 록 증\n( 법 인 사업자 )"), "bizReg");
+eq("일반과세자 서식", detectDocSource("(     일 반 과세자 )\n개업 연 월     일     : 2024 년 07 월 18 일"), "bizReg");
+
+// 사진 글자 인식: 글자 사이를 띄운 서식이 한 글자씩 떨어지고, "월"→"뭘", 라벨이 뭉개짐
+const ocrA = [
+  "사 업 자 등 록 증", "( 법 인 사업자 )", "등 록 번호 : 123-45-67890",
+  "법 인 명 (단체명)     : (주) 가 나 스웨이브", "대 _표 . 자     : 김예 시",
+  "개 업 연     월 일     : 2022 년 11 뭘 03 일 _ 법 인 등 록 번호 : 110111-1234567",
+  "사업장 소재지 : 경기도 예시시 가 나로72 번길7, 101호 (가나동)",
+].join("\n");
+const oa = parseExtracted(ocrA, ocrA, true);
+eq("사진: (주) 남기고 낱자 붙임", oa.name, "(주)가나스웨이브");
+eq("사진: 이름 낱자", oa.ceo, "김예시");
+eq("사진: '뭘'로 읽힌 월", oa.establishedAt, "2022-11-03");
+eq("사진: 주소 낱자 · 번길 붙임 · 멀쩡한 앞 낱말은 그대로", oa.address, "경기도 예시시 가나로72번길 7, 101호 (가나동)");
+const ocrB = [
+  "( 법 인 사업자 )", "등 록 번호 123-45-67890",
+  "법 인 명 (단체명)     : 주 식 휘 사 가 나 다 라사무소", "대 … [표 날발자 박 예 시",
+  "개     업 연 월 일     : 2018 년 05 월 02 일 _ 법 인 등 록 번호 : 110111-7654321",
+  "사업장 소재지     : 강 원 특 별 자 치 도 예 시시 다 라로89, 101호( 가 나 동) 10",
+  "사 업 의.     총^류     +:     제 조 업 희     ㆍ     [종목]운동기구, 철 조구조물",
+  "도매 및 소매업     ^     운동기 구",
+].join("\n");
+const ob = parseExtracted(ocrB, ocrB, true);
+eq("사진: 제목이 뭉개져도 서식으로 사업자등록증", ob.source, "bizReg");
+eq("사진: '주식휘사' → 주식회사 + 띄어쓰기", ob.name, "주식회사 가나다라사무소");
+eq("사진: 뭉개진 대표자 라벨 다음의 낱자 이름", ob.ceo, "박예시");
+eq("사진: 특별자치도 주소 · 괄호 안 · 테두리 숫자", ob.address, "강원특별자치도 예시시 다라로89, 101호(가나동)");
+eq("사진: 업태 끝 찌꺼기 · 종목 낱자", [ob.bizCategory, ob.bizItem, ob.bizItemsExtra], ["제조업", "운동기구, 철조구조물", "도매 및 소매업 — 운동기구"]);
+const ocrC = ["(     일 반 과세자 )", ": 123-45-67890", ": (6.     호     ： 가나 다라 식 당", "19     성     : 홍예시", "개업 연 월     일     : 2024 년 07 월 18 일"].join("\n");
+const oc = parseExtracted(ocrC, ocrC, true);
+eq("사진: '상'을 놓친 상호 · '명'을 놓친 성명", [oc.name, oc.ceo], ["가나 다라 식당", "홍예시"]);
+eq("낱자 붙이기: 원래 한 글자 낱말은 남김", joinSyllables("도매 및 소매업"), "도매 및 소매업");
+eq("낱자 붙이기: 숫자 뒤 층", joinSyllables("3-21, 1 층 일 부 호(가나동)"), "3-21, 1층 일부호(가나동)");
+eq("낱자 붙이기: 끝의 낱자는 앞에", joinSyllables("송예 근"), "송예근");
+eq("PDF 글자는 붙이지 않음", parseBusinessDoc("사업자등록증\n상 호 : 가 나 상 사").name, "가 나 상 사");
 
 if (fail) { console.log(`\n${fail}건 실패`); process.exit(1); }
 console.log("\n전부 통과");

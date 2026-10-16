@@ -367,6 +367,9 @@ export function excelSerialToDate(n: number): string | undefined {
  * UTF-8 로 읽다 깨지면 EUC-KR 로 다시 읽는다.
  */
 export function decodeText(buf: Uint8Array): string {
+  // 엑셀 "유니코드 텍스트"로 저장한 파일은 UTF-16 이다 — BOM 으로 알아본다
+  if (buf[0] === 0xff && buf[1] === 0xfe) return new TextDecoder("utf-16le").decode(buf.subarray(2));
+  if (buf[0] === 0xfe && buf[1] === 0xff) return new TextDecoder("utf-16be").decode(buf.subarray(2));
   try {
     return new TextDecoder("utf-8", { fatal: true }).decode(buf).replace(/^﻿/, "");
   } catch {
@@ -398,15 +401,29 @@ export function parseDelimited(text: string): string[][] {
   return rows;
 }
 
-/** 파일 한 개를 표들로 — .xlsx 면 시트별, .csv/.txt 면 한 장 */
+/**
+ * 파일 한 개를 표들로 — 확장자가 아니라 내용으로 알아본다.
+ * .xlsx(zip) · .xls(97~2003) · 웹에서 내려받은 HTML 표 · Excel 2003 XML · CSV/TSV(UTF-8·CP949·UTF-16)
+ */
 export async function readTableFile(file: { name: string; arrayBuffer(): Promise<ArrayBuffer> }): Promise<ReadSheet[]> {
   const buf = new Uint8Array(await file.arrayBuffer());
   const isZip = buf[0] === 0x50 && buf[1] === 0x4b;
-  if (isZip) return readXlsx(buf);
-  if (/\.xls$/i.test(file.name) || (buf[0] === 0xd0 && buf[1] === 0xcf)) {
-    throw new Error("예전 엑셀 형식(.xls)은 읽지 못합니다. 엑셀에서 '다른 이름으로 저장 → Excel 통합 문서(.xlsx)'로 저장해 주세요.");
+  if (isZip) {
+    if (/\.(docx|hwpx|pptx)$/i.test(file.name)) throw new Error("문서 파일입니다. 표는 엑셀(.xlsx·.xls)이나 CSV로 올려 주세요.");
+    return readXlsx(buf);
   }
-  return [{ name: file.name.replace(/\.[^.]+$/, ""), rows: parseDelimited(decodeText(buf)) }];
+  const { isCfb, readXls, looksLikeHtmlTable, readHtmlTables, looksLikeSpreadsheetMl, readSpreadsheetMl } = await import("./xls");
+  if (isCfb(buf)) {
+    if (/\.(hwp|doc|ppt)$/i.test(file.name)) throw new Error("문서 파일입니다. 표는 엑셀(.xlsx·.xls)이나 CSV로 올려 주세요.");
+    return readXls(buf);
+  }
+  const text = decodeText(buf);
+  if (looksLikeSpreadsheetMl(text)) return readSpreadsheetMl(text);
+  if (looksLikeHtmlTable(text)) {
+    const tables = readHtmlTables(text);
+    if (tables.length) return tables;
+  }
+  return [{ name: file.name.replace(/\.[^.]+$/, ""), rows: parseDelimited(text) }];
 }
 
 /** 브라우저에서 바이트를 파일로 내려받게 한다 */

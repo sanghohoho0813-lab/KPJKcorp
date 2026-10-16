@@ -235,7 +235,7 @@ async function runViewport(browser, kind) {
     expect(r, /\.xlsx$/.test(dl.suggestedFilename()), '조건 그대로 엑셀 내보내기');
     await go('/ax/clients');
     await page.getByRole('button', { name: '엑셀로 등록' }).click(); await sleep(500);
-    expect(r, (await page.getByText('엑셀·CSV 파일 고르기').count()) === 1, '엑셀·CSV 로 기업고객 일괄 등록 창');
+    expect(r, (await page.getByText('파일 고르기 · 여러 개 가능').count()) === 1 && (await page.getByText(/엑셀\(\.xlsx·\.xls\)·CSV/).count()) >= 1, '엑셀·CSV 로 기업고객 일괄 등록 창');
     r.shots.push(await shot('excel-import'));
   });
 

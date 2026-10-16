@@ -14,7 +14,9 @@ import {
 } from "@/lib/company-options";
 import { legalBaseName } from "@/lib/quick-task";
 import { DOC_SOURCE_LABEL, PARSED_LABEL, PARSED_ORDER, bizNoValid, corpNoValid, kindLine, parseBusinessDoc, parseExtracted, parseKindLines, type BizKind, type ParsedDoc, type ParsedKey } from "@/lib/docparse";
-import { ACCEPT_DOC, EXTRACT_METHOD_LABEL, extractTextFromFile, type ExtractMethod } from "@/lib/docextract";
+import { EXTRACT_METHOD_LABEL, extractTextFromFile, type ExtractMethod } from "@/lib/docextract";
+import { ACCEPT_COMPANY_FILES, SUPPORTED_TEXT, fileKind, shouldGoBulk } from "@/lib/company-sources";
+import { CompanyImportModal } from "./CompanyImport";
 import { Modal } from "@/components/ui/overlay";
 import { Badge, Button, Input, Textarea, cx } from "@/components/ui/ui";
 import { Chip, ChipMulti, ChipSelect } from "@/components/ui/chips";
@@ -52,6 +54,8 @@ function CompanyModalInner({ open, companyId, onClose, onCreated }: { open: bool
   const toast = useStore((s) => s.toast);
   const me = st.session?.userId ?? "u_admin";
   const editing = st.companies.find((c) => c.id === companyId);
+  // 서류 칸에 엑셀 명단이나 여러 곳의 서류를 올리면 → 여러 곳을 한 번에 등록하는 창으로 넘겨 바로 읽는다
+  const [bulk, setBulk] = useState<File[] | null>(null);
   // "내 담당만" 범위의 컨설턴트는 다른 사람에게 맡길 수 없다 — 맡기는 순간 그 기업이 자기 화면에서 사라지고 기록 저장도 거절된다
   const ownOnly = st.session?.role === "consultant" && st.settings.consultantScope === "own";
   const consultants = st.users.filter((u) => u.role !== "client" && u.active !== false && (!ownOnly || u.id === st.session?.userId));
@@ -161,6 +165,9 @@ function CompanyModalInner({ open, companyId, onClose, onCreated }: { open: bool
   const isCorp = f.entityType !== "sole" && f.entityType !== "other";
   const empBand = f.employees > 0 ? bandOfEmployees(f.employees) : f.employeeBand;
 
+  // 일괄 등록 창으로 넘어간 동안 이 창은 감춘다. 취소하면 쓰던 그대로 돌아오고, 등록하면 둘 다 닫힌다
+  if (bulk) return <CompanyImportModal open initialFiles={bulk} onClose={() => setBulk(null)} onDone={() => onClose()} />;
+
   return (
     <Modal
       open={open}
@@ -190,7 +197,7 @@ function CompanyModalInner({ open, companyId, onClose, onCreated }: { open: bool
             <Button size="sm" variant="ghost" onClick={startOver}>처음부터 다시</Button>
           </div>
         )}
-        <DocFillPanel current={f} onApply={applyDoc} />
+        <DocFillPanel current={f} onApply={applyDoc} onBulk={editing ? undefined : setBulk} />
 
         {/* 1. 기본 정보 */}
         <Sec n={1} title="기본 정보" desc="서류를 올리면 대부분 자동으로 채워집니다">
@@ -391,7 +398,7 @@ type Stage =
   | { kind: "review"; parsed: ParsedDoc; method: ExtractMethod | "paste"; fileName: string; size: number }
   | { kind: "done"; parsed: ParsedDoc; method: ExtractMethod | "paste"; fileName: string; applied: ParsedKey[] };
 
-function DocFillPanel({ current, onApply }: { current: CompanyForm; onApply: (patch: Partial<CompanyForm>, kind: CompanyDocKind, meta: CompanyDocMeta) => void }) {
+function DocFillPanel({ current, onApply, onBulk }: { current: CompanyForm; onApply: (patch: Partial<CompanyForm>, kind: CompanyDocKind, meta: CompanyDocMeta) => void; onBulk?: (files: File[]) => void }) {
   const [stage, setStage] = useState<Stage>({ kind: "idle" });
   const [mode, setMode] = useState<"file" | "paste">("file");
   const [pasted, setPasted] = useState("");
@@ -466,12 +473,27 @@ function DocFillPanel({ current, onApply }: { current: CompanyForm; onApply: (pa
     setStage({ kind: "busy", ratio: 0, label: "준비 중" });
     try {
       const res = await extractTextFromFile(file, (ratio, label) => setStage({ kind: "busy", ratio, label }), { namePass: true });
-      finish(parseExtracted(res.text, res.alt), res.method, file.name, file.size);
+      finish(parseExtracted(res.text, res.alt, res.method === "ocr"), res.method, file.name, file.size);
     } catch (cause) {
       setStage({ kind: "error", message: cause instanceof Error ? cause.message : "파일을 읽지 못했습니다. 글자 붙여넣기로 시도해 보세요." });
     } finally {
       if (fileRef.current) fileRef.current.value = "";
     }
+  };
+
+  /** 무엇을 올리든: 서류 한 장이면 이 창에 채우고, 엑셀 명단·서류 여러 장이면 한 번에 등록하는 창으로 */
+  const onFiles = (list: FileList | File[] | null | undefined) => {
+    const files = Array.from(list ?? []);
+    if (fileRef.current) fileRef.current.value = "";
+    if (!files.length) return;
+    const unknown = files.filter((x) => fileKind(x) === "unknown");
+    if (unknown.length) { setStage({ kind: "error", message: `읽을 수 없는 파일입니다: ${unknown.map((x) => x.name).join(", ")} — ${SUPPORTED_TEXT}을 올려 주세요.` }); return; }
+    if (shouldGoBulk(files)) {
+      if (onBulk) { onBulk(files); return; }
+      setStage({ kind: "error", message: "이 칸은 이 기업의 서류(PDF·사진 한 장)를 읽습니다. 엑셀 명단이나 여러 곳의 서류는 기업고객 화면의 '엑셀로 등록'에서 올려 주세요." });
+      return;
+    }
+    void onFile(files[0]);
   };
 
   const onPaste = () => {
@@ -484,7 +506,7 @@ function DocFillPanel({ current, onApply }: { current: CompanyForm; onApply: (pa
   return (
     <div className={cx("rounded-2xl border-2 p-4 transition-colors", stage.kind === "done" ? "border-success/40 bg-success-bg/30" : drag ? "border-accent bg-soft" : "border-dashed border-accent/50 bg-soft/40")}
       onDragOver={(e) => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)}
-      onDrop={(e) => { e.preventDefault(); setDrag(false); void onFile(e.dataTransfer.files?.[0]); }}>
+      onDrop={(e) => { e.preventDefault(); setDrag(false); onFiles(e.dataTransfer.files); }}>
       <div className="flex flex-wrap items-center gap-2">
         <span className={cx("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl", stage.kind === "done" ? "bg-success text-white" : "bg-accent text-accent-ink")}>
           {stage.kind === "busy" ? <Loader2 size={18} className="animate-spin" /> : stage.kind === "done" ? <Check size={18} /> : <ScanLine size={18} />}
@@ -509,11 +531,11 @@ function DocFillPanel({ current, onApply }: { current: CompanyForm; onApply: (pa
           </div>
           {mode === "file" ? (
             <div className="mt-2">
-              <input ref={fileRef} type="file" accept={ACCEPT_DOC} className="hidden" onChange={(e) => void onFile(e.target.files?.[0])} />
+              <input ref={fileRef} type="file" multiple={!!onBulk} accept={ACCEPT_COMPANY_FILES} className="hidden" onChange={(e) => onFiles(e.target.files)} aria-label="서류 파일" />
               <button type="button" disabled={stage.kind === "busy"} onClick={() => fileRef.current?.click()}
                 className="pressable flex w-full flex-col items-center gap-1 rounded-xl border border-line-2 bg-surface px-4 py-5 text-center hover:border-accent disabled:opacity-70">
-                <span className="text-[0.95rem] font-semibold">{stage.kind === "busy" ? stage.label : "PDF 또는 사진 선택 · 끌어다 놓기"}</span>
-                <span className="text-[0.78rem] text-ink-3">홈택스·인터넷등기소 PDF는 거의 정확합니다. 사진은 글자 인식(OCR)이라 흐리면 못 읽을 수 있습니다.</span>
+                <span className="text-[0.95rem] font-semibold">{stage.kind === "busy" ? stage.label : onBulk ? "PDF·사진·엑셀 선택 · 끌어다 놓기" : "PDF 또는 사진 선택 · 끌어다 놓기"}</span>
+                <span className="text-[0.78rem] text-ink-3">{onBulk ? "여러 장이나 엑셀 명단을 올리면 여러 곳을 한 번에 등록하는 화면으로 넘어갑니다. " : ""}홈택스·인터넷등기소 PDF는 거의 정확합니다. 사진은 글자 인식(OCR)이라 흐리면 못 읽을 수 있습니다.</span>
               </button>
               {stage.kind === "busy" && stage.ratio > 0 && (
                 <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full bg-accent transition-all" style={{ width: `${Math.round(stage.ratio * 100)}%` }} /></div>

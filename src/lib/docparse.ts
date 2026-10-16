@@ -84,7 +84,8 @@ export function fz(word: string): string {
 
 export function parseKoreanDate(input: string): string | undefined {
   const s = input.trim();
-  let m: RegExpExecArray | null = /(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/.exec(s);
+  // 글자 인식은 "월"을 "뭘·윌·윌"로, "일"을 "일·잌"으로 읽기도 한다 — 숫자 사이 낱자 하나는 넘어간다
+  let m: RegExpExecArray | null = /(\d{4})\s*년\s*(\d{1,2})\s*[월뭘윌웰얼]\s*(\d{1,2})\s*[일잌길]/.exec(s);
   if (!m) m = /(\d{4})\s*[.\-/]\s*(\d{1,2})\s*[.\-/]\s*(\d{1,2})/.exec(s);
   if (!m) {
     const d = digits(s);
@@ -161,7 +162,7 @@ function valueAfter(text: string, labelPattern: string): string | undefined {
     const next = after.split("\n").find((l) => l.trim() !== "");
     v = cutAtNextLabel(next ?? "");
   }
-  v = v.replace(/^\s*\([^)]{0,12}\)\s*[:：]?\s*/, "");
+  v = v.replace(/^\s*\(\s*(?:단\s*체\s*명|법\s*인\s*명|대\s*표\s*유\s*형|대\s*표\s*자|성\s*명|주\s*소|상\s*호)\s*\)\s*[:：]?\s*/, "");
   v = v.replace(/^(소재지|성명|법인명|상호|단체명)\s*[:：]\s*/, "");
   v = v.replace(/^[)\]}·.\-]+/, "").trim();
   return v === "" ? undefined : v;
@@ -170,10 +171,11 @@ function valueAfter(text: string, labelPattern: string): string | undefined {
 /* ---------------- 문서 종류 ---------------- */
 
 export function detectDocSource(text: string): DocSource {
-  const t = normalize(text);
+  // 사업자등록증·등기부는 제목과 라벨의 글자 사이를 띄운다("사 업 자 등 록 증") — 공백을 모두 뺀 글자로 본다
+  const t = normalize(text).replace(/\s+/g, "");
   const count = (ps: RegExp[]) => ps.reduce((n, re) => n + (re.test(t) ? 1 : 0), 0);
   const registry = count([/등기사항전부증명서/, /말소사항\s?포함/, /등기기록/, /회사성립연월일/, /등기번호/, /공고방법/, /1주의\s?금액/, /임원에\s?관한\s?사항/, /대표이사/]);
-  const business = count([/사업자등록증/, /개업연월일/, /업\s?태\s*[:：]/, /종\s?목\s*[:：]/, /사업장소재지/, /법인명\s?\(단체명\)/, /교부일자/]);
+  const business = count([/사업자등록증/, /개업연월일/, /업\s?태\s*[:：]/, /종\s?목\s*[:：]/, /사업장소재지/, /법인명\s?\(단체명\)/, /교부일자/, /법인사업자|일반과세자|간이과세자|면세사업자/]);
   if (registry === 0 && business === 0) return "unknown";
   if (/사업자등록증/.test(t) && !/등기사항전부증명서/.test(t)) return "bizReg";
   if (/등기사항전부증명서/.test(t) && !/사업자등록증/.test(t)) return "corpReg";
@@ -206,7 +208,7 @@ function findName(t: string, source: DocSource) {
   const opt = (w: string) => `(?:[\\s_.·ㆍ]*\\(?[\\s_.·ㆍ]*${fz(w)}[\\s_.·ㆍ]*\\)?)?`;
   const patterns = source === "corpReg"
     ? [fz("상호"), fz("법인명") + opt("단체명"), fz("회사명")]
-    : [fz("법인명") + opt("단체명"), fz("상호") + opt("법인명"), fz("회사명")];
+    : [fz("법인명") + opt("단체명"), fz("상호") + opt("법인명"), fz("회사명"), "(?:^|[^가-힣\\n])호(?=\\s*[:：])"];
   for (const p of patterns) {
     const v = valueAfter(t, p);
     if (v && v.length >= 2 && v.length <= 60 && /[가-힣A-Za-z]/.test(v)) return v;
@@ -224,7 +226,8 @@ function findName(t: string, source: DocSource) {
 function findCeo(t: string, source: DocSource) {
   const patterns = source === "corpReg"
     ? ["대\\s*표\\s*이\\s*사", "사내이사", "대\\s*표\\s*자"]
-    : ["성\\s*명\\s*\\(대표자\\)", "대\\s*표\\s*자\\s*\\(성명\\)", fz("성명"), fz("대표자")];
+    // 개인 사업자등록증 "성 명"에서 글자 인식이 "명"을 놓친 경우("성 : 홍길동") — 앞이 한글이 아닌 "성" 바로 뒤 쌍점만
+    : ["성\\s*명\\s*\\(대표자\\)", "대\\s*표\\s*자\\s*\\(성명\\)", fz("성명"), fz("대표자"), "(?:^|[^가-힣\\n])성(?=\\s*[:：])"];
   for (const p of patterns) {
     let v = valueAfter(t, p);
     if (!v) continue;
@@ -238,6 +241,40 @@ function findCeo(t: string, source: DocSource) {
     // 영문 이름은 "이름 성" 처럼 두 낱말일 때만 — 글자 인식이 한글을 "dss" 같은 영문으로 잘못 읽는 경우를 거른다
     const name = /^([가-힣]{2,6}|[A-Za-z]{2,}(?: [A-Za-z.]{1,20}){1,3})/.exec(v.trim());
     if (name) return name[1].trim();
+  }
+  return undefined;
+}
+
+/** 이름처럼 보이는 낱말이 아닌 것 (사업자등록증 라벨·발급기관 낱말) */
+const NOT_NAME = /^(업태|종목|상호|성명|대표자|대표|소재지|사업자|법인명|단체명|발급|사유|업종|종류|이하여백|본점|사업장|국세청|세무서장?|개업|등록번호|여부)$/;
+
+/**
+ * 대표자 칸이 비었을 때 — 사업자등록증 PDF는 칸 배치 때문에 대표자 이름이 다른 줄에 따로 떨어져 나온다("대표자(대표유형) :" … "홍길동").
+ * 대표자 라벨 뒤에 한글 2~4자만 있는 줄이 있으면 그 줄을 쓴다.
+ */
+function ceoOnOwnLine(t: string) {
+  const at = t.search(new RegExp(fz("대표자")));
+  if (at < 0) return undefined;
+  for (const line of t.slice(at).split("\n").slice(1, 12)) {
+    const v = line.trim();
+    if (/^[가-힣]{2,4}$/.test(v) && !NOT_NAME.test(v)) return v;
+  }
+  return undefined;
+}
+
+/**
+ * 사진 글자 인식이 대표자 라벨을 뭉갰을 때("대 … [표 날발자 김 예 시") — 상호 줄 바로 다음 한두 줄 끝의
+ * 띄어 읽힌 한글 낱자 2~4개("김 예 시")를 이름으로 본다. 숫자·쌍점이 든 다른 항목 줄은 보지 않는다.
+ */
+function ceoAfterNameLine(t: string, name: string | undefined) {
+  if (!name) return undefined;
+  const lines = t.split("\n");
+  const i = lines.findIndex((l) => l.replace(/\s+/g, "").includes(name.replace(/\s+/g, "")));
+  if (i < 0) return undefined;
+  for (const line of lines.slice(i + 1, i + 3)) {
+    if (/\d/.test(line) || /소\s*재|연\s*월|번\s*호|업\s*태|종\s*목/.test(line)) continue;
+    const m = /(?:^|[^가-힣])([가-힣](?:\s[가-힣]){1,3})\s*$/.exec(line.trim());
+    if (m) return m[1].replace(/\s/g, "");
   }
   return undefined;
 }
@@ -368,28 +405,123 @@ export function findBizKinds(raw: string): { category?: string; item?: string; p
 
 /* ---------------- 본체 ---------------- */
 
-export function parseBusinessDoc(raw: string): ParsedDoc {
+export function parseBusinessDoc(raw: string, opts: { ocr?: boolean } = {}): ParsedDoc {
   const t = normalize(raw);
   const source = detectDocSource(t);
   const out: ParsedDoc = { source };
   const put = <K extends ParsedKey>(k: K, v: ParsedDoc[K] | undefined) => { if (v !== undefined && v !== "") out[k] = v; };
-  put("name", findName(t, source));
+  const name = findName(t, source);
+  put("name", name);
   put("bizNo", findBizNo(t));
   put("corpNo", findCorpNo(t));
-  put("ceo", findCeo(t, source));
+  put("ceo", findCeo(t, source) ?? (source !== "corpReg" ? ceoOnOwnLine(t) ?? (opts.ocr ? ceoAfterNameLine(t, name) : undefined) : undefined));
   put("ceoBirth", findCeoBirth(t));
   put("establishedAt", findEstablished(t, source));
   put("address", findAddress(t, source));
   if (source !== "corpReg") {
     // 첫 줄이 주업태·주종목, 나머지 줄은 "그 외"로 (줄마다 "업태 — 종목")
-    const { pairs } = findBizKinds(raw);
+    const found = findBizKinds(raw);
+    // PDF 글자 추출은 업태 칸과 종목 칸을 따로 세로로 내놓기도 한다("업태 서비스업 / 건설업 …" 다음 "종목 / … ") — 그때는 칸별 목록을 순서대로 짝짓는다
+    const block = bizKindBlocks(raw);
+    const pairs = block.length > found.pairs.length ? block : found.pairs;
     const [main, ...rest] = pairs;
     put("bizCategory", main?.category ?? (main ? undefined : valueAfter(t, "업\\s*태")));
     put("bizItem", main?.item ?? (main ? undefined : valueAfter(t, "종\\s*목")));
     if (rest.length) put("bizItemsExtra", rest.map(kindLine).join("\n"));
   }
   if (source === "corpReg") put("capital", findCapital(t));
+  // 사진이면 낱자를 먼저 붙이고 손질한다 — 괄호를 먼저 다듬으면 "( 가 나 동)"이 "(가 나동)"으로 어긋난다
+  if (out.address) out.address = opts.ocr ? cleanAddress(tidyAddress(joinSyllables(out.address))) : cleanAddress(out.address);
+  if (opts.ocr) {
+    // 글자 사이를 띄운 서식을 사진으로 읽으면 "가 나 스웨이브", "김 예 시"처럼 한 글자씩 떨어진다 — 붙인다
+    if (out.name) out.name = fixCompanyForm(joinSyllables(out.name));
+    if (out.ceo) out.ceo = joinSyllables(out.ceo).replace(/\s+/g, "");
+    if (out.bizCategory) out.bizCategory = cleanKind(out.bizCategory, true);
+    if (out.bizItem) out.bizItem = cleanKind(out.bizItem, false);
+    if (out.bizItemsExtra) out.bizItemsExtra = out.bizItemsExtra.split("\n").map((l) => parseKindLines(l)[0]).filter(Boolean).map((k) => kindLine({ category: k.category && cleanKind(k.category, true), item: k.item && cleanKind(k.item, false) })).filter(Boolean).join("\n") || undefined;
+  }
   return out;
+}
+
+/**
+ * 띄어 읽힌 한글 낱자를 붙인다 — "가 나 스웨이브"→"가나스웨이브", "김 예 시"→"김예시", "예 시 천 로175"→"예시천로175".
+ * 낱자 묶음은 뒤 낱말에 붙이고(뒤가 없으면 앞 낱말에), 숫자 뒤의 "층·호"는 숫자에 붙인다("1 층"→"1층").
+ * "도매 및 소매업"의 "및"처럼 원래 한 글자인 낱말은 남긴다. 멀쩡한 앞 낱말("○○시")에는 붙이지 않는다.
+ */
+const ONE_SYLLABLE_WORDS = new Set(["및", "외", "등", "의", "겸", "각", "또"]);
+export function joinSyllables(v: string): string {
+  const toks = v.trim().split(/\s+/).filter(Boolean);
+  const single = (x: string | undefined) => !!x && /^[가-힣]$/.test(x) && !ONE_SYLLABLE_WORDS.has(x);
+  const out: string[] = [];
+  for (let i = 0; i < toks.length; ) {
+    if (!single(toks[i])) { out.push(toks[i]); i += 1; continue; }
+    let j = i;
+    while (single(toks[j])) j += 1;
+    let run = toks.slice(i, j);
+    // 숫자 바로 뒤의 층·호·동은 숫자에 ("1 층 일 부 호" → "1층 일부호")
+    if (out.length && /\d$/.test(out[out.length - 1]) && /^[층호동]$/.test(run[0])) { out[out.length - 1] += run[0]; run = run.slice(1); }
+    if (run.length) {
+      const word = run.join("");
+      const next = toks[j];
+      if (next && /^[가-힣0-9(]/.test(next) && !ONE_SYLLABLE_WORDS.has(next)) { out.push(word + next); j += 1; }
+      else if (run.length === 1 && out.length && /[가-힣0-9)]$/.test(out[out.length - 1])) out[out.length - 1] += word;
+      else out.push(word);
+    }
+    i = j;
+  }
+  return out.join(" ");
+}
+
+/** 회사 형태 낱말 손질 — "주식휘사"(인식 오류) → "주식회사", 상호와 붙어 버린 "주식회사가나다" → "주식회사 가나다" */
+function fixCompanyForm(v: string) {
+  return v
+    .replace(/주\s*식\s*[회휘훼회]\s*사/g, "주식회사")
+    .replace(/^주식회사(?=[가-힣A-Za-z])/, "주식회사 ")
+    .replace(/([가-힣A-Za-z])주식회사$/, "$1 주식회사")
+    .replace(/\(\s*주\s*\)\s*/, "(주)")
+    .replace(/^[^가-힣A-Za-z(㈜]+|[^가-힣A-Za-z0-9)]+$/g, "")
+    .trim();
+}
+
+/** 주소 손질 — "175 번길" → "175번길", "( 가 나 동)" → "(가나동)", 괄호 뒤에 붙은 엉뚱한 숫자(사진 테두리) 떼기 */
+function cleanAddress(v: string) {
+  return v
+    .replace(/(\d)\s+(번안길|번길|안길|길|로)(?=[\s\d,]|$)/g, "$1$2")
+    .replace(/(번길|번안길)(\d)/g, "$1 $2")
+    .replace(/\(\s+/g, "(").replace(/\s+\)/g, ")")
+    .replace(/\)\s+\d{1,3}$/, ")")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+/** 업태·종목 손질 — 뭉개진 [업태] 상자 조각("임태") 떼기, 낱자 붙이기, 앞뒤 부호 떼기. 업태는 "…업" 뒤 한 글자 찌꺼기도 뗀다 */
+function cleanKind(v: string, category: boolean) {
+  let x = joinSyllables(v.replace(/^[\s\[|(]*[임업엄얼언][태테래][\s\]|)]*/, "").replace(/[\^~`'"“”。ㆍ·|\[\]{}]/g, " ").replace(/\s+/g, " "));
+  x = x.replace(/^[^가-힣A-Za-z0-9]+|[^가-힣A-Za-z0-9)]+$/g, "").trim();
+  if (category) x = x.replace(/^([가-힣\s]*업)[가-힣]$/, "$1");
+  return x;
+}
+
+/** PDF 칸별 세로 배치의 업태·종목 — "업태 서비스업" / "건설업" / "음식점업" … "종목" / "프렌차이즈 …" / "인테리어 …" */
+function bizKindBlocks(raw: string): BizKind[] {
+  const lines = raw.replace(/\r\n?/g, "\n").split("\n").map((l) => l.trim());
+  const ci = lines.findIndex((l) => /^업\s*태(\s|$)/.test(l));
+  const ii = lines.findIndex((l, i) => i > ci && /^종\s*목(\s|$)/.test(l));
+  if (ci < 0 || ii < 0) return [];
+  const take = (from: number, first: string, until: (l: string) => boolean) => {
+    const out: string[] = [];
+    if (first.trim()) out.push(first.trim());
+    for (let i = from; i < lines.length && out.length < 8; i += 1) {
+      const l = lines[i];
+      if (until(l)) break;
+      if (l && (l.match(/[가-힣]/g) ?? []).length >= 2 && l.length <= 40 && !/[:：]/.test(l)) out.push(l);
+    }
+    return out;
+  };
+  const cats = take(ci + 1, lines[ci].replace(/^업\s*태/, ""), (l) => /^종\s*목(\s|$)/.test(l) || KIND_END.test(l));
+  const items = take(ii + 1, lines[ii].replace(/^종\s*목/, ""), (l) => KIND_END.test(l) || /^업\s*태(\s|$)/.test(l));
+  if (cats.length < 2 || !items.length) return [];
+  return cats.map((c, k) => ({ category: c, item: items[k] }));
 }
 
 /** 읽힌 항목 수 */
@@ -403,10 +535,10 @@ export function parsedCount(p: ParsedDoc) {
  * 이름·상호·주소·업태·종목은 두 번째(한글 전용)를 우선한다.
  */
 const NAME_KEYS: ParsedKey[] = ["name", "ceo", "address", "bizCategory", "bizItem", "bizItemsExtra"];
-export function parseExtracted(text: string, alt?: string): ParsedDoc {
-  const a = parseBusinessDoc(text);
+export function parseExtracted(text: string, alt?: string, ocr = alt !== undefined): ParsedDoc {
+  const a = parseBusinessDoc(text, { ocr });
   if (!alt) return a;
-  const b = parseBusinessDoc(alt);
+  const b = parseBusinessDoc(alt, { ocr });
   const out: ParsedDoc = { ...a, source: a.source !== "unknown" ? a.source : b.source };
   const put = (k: ParsedKey, v: unknown) => { if (v !== undefined) (out as unknown as Record<string, unknown>)[k] = v; };
   for (const k of NAME_KEYS) put(k, b[k] ?? a[k]);

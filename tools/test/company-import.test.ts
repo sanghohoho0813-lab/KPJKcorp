@@ -49,4 +49,26 @@ ok(ex.length === IMPORT_FIELDS.length, "example row width " + ex.length);
   ok(i.status === "error" && /오늘 뒤/.test(i.problems.join()), "future check date rejected: " + i.problems);
   ok(j.status === "error" && /확인일을 날짜로/.test(j.problems.join()), "bad check date: " + j.problems);
 }
+// 이미 있는 기업: 빈 칸만 채우기 · 이름이 한 글자 다른 기업은 "같은 회사인지 확인" (지어낸 기업)
+{
+  const hdr = ["상호", "대표자", "사업자번호", "주소", "메모", "사업자등록증 확인일"];
+  const rs = [hdr,
+    ["(주)가나스웨이브", "김예시", "111-22-33333", "경기도 예시시 예시로 7", "등록증 기준", "2026-10-15"],
+    ["주식회사 다라플로우", "이예시", "", "경기도 예시시 예시길 3", "", ""],
+    ["마바카우 주식회사", "박예시", "222-33-44444", "서울특별시 중구 예시로 47", "", ""],
+    ["가나", "갑", "", "", "", ""],
+  ];
+  const existing = [
+    { id: "co_1", name: "(주)가나스에이브", bizNo: "", ceo: "김예시", address: "", memo: "직접 입력", contactName: "김예시", contactTitle: "대표이사" },
+    { id: "co_2", name: "(주)다라플로우", bizNo: "", ceo: "이예시", address: "이미 있는 주소", memo: "", contactName: "", contactTitle: "" },
+    { id: "co_3", name: "마바카우", bizNo: "222-33-55555", ceo: "박예시", address: "" },
+    { id: "co_4", name: "가다", bizNo: "", ceo: "을" },
+  ];
+  const [n1, n2, n3, n4] = buildImportRows(rs, 0, mapHeaders(rs[0]), { companies: existing, users: [], me: "u", nowIso: "2026-10-16T00:00:00.000Z" });
+  ok(n1.status === "duplicate" && n1.match?.id === "co_1" && n1.match.similar && n1.match.renameTo === "(주)가나스웨이브" && /이름이 비슷한 기업/.test(n1.problems[0]), "한 글자 다른 이름 → 같은 회사 후보: " + n1.problems);
+  ok(n1.match?.fill.bizNo === "111-22-33333" && n1.match.fill.address === "경기도 예시시 예시로 7" && n1.match.fill.memo === undefined && n1.match.fill.ceo === undefined && n1.match.fill.docs?.bizReg?.method === "manual", "빈 칸만 채움 · 있는 메모·대표자는 그대로: " + JSON.stringify(n1.match?.fill));
+  ok(n2.status === "duplicate" && n2.match?.id === "co_2" && !n2.match.similar && !n2.match.renameTo && n2.match.fill.address === undefined && n2.match.fill.contactName === "이예시", "같은 이름: 있는 주소는 그대로, 빈 담당자는 채움: " + JSON.stringify(n2.match?.fill));
+  ok(n3.status === "duplicate" && n3.match?.similar === true && !n3.match.renameTo && /사업자번호가 다릅니다/.test(n3.problems[0]), "같은 이름 · 다른 사업자번호 → 사람이 확인(기본 꺼짐): " + n3.problems);
+  ok(n4.status === "ok", "세 글자 이하 이름은 비슷한 이름으로 보지 않음: " + n4.status);
+}
 process.exit(fail ? 1 : 0);

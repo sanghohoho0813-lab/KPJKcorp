@@ -12,8 +12,14 @@ for f in tools/test/*.test.ts; do npx tsx "$f" || echo "FAIL: $f"; done
 | `consult-followups.test.ts` | 상담 기록 → 후속 업무 · 자료 요청 — 만들 항목(다음 Action · 약속 · 필요 자료), 기본 체크, 이미 만든 것 다시 안 만들기 |
 | `quick-task.test.ts` | 업무 한 줄 등록 — 제목에서 기업·업무 유형 찾기(법인 표기·띄어쓰기·보관 기업), 빠른 기한, 기한 묶음, 중복 검사용 이름 |
 | `xlsx.test.ts` | 엑셀 쓰기→읽기 왕복, 특수문자·줄바꿈, CSV 따옴표, EUC-KR(한국어 엑셀 CSV), 날짜 일련번호 |
-| `company-import.test.ts` | 머리글 별칭 인식, 제목 줄 건너뛰기, 검사 규칙, 기존·파일 내 중복, 날짜·인원 해석 |
+| `company-import.test.ts` | 머리글 별칭 인식, 제목 줄 건너뛰기, 검사 규칙, 기존·파일 내 중복, 날짜·인원 해석, 그 외 업태·사업자등록증 확인일, 이름이 한 글자 다른 기업·빈 칸만 채우기 |
+| `xls.test.ts` | 예전 엑셀(.xls, LibreOffice·xlwt 두 가지) · 웹에서 받은 HTML 표 · Excel 2003 XML · UTF-16 텍스트, 긴 글자(레코드 경계), 수식 결과, 손상 파일 200개 |
+| `company-sources.test.ts` | 올린 파일 종류 가리기, 서류 여러 장 → 한 줄씩, 같은 회사의 사업자등록증·등기부 합치기, 잘못 읽은 번호 막기, 못 읽은 파일 안내 |
+| `docparse.test.ts` | 사업자등록증·등기부 읽기 — 글자 사이를 띄운 서식, 다른 줄로 떨어진 대표자, 칸별 세로 업태·종목, 사진 글자 인식의 낱자·오인식("뭘"·"주식휘사") |
 | `evidence-filter.test.ts` | 실증 기록 기간 경계·분류·행위자·기업·다중 검색어, 규칙 기준일 저장값 방어 |
 | `server-health.test.ts` | 서버 연결 점검 9가지 상황(정상·service_role 키·주소·401·오프라인·미로그인·옛 SQL·역할 없음·보관함 없음) |
+
+`fixtures/` 의 시험 파일은 `sample.fods`(지어낸 기업 3곳)를 LibreOffice 로 바꾼 것과 xlwt 로 만든 것입니다 — 실제 고객 정보는 넣지 않습니다.
+다시 만들기: `soffice --headless --convert-to xls sample.fods` (html · `'xml:MS Excel 2003 XML'` 도 같은 방법).
 
 서버 권한(RLS)·열 이름 시험은 `supabase/test/` 에 있습니다.
