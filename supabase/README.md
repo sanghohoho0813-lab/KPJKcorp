@@ -191,8 +191,9 @@ update public.app_settings set consultant_scope = 'all' where id = 1;   -- 전�
 ## 5. 권한이 정말 막히는지 확인하기
 
 정책을 "설정했다"와 "실제로 막는다"는 다릅니다. 노트북에 Postgres가 있다면
-`test/000_supabase_stub.sql` → `setup.sql` → `test/010_rls_test.sql` 순서로
-실행해 79개 항목을 직접 확인할 수 있습니다. 이 저장소에서는 전부 통과했습니다(2026-09-30).
+`bash supabase/test/run-rls.sh` 한 줄로 `test/000_supabase_stub.sql` → `setup.sql` → `test/010_rls_test.sql` 을
+시험용 데이터베이스(kpjk_rls — 실제 Supabase·운영 데이터와 무관)에 올려 156개 항목을 직접 확인할 수 있습니다.
+실패가 있으면 종료 코드 1. 이 저장소에서는 전부 통과했습니다(2026-10-19, 경과 보고 확인 기록·규칙 업무 11항목 포함).
 실제 Supabase(로컬 Docker)에 대표·컨설턴트·고객 계정으로 붙인 화면 검증은 `tools/pilot/` 에 있습니다.
 
 - 고객은 자기 회사만 보이고, 남의 회사는 기업·프로젝트·문의·파일 어느 것도 안 보임

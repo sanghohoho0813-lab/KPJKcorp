@@ -68,8 +68,11 @@ export function reportSeenAt(activities: Pick<Activity, "type" | "at" | "meta">[
   return at;
 }
 
+/** 기간 표기 — 하루면 "10/19", 아니면 "10/5 ~ 10/19" */
+const span = (from: string, to: string, sep = " ~ ") => (from === to ? md(to) : `${md(from)}${sep}${md(to)}`);
+
 export function reportTitle(from: string, to: string) {
-  return `${REPORT_PREFIX} · ${md(from)} ~ ${md(to)}`;
+  return `${REPORT_PREFIX} · ${span(from, to)}`;
 }
 
 /**
@@ -149,7 +152,7 @@ export function buildReport(src: ReportSource, from: string, to: string, nowIso 
 /** 보낼 본문 — ■ 묶음 제목 · 줄. 고객 화면은 이 표시를 보고 제목·목록으로 그린다(NoticeBody) */
 export function reportBody(opts: { company: Company; from: string; to: string; sections: ReportSection[]; skip?: Set<string>; note?: string; signature?: string }): string {
   const who = opts.company.ceo ? `${opts.company.ceo} 대표님` : "대표님";
-  const out: string[] = [`${who}, ${md(opts.from)}~${md(opts.to)} 진행 상황을 정리해 드립니다.`];
+  const out: string[] = [`${who}, ${span(opts.from, opts.to, "~")} 진행 상황을 정리해 드립니다.`];
   for (const s of opts.sections) {
     const lines = s.lines.filter((l) => !opts.skip?.has(l.key));
     if (!lines.length) continue;

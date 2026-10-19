@@ -496,8 +496,11 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
   const strip = page.getByTestId('pinned-strip');
   ok('10 고객 홈 맨 위: 담당자 경과 보고', /담당자 경과 보고/.test(await strip.innerText()) && /경과 보고 ·/.test(await strip.innerText()));
   await strip.click(); await sleep(1200);
+  ok('10 고객 화면: 지난 보고는 접힌 묶음(제목만)', /지난 경과 보고 1건/.test(await page.getByTestId('older-reports').innerText()) && (await page.locator('#notices [data-notice-body]').filter({ hasText: 'REPORT-OK' }).count()) === 0);
+  await page.getByTestId('older-reports').getByRole('button', { name: /지난 경과 보고 1건/ }).click(); await sleep(300);
+  await page.getByTestId('older-reports').getByRole('button', { name: /경과 보고 ·/ }).first().click(); await sleep(300);
   const body = page.locator('#notices [data-notice-body]').filter({ hasText: 'REPORT-OK' }).first();
-  ok('10 고객 화면: 첫 보고 본문(한마디 포함)', await body.isVisible());
+  ok('10 고객 화면: 펼치면 첫 보고 본문(한마디 포함)', await body.isVisible());
   const latest = page.locator('#notices [data-notice-body]').first();
   ok('10 고객 화면: 묶음 제목은 굵은 제목 · 줄은 목록', (await latest.locator('div.font-bold').filter({ hasText: '지금 진행 상황' }).count()) === 1 && (await latest.locator('div.flex.gap-2').count()) >= 2);
   await sleep(1500);
@@ -521,6 +524,8 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
   ok('10 보고 창: 지난 보고 · 고객 확인', /지난 보고 .* · 고객 확인 \d+\/\d+/.test(await dlg().getByTestId('report-range').innerText()));
   await go(page, '/ax/schedule?tab=notice');
   ok('10 공지 관리: 경과 보고마다 고객 확인 / 확인 전', (await page.getByText(/^고객 확인 \d+\/\d+$/).count()) >= 1 && (await page.getByText('고객 확인 전', { exact: true }).count()) >= 1);
+  await page.getByTestId('notice-kind').getByRole('button', { name: /^경과 보고 \d+$/ }).click(); await sleep(300);
+  ok('10 공지 관리: 경과 보고만 거르기', (await page.getByText('중간 보고 전 확인 부탁드립니다').count()) === 0 && (await page.getByText(/^경과 보고 · \d+\/\d+( ~ \d+\/\d+)?$/).count()) === 2);
   await go(page, '/portal/schedule');
   await page.setViewportSize({ width: 390, height: 844 }); await sleep(500);
   ok('10 휴대폰 일정 · 공지 가로 넘침 없음', (await overflow(page)) <= 0);

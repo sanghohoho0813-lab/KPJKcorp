@@ -95,6 +95,7 @@ ok(body.includes("■ 지금 진행 상황\n· 경영진단 — 자료 검토 �
 ok(!body.includes("문의 1건") && !body.includes("■ 다음 일정"), "뺀 줄 · 다 뺀 묶음은 없음");
 ok(body.includes("■ 담당자 한마디\n이번 주에 초안을 마무리합니다.") && body.endsWith("— 박담당 이사"), "한마디 · 서명");
 ok(reportTitle(from, to) === "경과 보고 · 10/5 ~ 10/19", "제목");
+ok(reportTitle(to, to) === "경과 보고 · 10/19" && reportBody({ company, from: to, to, sections: [] }).startsWith("홍길동 대표님, 10/19 진행 상황"), "같은 날 다시 보내면 하루로 표기");
 
 // 7) 공지 본문 서식
 const blocks = noticeBlocks(body);

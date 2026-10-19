@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Megaphone, Pencil, Pin, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, Megaphone, Pencil, Pin, Plus, Trash2 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { can } from "@/lib/permissions";
 import { fmtDate, fmtRelative } from "@/lib/format";
 import type { Notice } from "@/lib/types";
 import { isReport, localDay, md, noticeBlocks, reportSeenAt } from "@/lib/progress-report";
-import { Badge, Button, Card, EmptyState, Field, Input, Select, Textarea, cx } from "@/components/ui/ui";
+import { Badge, Button, Card, EmptyState, Field, Input, SegmentedControl, Select, Textarea, cx } from "@/components/ui/ui";
 import { Modal, Confirm } from "@/components/ui/overlay";
 import { Chip } from "@/components/ui/chips";
 
@@ -31,30 +31,45 @@ const isLive = (n: Notice, nowIso: string) => n.publishedAt <= nowIso && (!n.exp
 
 export function NoticeList({ items, limit, compact }: { items: Notice[]; limit?: number; compact?: boolean }) {
   const [open, setOpen] = useState<string | null>(null);
-  const list = limit ? items.slice(0, limit) : items;
+  const [olderOpen, setOlderOpen] = useState(false);
+  // 경과 보고는 2주마다 쌓인다 — 펼쳐 두는 것은 가장 최근 하나, 지난 보고는 접은 묶음으로(제목만, 누르면 펼침)
+  const reports = items.filter(isReport).sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
+  const older = new Set(reports.slice(1).map((n) => n.id));
+  const main = items.filter((n) => !older.has(n.id));
+  const list = limit ? main.slice(0, limit) : main;
+  const item = (n: Notice, folded: boolean) => {
+    const expanded = !folded || open === n.id;
+    return (
+      <div key={n.id} className={cx("rounded-xl border px-4 py-3", n.pinned ? "border-accent/40 bg-soft/40" : "border-line")}>
+        <button
+          type="button"
+          onClick={() => folded && setOpen(open === n.id ? null : n.id)}
+          aria-expanded={folded ? expanded : undefined}
+          className={cx("flex w-full items-start gap-2 text-left", folded && "pressable")}
+        >
+          {n.pinned ? <Pin size={15} className="mt-1 shrink-0 text-accent" /> : <Megaphone size={15} className="mt-1 shrink-0 text-ink-3" />}
+          <span className="min-w-0 flex-1">
+            <span className="block font-bold leading-snug">{n.title}</span>
+            <span className="mt-0.5 block text-[0.78rem] text-ink-3">{fmtDate(n.publishedAt, { year: true })}{n.expiresAt ? ` · ${fmtDate(n.expiresAt)}까지` : ""}</span>
+          </span>
+        </button>
+        {expanded && n.body && <NoticeBody text={n.body} className="mt-2 sm:pl-6" />}
+        {expanded && isReport(n) && <SeenMark noticeId={n.id} />}
+      </div>
+    );
+  };
   return (
     <div className="space-y-2">
-      {list.map((n) => {
-        const expanded = !compact || open === n.id;
-        return (
-          <div key={n.id} className={cx("rounded-xl border px-4 py-3", n.pinned ? "border-accent/40 bg-soft/40" : "border-line")}>
-            <button
-              type="button"
-              onClick={() => compact && setOpen(open === n.id ? null : n.id)}
-              aria-expanded={compact ? expanded : undefined}
-              className={cx("flex w-full items-start gap-2 text-left", compact && "pressable")}
-            >
-              {n.pinned ? <Pin size={15} className="mt-1 shrink-0 text-accent" /> : <Megaphone size={15} className="mt-1 shrink-0 text-ink-3" />}
-              <span className="min-w-0 flex-1">
-                <span className="block font-bold leading-snug">{n.title}</span>
-                <span className="mt-0.5 block text-[0.78rem] text-ink-3">{fmtDate(n.publishedAt, { year: true })}{n.expiresAt ? ` · ${fmtDate(n.expiresAt)}까지` : ""}</span>
-              </span>
-            </button>
-            {expanded && n.body && <NoticeBody text={n.body} className="mt-2 sm:pl-6" />}
-            {expanded && isReport(n) && <SeenMark noticeId={n.id} />}
-          </div>
-        );
-      })}
+      {list.map((n) => item(n, !!compact))}
+      {older.size > 0 && !limit && (
+        <div data-testid="older-reports">
+          <button type="button" onClick={() => setOlderOpen((v) => !v)} aria-expanded={olderOpen}
+            className="pressable flex min-h-11 w-full items-center justify-between rounded-xl border border-dashed border-line-2 px-4 text-left text-[0.88rem] font-semibold text-ink-2">
+            지난 경과 보고 {older.size}건 <ChevronDown size={16} className={cx("shrink-0 transition-transform", olderOpen && "rotate-180")} />
+          </button>
+          {olderOpen && <div className="mt-2 space-y-2">{reports.slice(1).map((n) => item(n, true))}</div>}
+        </div>
+      )}
     </div>
   );
 }
@@ -108,7 +123,13 @@ export function NoticeManager() {
   const remove = useStore((s) => s.removeNotice);
   const toast = useStore((s) => s.toast);
   const nowIso = new Date().toISOString();
-  const list = [...st.notices].sort((a, b) => Number(isLive(b, nowIso)) - Number(isLive(a, nowIso)) || Number(!!b.pinned) - Number(!!a.pinned) || b.publishedAt.localeCompare(a.publishedAt));
+  // 경과 보고가 기업마다 2주에 한 번씩 쌓인다 — 종류로 거르고, 처음엔 30개만
+  const [kind, setKind] = useState<"all" | "notice" | "report">("all");
+  const [more, setMore] = useState(false);
+  const all = [...st.notices].sort((a, b) => Number(isLive(b, nowIso)) - Number(isLive(a, nowIso)) || Number(!!b.pinned) - Number(!!a.pinned) || b.publishedAt.localeCompare(a.publishedAt));
+  const reportN = all.filter(isReport).length;
+  const filtered = kind === "all" ? all : all.filter((n) => isReport(n) === (kind === "report"));
+  const list = more ? filtered : filtered.slice(0, 30);
   const who = (id: string) => st.users.find((u) => u.id === id)?.name ?? "";
 
   return (
@@ -119,8 +140,14 @@ export function NoticeManager() {
         </p>
         {may && <Button variant="accent" icon={<Plus size={16} />} onClick={() => setEditing("new")}>공지 작성</Button>}
       </div>
+      {reportN > 0 && (
+        <div className="mb-3" data-testid="notice-kind">
+          <SegmentedControl size="sm" value={kind} onChange={(k) => { setKind(k); setMore(false); }}
+            options={[{ key: "all", label: `전체 ${all.length}` }, { key: "notice", label: `일반 공지 ${all.length - reportN}` }, { key: "report", label: `경과 보고 ${reportN}` }]} />
+        </div>
+      )}
       <Card className="overflow-hidden">
-        {list.length === 0 ? (
+        {all.length === 0 ? (
           <EmptyState icon={<Megaphone size={30} />} title="아직 게시한 공지가 없습니다" desc="첫 공지를 쓰면 고객 Portal 의 '일정 · 공지'와 홈 화면에 뜹니다."
             action={may ? <Button variant="outline" onClick={() => setEditing("new")}>공지 작성</Button> : undefined} />
         ) : (
@@ -152,6 +179,11 @@ export function NoticeManager() {
                 </div>
               );
             })}
+            {filtered.length > list.length && (
+              <button type="button" onClick={() => setMore(true)} className="pressable flex min-h-11 w-full items-center justify-center text-[0.86rem] font-semibold text-ink-2 hover:bg-surface-2">
+                {filtered.length - list.length}개 더 보기
+              </button>
+            )}
           </div>
         )}
       </Card>

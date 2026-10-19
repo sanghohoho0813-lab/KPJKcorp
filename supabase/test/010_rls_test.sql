@@ -447,6 +447,51 @@ set role anon;
 select chk('로그인 안 한 사람: 거절',                   denied($$select public.kpjk_mark_notifications_read(array['nt_rd1'])$$), true);
 reset role;
 
+-- =========================== 경과 보고 — 고객 확인 기록 · 규칙 업무 (2026-10-19) ========
+-- 고객은 자기 이름 · 자기 회사로만 '경과 보고 확인'(notice_read)을 남긴다. 담당자는 그 기록을 보고,
+-- '보고 미확인 → 확인 연락' 규칙 업무를 만들고(같은 열쇠는 DB 가 한 번만), 고객이 보면 대표 화면이 끝낸다.
+create or replace function dup_blocked(p_sql text) returns boolean
+language plpgsql as $$
+begin
+  execute p_sql;
+  return false;
+exception when unique_violation then
+  return true;
+end $$;
+insert into public.notices(id, company_id, title, body, pinned, author_id) values
+  ('nc_rep1', 'co_a', '경과 보고 · 10/5 ~ 10/19', '■ 지금 진행 상황', true, '00000000-0000-0000-0000-00000000c001');
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000f001';   -- 고객 A
+select chk('고객A: 자기 회사 경과 보고가 보인다',          visible($$select 1 from public.notices where id='nc_rep1'$$), 1::bigint);
+select chk('고객A: 경과 보고 확인을 자기 이름으로 남긴다',
+       affected($$insert into public.activities(id, type, company_id, actor_id, actor_role, message, meta) values ('ac_nr1','notice_read','co_a','00000000-0000-0000-0000-00000000f001','client','경과 보고 확인','{"noticeId":"nc_rep1"}')$$), 1::bigint);
+select chk('고객A: 다른 회사 이름으로는 못 남긴다',
+       denied($$insert into public.activities(id, type, company_id, actor_id, actor_role, message, meta) values ('ac_nr2','notice_read','co_b','00000000-0000-0000-0000-00000000f001','client','가짜','{"noticeId":"nc_rep1"}')$$), true);
+select chk('고객A: 담당자 이름으로는 못 남긴다',
+       denied($$insert into public.activities(id, type, company_id, actor_id, actor_role, message, meta) values ('ac_nr3','notice_read','co_a','00000000-0000-0000-0000-00000000c001','consultant','가짜','{"noticeId":"nc_rep1"}')$$), true);
+select chk('고객A: 확인 기록은 고객 화면 기록 목록 밖(읽기 없음)', visible($$select 1 from public.activities where type='notice_read'$$), 0::bigint);
+reset role; reset request.jwt.claim.sub;
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000f002';   -- 고객 B
+select chk('고객B: A사 경과 보고는 안 보인다',            visible($$select 1 from public.notices where id='nc_rep1'$$), 0::bigint);
+reset role; reset request.jwt.claim.sub;
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000c001';   -- 컨설턴트
+select chk('컨설턴트: 고객 확인 기록이 보인다(보고 id 그대로)',
+       visible($$select 1 from public.activities where type='notice_read' and meta->>'noticeId'='nc_rep1'$$), 1::bigint);
+reset role; reset request.jwt.claim.sub;
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000a001';   -- 대표(규칙은 대표 화면이 돌린다)
+select chk('대표: 확인 연락 규칙 업무를 만든다',
+       affected($$insert into public.tasks(id, company_id, title, type, assignee_id, status, source, rule_key) values ('tk_ru1','co_a','에이테스트 경과 보고 3일 미확인 — 확인 연락','후속연락','00000000-0000-0000-0000-00000000c001','todo','auto','report_unseen:nc_rep1')$$), 1::bigint);
+select chk('대표: 같은 열쇠의 업무는 DB 가 다시 못 만들게 막는다',
+       dup_blocked($$insert into public.tasks(id, company_id, title, type, assignee_id, status, source, rule_key) values ('tk_ru2','co_a','중복','후속연락','00000000-0000-0000-0000-00000000c001','todo','auto','report_unseen:nc_rep1')$$), true);
+select chk('대표: 고객이 본 뒤 그 업무를 끝낸다',
+       affected($$update public.tasks set status='done', completed_at=now() where id='tk_ru1'$$), 1::bigint);
+select chk('대표: 자동 완료 기록(system)을 남긴다',
+       affected($$insert into public.activities(id, type, company_id, actor_id, actor_role, message) values ('ac_ru1','task_completed','co_a',null,'system','업무 완료(대표가 경과 보고 확인)')$$), 1::bigint);
+reset role; reset request.jwt.claim.sub;
+
 -- =========================== 결과 ===========================================
 select n, case when pass then '통과' else '실패' end as 결과, label as 검증, detail as 비고
 from _r order by n;
