@@ -150,7 +150,7 @@ export default function ClientCardPage() {
 
   return (
     <div className="space-y-5">
-      <Link href="/ax/clients" className="link-more"><ArrowLeft size={16} /> 기업고객</Link>
+      {/* PC 는 위 위치 표시(기업고객 › 상세)가 돌아가기 역할 — 휴대폰에서만 */}<Link href="/ax/clients" className="link-more lg:hidden"><ArrowLeft size={16} /> 기업고객</Link>
 
       {/* Header — SIGNATURE 01 Enterprise Client Card */}
       <Card className="p-5 md:p-6">
@@ -255,7 +255,7 @@ export default function ClientCardPage() {
 
       {/* Quick status */}
       {/* 휴대폰에서는 아래 "지금 할 일"이 같은 내용을 더 구체적으로 보여 준다 */}
-      <div className="hidden grid-cols-2 gap-3 md:grid md:grid-cols-4">
+      <div className="kpi-row hidden grid-cols-2 gap-3 md:grid md:grid-cols-4">
         <KpiCard label="진행 프로젝트" value={active.length} sub={active[0]?.name ?? "없음"} icon={<IconTile color="var(--mod-ops)" size={30}><FolderOpen size={15} /></IconTile>} />
         <KpiCard label="자료 미제출 · 검토대기" value={<>{missing.length}<span className="text-[1rem] text-ink-3"> / {waiting.length}</span></>} sub={missing.some((d) => daysBetween(d.dueDate, nowIso) > 0) ? "기한 초과 있음" : "기한 내"} tone={missing.some((d) => daysBetween(d.dueDate, nowIso) > 0) ? "error" : undefined} icon={<IconTile color="var(--mod-doc)" size={30}><FileText size={15} /></IconTile>} />
         <KpiCard label="다음 일정" value={upcoming[0] ? fmtDate(upcoming[0].start) : "-"} sub={upcoming[0]?.title ?? "예정 일정 없음"} icon={<IconTile color="var(--mod-schedule)" size={30}><CalendarDays size={15} /></IconTile>} />

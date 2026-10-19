@@ -60,7 +60,7 @@ export function Badge({ tone = "neutral", children, className, dot }: { tone?: T
   return (
     // max-w-full + 말줄임: 글자 크기를 키운 좁은 화면에서 라벨이 길면 배지가 화면을 밀어낸다.
     // 라벨이 잘리는 것보다 페이지가 가로로 스크롤되는 쪽이 더 나쁘다.
-    <span className={cx("inline-flex max-w-full items-center gap-1.5 overflow-hidden text-ellipsis rounded-full px-2.5 py-0.5 text-[0.75rem] font-semibold whitespace-nowrap leading-5", toneCls[tone], className)}>
+    <span className={cx("badge inline-flex max-w-full items-center gap-1.5 overflow-hidden text-ellipsis rounded-full px-2.5 py-0.5 text-[0.75rem] font-semibold whitespace-nowrap leading-5", toneCls[tone], className)}>
       {dot && <span className="h-1.5 w-1.5 rounded-full bg-current" />}
       {children}
     </span>
@@ -167,7 +167,7 @@ export function PageHeader({ title, desc, actions, badge, id }: { title: ReactNo
 
 export function SectionTitle({ children, action, className }: { children: ReactNode; action?: ReactNode; className?: string }) {
   return (
-    <div className={cx("mb-3 flex items-center justify-between gap-3", className)}>
+    <div className={cx("section-title mb-3 flex items-center justify-between gap-3", className)}>
       {/* 제목이 줄바꿈되더라도 오른쪽 버튼·배지는 한 줄을 지킨다 — 좁은 화면에서 "AI READY"가 세 줄로 찢어졌다 */}
       <h2 className="min-w-0 text-[1.15rem] font-bold">{children}</h2>
       {action && <div className="flex shrink-0 items-center gap-2">{action}</div>}

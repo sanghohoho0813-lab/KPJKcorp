@@ -563,6 +563,24 @@ function MoreSheet() {
   );
 }
 
+/** 위치 표시 — 모듈 › 화면 (› 상세). ERP 처럼 지금 어디에 있는지 늘 한 줄로. 휴대폰은 아래 막대가 위치를 알려 주므로 PC 에서만 */
+function AxCrumb({ pathname }: { pathname: string }) {
+  const under = (href: string) => pathname === href || pathname.startsWith(href + "/");
+  const hit = NAV_GROUPS.flatMap((g) => g.items.map((i) => ({ group: g.label, item: i }))).find((x) => under(x.item.href));
+  const util = hit ? undefined : NAV_UTILITY.find((i) => under(i.href));
+  const item = hit?.item ?? util;
+  if (!item) return null;
+  const detail = pathname !== item.href;
+  return (
+    <nav aria-label="현재 위치" data-testid="ax-crumb" className="ax-crumb mb-2.5 hidden min-w-0 items-center gap-1 text-[0.75rem] font-semibold text-ink-3 lg:flex">
+      <span className="shrink-0">{hit?.group ?? "도움말 · 설정"}</span>
+      <ChevronRight size={12} className="shrink-0 opacity-60" />
+      {detail ? <Link href={item.href} className="truncate hover:text-ink">{item.label}</Link> : <span className="truncate text-ink-2">{item.label}</span>}
+      {detail && <><ChevronRight size={12} className="shrink-0 opacity-60" /><span className="shrink-0 text-ink-2">상세</span></>}
+    </nav>
+  );
+}
+
 export function AxShell({ children }: { children: ReactNode }) {
   const hydrated = useStore((s) => s.hydrated);
   const session = useStore((s) => s.session);
@@ -589,8 +607,14 @@ export function AxShell({ children }: { children: ReactNode }) {
 
   const ready = hydrated && session && session.role !== "client";
 
+  // 내부 화면 디자인(.ax-ui — ERP 처럼 정돈된 모양)은 창(body 로 나감)에도 걸려야 해서 html 에도 붙인다
+  useEffect(() => {
+    document.documentElement.classList.add("ax-ui");
+    return () => document.documentElement.classList.remove("ax-ui");
+  }, []);
+
   return (
-    <div className="min-h-screen bg-canvas">
+    <div className="ax-ui min-h-screen bg-canvas">
       <Sidebar />
       <div className="lg:pl-[var(--sidebar-w)]">
         <Header />
@@ -601,6 +625,7 @@ export function AxShell({ children }: { children: ReactNode }) {
           <LivePopups audience="internal" />
           <UnreadTitle audience="internal" />
           <PasswordNudge href="/ax/settings?open=account" />
+          {ready && <AxCrumb pathname={pathname} />}
           {ready ? <div key={pathname} className="anim-page">{children}</div> : <PageSkeleton />}
         </main>
       </div>

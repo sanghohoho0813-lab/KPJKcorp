@@ -191,13 +191,13 @@ export function CoachCard() {
 
   if (!s.active) {
     return (
-      <Card className="coach-box coach-glow anim-rise overflow-hidden p-5">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center">
+      <Card className="coach-box coach-glow anim-rise overflow-hidden px-5 py-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
           <div className="flex min-w-0 flex-1 items-start gap-3">
             <span className="hover-pop flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-ink"><Compass size={20} /></span>
             <div className="min-w-0">
               <h2 className="text-[1.1rem] font-bold">AX 실증 14일을 시작할까요?</h2>
-              <p className="mt-1 text-[0.88rem] leading-relaxed text-ink-2">
+              <p className="mt-1 line-clamp-2 text-[0.88rem] leading-relaxed text-ink-2 md:line-clamp-none">
                 하루 1~3개 미션으로 실제 업무를 시스템 안에서 처리합니다. 별도 입력 없이, 그 행동이 그대로 실증 기록이 됩니다.
               </p>
             </div>
@@ -207,7 +207,7 @@ export function CoachCard() {
           </Button>
         </div>
         <WhyToggle open={why} onToggle={() => setWhy((v) => !v)} />
-        <div className="-mx-5 -mb-5 mt-4"><BaselineNudge /></div>
+        <div className="-mx-5 -mb-4 mt-3 empty:hidden"><BaselineNudge /></div>
       </Card>
     );
   }

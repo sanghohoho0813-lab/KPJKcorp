@@ -459,3 +459,54 @@ html[data-motion="reduce"] .coach-glow { animation: none; }
 .snap-row > * { scroll-snap-align: start; }
 /* 입력칸 — 고객 화면은 조금 더 둥글게 */
 .portal-ui .field-input { border-radius: 14px; }
+
+/* ------------------------------------------------------------------
+   내부 AX — ERP 처럼 정돈된 모양: 차분한 회색 바탕, 얇은 테두리·작은 그림자, 각진 상태 칩,
+   머리 영역 아래 구분선, 패널 제목줄, 촘촘한 숫자 칸. AxShell 이 html 과 바깥 div 에 .ax-ui 를 붙인다.
+   글자 크기 기준(19px~)과 기능은 그대로 — 모양과 밀도만 바꾼다.
+   ------------------------------------------------------------------ */
+.ax-ui {
+  --radius-card: 12px;
+  --radius-btn: 8px;
+  --neutral-canvas: #f3f4f6;
+  --ax-head: #f8f9fb;
+  --ax-line: #e2e5ea;
+}
+.ax-ui .card { border-color: var(--ax-line); box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05); }
+.ax-ui .card-hover:hover { transform: none; border-color: var(--neutral-border-2); box-shadow: 0 2px 10px -4px rgba(16, 24, 40, 0.16); }
+.ax-ui .badge { border-radius: 6px; }
+.ax-ui .seg { border-radius: 9px; }
+.ax-ui .seg-btn { border-radius: 7px; }
+.ax-ui .field-input { border-radius: 8px; }
+/* 화면 머리 — 제목은 한 단계 작게, 아래 구분선으로 본문과 나눈다 */
+.ax-ui .page-header { padding-bottom: 0.95rem; margin-bottom: 1.3rem; border-bottom: 1px solid var(--ax-line); }
+.ax-ui .page-header h1 { font-size: 1.55rem; font-weight: 800; letter-spacing: -0.015em; line-height: 1.25; }
+.ax-ui .page-header p { font-size: 0.86rem; }
+@media (max-width: 767px) { .ax-ui .page-header h1 { font-size: 1.32rem; } }
+/* 숫자 칸 — 낮고 촘촘하게 */
+.ax-ui .kpi { padding: 0.85rem 1rem; gap: 0.35rem; }
+.ax-ui .kpi-value { font-size: 1.7rem; letter-spacing: -0.01em; }
+.ax-ui .kpi > div:first-child > span:first-child { font-size: 0.8rem; }
+.ax-ui .kpi .mt-2 { margin-top: 0.3rem; font-size: 0.78rem; }
+/* 패널 — 제목줄을 띠로 (카드 첫 줄의 SectionTitle) */
+.ax-ui .card.p-5 { padding-block: 1rem; }
+.ax-ui .card.p-5 > .section-title:first-child {
+  margin: -1rem -1.25rem 0.85rem; padding: 0.7rem 1.25rem;
+  background: var(--ax-head); border-bottom: 1px solid var(--ax-line);
+  border-radius: calc(var(--radius-card) - 1px) calc(var(--radius-card) - 1px) 0 0;
+}
+.ax-ui .section-title h2 { font-size: 1rem; }
+/* 표 머리 */
+.ax-ui table thead th { background: var(--ax-head); font-size: 0.78rem; font-weight: 600; color: var(--neutral-text-2); }
+/* AI·자동화 버튼 — 화면마다 있는 버튼이라 보라 덩어리 대신 차분한 테두리 버튼으로 */
+.ax-ui .ax-insight { border-color: var(--neutral-border-2); background: var(--neutral-surface); color: var(--neutral-text-2); font-weight: 600; }
+.ax-ui .ax-insight svg { color: var(--nav-ai-ink); }
+.ax-ui .ax-insight:hover { background: var(--neutral-surface-2); }
+/* AX 코치 상자 — 번지는 빛 대신 왼쪽 강조선 하나 */
+.ax-ui .coach-box { background: var(--neutral-surface); border-color: var(--ax-line); box-shadow: inset 3px 0 0 var(--theme-accent), 0 1px 2px rgba(16, 24, 40, 0.05); }
+.ax-ui .coach-glow { animation: none; }
+/* 숫자 칸 묶음 — 따로 뜬 카드 대신 한 장의 요약판(칸 사이는 1px 선). 격자 틈을 선 색으로 칠하는 방식이라
+   2칸·4칸·8칸 어느 배치에서도 선이 맞는다 */
+.ax-ui .kpi-row { gap: 1px; background: var(--ax-line); border: 1px solid var(--ax-line); border-radius: var(--radius-card); overflow: hidden; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05); }
+.ax-ui .kpi-row > .card, .ax-ui .kpi-row > a.card, .ax-ui .kpi-row > div > .card { border: 0; border-radius: 0; box-shadow: none; }
+.ax-ui .kpi-row > .card-hover:hover, .ax-ui .kpi-row .card-hover:hover { box-shadow: none; background: var(--ax-head); }

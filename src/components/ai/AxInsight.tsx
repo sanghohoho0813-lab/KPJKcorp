@@ -23,7 +23,7 @@ export function AxInsightButton({ topic, className, compact }: { topic: InsightT
         aria-label="AI · 자동화 적용 보기"
         title="이 화면에서 작동 중인 자동화와 AI·API 고도화 방향"
         className={cx(
-          "pressable inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-lg border border-[color:var(--nav-ai-ink)]/25 bg-[color:var(--nav-ai)]/10 px-2.5 py-1.5 text-[0.8rem] font-bold text-[color:var(--nav-ai-ink)] hover:bg-[color:var(--nav-ai)]/20",
+          "ax-insight pressable inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-lg border border-[color:var(--nav-ai-ink)]/25 bg-[color:var(--nav-ai)]/10 px-2.5 py-1.5 text-[0.8rem] font-bold text-[color:var(--nav-ai-ink)] hover:bg-[color:var(--nav-ai)]/20",
           className,
         )}
       >

@@ -65,7 +65,7 @@ function DocumentsInner() {
             action={<LinkButton href="/ax/projects" variant="accent">프로젝트로 가기</LinkButton>} />
         </Card>
       ) : <>
-      <div className="mb-5 mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="kpi-row mb-5 mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
         <KpiCard label="미제출" value={counts.missing} sub={counts.overdue ? `기한 초과 ${counts.overdue}` : "기한 초과 없음"} tone={counts.overdue ? "error" : undefined} />
         <KpiCard label="검토 대기 · 검토중" value={counts.waiting} sub="담당자 검토 필요" accentValue={counts.waiting > 0} />
         <KpiCard label="보완필요" value={counts.revision} sub="고객 재제출 대기" tone={counts.revision ? "error" : undefined} />

@@ -103,9 +103,10 @@ export function OpsStrip() {
         <span className="text-[0.95rem] font-bold">운영 현황</span>
         <Badge>{assigneeId ? "내 담당 기준" : "회사 전체"}</Badge>
       </div>
-      <div className="grid grid-cols-3 gap-2 md:grid-cols-6">
+      {/* 한 장의 요약판 — 칸 사이는 1px 선(격자 틈을 선 색으로 칠한다) */}
+      <div className="grid grid-cols-3 gap-px overflow-hidden rounded-[10px] border border-line bg-line md:grid-cols-6">
         {items.map((it) => (
-          <Link key={it.label} href={it.href} className="pressable min-w-0 rounded-xl bg-surface-2 px-3 py-2.5 hover:bg-line/60">
+          <Link key={it.label} href={it.href} className="pressable min-w-0 bg-surface px-3 py-2.5 hover:bg-surface-2">
             {/* 폰에서는 세 칸이라 이름이 잘린다 — 자르지 않고 두 줄로. 숫자 줄은 칸마다 같은 높이에 맞춘다 */}
             <div className="flex min-h-[2.1em] items-start text-[0.75rem] font-semibold leading-tight text-ink-3 md:min-h-0">{it.label}</div>
             <div className={cx("tnum mt-0.5 text-[1.35rem] font-bold leading-tight", it.hot && "text-error")}>{it.n}</div>

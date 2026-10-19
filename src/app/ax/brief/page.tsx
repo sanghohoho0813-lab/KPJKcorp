@@ -51,7 +51,7 @@ export default function BriefPage() {
           </span>
         ))}
       </div>
-      <div className="mb-4 hidden gap-3 md:grid md:grid-cols-4 xl:grid-cols-8">
+      <div className="kpi-row mb-4 hidden gap-3 md:grid md:grid-cols-4 xl:grid-cols-8">
         <KpiCard label="후속연락 필요" value={counts.followups} tone={counts.followups ? "error" : undefined} />
         <KpiCard label="자료 기한 이슈" value={counts.docs} tone={counts.docs ? "error" : undefined} />
         <KpiCard label="정체 프로젝트" value={counts.stalled} tone={counts.stalled ? "error" : undefined} />

@@ -82,7 +82,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+      <div className="page-header flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
         <div>
           <div className="text-[0.85rem] font-semibold text-ink-3">{fmtFull(now)}</div>
           <h1 className="text-[1.75rem] font-bold md:text-[2rem]">오늘 확인할 일</h1>
@@ -96,7 +96,7 @@ export default function DashboardPage() {
       <FirstRunOrCoach />
 
       {/* 첫 화면 숫자는 "지금 처리할 것"만 — 누르면 그 일로 바로 간다. 상태 숫자(운영 현황)는 아래에 둔다 */}
-      <div id="tut-kpi" className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
+      <div id="tut-kpi" className="kpi-row grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
         {isAdmin
           ? <KpiCard label="내 승인 대기" value={pendingApprovals.length} sub={pendingApprovals.length ? "지금 확인 필요" : "대기 없음"} href="/ax/opportunities?tab=approvals" tone={pendingApprovals.length ? "error" : undefined} icon={<IconTile color="var(--mod-alert)" size={32}><ShieldCheck size={16} /></IconTile>} />
           : <KpiCard id="kpi-today" label="오늘 할 업무" value={todayMine.length} sub={overdueMine ? `기한 초과 ${overdueMine}건 포함` : todayMine.length ? "오늘 18시까지" : "모두 처리"} href="/ax/tasks" tone={overdueMine ? "error" : undefined} accentValue={!overdueMine && todayMine.length > 0} icon={<IconTile color="var(--mod-ops)" size={32}><ListChecks size={16} /></IconTile>} />}
