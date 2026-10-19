@@ -1,4 +1,4 @@
-import type { Company, DocumentRequest, Inquiry, Notice, Project, ResultFile, Schedule } from "./types";
+import type { Activity, Company, DocumentRequest, Inquiry, Notice, Project, ResultFile, Schedule } from "./types";
 import { CUSTOMER_STEPS, stageToCustomerStep } from "./stages";
 import { addMonthsYmd, todayYmd } from "./vault";
 
@@ -59,6 +59,13 @@ export const isReport = (n: Pick<Notice, "title">) => n.title.startsWith(REPORT_
 /** 이 기업에 보낸 가장 최근 경과 보고 */
 export function lastReportFor(notices: Notice[], companyId: string): Notice | undefined {
   return notices.filter((n) => n.companyId === companyId && isReport(n)).sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))[0];
+}
+
+/** 고객이 이 보고를 처음 끝까지 본 때(Portal 기록 notice_read). 아직이면 undefined */
+export function reportSeenAt(activities: Pick<Activity, "type" | "at" | "meta">[], noticeId: string): string | undefined {
+  let at: string | undefined;
+  for (const a of activities) if (a.type === "notice_read" && a.meta?.noticeId === noticeId && (!at || a.at < at)) at = a.at;
+  return at;
 }
 
 export function reportTitle(from: string, to: string) {

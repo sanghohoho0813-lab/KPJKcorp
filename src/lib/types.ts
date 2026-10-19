@@ -694,6 +694,8 @@ export type ActivityType =
   | "task_completed"
   | "portal_login"
   | "result_downloaded"
+  /** 고객이 Portal 에서 경과 보고를 끝까지 봄 — meta.noticeId */
+  | "notice_read"
   | "opportunity_created"
   | "program_shared"
   | "program_unshared"

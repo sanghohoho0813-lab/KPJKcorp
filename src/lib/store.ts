@@ -225,6 +225,8 @@ export interface StoreState extends SeedData {
   removePayment: (id: string, byUserId: string) => void;
   shareResult: (data: Omit<ResultFile, "id" | "sharedAt">, byUserId: string) => void;
   downloadResult: (resultId: string, byUserId: string) => void;
+  /** 고객이 Portal 에서 경과 보고를 끝까지 봄 — 고객 본인 세션에서만, 같은 보고는 한 번 */
+  markNoticeSeen: (noticeId: string) => boolean;
   // opportunity / approval / survey
   /** onBehalf: 대표·컨설턴트가 고객 화면(미리보기)에서 고객 대신 접수 — 기록에 그렇게 남는다 */
   raiseOpportunity: (data: { companyId: string; serviceKey: string; note?: string; reason?: string; source: OpportunitySource; onBehalf?: boolean }, byUserId: string, byRole: Role) => void;
@@ -1840,6 +1842,17 @@ export const useStore = create<StoreState>()(
           activities: [makeActivity({ type: "result_shared", companyId: data.companyId, projectId: data.projectId, actorId: byUserId, actorRole: "consultant", text: `결과자료 공유: ${data.name}` }), ...st.activities],
           notifications: [makeNotification({ audience: "client", companyId: data.companyId, title: "결과자료가 공유되었습니다", body: `${data.name}을(를) 완료자료에서 확인하세요.`, href: "/portal/results" }), ...st.notifications],
         });
+      },
+      markNoticeSeen: (noticeId) => {
+        const st = get();
+        const s = st.session;
+        // 담당자가 '고객 화면 보기'로 들어온 것은 고객이 본 것이 아니다
+        if (!s || s.role !== "client" || s.portalPreviewCompanyId) return false;
+        const n = st.notices.find((x) => x.id === noticeId);
+        if (!n || !n.companyId || n.companyId !== s.companyId) return false;
+        if (st.activities.some((a) => a.type === "notice_read" && a.meta?.noticeId === noticeId)) return false;
+        set({ activities: [makeActivity({ type: "notice_read", companyId: n.companyId, actorId: s.userId, actorRole: "client", text: `경과 보고 확인: ${n.title}`, meta: { noticeId } }), ...st.activities] });
+        return true;
       },
       downloadResult: (resultId, byUserId) => {
         const st = get();

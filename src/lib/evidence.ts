@@ -75,7 +75,7 @@ export function evidenceAreas(ctx: EvidenceCtx): EvidenceArea[] {
       label: "고객 Portal 사용",
       why: "고객이 직접 참여했다는 증거. AX 도입의 핵심 차별점",
       target: 8,
-      count: countTypes(ctx, ["portal_login", "document_uploaded", "inquiry_created", "quote_responded", "result_downloaded"], (a) => a.actorRole === "client"),
+      count: countTypes(ctx, ["portal_login", "document_uploaded", "inquiry_created", "quote_responded", "result_downloaded", "notice_read"], (a) => a.actorRole === "client"),
       how: "고객에게 자료 요청 · 제안 발송 후 회신 받기",
       href: "/ax/documents",
     },

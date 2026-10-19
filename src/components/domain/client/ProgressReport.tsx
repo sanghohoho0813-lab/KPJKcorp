@@ -5,7 +5,7 @@ import { ClipboardList, Copy, Send } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { can } from "@/lib/permissions";
 import { daysFromTo, todayYmd } from "@/lib/vault";
-import { buildReport, isReport, lastReportFor, localDay, md, reportBody, reportFrom, reportTitle, type ReportRange } from "@/lib/progress-report";
+import { buildReport, isReport, lastReportFor, localDay, md, reportBody, reportSeenAt, reportFrom, reportTitle, type ReportRange } from "@/lib/progress-report";
 import type { Company } from "@/lib/types";
 import { Button, SegmentedControl, Textarea, cx } from "@/components/ui/ui";
 import { Modal } from "@/components/ui/overlay";
@@ -25,6 +25,8 @@ function Inner({ company: c, onClose }: { company: Company; onClose: () => void 
   const me = st.session?.userId ?? "";
   const today = todayYmd();
   const last = useMemo(() => lastReportFor(st.notices, c.id), [st.notices, c.id]);
+  const activities = useStore((s) => s.activities);
+  const lastSeen = useMemo(() => (last ? reportSeenAt(activities, last.id) : undefined), [activities, last]);
   const [range, setRange] = useState<ReportRange>(last && daysFromTo(localDay(last.publishedAt), today) <= 45 ? "since" : "2w");
   const [view, setView] = useState<"pick" | "preview">("pick");
   const [off, setOff] = useState<Set<string>>(new Set());
@@ -78,7 +80,7 @@ function Inner({ company: c, onClose }: { company: Company; onClose: () => void 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2" data-testid="report-range">
         <SegmentedControl size="sm" value={range} onChange={(k) => { setRange(k); setOff(new Set()); }} options={ranges} />
         <span className="text-[0.8rem] text-ink-3">
-          {md(from)} ~ 오늘 · {last ? `지난 보고 ${md(localDay(last.publishedAt))} (${daysFromTo(localDay(last.publishedAt), today)}일 전)` : "보낸 경과 보고 없음"}
+          {md(from)} ~ 오늘 · {last ? `지난 보고 ${md(localDay(last.publishedAt))} (${daysFromTo(localDay(last.publishedAt), today)}일 전) · ${lastSeen ? `고객 확인 ${md(localDay(lastSeen))}` : "고객 확인 전"}` : "보낸 경과 보고 없음"}
         </span>
       </div>
       <p className="mt-1.5 text-[0.78rem] leading-relaxed text-ink-3">

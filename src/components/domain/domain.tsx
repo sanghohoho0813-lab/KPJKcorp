@@ -162,6 +162,7 @@ export function BriefList({ items, limit, compact, emptyText }: { items: BriefIt
 /* ---------- Activity feed (Evidence) ---------- */
 const ACT_ICON: Record<Activity["type"], ReactNode> = {
   notice_published: <Megaphone size={14} />,
+  notice_read: <Megaphone size={14} />,
   notice_updated: <Megaphone size={14} />,
   notice_removed: <Megaphone size={14} />,
   profile_updated: <Pencil size={14} />,

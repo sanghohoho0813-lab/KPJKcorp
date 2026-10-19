@@ -1,5 +1,5 @@
 // 경과 보고 — 기간 안 기록으로 만든 줄(진행 상황·한 일·부탁·다음 일정), 고객에게 안 보이는 기록 빼기, 본문·제목, 지난 보고, 공지 본문 서식. 기업·기록은 지어낸 것.
-import { buildReport, isReport, lastReportFor, noticeBlocks, reportBody, reportFrom, reportTitle } from "../../src/lib/progress-report";
+import { buildReport, isReport, lastReportFor, noticeBlocks, reportBody, reportFrom, reportSeenAt, reportTitle } from "../../src/lib/progress-report";
 import type { Company, DocumentRequest, Inquiry, Notice, Project, ResultFile, Schedule } from "../../src/lib/types";
 
 let fail = 0;
@@ -114,6 +114,16 @@ const notices: Notice[] = [
 ];
 ok(lastReportFor(notices, "co_t")?.id === "n2", "이 기업의 가장 최근 경과 보고(다른 공지·다른 기업 제외)");
 ok(isReport(notices[0]) && !isReport(notices[2]), "경과 보고 가리기");
+
+// 9) 고객 확인 — 이 보고의 가장 이른 notice_read, 다른 보고·다른 기록은 무시
+const acts = [
+  { type: "notice_read" as const, at: "2026-10-03T05:00:00Z", meta: { noticeId: "n2" } },
+  { type: "notice_read" as const, at: "2026-10-02T05:00:00Z", meta: { noticeId: "n2" } },
+  { type: "notice_read" as const, at: "2026-10-01T05:00:00Z", meta: { noticeId: "n1" } },
+  { type: "result_downloaded" as const, at: "2026-10-01T01:00:00Z", meta: { noticeId: "n2" } },
+];
+ok(reportSeenAt(acts, "n2") === "2026-10-02T05:00:00Z", "고객 확인: 이 보고의 첫 기록");
+ok(reportSeenAt(acts, "n4") === undefined, "고객 확인 전이면 없음");
 
 console.log(fail ? `\n${fail} FAIL` : "\nALL OK");
 process.exit(fail ? 1 : 0);

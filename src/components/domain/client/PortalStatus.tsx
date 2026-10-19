@@ -6,7 +6,8 @@ import { AlertTriangle, ChevronRight, Eye, Link2, Link2Off } from "lucide-react"
 import { useStore } from "@/lib/store";
 import type { Company } from "@/lib/types";
 import { fmtDateTime } from "@/lib/format";
-import { liveNoticesFor } from "@/components/domain/Notices";
+import { ReportSeenBadge, liveNoticesFor } from "@/components/domain/Notices";
+import { lastReportFor } from "@/lib/progress-report";
 import { Badge, Button, Card, SectionTitle, cx } from "@/components/ui/ui";
 import { SEVERITY_LABEL, companyAlerts, type OpsAlert } from "@/lib/work-status";
 
@@ -21,6 +22,7 @@ export function PortalStatus({ company, onMakeAccount }: { company: Company; onM
   const accounts = st.users.filter((u) => u.role === "client" && u.companyId === company.id);
   const active = accounts.filter((u) => u.active !== false);
   const lastLogin = st.activities.filter((a) => a.companyId === company.id && a.type === "portal_login").sort((a, b) => b.at.localeCompare(a.at))[0];
+  const lastReport = lastReportFor(st.notices, company.id);
   const nowIso = new Date().toISOString();
   const visible = {
     projects: st.projects.filter((p) => p.companyId === company.id && p.clientVisible && !p.archived).length,
@@ -39,6 +41,11 @@ export function PortalStatus({ company, onMakeAccount }: { company: Company; onM
         <div className="space-y-1 text-[0.88rem]">
           {active.map((u) => <div key={u.id} className="flex flex-wrap items-center gap-2"><Badge tone="success">연결됨</Badge><b>{u.name}</b><span className="text-ink-3">{u.email}</span></div>)}
           <p className="text-[0.8rem] text-ink-3">마지막 접속 {lastLogin ? fmtDateTime(lastLogin.at) : "아직 없음"}</p>
+          {lastReport && (
+            <p className="flex flex-wrap items-center gap-1.5 text-[0.8rem] text-ink-3" data-testid="report-seen">
+              최근 경과 보고 {fmtDateTime(lastReport.publishedAt)} <ReportSeenBadge noticeId={lastReport.id} />
+            </p>
+          )}
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-2 rounded-xl bg-warning-bg px-3 py-2.5 text-[0.85rem] text-warning">

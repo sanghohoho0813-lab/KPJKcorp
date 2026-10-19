@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Megaphone, Pencil, Pin, Plus, Trash2 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { can } from "@/lib/permissions";
 import { fmtDate, fmtRelative } from "@/lib/format";
 import type { Notice } from "@/lib/types";
-import { noticeBlocks } from "@/lib/progress-report";
+import { isReport, localDay, md, noticeBlocks, reportSeenAt } from "@/lib/progress-report";
 import { Badge, Button, Card, EmptyState, Field, Input, Select, Textarea, cx } from "@/components/ui/ui";
 import { Modal, Confirm } from "@/components/ui/overlay";
 import { Chip } from "@/components/ui/chips";
@@ -51,11 +51,37 @@ export function NoticeList({ items, limit, compact }: { items: Notice[]; limit?:
               </span>
             </button>
             {expanded && n.body && <NoticeBody text={n.body} className="mt-2 sm:pl-6" />}
+            {expanded && isReport(n) && <SeenMark noticeId={n.id} />}
           </div>
         );
       })}
     </div>
   );
+}
+
+/**
+ * 경과 보고를 고객이 끝까지 봤는가 — 본문 끝이 1초 넘게 화면에 보이면 한 번 기록한다(고객 본인 세션만).
+ * 담당자 화면(보고 창 · 공지 목록 · 고객 플랫폼)에 '고객 확인 M/D'로 보인다. 같은 기기에서는 다시 재지 않는다.
+ */
+function SeenMark({ noticeId }: { noticeId: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const mark = useStore((s) => s.markNoticeSeen);
+  const isClient = useStore((s) => s.session?.role === "client" && !s.session?.portalPreviewCompanyId);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !isClient || typeof IntersectionObserver === "undefined") return;
+    const key = `kpjk-notice-seen:${noticeId}`;
+    try { if (localStorage.getItem(key)) return; } catch { /* 저장 못 하는 브라우저 — 서버 기록으로 충분 */ }
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const io = new IntersectionObserver(([e]) => {
+      if (t) clearTimeout(t);
+      if (!e.isIntersecting) return;
+      t = setTimeout(() => { mark(noticeId); try { localStorage.setItem(key, "1"); } catch { /* 무시 */ } io.disconnect(); }, 1000);
+    }, { threshold: 1 });
+    io.observe(el);
+    return () => { io.disconnect(); if (t) clearTimeout(t); };
+  }, [noticeId, isClient, mark]);
+  return <div ref={ref} aria-hidden className="h-px" data-seen-mark />;
 }
 
 /** 공지 본문 — "■ " 줄은 작은 제목, "· "·"- " 줄은 목록(경과 보고가 이 모양으로 온다), 나머지는 문단 */
@@ -108,6 +134,7 @@ export function NoticeManager() {
                     <div className="flex flex-wrap items-center gap-1.5">
                       <Badge tone={n.companyId ? "neutral" : "accent"}>{target}</Badge>
                       {n.pinned && <Badge tone="info">홈 상단 고정</Badge>}
+                      {isReport(n) && n.companyId && <ReportSeenBadge noticeId={n.id} />}
                       {!live && <Badge>{n.publishedAt > nowIso ? "게시 예정" : "기간 종료"}</Badge>}
                       <span className="min-w-0 font-semibold">{n.title}</span>
                     </div>
@@ -208,4 +235,11 @@ function NoticeModal({ initial, onClose }: { initial?: Notice; onClose: () => vo
       </div>
     </Modal>
   );
+}
+
+/** 경과 보고 — 고객이 끝까지 봤는지(담당자 화면) */
+export function ReportSeenBadge({ noticeId }: { noticeId: string }) {
+  const activities = useStore((s) => s.activities);
+  const at = reportSeenAt(activities, noticeId);
+  return at ? <Badge tone="success">고객 확인 {md(localDay(at))}</Badge> : <Badge>고객 확인 전</Badge>;
 }

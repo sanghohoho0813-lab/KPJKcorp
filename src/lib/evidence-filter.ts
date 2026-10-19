@@ -34,7 +34,7 @@ export const GROUP_OF: Record<ActivityType, EvidenceGroup> = {
   doc_request_updated: "docs", doc_request_canceled: "docs",
   task_created: "work", task_completed: "work", task_updated: "work", task_deleted: "work",
   schedule_created: "work", schedule_updated: "work", schedule_deleted: "work", rule_task_created: "work", rule_changed: "work", ai_action_taken: "work",
-  inquiry_created: "comms", inquiry_answered: "comms", notice_published: "comms", notice_updated: "comms", notice_removed: "comms", survey_submitted: "comms",
+  inquiry_created: "comms", inquiry_answered: "comms", notice_published: "comms", notice_read: "comms", notice_updated: "comms", notice_removed: "comms", survey_submitted: "comms",
   profile_updated: "company", vault_updated: "docs", file_uploaded: "docs", file_removed: "docs",
   work_status_changed: "project", journal_written: "work",
   payment_added: "sales", payment_received: "sales", payment_removed: "sales",

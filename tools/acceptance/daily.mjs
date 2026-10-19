@@ -472,6 +472,14 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
   ok('10 홈 고정은 가장 최근 보고 하나', reports.length === 2 && reports.filter((n) => n.pinned).length === 1 && !st.notices.find((n) => n.id === r1.id).pinned);
   await go(page, '/ax/tasks'); st = await dump(page);
   ok('10 보낸 뒤에는 규칙 업무를 다시 만들지 않음', st.tasks.filter((t) => t.companyId === 'co_a' && t.ruleKey?.startsWith('progress_report:') && t.status !== 'done').length === 0);
+  const latestId = st.notices.find((n) => n.companyId === 'co_a' && n.pinned && n.title.startsWith('경과 보고'))?.id;
+  // 담당자가 '고객 화면 보기'로 본 것은 고객 확인이 아니다
+  await go(page, '/ax/clients/co_a');
+  // 위 머리줄의 같은 이름 버튼은 기업 고르기 창을 연다 — 기업 카드의 버튼(마지막)을 누른다
+  await page.locator('button:visible', { hasText: '고객 화면 보기' }).last().click(); await page.waitForURL(/\/portal/); await sleep(800);
+  await go(page, '/portal/schedule'); await sleep(2000);
+  st = await dump(page);
+  ok('10 담당자 미리 보기는 고객 확인으로 안 셈', !!latestId && !st.activities.some((a) => a.type === 'notice_read'));
 
   // 고객: 홈 고정 띠 → 일정 · 공지에서 제목 · 목록으로 보임
   const storeKey = await page.evaluate(() => Object.keys(localStorage).find((k) => { try { return !!JSON.parse(localStorage.getItem(k) ?? 'null')?.state; } catch { return false; } }));
@@ -491,6 +499,28 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
   ok('10 고객 화면: 첫 보고 본문(한마디 포함)', await body.isVisible());
   const latest = page.locator('#notices [data-notice-body]').first();
   ok('10 고객 화면: 묶음 제목은 굵은 제목 · 줄은 목록', (await latest.locator('div.font-bold').filter({ hasText: '지금 진행 상황' }).count()) === 1 && (await latest.locator('div.flex.gap-2').count()) >= 2);
+  await sleep(1500);
+  st = await dump(page);
+  const seen = st.activities.filter((a) => a.type === 'notice_read' && a.meta?.noticeId === latestId);
+  ok('10 고객이 끝까지 본 경과 보고는 기록(고객 본인 · 이 기업)', seen.length === 1 && seen[0].actorRole === 'client' && seen[0].companyId === 'co_a');
+  await go(page, '/portal/schedule'); await sleep(1800);
+  st = await dump(page);
+  ok('10 같은 보고는 한 번만 기록', st.activities.filter((a) => a.type === 'notice_read' && a.meta?.noticeId === latestId).length === 1);
+  // 담당자 화면: 고객 플랫폼 탭 · 보고 창에 '고객 확인'
+  await page.evaluate((key) => { const s = JSON.parse(localStorage.getItem(key)); s.state.session = null; localStorage.setItem(key, JSON.stringify(s)); }, storeKey);
+  await page.goto(B + '/login', { waitUntil: 'networkidle' });
+  await page.getByLabel('아이디 (이메일)').fill('ceo@kpjk.co.kr');
+  await page.locator('input[type=password]').first().fill('kpjk2026!');
+  await page.getByRole('button', { name: '로그인' }).click();
+  await page.waitForURL(/\/ax\//); await sleep(1200);
+  await page.getByRole('button', { name: /건너뛰기/ }).first().click({ timeout: 800 }).catch(() => {});
+  await go(page, '/ax/clients/co_a?tab=portal');
+  ok('10 고객 플랫폼 탭: 최근 경과 보고 · 고객 확인', /고객 확인 \d+\/\d+/.test(await page.getByTestId('report-seen').innerText()));
+  await page.getByTestId('client-quick-actions').getByRole('button', { name: '경과 보고' }).click(); await sleep(500);
+  ok('10 보고 창: 지난 보고 · 고객 확인', /지난 보고 .* · 고객 확인 \d+\/\d+/.test(await dlg().getByTestId('report-range').innerText()));
+  await go(page, '/ax/schedule?tab=notice');
+  ok('10 공지 관리: 경과 보고마다 고객 확인 / 확인 전', (await page.getByText(/^고객 확인 \d+\/\d+$/).count()) >= 1 && (await page.getByText('고객 확인 전', { exact: true }).count()) >= 1);
+  await go(page, '/portal/schedule');
   await page.setViewportSize({ width: 390, height: 844 }); await sleep(500);
   ok('10 휴대폰 일정 · 공지 가로 넘침 없음', (await overflow(page)) <= 0);
   ok('10 페이지 오류 없음', page.errs.length === 0, page.errs.slice(0, 2).join(' | '));
