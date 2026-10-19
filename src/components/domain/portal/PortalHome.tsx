@@ -11,6 +11,7 @@ import { openOnly } from "@/lib/programs-client";
 import type { Company } from "@/lib/types";
 import { CUSTOMER_STEPS, stageToCustomerStep } from "@/lib/stages";
 import { Icon3D, PORTAL_ICON } from "./Icon3D";
+import { isReport } from "@/lib/progress-report";
 import { Avatar, cx } from "@/components/ui/ui";
 import type { useGrowth } from "./GrowthBoard";
 
@@ -197,7 +198,7 @@ export function PinnedStrip({ title, more }: { title: string; more: number }) {
   return (
     <Link href="/portal/schedule#notices" data-testid="pinned-strip" className="pressable flex items-center gap-3 rounded-2xl bg-soft px-4 py-3 ring-1 ring-accent/15">
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface text-accent"><Pin size={15} /></span>
-      <span className="min-w-0 flex-1 leading-tight"><span className="block text-[0.7rem] font-bold text-accent">담당자 공지{more > 0 ? ` · ${more + 1}건` : ""}</span><span className="block truncate text-[0.9rem] font-semibold">{title}</span></span>
+      <span className="min-w-0 flex-1 leading-tight"><span className="block text-[0.7rem] font-bold text-accent">{isReport({ title }) ? "담당자 경과 보고" : "담당자 공지"}{more > 0 ? ` · 고정 ${more + 1}건` : ""}</span><span className="block truncate text-[0.9rem] font-semibold">{title}</span></span>
       <ChevronRight size={17} className="shrink-0 text-ink-3" />
     </Link>
   );

@@ -4,7 +4,7 @@ import { CancelDocRequestButton } from "@/components/domain/portal/CancelRequest
 import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Building2, EyeOff, Lock, Landmark, CalendarDays, ChevronDown, ChevronRight, Eye, FileCheck2, FileText, FolderOpen, ListPlus, Mail, PhoneCall, MapPin, MessageSquare, MessageSquareText, NotebookPen, Phone, Plus, Sparkles, UserRound, Pencil, Archive, ArchiveRestore, UserPlus } from "lucide-react";
+import { ArrowLeft, Building2, ClipboardList, EyeOff, Lock, Landmark, CalendarDays, ChevronDown, ChevronRight, Eye, FileCheck2, FileText, FolderOpen, ListPlus, Mail, PhoneCall, MapPin, MessageSquare, MessageSquareText, NotebookPen, Phone, Plus, Sparkles, UserRound, Pencil, Archive, ArchiveRestore, UserPlus } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { AxInsightButton } from "@/components/ai/AxInsight";
 import { useUi } from "@/lib/ui-store";
@@ -36,6 +36,7 @@ import { shortCompanyName } from "@/lib/quick-task";
 import { ContactLine, LogContactModal, useContactStatus, useMayLogContact } from "@/components/domain/ContactLog";
 import { EXTRACT_METHOD_LABEL } from "@/lib/docextract";
 import { PolicyDocsModal } from "@/components/domain/client/PolicyDocs";
+import { ProgressReportModal } from "@/components/domain/client/ProgressReport";
 
 type TabKey = "overview" | "work" | "vault" | "docs" | "contract" | "consult" | "schedule" | "portal" | "journal" | "history";
 const TAB_KEYS: TabKey[] = ["overview", "work", "vault", "docs", "contract", "consult", "schedule", "portal", "journal", "history"];
@@ -68,6 +69,7 @@ export default function ClientCardPage() {
   const [newConsult, setNewConsult] = useState(false);
   const [newSchedule, setNewSchedule] = useState(false);
   const [policyDocs, setPolicyDocs] = useState(false);
+  const [report, setReport] = useState(false);
   const [companyDoc, setCompanyDoc] = useState(false);
   const [newTask, setNewTask] = useState(false);
   // 휴대폰에서는 머리글의 번호·연락처 줄을 접어 둔다 — 열자마자 할 일이 보이게
@@ -249,6 +251,7 @@ export default function ClientCardPage() {
         {may("doc.request") && <QuickAction icon={<FileText size={16} />} label="자료 요청" onClick={() => (active[0] ? setNewDoc(active[0].id) : setCompanyDoc(true))} />}
         {may("doc.request") && <QuickAction icon={<Landmark size={16} />} label="정책자금 서류" onClick={() => setPolicyDocs(true)} />}
         {may("schedule.create") && <QuickAction icon={<CalendarDays size={16} />} label="일정 등록" onClick={() => setNewSchedule(true)} />}
+        {may("notice.write") && <QuickAction icon={<ClipboardList size={16} />} label="경과 보고" onClick={() => setReport(true)} />}
         <QuickAction icon={<MessageSquareText size={16} />} label="업무 일기" onClick={() => setTab("journal")} />
         {c.contactPhone && <a href={`tel:${c.contactPhone.replace(/[^0-9+]/g, "")}`} onClick={() => { if (mayLog) setLogContact(true); }} className="pressable flex shrink-0 items-center gap-1.5 rounded-xl border border-line bg-surface px-3.5 py-2 text-[0.88rem] font-semibold text-ink-2 hover:border-accent hover:text-ink md:hidden"><Phone size={16} className="text-accent" />전화</a>}
       </div>
@@ -523,6 +526,7 @@ export default function ClientCardPage() {
       <NewConsultationModal open={newConsult} onClose={() => setNewConsult(false)} companyId={c.id} />
       <NewScheduleModal open={newSchedule} onClose={() => setNewSchedule(false)} companyId={c.id} projectId={active[0]?.id} />
       <PolicyDocsModal company={c} open={policyDocs} onClose={() => setPolicyDocs(false)} />
+      <ProgressReportModal company={c} open={report} onClose={() => setReport(false)} />
       <CompanyDocRequestModal companyId={c.id} open={companyDoc} onClose={() => setCompanyDoc(false)} />
       <LogContactModal company={c} open={logContact} onClose={() => setLogContact(false)} />
       <NewTaskModal open={newTask} onClose={() => setNewTask(false)} companyId={c.id} projectId={active[0]?.id} />

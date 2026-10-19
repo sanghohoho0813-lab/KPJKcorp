@@ -6,6 +6,7 @@
 //  5) 휴대폰: 기업 상세 첫 화면에 할 일이 보이는지 · 가로 넘침 · 페이지 오류
 //  8) 정책자금 준비 서류: 묶음 요청(알림 한 번) → 고객 홈 한 줄 → 파일 여러 개 제출 → 검토 발급일 → 서류함·고객 준비됨
 //  9) 공고 신청 묶음: 서류함 파일 → 신청일 기준 상태 → 공고문 서류 더하기 → zip(번호·서류명 + 서류목록) → 모자란 서류 요청(기한은 신청일 앞)
+// 10) 경과 보고: 기업 상세 빠른 작업 → 기간 · 줄 고르기 · 한마디 → 미리 보기 · 카톡용 복사 → 고객에게 보내기(공지 · 홈 맨 위) → 고객 화면
 // 실행: npm run build && npm start (데모 모드) → node tools/acceptance/daily.mjs
 import fs from 'fs';
 import { execFileSync } from 'child_process';
@@ -412,6 +413,78 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
   await page.setViewportSize({ width: 390, height: 844 }); await sleep(500);
   ok('9 휴대폰 신청 묶음 가로 넘침 없음', (await overflow(page)) <= 0);
   ok('9 페이지 오류 없음', page.errs.length === 0, page.errs.slice(0, 2).join(' | '));
+}
+
+// ---------- 경과 보고 (대표 PC → 고객 화면) ----------
+{
+  const page = await session('pc', ['ceo@kpjk.co.kr', 'kpjk2026!']);
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin: B });
+  const dlg = () => page.locator('[role=dialog]:visible').last();
+  await go(page, '/ax/clients/co_a');
+  const qa = page.getByTestId('client-quick-actions').getByRole('button', { name: '경과 보고' });
+  ok('10 기업 상세 빠른 작업에 경과 보고', await qa.isVisible());
+  await qa.click(); await sleep(500);
+  const lines = dlg().getByTestId('report-lines');
+  const sections = await lines.locator('[data-report-section]').evaluateAll((els) => els.map((e) => e.getAttribute('data-report-section')));
+  ok('10 진행 상황 · 한 일 · 부탁드릴 것 묶음이 채워짐', sections.includes('now') && sections.includes('done') && sections.includes('ask'), sections.join(','));
+  let st = await dump(page);
+  const openReqs = st.docRequests.filter((d) => d.companyId === 'co_a' && (d.status === 'requested' || d.status === 'revision'));
+  const askN = await lines.locator('[data-report-section=ask] [data-line]').count();
+  ok('10 부탁드릴 것 = 남은 요청자료', askN === Math.min(openReqs.length, 5) + (openReqs.length > 5 ? 1 : 0), `${askN} / ${openReqs.length}`);
+  const first = lines.locator('[data-report-section=done] [data-line]').first();
+  const offText = (await first.innerText()).trim();
+  await first.locator('input').uncheck();
+  await dlg().getByLabel('담당자 한마디').fill('시험용 한마디 REPORT-OK');
+  await dlg().getByTestId('report-view').getByRole('button', { name: '고객 화면 미리 보기' }).click(); await sleep(300);
+  const pv = await dlg().getByTestId('report-preview').innerText();
+  ok('10 미리 보기: 제목 · 한마디 · 뺀 줄 없음', /경과 보고 · \d+\/\d+ ~ \d+\/\d+/.test(pv) && pv.includes('REPORT-OK') && !pv.includes(offText), offText);
+  await dlg().getByRole('button', { name: '카톡용 복사' }).click(); await sleep(300);
+  const clip = await page.evaluate(() => navigator.clipboard.readText());
+  ok('10 카톡용 복사: 제목 · 본문 · 고객 화면 주소', clip.startsWith('경과 보고 ·') && clip.includes('REPORT-OK') && clip.includes('/portal/schedule#notices'));
+  const s0 = await dump(page);
+  await dlg().getByRole('button', { name: '고객에게 보내기' }).click(); await sleep(600);
+  st = await dump(page);
+  const sent = st.notices.filter((n) => !s0.notices.some((x) => x.id === n.id));
+  const r1 = sent[0];
+  ok('10 공지 한 건 · 이 기업 · 홈 고정', sent.length === 1 && r1.companyId === 'co_a' && r1.pinned === true && r1.title.startsWith('경과 보고 ·'));
+  ok('10 본문: 묶음 제목 · 한마디 · 서명 · 뺀 줄 없음', r1.body.includes('■ 지금 진행 상황') && r1.body.includes('■ 담당자 한마디\n시험용 한마디 REPORT-OK') && /\n— 담당 /.test(r1.body) && !r1.body.includes(offText));
+  const hidden = [
+    ...st.schedules.filter((x) => x.companyId === 'co_a' && !x.visibleToClient).map((x) => x.title),
+    ...st.tasks.filter((x) => x.companyId === 'co_a').map((x) => x.title),
+    ...(st.journal ?? []).filter((x) => x.companyId === 'co_a').map((x) => x.body ?? x.text ?? '').filter((t) => t.length > 8).map((t) => t.slice(0, 30)),
+  ];
+  ok('10 내부 일정 · 업무 · 업무 일기는 본문에 없음', hidden.length > 0 && hidden.every((t) => !r1.body.includes(t)), `${hidden.length}건 확인`);
+  const notes = st.notifications.filter((x) => !s0.notifications.some((y) => y.id === x.id));
+  ok('10 고객 알림 한 번', notes.length === 1 && notes[0].audience === 'client' && notes[0].companyId === 'co_a');
+  // 다시 열면 '지난 보고 이후'가 기본 · 두 번째로 보내면 앞 보고 고정은 풀림
+  await qa.click(); await sleep(500);
+  ok('10 다시 열면 지난 보고 이후', /지난 보고 \d+\/\d+ \(0일 전\)/.test(await dlg().getByTestId('report-range').innerText()));
+  await dlg().getByRole('button', { name: '고객에게 보내기' }).click(); await sleep(600);
+  st = await dump(page);
+  const reports = st.notices.filter((n) => n.companyId === 'co_a' && n.title.startsWith('경과 보고'));
+  ok('10 홈 고정은 가장 최근 보고 하나', reports.length === 2 && reports.filter((n) => n.pinned).length === 1 && !st.notices.find((n) => n.id === r1.id).pinned);
+
+  // 고객: 홈 고정 띠 → 일정 · 공지에서 제목 · 목록으로 보임
+  const storeKey = await page.evaluate(() => Object.keys(localStorage).find((k) => { try { return !!JSON.parse(localStorage.getItem(k) ?? 'null')?.state; } catch { return false; } }));
+  await page.evaluate((key) => { const s = JSON.parse(localStorage.getItem(key)); s.state.session = null; localStorage.setItem(key, JSON.stringify(s)); }, storeKey);
+  await page.goto(B + '/login', { waitUntil: 'networkidle' });
+  await page.getByLabel('아이디 (이메일)').fill('ceo@a-precision.demo');
+  await page.locator('input[type=password]').first().fill('client2026!');
+  await page.getByRole('button', { name: '로그인' }).click();
+  await page.waitForURL(/\/portal/); await sleep(1200);
+  await page.getByRole('button', { name: /건너뛰기/ }).first().click({ timeout: 800 }).catch(() => {});
+  await page.getByLabel(/튜토리얼 닫기|이용 안내 닫기/).click({ timeout: 800 }).catch(() => {});
+  await go(page, '/portal');
+  const strip = page.getByTestId('pinned-strip');
+  ok('10 고객 홈 맨 위: 담당자 경과 보고', /담당자 경과 보고/.test(await strip.innerText()) && /경과 보고 ·/.test(await strip.innerText()));
+  await strip.click(); await sleep(1200);
+  const body = page.locator('#notices [data-notice-body]').filter({ hasText: 'REPORT-OK' }).first();
+  ok('10 고객 화면: 첫 보고 본문(한마디 포함)', await body.isVisible());
+  const latest = page.locator('#notices [data-notice-body]').first();
+  ok('10 고객 화면: 묶음 제목은 굵은 제목 · 줄은 목록', (await latest.locator('div.font-bold').filter({ hasText: '지금 진행 상황' }).count()) === 1 && (await latest.locator('div.flex.gap-2').count()) >= 2);
+  await page.setViewportSize({ width: 390, height: 844 }); await sleep(500);
+  ok('10 휴대폰 일정 · 공지 가로 넘침 없음', (await overflow(page)) <= 0);
+  ok('10 페이지 오류 없음', page.errs.length === 0, page.errs.slice(0, 2).join(' | '));
 }
 
 await browser.close();

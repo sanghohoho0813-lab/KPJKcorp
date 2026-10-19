@@ -6,6 +6,7 @@ import { useStore } from "@/lib/store";
 import { can } from "@/lib/permissions";
 import { fmtDate, fmtRelative } from "@/lib/format";
 import type { Notice } from "@/lib/types";
+import { noticeBlocks } from "@/lib/progress-report";
 import { Badge, Button, Card, EmptyState, Field, Input, Select, Textarea, cx } from "@/components/ui/ui";
 import { Modal, Confirm } from "@/components/ui/overlay";
 import { Chip } from "@/components/ui/chips";
@@ -49,10 +50,23 @@ export function NoticeList({ items, limit, compact }: { items: Notice[]; limit?:
                 <span className="mt-0.5 block text-[0.78rem] text-ink-3">{fmtDate(n.publishedAt, { year: true })}{n.expiresAt ? ` · ${fmtDate(n.expiresAt)}까지` : ""}</span>
               </span>
             </button>
-            {expanded && n.body && <p className="mt-2 whitespace-pre-line pl-6 text-[0.9rem] leading-relaxed text-ink-2">{n.body}</p>}
+            {expanded && n.body && <NoticeBody text={n.body} className="mt-2 sm:pl-6" />}
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/** 공지 본문 — "■ " 줄은 작은 제목, "· "·"- " 줄은 목록(경과 보고가 이 모양으로 온다), 나머지는 문단 */
+export function NoticeBody({ text, className }: { text: string; className?: string }) {
+  return (
+    <div className={cx("space-y-1.5 text-[0.9rem] leading-relaxed text-ink-2", className)} data-notice-body>
+      {noticeBlocks(text).map((b, i) =>
+        b.kind === "h" ? <div key={i} className="pt-1.5 text-[0.84rem] font-bold text-ink">{b.text}</div>
+        : b.kind === "li" ? <div key={i} className="flex gap-2"><span className="mt-[0.68em] h-1 w-1 shrink-0 rounded-full bg-ink-3" aria-hidden /><span className="min-w-0">{b.text}</span></div>
+        : <p key={i}>{b.text}</p>,
+      )}
     </div>
   );
 }
