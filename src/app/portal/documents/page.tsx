@@ -1,5 +1,6 @@
 "use client";
 
+import { Icon3D } from "@/components/domain/portal/Icon3D";
 import { useEffect, useState } from "react";
 import { FileCheck2, FileText, FolderUp, Upload } from "lucide-react";
 import { useStore, usePortalCompanyId } from "@/lib/store";
@@ -42,7 +43,7 @@ export default function PortalDocumentsPage() {
 
   return (
     <div>
-      <PageHeader title="요청자료 제출" desc="검토에 필요한 파일을 상태별로 확인하고 업로드하세요. 제출하면 담당 컨설턴트에게 바로 전달됩니다." actions={todo[0] && <Button variant="accent" icon={<Upload size={16} />} onClick={() => setUpload(todo[0])}>파일 업로드</Button>} />
+      <PageHeader icon={<Icon3D name="upload" size="2.4rem" />} title="요청자료 제출" desc="올리시면 담당 컨설턴트에게 바로 전달됩니다." actions={todo[0] && <Button variant="accent" icon={<Upload size={16} />} onClick={() => setUpload(todo[0])}>파일 업로드</Button>} />
       <div className="mb-5">
         <StatStrip items={[
           { label: "미제출", value: todo.filter((d) => d.status === "requested").length, tone: "error", note: todo.some((d) => daysBetween(d.dueDate, now) > 0) ? "기한 지남" : undefined },
@@ -55,7 +56,7 @@ export default function PortalDocumentsPage() {
       {hasPolicy && <h2 className="mb-2 text-[1.05rem] font-bold">그 밖의 요청자료</h2>}
       <div className="mb-4"><SegmentedControl size="sm" value={filter} onChange={setFilter} options={[{ key: "all", label: "전체" }, { key: "todo", label: `제출 필요 ${others.filter((d) => d.status === "requested" || d.status === "revision").length}` }, { key: "done", label: "제출됨" }]} /></div>
       <Card className="overflow-hidden" id="tut-p-docs">
-        {rows.length === 0 ? <EmptyState icon={<FolderUp size={30} />} title={hasPolicy ? "그 밖의 요청자료가 없습니다" : "요청된 자료가 없습니다"} desc="담당 컨설턴트가 자료를 요청하면 여기에 표시됩니다." /> : (
+        {rows.length === 0 ? <EmptyState icon={<Icon3D name="upload" size="3rem" />} title={hasPolicy ? "그 밖의 요청자료가 없습니다" : "요청된 자료가 없습니다"} desc="담당 컨설턴트가 자료를 요청하면 여기에 표시됩니다." /> : (
           <div className="divide-y divide-line">
             {rows.map((d) => {
               const pending = d.status === "requested" || d.status === "revision";

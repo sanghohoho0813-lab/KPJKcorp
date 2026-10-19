@@ -1,7 +1,7 @@
 "use client";
 
+import { Icon3D } from "@/components/domain/portal/Icon3D";
 import Link from "next/link";
-import { Bell } from "lucide-react";
 import { useStore, usePortalCompanyId } from "@/lib/store";
 import { fmtRelative, fmtDateTime } from "@/lib/format";
 import { Button, Card, EmptyState, PageHeader, cx } from "@/components/ui/ui";
@@ -15,9 +15,9 @@ export default function PortalNotificationsPage() {
   const unread = list.filter((n) => !n.read).length;
   return (
     <div>
-      <PageHeader title="알림" desc="자료 요청·검토 결과·일정·결과자료·문의 답변 안내입니다." actions={unread > 0 && <Button variant="outline" size="sm" onClick={() => markAll("client", companyId)}>모두 읽음 ({unread})</Button>} />
+      <PageHeader icon={<Icon3D name="bell" size="2.4rem" />} title="알림" desc="자료 요청·검토 결과·일정·결과자료·문의 답변 안내입니다." actions={unread > 0 && <Button variant="outline" size="sm" onClick={() => markAll("client", companyId)}>모두 읽음 ({unread})</Button>} />
       <Card className="overflow-hidden">
-        {list.length === 0 ? <EmptyState icon={<Bell size={30} />} title="알림이 없습니다" /> : (
+        {list.length === 0 ? <EmptyState icon={<Icon3D name="bell" size="3rem" />} title="알림이 없습니다" /> : (
           <div className="divide-y divide-line">
             {list.map((n) => (
               <Link key={n.id} href={n.href} onClick={() => markRead(n.id)} className={cx("block px-5 py-4 hover:bg-surface-2/60", !n.read && "bg-soft/30")}>

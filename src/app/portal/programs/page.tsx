@@ -1,5 +1,6 @@
 "use client";
 
+import { Icon3D } from "@/components/domain/portal/Icon3D";
 import { CancelRequestButton, OnBehalfNote, useOnBehalf } from "@/components/domain/portal/CancelRequest";
 import { useEffect, useMemo, useState } from "react";
 import { MessageSquarePlus } from "lucide-react";
@@ -49,8 +50,8 @@ export default function PortalPrograms() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="우리 회사에 맞는 지원사업" badge={<Badge tone="accent">베타</Badge>}
-        desc={`${c.name}의 지역·업종·업력·인원을 기준으로 지금 접수 중인 공고 중 검토해 볼 것을 골랐습니다.`} />
+      <PageHeader icon={<Icon3D name="funding" size="2.4rem" />} title="우리 회사에 맞는 지원사업" badge={<Badge tone="accent">베타</Badge>}
+        desc={`${c.name}의 지역·업종·업력·인원에 맞춰 지금 접수 중인 실제 공고를 골랐습니다.`} />
       <div className="flex flex-wrap items-center gap-2 text-[0.88rem]">
         <b>검토해 볼 공고 {sent.length + matches.length}건</b>{sent.length > 0 && <span className="font-semibold text-accent">담당자 추천 {sent.length}건</span>}{urgent > 0 && <span className="font-semibold text-error">마감 임박 {urgent}건</span>}
       </div>

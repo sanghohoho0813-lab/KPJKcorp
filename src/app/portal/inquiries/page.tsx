@@ -1,7 +1,8 @@
 "use client";
 
+import { Icon3D } from "@/components/domain/portal/Icon3D";
 import { useEffect, useState } from "react";
-import { MessageSquare, Plus, Send } from "lucide-react";
+import { Plus, Send } from "lucide-react";
 import { useStore, usePortalCompanyId } from "@/lib/store";
 import { fmtDateTime, fmtRelative } from "@/lib/format";
 import type { Inquiry } from "@/lib/types";
@@ -55,10 +56,10 @@ export default function PortalInquiriesPage() {
 
   return (
     <div>
-      <PageHeader title="문의하기" desc={`담당 컨설턴트 ${consultant?.name ?? ""} ${consultant?.title ?? ""}에게 직접 질문하세요. 답변은 알림으로 안내드립니다.`} actions={<Button variant="accent" icon={<Plus size={16} />} onClick={() => setOpen(true)}>새 문의</Button>} />
+      <PageHeader icon={<Icon3D name="idea" size="2.4rem" />} title="문의하기" desc={`담당 컨설턴트 ${consultant?.name ?? ""} ${consultant?.title ?? ""}에게 직접 물어보세요. 답이 오면 알림으로 알려 드립니다.`} actions={<Button variant="accent" icon={<Plus size={16} />} onClick={() => setOpen(true)}>새 문의</Button>} />
       <div className="grid gap-5 lg:grid-cols-[340px_1fr]">
         <Card className="overflow-hidden">
-          {list.length === 0 ? <EmptyState icon={<MessageSquare size={30} />} title="아직 문의가 없습니다" action={<Button variant="outline" onClick={() => setOpen(true)}>첫 문의 남기기</Button>} /> : (
+          {list.length === 0 ? <EmptyState icon={<Icon3D name="idea" size="3rem" />} title="아직 문의가 없습니다" action={<Button variant="outline" onClick={() => setOpen(true)}>첫 문의 남기기</Button>} /> : (
             <div className="divide-y divide-line">
               {list.map((iq) => (
                 <button key={iq.id} onClick={() => setSel(iq.id)} className={cx("pressable block w-full px-4 py-3 text-left hover:bg-surface-2/60", sel === iq.id && "bg-soft/40")}>
@@ -93,7 +94,7 @@ export default function PortalInquiriesPage() {
             )}
           </Card>
         ) : (
-          <Card className="hidden lg:block"><EmptyState icon={<MessageSquare size={30} />} title="문의를 선택하거나 새 문의를 남겨주세요" /></Card>
+          <Card className="hidden lg:block"><EmptyState icon={<Icon3D name="idea" size="3rem" />} title="문의를 선택하거나 새 문의를 남겨주세요" /></Card>
         )}
       </div>
       <Modal open={open} onClose={() => setOpen(false)} title="새 문의" size="sm" footer={<><Button variant="ghost" onClick={() => setOpen(false)}>취소</Button><Button variant="accent" icon={<Send size={15} />} onClick={submit}>문의 보내기</Button></>}>

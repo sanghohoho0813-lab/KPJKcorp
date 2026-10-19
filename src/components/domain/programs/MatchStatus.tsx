@@ -1,5 +1,6 @@
 "use client";
 
+import { Icon3D } from "@/components/domain/portal/Icon3D";
 import { CalendarClock, Radar, SearchCheck } from "lucide-react";
 import type { Company } from "@/lib/types";
 import type { LiveStatus } from "@/lib/programs-client";
@@ -38,7 +39,9 @@ export function MatchStatus({ checked, companies, lastAt, live, audience = "inte
   return (
     <div className={cx("card p-5", className)} data-testid="match-status">
       <div className="flex items-start gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[color:var(--nav-ai)]/12 text-[color:var(--nav-ai-ink)]"><Radar size={20} /></span>
+        {audience === "client"
+          ? <Icon3D name="funding" size="2.6rem" />
+          : <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[color:var(--nav-ai)]/12 text-[color:var(--nav-ai-ink)]"><Radar size={20} /></span>}
         <div className="min-w-0 flex-1">
           <div className="text-[1.02rem] font-bold">{title}</div>
           <p className="mt-0.5 text-[0.85rem] text-ink-2">

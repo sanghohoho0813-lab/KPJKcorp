@@ -1,5 +1,6 @@
 "use client";
 
+import { Icon3D } from "@/components/domain/portal/Icon3D";
 import { Download, FileCheck2 } from "lucide-react";
 import { useStore, usePortalCompanyId } from "@/lib/store";
 import { fmtDate, fmtSize } from "@/lib/format";
@@ -26,8 +27,8 @@ export default function PortalResultsPage() {
   };
   return (
     <div>
-      <PageHeader title="완료자료" desc="담당 컨설턴트가 전달한 보고서·제안서·분석자료를 확인합니다." badge={<Badge>{results.length}건</Badge>} />
-      {results.length === 0 ? <Card><EmptyState icon={<FileCheck2 size={30} />} title="아직 전달된 결과자료가 없습니다" desc="결과자료가 공유되면 알림으로 안내드립니다." /></Card> : (
+      <PageHeader icon={<Icon3D name="results" size="2.4rem" />} title="완료자료" desc="담당 컨설턴트가 전달한 보고서·제안서·분석자료를 확인합니다." badge={<Badge>{results.length}건</Badge>} />
+      {results.length === 0 ? <Card><EmptyState icon={<Icon3D name="results" size="3rem" />} title="아직 전달된 결과자료가 없습니다" desc="결과자료가 공유되면 알림으로 안내드립니다." /></Card> : (
         <div className="grid gap-3 md:grid-cols-2">
           {results.map((r) => (
             <Card key={r.id} className="flex items-start gap-3 p-5">

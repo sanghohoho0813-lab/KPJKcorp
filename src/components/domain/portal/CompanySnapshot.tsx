@@ -40,7 +40,7 @@ function useQuests(c: Company, board: Board) {
 
 /* ------------------------------ 숫자 4칸 + 매출 추이 ------------------------------ */
 
-export function CompanySnapshot({ company: c, board, showFactsLink = true, collapsible }: { company: Company; board: Board; showFactsLink?: boolean; /** 휴대폰에서 매출 추이·인증 현황을 접어 둔다(홈) */ collapsible?: boolean }) {
+export function CompanySnapshot({ company: c, board, showFactsLink = true, collapsible, showIcon = true }: { company: Company; board: Board; showFactsLink?: boolean; /** 휴대폰에서 매출 추이·인증 현황을 접어 둔다(홈) */ collapsible?: boolean; /** 우리 회사 화면은 제목에 같은 그림이 있다 */ showIcon?: boolean }) {
   const [more, setMore] = useState(!collapsible);
   const today = todayLocal();
   const age = businessAge(c, today);
@@ -57,7 +57,7 @@ export function CompanySnapshot({ company: c, board, showFactsLink = true, colla
     <section className="card overflow-hidden" data-testid="company-snapshot">
       {/* 휴대폰: 제목 한 줄 + 꼬리표는 옆으로 넘기는 한 줄 / PC: 한 줄에 모두 */}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-2.5 border-b border-line px-4 py-3.5 md:px-6 md:py-4">
-        <Icon3D name="company" size="1.9rem" />
+        {showIcon && <Icon3D name="company" size="1.9rem" />}
         <h2 className="text-[1.1rem] font-extrabold md:text-[1.15rem]">우리 회사 한눈에</h2>
         {c.sample && <span className="rounded-full bg-warning-bg px-2.5 py-0.5 text-[0.72rem] font-bold text-warning" data-testid="sample-figures">샘플 회사 · 예시 수치</span>}
         <div className="hide-scrollbar flex w-full gap-1.5 overflow-x-auto md:ml-auto md:w-auto">

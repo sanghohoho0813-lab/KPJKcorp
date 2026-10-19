@@ -1,5 +1,6 @@
 "use client";
 
+import { Icon3D } from "@/components/domain/portal/Icon3D";
 import { CancelRequestButton, OnBehalfNote, useOnBehalf } from "@/components/domain/portal/CancelRequest";
 import { useMemo, useState } from "react";
 import { Check, ChevronRight, MessageSquarePlus, Receipt, Sparkles, ThumbsUp } from "lucide-react";
@@ -9,7 +10,7 @@ import { KPJK_SERVICES, OPP_STATUS, SERVICE_BY_KEY, type ServiceDef } from "@/li
 import { KPJK_CONSULTING } from "@/lib/company-options";
 import { NextGrowth, useGrowth } from "@/components/domain/portal/GrowthBoard";
 import { daysBetween, fmtDate, fmtRelative, fmtWon } from "@/lib/format";
-import { Badge, Button, Card, EmptyState, SectionTitle, Textarea, cx } from "@/components/ui/ui";
+import { Badge, Button, Card, EmptyState, PageHeader, SectionTitle, Textarea, cx } from "@/components/ui/ui";
 import type { Quote } from "@/lib/types";
 import { Modal } from "@/components/ui/overlay";
 
@@ -60,12 +61,8 @@ export default function PortalServicesPage() {
 
   return (
     <div className="space-y-5">
-      <div id="tut-p-services">
-        <h1 className="text-[1.5rem] font-bold md:text-[1.8rem]">함께 검토해볼 수 있는 것</h1>
-        <p className="mt-1 text-[0.92rem] text-ink-2">
-          담당 컨설턴트가 {c.name}에 맞춰 골라 드린 항목과 KPJK가 함께하는 컨설팅 분야입니다. 상담을 요청하시면 담당 컨설턴트가 확인 후 연락드립니다.
-        </p>
-      </div>
+      <PageHeader id="tut-p-services" icon={<Icon3D name="together" size="2.4rem" />} title="함께 검토해볼 수 있는 것"
+        desc={`담당 컨설턴트가 ${c.name}에 맞춰 골라 드린 항목과 KPJK 컨설팅 분야입니다. 상담을 요청하시면 확인 후 연락드립니다.`} />
 
       {/* 받은 제안 — 회신을 기다리는 건이 가장 위. 고객이 눌러야 다음이 진행된다. */}
       {myQuotes.length > 0 && (
@@ -194,7 +191,7 @@ export default function PortalServicesPage() {
           </div>
         </div>
       ) : (
-        <EmptyState icon={<Check size={28} />} title="아직 담당 컨설턴트가 올린 제안이 없습니다." desc={`궁금한 분야가 있으면 아래에서 상담을 요청하시거나 ${consultant?.name ?? "담당 컨설턴트"} ${consultant?.title ?? ""}에게 문의해 주세요.`} />
+        <EmptyState icon={<Icon3D name="together" size="3rem" />} title="아직 담당 컨설턴트가 올린 제안이 없습니다." desc={`궁금한 분야가 있으면 아래에서 상담을 요청하시거나 ${consultant?.name ?? "담당 컨설턴트"} ${consultant?.title ?? ""}에게 문의해 주세요.`} />
       )}
 
       {/* 기업정보·진행 이력으로 고른 검토 과제 — 근거를 함께 */}

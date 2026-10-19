@@ -1,5 +1,6 @@
 "use client";
 
+import { Icon3D } from "@/components/domain/portal/Icon3D";
 import { useStore, usePortalCompanyId } from "@/lib/store";
 import { PageHeader } from "@/components/ui/ui";
 import { useGrowth } from "@/components/domain/portal/GrowthBoard";
@@ -16,8 +17,8 @@ export default function PortalCompanyPage() {
   if (!c || !board) return null;
   return (
     <div className="space-y-5">
-      <PageHeader title="우리 회사" desc="회사 현황을 숫자로 보고, 다음에 할 일을 하나씩 점검해 나갑니다." />
-      <CompanySnapshot company={c} board={board} showFactsLink={false} />
+      <PageHeader icon={<Icon3D name="company" size="2.4rem" />} title="우리 회사" desc="회사 현황을 숫자로 보고, 다음에 할 일을 하나씩 점검합니다." />
+      <CompanySnapshot company={c} board={board} showFactsLink={false} showIcon={false} />
       <GrowthQuests company={c} board={board} />
       <CompanyFacts company={c} />
     </div>

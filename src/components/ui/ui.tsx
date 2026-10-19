@@ -150,16 +150,19 @@ export function IconTile({ color, children, size = 40 }: { color: string; childr
 }
 
 /* ---------- Page header ---------- */
-export function PageHeader({ title, desc, actions, badge, id }: { title: ReactNode; desc?: ReactNode; actions?: ReactNode; badge?: ReactNode; id?: string }) {
+export function PageHeader({ title, desc, actions, badge, id, icon }: { title: ReactNode; desc?: ReactNode; actions?: ReactNode; badge?: ReactNode; id?: string; /** 제목 왼쪽 작은 그림(고객 화면) */ icon?: ReactNode }) {
+  const head = (
+    <div className={icon ? "min-w-0" : undefined}>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        <h1 className="text-[1.75rem] font-bold md:text-[2rem]">{title}</h1>
+        {badge}
+      </div>
+      {desc && <p className="mt-1 text-[0.95rem] text-ink-2">{desc}</p>}
+    </div>
+  );
   return (
     <div id={id} className="page-header mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-      <div>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-          <h1 className="text-[1.75rem] font-bold md:text-[2rem]">{title}</h1>
-          {badge}
-        </div>
-        {desc && <p className="mt-1 text-[0.95rem] text-ink-2">{desc}</p>}
-      </div>
+      {icon ? <div className="flex min-w-0 items-start gap-3"><span className="mt-0.5 shrink-0">{icon}</span>{head}</div> : head}
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
   );
