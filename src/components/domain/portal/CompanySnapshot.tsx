@@ -54,22 +54,26 @@ export function CompanySnapshot({ company: c, board, showFactsLink = true, colla
 
   return (
     <section className="card overflow-hidden" data-testid="company-snapshot">
-      <div className="flex flex-wrap items-center gap-2 border-b border-line px-5 py-4 md:px-6">
+      {/* 휴대폰: 제목 한 줄 + 꼬리표는 옆으로 넘기는 한 줄 / PC: 한 줄에 모두 */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-2.5 border-b border-line px-4 py-3.5 md:px-6 md:py-4">
         <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-soft text-accent-strong"><Building2 size={18} /></span>
-        <h2 className="text-[1.15rem] font-extrabold">우리 회사 한눈에</h2>
-        {c.sample && <span className="rounded-full bg-warning-bg px-2.5 py-0.5 text-[0.75rem] font-bold text-warning" data-testid="sample-figures">샘플 회사 · 예시 수치</span>}
-        {contractDay !== undefined && contractDay > 0 && <span className="ml-auto rounded-full bg-surface-2 px-2.5 py-1 text-[0.78rem] font-bold text-ink-2" data-testid="contract-day" title={`계약 시작 ${formatYmd(c.contractStartedAt!).replaceAll("-", ".")}`}>KPJK 계약 <span className="tnum">{contractDay.toLocaleString("ko-KR")}</span>일차</span>}
-        <span className={cx("flex items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-1 text-[0.78rem] font-bold text-ink-2", !(contractDay !== undefined && contractDay > 0) && "ml-auto")} data-testid="growth-level">
-          <TrendingUp size={14} className="text-accent-strong" /> 성장 {level.level}/5단계 · {level.name}
-        </span>
+        <h2 className="text-[1.1rem] font-extrabold md:text-[1.15rem]">우리 회사 한눈에</h2>
+        {c.sample && <span className="rounded-full bg-warning-bg px-2.5 py-0.5 text-[0.72rem] font-bold text-warning" data-testid="sample-figures">샘플 회사 · 예시 수치</span>}
+        <div className="hide-scrollbar flex w-full gap-1.5 overflow-x-auto md:ml-auto md:w-auto">
+          {contractDay !== undefined && contractDay > 0 && <span className="shrink-0 whitespace-nowrap rounded-full bg-surface-2 px-2.5 py-1 text-[0.75rem] font-bold text-ink-2" data-testid="contract-day" title={`계약 시작 ${formatYmd(c.contractStartedAt!).replaceAll("-", ".")}`}>KPJK 계약 <span className="tnum">{contractDay.toLocaleString("ko-KR")}</span>일차</span>}
+          <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-surface-2 px-2.5 py-1 text-[0.75rem] font-bold text-ink-2" data-testid="growth-level">
+            <TrendingUp size={14} className="text-accent-strong" /> 성장 {level.level}/5단계 · {level.name}
+          </span>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4" data-testid="snapshot-tiles">
+      {/* 휴대폰: 매출 한 줄 + 업력·임직원·인증 세 칸 / PC: 네 칸 */}
+      <div className="grid grid-cols-3 lg:grid-cols-4" data-testid="snapshot-tiles">
         {/* 1. 최근 매출 — 가장 크게. 전년 대비와 3개년 막대를 같이 */}
-        <div className="col-span-2 border-b border-line p-5 lg:col-span-1 lg:border-b-0 lg:border-r md:p-6" data-testid="tile-revenue">
+        <div className="col-span-3 border-b border-line p-4 lg:col-span-1 lg:border-b-0 lg:border-r md:p-6" data-testid="tile-revenue">
           <div className="flex items-center gap-1.5 text-[0.8rem] font-bold text-ink-3"><TrendIcon dir={dir} /> {trend.latest ? `${trend.latest.year}년 매출` : "최근 매출"}</div>
           <div className="mt-1.5 flex items-end gap-3">
-            <div className="tnum text-[2rem] font-black leading-none tracking-tight md:text-[2.3rem]">{trend.latest ? fmtMoneyKo(trend.latest.revenue).replace(" 원", "") : "—"}{trend.latest && <> <small className="text-[0.9rem] font-bold text-ink-2">원</small></>}</div>
+            <div className="tnum text-[1.85rem] font-black leading-none tracking-tight md:text-[2.3rem]">{trend.latest ? fmtMoneyKo(trend.latest.revenue).replace(" 원", "") : "—"}{trend.latest && <> <small className="text-[0.9rem] font-bold text-ink-2">원</small></>}</div>
             {spark.length > 1 && (
               <div className="mb-1 ml-auto flex h-9 items-end gap-1" aria-hidden>
                 {spark.map((f, i) => <span key={f.year} className={cx("w-2.5 rounded-sm", i === spark.length - 1 ? "bg-accent" : "bg-ink-3/30")} style={{ height: `${Math.max(18, Math.round((f.revenue! / sMax) * 100))}%` }} />)}
@@ -86,7 +90,7 @@ export function CompanySnapshot({ company: c, board, showFactsLink = true, colla
         <BigTile k="people" label="임직원" icon={<Users size={15} />} value={c.employees ? <>{c.employees.toLocaleString("ko-KR")}<small>명</small></> : band ?? "—"} sub={c.region || c.address || ""} />
         <BigTile k="certs" label="보유 인증" icon={<BadgeCheck size={15} />} value={<>{certs.length}<small>개</small></>}
           sub={certs.length ? certs.slice(0, 2).map((x) => x.name).join(" · ") + (certs.some((x) => x.state === "expiring" || x.state === "expired") ? " · 갱신 확인" : "") : "인증서를 보내 주시면 기록됩니다"}
-          hot={certs.some((x) => x.state === "expiring" || x.state === "expired")} className="col-span-2 border-t lg:col-span-1 lg:border-t-0" />
+          hot={certs.some((x) => x.state === "expiring" || x.state === "expired")} />
       </div>
 
       {/* 홈 휴대폰: 숫자 4칸만 먼저 — 매출 막대·인증 목록은 눌러서 펼친다(PC는 늘 펼침) */}
@@ -114,10 +118,10 @@ export function CompanySnapshot({ company: c, board, showFactsLink = true, colla
 
 function BigTile({ k, label, icon, value, sub, hot, className }: { k: string; label: string; icon: React.ReactNode; value: React.ReactNode; sub?: string; hot?: boolean; className?: string }) {
   return (
-    <div className={cx("min-w-0 border-line p-5 md:p-6 [&:not(:last-child)]:border-r", hot && "bg-warning-bg/40", className)} data-testid={`tile-${k}`}>
-      <div className="flex items-center gap-1.5 text-[0.8rem] font-bold text-ink-3"><span className="text-accent-strong">{icon}</span>{label}</div>
-      <div className="tnum mt-1.5 truncate text-[1.75rem] font-black leading-none tracking-tight md:text-[2rem] [&_small]:ml-0.5 [&_small]:text-[0.85rem] [&_small]:font-bold [&_small]:text-ink-2">{value}</div>
-      {sub && <div className={cx("mt-2 line-clamp-2 text-[0.78rem] leading-snug", hot ? "font-semibold text-warning" : "text-ink-3")}>{sub}</div>}
+    <div className={cx("min-w-0 border-line px-3.5 py-3.5 md:p-6 [&:not(:last-child)]:border-r", hot && "bg-warning-bg/40", className)} data-testid={`tile-${k}`}>
+      <div className="flex items-center gap-1 text-[0.72rem] font-bold text-ink-3 md:gap-1.5 md:text-[0.8rem]"><span className="text-accent-strong [&>svg]:h-3.5 [&>svg]:w-3.5 md:[&>svg]:h-[15px] md:[&>svg]:w-[15px]">{icon}</span>{label}</div>
+      <div className="tnum mt-1.5 truncate text-[1.35rem] font-black leading-none tracking-tight md:text-[2rem] [&_small]:ml-0.5 [&_small]:text-[0.72rem] [&_small]:font-bold [&_small]:text-ink-2 md:[&_small]:text-[0.85rem]">{value}</div>
+      {sub && <div className={cx("mt-1.5 line-clamp-2 text-[0.7rem] leading-snug md:mt-2 md:text-[0.78rem]", hot ? "font-semibold text-warning" : "text-ink-3")}>{sub}</div>}
     </div>
   );
 }

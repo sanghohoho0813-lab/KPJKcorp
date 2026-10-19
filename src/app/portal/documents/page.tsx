@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FileText, FolderUp, Upload } from "lucide-react";
+import { FileCheck2, FileText, FolderUp, Upload } from "lucide-react";
 import { useStore, usePortalCompanyId } from "@/lib/store";
-import { daysBetween, fmtDate, fmtDateTime, fmtSize, relativeDay } from "@/lib/format";
+import { daysBetween, fmtDate, fmtDateTime, relativeDay } from "@/lib/format";
 import type { DocumentRequest } from "@/lib/types";
 import { Badge, Button, Card, EmptyState, PageHeader, SegmentedControl, cx } from "@/components/ui/ui";
 import { StatStrip } from "@/components/domain/portal/StatStrip";
@@ -58,24 +58,31 @@ export default function PortalDocumentsPage() {
         {rows.length === 0 ? <EmptyState icon={<FolderUp size={30} />} title={hasPolicy ? "그 밖의 요청자료가 없습니다" : "요청된 자료가 없습니다"} desc="담당 컨설턴트가 자료를 요청하면 여기에 표시됩니다." /> : (
           <div className="divide-y divide-line">
             {rows.map((d) => {
-              const overdue = (d.status === "requested" || d.status === "revision") && daysBetween(d.dueDate, now) > 0;
+              const pending = d.status === "requested" || d.status === "revision";
+              const overdue = pending && daysBetween(d.dueDate, now) > 0;
               const last = d.files[d.files.length - 1];
+              // 주문 목록처럼: 왼쪽 상태 아이콘 · 가운데 이름과 한 줄 정보 · 오른쪽 버튼 하나. 끝난 자료에는 기한을 다시 적지 않는다
+              const tone = d.status === "revision" ? "bg-error-bg text-error" : d.status === "requested" ? "bg-[#fff1e6] text-[#c25a12]" : d.status === "done" ? "bg-success-bg text-success" : "bg-info-bg text-info";
+              const meta = pending
+                ? <span className={cx(overdue && "font-semibold text-error")}>기한 {fmtDate(d.dueDate)} ({relativeDay(d.dueDate)})</span>
+                : last ? <span className="truncate">제출 {fmtDate(last.uploadedAt)} · {last.fileName}{d.files.length > 1 ? ` 외 ${d.files.length - 1}개` : ""}</span> : null;
               return (
-                <div key={d.id} className={cx("flex flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:px-5", overdue && "bg-error-bg/30")}>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2"><DocStatusBadge status={d.status} client /><span className="font-bold">{d.name}</span></div>
-                    {d.description && <div className="mt-0.5 text-[0.85rem] text-ink-2">{d.description}</div>}
-                    {d.status === "revision" && d.reviewNote && <div className="mt-1.5 rounded-lg bg-error-bg px-3 py-2 text-[0.85rem] text-error"><b>보완 요청:</b> {d.reviewNote}</div>}
-                    <div className="mt-1 flex flex-wrap gap-x-3 text-[0.78rem] text-ink-3">
-                      <span className={cx(overdue && "font-semibold text-error")}>기한 {fmtDate(d.dueDate)} ({relativeDay(d.dueDate)})</span>
-                      {last && <span>제출 {fmtDateTime(last.uploadedAt)} · {last.fileName} ({fmtSize(last.size)})</span>}
+                <div key={d.id} className={cx("px-4 py-3.5 md:px-5", overdue && "bg-error-bg/30")}>
+                  <div className="flex items-center gap-3">
+                    <span className={cx("flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl", tone)}>{d.status === "done" ? <FileCheck2 size={18} /> : pending ? <FolderUp size={18} /> : <FileText size={18} />}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1"><span className="font-bold">{d.name}</span><DocStatusBadge status={d.status} client /></div>
+                      <div className="mt-0.5 flex min-w-0 text-[0.78rem] text-ink-3">{meta}</div>
+                    </div>
+                    <div className="flex shrink-0 gap-2">
+                      {(d.status === "requested") && <Button variant="accent" size="sm" icon={<Upload size={14} />} onClick={() => setUpload(d)}>업로드</Button>}
+                      {d.status === "revision" && <Button variant="accent" size="sm" icon={<Upload size={14} />} onClick={() => setUpload(d)}>재제출</Button>}
+                      {(d.status === "submitted" || d.status === "reviewing" || d.status === "done") && <Button variant="ghost" size="sm" onClick={() => setView(d)}>{d.status === "done" ? "보기" : "확인"}</Button>}
                     </div>
                   </div>
-                  <div className="flex shrink-0 gap-2">
-                    {(d.status === "requested") && <Button variant="accent" size="sm" icon={<Upload size={14} />} onClick={() => setUpload(d)}>업로드</Button>}
-                    {d.status === "revision" && <Button variant="outline" size="sm" icon={<Upload size={14} />} onClick={() => setUpload(d)}>재제출</Button>}
-                    {(d.status === "submitted" || d.status === "reviewing" || d.status === "done") && <Button variant="ghost" size="sm" icon={<FileText size={14} />} onClick={() => setView(d)}>{d.status === "done" ? "보기" : "확인"}</Button>}
-                  </div>
+                  {/* 긴 설명·보완 사유는 아래 줄에 — 버튼 옆에 끼우면 휴대폰에서 글이 한 뼘 폭으로 눌린다 */}
+                  {pending && d.description && <div className="mt-1.5 line-clamp-2 pl-[3.25rem] text-[0.82rem] text-ink-2">{d.description}</div>}
+                  {d.status === "revision" && d.reviewNote && <div className="ml-[3.25rem] mt-1.5 rounded-xl bg-error-bg px-3 py-2 text-[0.82rem] text-error"><b>보완 요청:</b> {d.reviewNote}</div>}
                 </div>
               );
             })}

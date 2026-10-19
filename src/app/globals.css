@@ -431,14 +431,28 @@ html[data-motion="reduce"] .coach-glow { animation: none; }
   .portal-ui .kpi-value { font-size: 1.45rem; }
   .portal-ui .kpi .mt-2 { margin-top: 0.25rem; font-size: 0.75rem; }
 }
-/* 고객 홈 머리 영역 — 테마의 진한 강조색(흰 글자 대비 4.5:1 이상) */
+/* 고객 홈 머리 영역 — 테마의 진한 강조색(흰 글자 대비 4.5:1 이상).
+   맨 위 띠는 강조색 그대로 두고(머리줄과 이어지게) 밝은 빛·무늬는 아래쪽에 둔다 */
 .portal-hero-bg {
   /* 둥근 무늬도 배경으로 — 요소로 두면 잘린 내용으로 잡히고 읽기 도구에도 걸린다 */
   background:
-    radial-gradient(circle at 104% -12%, rgba(255, 255, 255, 0.09) 0 26%, transparent 26.3%),
-    radial-gradient(circle at 72% 128%, rgba(255, 255, 255, 0.06) 0 21%, transparent 21.3%),
-    radial-gradient(90% 120% at 100% 0%, color-mix(in srgb, var(--theme-accent) 55%, transparent) 0%, transparent 60%),
-    linear-gradient(160deg, var(--theme-accent-strong) 0%, color-mix(in srgb, var(--theme-accent-strong) 82%, black) 100%);
+    radial-gradient(circle at 106% 34%, rgba(255, 255, 255, 0.08) 0 24%, transparent 24.3%),
+    radial-gradient(circle at 70% 132%, rgba(255, 255, 255, 0.06) 0 21%, transparent 21.3%),
+    radial-gradient(80% 90% at 100% 55%, color-mix(in srgb, var(--theme-accent) 50%, transparent) 0%, transparent 62%),
+    linear-gradient(180deg, var(--theme-accent-strong) 0%, color-mix(in srgb, var(--theme-accent-strong) 84%, black) 100%);
+}
+/* 고객 홈 휴대폰 머리줄 — 브랜드 색으로 이어서 */
+@media (max-width: 1023px) {
+  .hdr-brand { background: var(--theme-accent-strong); border-color: transparent; color: #fff; backdrop-filter: none; }
+  .hdr-brand .hdr-logo { background: #fff; color: var(--theme-shell); }
+  .hdr-brand .hdr-fs { border-color: rgba(255, 255, 255, 0.35); }
+  .hdr-brand .hdr-fs > span { background: rgba(255, 255, 255, 0.35); }
+  .hdr-brand .hdr-fs button { color: #fff; }
+  .hdr-brand .hdr-fs button:hover { background: rgba(255, 255, 255, 0.12); }
+  .hdr-brand .hdr-bell > div > button { color: #fff; }
+  .hdr-brand .hdr-bell > div > button:hover { background: rgba(255, 255, 255, 0.12); }
+  .hdr-brand .hdr-bell > div > button > span { box-shadow: 0 0 0 2px var(--theme-accent-strong); }
+  .hdr-brand .hdr-who, .hdr-brand .hdr-who * { color: #fff; }
 }
 /* 가로로 넘기는 카드 줄 */
 .snap-row { scroll-snap-type: x mandatory; scroll-padding-inline: 1rem; }

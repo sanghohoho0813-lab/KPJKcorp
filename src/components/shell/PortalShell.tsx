@@ -132,25 +132,26 @@ export function PortalShell({ children }: { children: ReactNode }) {
           <span>미리보기 중입니다. 상담 요청·관심·공고 문의는 <b>고객 대신 접수</b>로 넣을 수 있습니다. 자료 제출·문의 작성·견적 회신은 고객 계정으로만 합니다.</span>
         </div>
       )}
-      <header className="sticky top-0 z-30 border-b border-line bg-surface/90 backdrop-blur">
+      {/* 고객 홈(휴대폰)은 머리줄이 아래 브랜드 색 머리와 이어진다 — 앱 첫 화면처럼 경계 없이(globals.css .hdr-brand) */}
+      <header className={cx("sticky top-0 z-30 border-b border-line bg-surface/90 backdrop-blur", pathname === "/portal" && "hdr-brand")}>
         {/* 글자 크기를 키우면 이 줄의 모든 요소가 같이 넓어진다. 줄일 수 있는 것(로고 문구·메뉴)은
             줄어들게 하고, 줄이면 안 되는 것(알림·계정)에만 shrink-0을 준다. */}
         <div className="mx-auto flex h-[var(--header-h)] max-w-[1480px] items-center gap-2 px-4 md:gap-3 md:px-6">
           <Link href="/portal" className="flex min-w-0 items-center gap-2.5">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-shell text-[0.65rem] font-black text-white">KPJK</span>
+            <span className="hdr-logo flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-shell text-[0.65rem] font-black text-white">KPJK</span>
             <span className="truncate text-[1rem] font-bold"><span className="hidden 2xl:inline">KPJK </span>성장 플랫폼</span>
           </Link>
           {/* 메뉴가 잘려 보이면 안 된다 — 넓은 화면(xl)에서 8개 전부, 그보다 좁으면 앞의 6개(나머지는 알림·내 정보에서) */}
           <nav className="ml-1 hidden shrink-0 items-center gap-0.5 lg:flex" data-testid="portal-nav">
             {NAV.slice(0, 8).map((n, i) => (
-              <Link key={n.href} href={n.href} className={cx("pressable lift whitespace-nowrap rounded-lg px-2 py-2 text-[0.85rem] font-semibold transition-colors", i >= 6 && "hidden xl:block", isActive(pathname, n.href) ? "bg-surface-2 text-ink" : "text-ink-2 hover:bg-surface-2 hover:text-ink")}>
+              <Link key={n.href} href={n.href} aria-current={isActive(pathname, n.href) ? "page" : undefined} className={cx("pressable lift whitespace-nowrap rounded-full px-3 py-2 text-[0.85rem] font-semibold transition-colors", i >= 6 && "hidden xl:block", isActive(pathname, n.href) ? "bg-soft text-accent" : "text-ink-2 hover:bg-surface-2 hover:text-ink")}>
                 {n.label}
               </Link>
             ))}
           </nav>
           <div className="flex-1" />
           {/* 고객 화면에서도 글자 크기는 바로 바꿀 수 있어야 한다 — 대표님들 연령대가 넓다. */}
-          <FontScaleStepper className="mr-1 shrink-0" />
+          <FontScaleStepper className="hdr-fs mr-1 shrink-0" />
           <div className="hidden shrink-0 items-center gap-1 lg:flex">
             <DevicePreviewButton className={cx(btn, "hdr-optional")} labelClass="hidden 2xl:inline" />
             {!inFrame && (
@@ -159,9 +160,9 @@ export function PortalShell({ children }: { children: ReactNode }) {
               </button>
             )}
           </div>
-          <span className="shrink-0"><NotificationBell audience="client" companyId={companyId} /></span>
+          <span className="hdr-bell shrink-0"><NotificationBell audience="client" companyId={companyId} /></span>
           <Link href="/portal/me" className="flex shrink-0 items-center gap-2 pl-1">
-            <div className="hdr-optional hidden max-w-[180px] whitespace-nowrap text-right leading-tight sm:block lg:hidden 2xl:block">
+            <div className="hdr-who hdr-optional hidden max-w-[180px] whitespace-nowrap text-right leading-tight sm:block lg:hidden 2xl:block">
               <div className="truncate text-[0.82rem] font-bold">{company?.name}</div>
               <div className="truncate text-[0.7rem] text-ink-3">{isInternal ? company?.contactName : user?.name} {isInternal ? company?.contactTitle : user?.title}</div>
             </div>
