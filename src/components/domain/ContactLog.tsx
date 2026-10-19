@@ -10,6 +10,7 @@ import type { Company } from "@/lib/types";
 import { Modal } from "@/components/ui/overlay";
 import { Button, Field, Input, cx } from "@/components/ui/ui";
 import { useMay } from "@/components/domain/EntityModals";
+import { Icon3D } from "@/components/domain/portal/Icon3D";
 
 /** 연락 공백 계산에 쓰는 기록 묶음 + 기준일(설정의 '고객 연락 공백' 규칙과 같은 값) */
 export function useContactSources(): { src: ContactSources; cycle: number } {
@@ -30,14 +31,14 @@ export function useContactStatus(company?: Company): ContactStatus & { cycle: nu
 }
 
 /** "마지막 연락 9일 전 · 상담" — 기준일을 넘기면 빨갛게 */
-export function ContactLine({ status, className }: { status: ContactStatus & { cycle: number }; className?: string }) {
+export function ContactLine({ status, className, icon3d }: { status: ContactStatus & { cycle: number }; className?: string; /** 기업 상세 머리글: 작은 3D 전화 그림 */ icon3d?: boolean }) {
   if (!status.last || status.days === undefined) return null;
   const when = status.days === 0 ? "오늘" : `${status.days}일 전`;
   const tail = status.planned ? `미팅 예정 ${fmtDate(status.planned)}` : !status.due && status.left !== undefined ? (status.left > 0 ? `다음 연락까지 ${status.left}일` : "오늘 연락할 때") : `기준 ${status.cycle}일`;
   // 좁은 화면에서는 덩어리째 줄을 바꾼다 — 글자 중간에서 끊기지 않게
   return (
     <span className={cx("inline-flex flex-wrap items-center gap-x-1.5", status.due ? "font-semibold text-error" : "text-ink-2", className)} data-testid="contact-line">
-      <span className="inline-flex items-center gap-1.5 whitespace-nowrap"><PhoneCall size={14} className={status.due ? "text-error" : "text-ink-3"} />{status.due ? `연락 ${status.days}일 없음` : `마지막 연락 ${when}`}</span>
+      <span className="inline-flex items-center gap-1.5 whitespace-nowrap">{icon3d ? <Icon3D name="ax-phone" size="1.35rem" /> : <PhoneCall size={14} className={status.due ? "text-error" : "text-ink-3"} />}{status.due ? `연락 ${status.days}일 없음` : `마지막 연락 ${when}`}</span>
       <span className={cx("whitespace-nowrap", status.due ? "font-medium" : "text-ink-3")}>· {status.last.how}</span>
       <span className={cx("whitespace-nowrap", status.due ? "font-medium" : "text-ink-3")}>· {tail}</span>
     </span>

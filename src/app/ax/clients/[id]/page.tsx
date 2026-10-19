@@ -4,7 +4,7 @@ import { CancelDocRequestButton } from "@/components/domain/portal/CancelRequest
 import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Building2, ClipboardList, EyeOff, Lock, Landmark, CalendarDays, ChevronDown, ChevronRight, Eye, FileCheck2, FileText, FolderOpen, ListPlus, Mail, PhoneCall, MapPin, MessageSquare, MessageSquareText, NotebookPen, Phone, Plus, Sparkles, UserRound, Pencil, Archive, ArchiveRestore, UserPlus } from "lucide-react";
+import { ArrowLeft, Building2, ClipboardList, EyeOff, Lock, Landmark, CalendarDays, ChevronDown, ChevronRight, Eye, FileCheck2, FileText, ListPlus, Mail, PhoneCall, MapPin, MessageSquare, MessageSquareText, NotebookPen, Phone, Plus, Sparkles, UserRound, Pencil, Archive, ArchiveRestore, UserPlus } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { AxInsightButton } from "@/components/ai/AxInsight";
 import { useUi } from "@/lib/ui-store";
@@ -37,6 +37,7 @@ import { ContactLine, LogContactModal, useContactStatus, useMayLogContact } from
 import { EXTRACT_METHOD_LABEL } from "@/lib/docextract";
 import { PolicyDocsModal } from "@/components/domain/client/PolicyDocs";
 import { ProgressReportModal } from "@/components/domain/client/ProgressReport";
+import { Icon3D } from "@/components/domain/portal/Icon3D";
 
 type TabKey = "overview" | "work" | "vault" | "docs" | "contract" | "consult" | "schedule" | "portal" | "journal" | "history";
 const TAB_KEYS: TabKey[] = ["overview", "work", "vault", "docs", "contract", "consult", "schedule", "portal", "journal", "history"];
@@ -177,7 +178,7 @@ export default function ClientCardPage() {
                 ].filter(Boolean) as string[]).map((x, i) => <span key={x}>{i > 0 && " · "}<span className="whitespace-nowrap">{x}</span></span>)}
                 {!c.entityType && !companySummary(c) && !c.bizNo && !c.corpNo && !c.establishedAt && "기본 정보가 아직 없습니다 — 기업정보 수정에서 서류를 올리면 채워집니다."}
               </div>
-              <div className="mt-1.5 text-[0.85rem]"><ContactLine status={contact} /></div>
+              <div className="mt-1.5 text-[0.85rem]"><ContactLine status={contact} icon3d /></div>
               {(c.bizCategory || c.bizItem) && <div className="mt-0.5 text-[0.82rem] text-ink-3">업태 {c.bizCategory ?? "-"} · 종목 {c.bizItem ?? "-"}{c.bizItemsExtra ? <span title={c.bizItemsExtra}> · 외 업태 {c.bizItemsExtra.split("\n").filter(Boolean).length}개</span> : null}{c.capital ? ` · 자본금 ${c.capital.toLocaleString("ko-KR")}원` : ""}</div>}
               {(c.interests?.length || c.leadSource) ? (
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -259,10 +260,10 @@ export default function ClientCardPage() {
       {/* Quick status */}
       {/* 휴대폰에서는 아래 "지금 할 일"이 같은 내용을 더 구체적으로 보여 준다 */}
       <div className="kpi-row hidden grid-cols-2 gap-3 md:grid md:grid-cols-4">
-        <KpiCard label="진행 프로젝트" value={active.length} sub={active[0]?.name ?? "없음"} icon={<IconTile color="var(--mod-ops)" size={30}><FolderOpen size={15} /></IconTile>} />
-        <KpiCard label="자료 미제출 · 검토대기" value={<>{missing.length}<span className="text-[1rem] text-ink-3"> / {waiting.length}</span></>} sub={missing.some((d) => daysBetween(d.dueDate, nowIso) > 0) ? "기한 초과 있음" : "기한 내"} tone={missing.some((d) => daysBetween(d.dueDate, nowIso) > 0) ? "error" : undefined} icon={<IconTile color="var(--mod-doc)" size={30}><FileText size={15} /></IconTile>} />
-        <KpiCard label="다음 일정" value={upcoming[0] ? fmtDate(upcoming[0].start) : "-"} sub={upcoming[0]?.title ?? "예정 일정 없음"} icon={<IconTile color="var(--mod-schedule)" size={30}><CalendarDays size={15} /></IconTile>} />
-        <KpiCard label="최근 문의" value={inquiries.length} sub={openIq.length ? `답변 대기 ${openIq.length}건` : "답변 대기 없음"} tone={openIq.length ? "error" : undefined} icon={<IconTile color="var(--mod-customer)" size={30}><MessageSquare size={15} /></IconTile>} />
+        <KpiCard label="진행 프로젝트" value={active.length} sub={active[0]?.name ?? "없음"} icon={<Icon3D name="ax-doc" size="2.1rem" />} />
+        <KpiCard label="자료 미제출 · 검토대기" value={<>{missing.length}<span className="text-[1rem] text-ink-3"> / {waiting.length}</span></>} sub={missing.some((d) => daysBetween(d.dueDate, nowIso) > 0) ? "기한 초과 있음" : "기한 내"} tone={missing.some((d) => daysBetween(d.dueDate, nowIso) > 0) ? "error" : undefined} icon={<Icon3D name="ax-files" size="2.1rem" />} />
+        <KpiCard label="다음 일정" value={upcoming[0] ? fmtDate(upcoming[0].start) : "-"} sub={upcoming[0]?.title ?? "예정 일정 없음"} icon={<Icon3D name="ax-deadline" size="2.1rem" />} />
+        <KpiCard label="최근 문의" value={inquiries.length} sub={openIq.length ? `답변 대기 ${openIq.length}건` : "답변 대기 없음"} tone={openIq.length ? "error" : undefined} icon={<Icon3D name="ax-talk" size="2.1rem" />} />
       </div>
 
       <Tabs tabs={tabs} value={tab} onChange={setTab} id="tut-client-tabs" />

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { ArrowRight, BookOpen, CalendarDays, FolderOpen, MessageSquare, ListChecks, PhoneCall, ShieldCheck, Sparkles, TrendingUp } from "lucide-react";
+import { ArrowRight, BookOpen, CalendarDays, ShieldCheck, Sparkles, TrendingUp } from "lucide-react";
 import { useStore, useCurrentUser } from "@/lib/store";
 import { AxInsightButton } from "@/components/ai/AxInsight";
 import { useUi } from "@/lib/ui-store";
@@ -10,7 +10,8 @@ import { buildBrief, briefSummaryCounts } from "@/lib/brief";
 import { daysBetween, daysLate, isSameDay, fmtRelative, fmtFull, fmtWon } from "@/lib/format";
 import { OPP_STATUS } from "@/lib/services";
 import { useNow } from "@/lib/hooks";
-import { AiReadyBadge, Card, KpiCard, SectionTitle, Badge, IconTile, cx } from "@/components/ui/ui";
+import { AiReadyBadge, Card, KpiCard, SectionTitle, Badge, cx } from "@/components/ui/ui";
+import { Icon3D } from "@/components/domain/portal/Icon3D";
 import { BriefList, ScheduleItem } from "@/components/domain/domain";
 import { FirstRunOrCoach } from "@/components/domain/FirstRun";
 import { CeoSummaryCard, OpsStrip } from "@/components/domain/CeoSummary";
@@ -98,11 +99,11 @@ export default function DashboardPage() {
       {/* 첫 화면 숫자는 "지금 처리할 것"만 — 누르면 그 일로 바로 간다. 상태 숫자(운영 현황)는 아래에 둔다 */}
       <div id="tut-kpi" className="kpi-row grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
         {isAdmin
-          ? <KpiCard label="내 승인 대기" value={pendingApprovals.length} sub={pendingApprovals.length ? "지금 확인 필요" : "대기 없음"} href="/ax/opportunities?tab=approvals" tone={pendingApprovals.length ? "error" : undefined} icon={<IconTile color="var(--mod-alert)" size={32}><ShieldCheck size={16} /></IconTile>} />
-          : <KpiCard id="kpi-today" label="오늘 할 업무" value={todayMine.length} sub={overdueMine ? `기한 초과 ${overdueMine}건 포함` : todayMine.length ? "오늘 18시까지" : "모두 처리"} href="/ax/tasks" tone={overdueMine ? "error" : undefined} accentValue={!overdueMine && todayMine.length > 0} icon={<IconTile color="var(--mod-ops)" size={32}><ListChecks size={16} /></IconTile>} />}
-        <KpiCard label="미답변 문의" value={openInquiries} sub={openInquiries ? "답변 필요" : "모두 답변됨"} href="/ax/tasks?tab=inquiry" tone={openInquiries ? "error" : undefined} icon={<IconTile color="var(--mod-customer)" size={32}><MessageSquare size={16} /></IconTile>} />
-        <KpiCard label="자료 검토 대기" value={docWaiting} sub={counts.docs ? `기한 이슈 ${counts.docs}건` : "기한 이슈 없음"} href="/ax/documents" tone={counts.docs ? "error" : undefined} icon={<IconTile color="var(--mod-doc)" size={32}><FolderOpen size={16} /></IconTile>} />
-        <KpiCard id="kpi-contact" label="연락 필요" value={contactDue} sub={contactDue ? `${cycle}일 넘게 연락 없음` : "공백 없음"} href="/ax/clients?filter=contact" tone={contactDue ? "error" : undefined} icon={<IconTile color="var(--mod-schedule)" size={32}><PhoneCall size={16} /></IconTile>} />
+          ? <KpiCard label="내 승인 대기" value={pendingApprovals.length} sub={pendingApprovals.length ? "지금 확인 필요" : "대기 없음"} href="/ax/opportunities?tab=approvals" tone={pendingApprovals.length ? "error" : undefined} icon={<Icon3D name="ax-approval" size="2.25rem" />} />
+          : <KpiCard id="kpi-today" label="오늘 할 업무" value={todayMine.length} sub={overdueMine ? `기한 초과 ${overdueMine}건 포함` : todayMine.length ? "오늘 18시까지" : "모두 처리"} href="/ax/tasks" tone={overdueMine ? "error" : undefined} accentValue={!overdueMine && todayMine.length > 0} icon={<Icon3D name="ax-tasks" size="2.25rem" />} />}
+        <KpiCard label="미답변 문의" value={openInquiries} sub={openInquiries ? "답변 필요" : "모두 답변됨"} href="/ax/tasks?tab=inquiry" tone={openInquiries ? "error" : undefined} icon={<Icon3D name="ax-inquiry" size="2.25rem" />} />
+        <KpiCard label="자료 검토 대기" value={docWaiting} sub={counts.docs ? `기한 이슈 ${counts.docs}건` : "기한 이슈 없음"} href="/ax/documents" tone={counts.docs ? "error" : undefined} icon={<Icon3D name="ax-review" size="2.25rem" />} />
+        <KpiCard id="kpi-contact" label="연락 필요" value={contactDue} sub={contactDue ? `${cycle}일 넘게 연락 없음` : "공백 없음"} href="/ax/clients?filter=contact" tone={contactDue ? "error" : undefined} icon={<Icon3D name="ax-call" size="2.25rem" />} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
