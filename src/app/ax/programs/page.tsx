@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Bell, Building2, Copy, Download, Link2, Phone, Plus, Trash2, UserPlus, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { AxInsightButton } from "@/components/ai/AxInsight";
@@ -27,6 +27,13 @@ const leadProfile = (l: Lead): MatchProfile => ({ region: l.region, industry: l.
 const DAY_PLUS = 25 * 3600 * 1000;
 /** 공고 목록을 한 번에 그리는 수 — 더 보려면 아래 "더 보기" */
 const PAGE_SIZE = 60;
+
+/** ?tab=leads · ?tab=companies — 알림(새 가망고객)처럼 앱 안에서 넘어와도 그 탭으로. 처음 그릴 땐 주소창이 아직 안 바뀌어 있다 */
+function TabFromUrl({ onTab }: { onTab: (t: Tab) => void }) {
+  const q = useSearchParams().get("tab");
+  useEffect(() => { if (q === "leads" || q === "companies") onTab(q); }, [q, onTab]);
+  return null;
+}
 
 export default function ProgramsPage() {
   const st = useStore();
@@ -122,6 +129,7 @@ export default function ProgramsPage() {
 
   return (
     <div className="space-y-4">
+      <Suspense fallback={null}><TabFromUrl onTab={setTab} /></Suspense>
       <PageHeader title="지원사업 매칭" badge={<><Badge tone="accent">베타</Badge><AxInsightButton topic="programs" /></>}
         desc="공고를 고객·가망고객의 조건과 맞춰 봅니다. 자격 판정이 아니라 '검토해 볼 공고'와 그 근거입니다."
         actions={may("program.manage") ? <>

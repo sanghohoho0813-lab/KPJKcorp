@@ -7,6 +7,7 @@
 //  8) 정책자금 준비 서류: 묶음 요청(알림 한 번) → 고객 홈 한 줄 → 파일 여러 개 제출 → 검토 발급일 → 서류함·고객 준비됨
 //  9) 공고 신청 묶음: 서류함 파일 → 신청일 기준 상태 → 공고문 서류 더하기 → zip(번호·서류명 + 서류목록) → 모자란 서류 요청(기한은 신청일 앞)
 // 10) 경과 보고: 기업 상세 빠른 작업 → 기간 · 줄 고르기 · 한마디 → 미리 보기 · 카톡용 복사 → 고객에게 보내기(공지 · 홈 맨 위) → 고객 화면
+// 11) 앱 안에서 넘어올 때 주소의 탭 · 창 열기(?tab= · ?kit= · ?report=1 · 지원사업 ?tab=leads) — 새로 고침 없이도 맞는 화면
 // 실행: npm run build && npm start (데모 모드) → node tools/acceptance/daily.mjs
 import fs from 'fs';
 import { execFileSync } from 'child_process';
@@ -420,16 +421,19 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
   const page = await session('pc', ['ceo@kpjk.co.kr', 'kpjk2026!']);
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin: B });
   const dlg = () => page.locator('[role=dialog]:visible').last();
-  await go(page, '/ax/clients/co_a');
-  const qa = page.getByTestId('client-quick-actions').getByRole('button', { name: '경과 보고' });
-  ok('10 기업 상세 빠른 작업에 경과 보고', await qa.isVisible());
-  await qa.click(); await sleep(500);
-  const lines = dlg().getByTestId('report-lines');
-  const sections = await lines.locator('[data-report-section]').evaluateAll((els) => els.map((e) => e.getAttribute('data-report-section')));
-  ok('10 진행 상황 · 한 일 · 부탁드릴 것 묶음이 채워짐', sections.includes('now') && sections.includes('done') && sections.includes('ask'), sections.join(','));
+  await go(page, '/ax/tasks');
   let st = await dump(page);
   const ruleTask = st.tasks.find((t) => t.companyId === 'co_a' && t.ruleKey?.startsWith('progress_report:') && t.status === 'todo');
   ok('10 규칙 업무: 경과 보고 공백 → 보내기 업무가 있음', !!ruleTask && ruleTask.type === '보고서' && ruleTask.source === 'auto', ruleTask?.title);
+  await page.getByRole('button', { name: '미완료', exact: true }).click(); await sleep(400);
+  const write = page.locator('a[href="/ax/clients/co_a?report=1"]:visible').first();
+  ok('10 업무함: 경과 보고 업무에 보고 쓰기', await write.isVisible());
+  await write.click(); await page.waitForURL(/\/ax\/clients\/co_a\?report=1/); await sleep(900);
+  const qa = page.getByTestId('client-quick-actions').getByRole('button', { name: '경과 보고' });
+  ok('10 보고 쓰기 → 그 기업 보고 창이 바로 열림 · 빠른 작업에도 경과 보고', await dlg().getByTestId('report-lines').isVisible() && await qa.isVisible());
+  const lines = dlg().getByTestId('report-lines');
+  const sections = await lines.locator('[data-report-section]').evaluateAll((els) => els.map((e) => e.getAttribute('data-report-section')));
+  ok('10 진행 상황 · 한 일 · 부탁드릴 것 묶음이 채워짐', sections.includes('now') && sections.includes('done') && sections.includes('ask'), sections.join(','));
   const openReqs = st.docRequests.filter((d) => d.companyId === 'co_a' && (d.status === 'requested' || d.status === 'revision'));
   const askN = await lines.locator('[data-report-section=ask] [data-line]').count();
   ok('10 부탁드릴 것 = 남은 요청자료', askN === Math.min(openReqs.length, 5) + (openReqs.length > 5 ? 1 : 0), `${askN} / ${openReqs.length}`);
@@ -490,6 +494,22 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
   await page.setViewportSize({ width: 390, height: 844 }); await sleep(500);
   ok('10 휴대폰 일정 · 공지 가로 넘침 없음', (await overflow(page)) <= 0);
   ok('10 페이지 오류 없음', page.errs.length === 0, page.errs.slice(0, 2).join(' | '));
+}
+
+// ---------- 앱 안 이동: 주소의 탭 · 창 (새로 고침 없이) ----------
+{
+  const page = await session('pc', ['ceo@kpjk.co.kr', 'kpjk2026!']);
+  const push = async (u) => { await page.evaluate((x) => window.next.router.push(x), u); await sleep(1500); };
+  await go(page, '/ax/dashboard');
+  await push('/ax/clients/co_a?tab=vault');
+  ok('11 ?tab=vault → 서류함 탭', await page.locator('#vault-tab').isVisible());
+  await go(page, '/ax/dashboard');
+  await push('/ax/clients/co_a?tab=vault&kit=none');
+  ok('11 ?kit= → 공고 신청 묶음 창', await page.getByTestId('apply-kit').isVisible());
+  await go(page, '/ax/dashboard');
+  await push('/ax/programs?tab=leads');
+  ok('11 지원사업 ?tab=leads → 가망고객 탭', (await page.getByRole('tab', { name: /가망고객/ }).getAttribute('aria-selected')) === 'true');
+  ok('11 페이지 오류 없음', page.errs.length === 0, page.errs.slice(0, 2).join(' | '));
 }
 
 await browser.close();

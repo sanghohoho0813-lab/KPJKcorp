@@ -2,8 +2,8 @@
 
 import { CancelDocRequestButton } from "@/components/domain/portal/CancelRequest";
 import Link from "next/link";
-import { useMemo, useState, type ReactNode } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Building2, ClipboardList, EyeOff, Lock, Landmark, CalendarDays, ChevronDown, ChevronRight, Eye, FileCheck2, FileText, ListPlus, Mail, PhoneCall, MapPin, MessageSquare, MessageSquareText, NotebookPen, Phone, Plus, Sparkles, UserRound, Pencil, Archive, ArchiveRestore, UserPlus } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { AxInsightButton } from "@/components/ai/AxInsight";
@@ -71,6 +71,7 @@ export default function ClientCardPage() {
   const [newSchedule, setNewSchedule] = useState(false);
   const [policyDocs, setPolicyDocs] = useState(false);
   const [report, setReport] = useState(false);
+  const openReport = useCallback(() => setReport(true), []);
   const [companyDoc, setCompanyDoc] = useState(false);
   const [newTask, setNewTask] = useState(false);
   // 휴대폰에서는 머리글의 번호·연락처 줄을 접어 둔다 — 열자마자 할 일이 보이게
@@ -527,7 +528,8 @@ export default function ClientCardPage() {
       <NewConsultationModal open={newConsult} onClose={() => setNewConsult(false)} companyId={c.id} />
       <NewScheduleModal open={newSchedule} onClose={() => setNewSchedule(false)} companyId={c.id} projectId={active[0]?.id} />
       <PolicyDocsModal company={c} open={policyDocs} onClose={() => setPolicyDocs(false)} />
-      <ProgressReportModal company={c} open={report} onClose={() => setReport(false)} />
+      <ProgressReportModal company={c} open={report && may("notice.write")} onClose={() => setReport(false)} />
+      <Suspense fallback={null}><FromUrl onTab={setTab} onReport={openReport} /></Suspense>
       <CompanyDocRequestModal companyId={c.id} open={companyDoc} onClose={() => setCompanyDoc(false)} />
       <LogContactModal company={c} open={logContact} onClose={() => setLogContact(false)} />
       <NewTaskModal open={newTask} onClose={() => setNewTask(false)} companyId={c.id} projectId={active[0]?.id} />
@@ -574,6 +576,22 @@ function SummaryBlock({ title, items }: { title: string; items: string[] }) {
 }
 
 export { Stat };
+
+/**
+ * 주소의 ?tab= · ?report=1 을 화면에 반영한다. 앱 안에서 링크로 넘어오면 주소창이 그리기보다 늦게 바뀌어
+ * 처음 그릴 때 window.location 으로는 못 읽는다 — 그래서 주소가 바뀔 때마다 여기서 다시 맞춘다.
+ *  ?tab=vault  현황표 · 지원사업 매칭 '서류 묶음' 등에서
+ *  ?report=1   업무함의 '경과 보고' 업무에서 — 보고 창을 한 번만 연다
+ */
+function FromUrl({ onTab, onReport }: { onTab: (t: TabKey) => void; onReport: () => void }) {
+  const sp = useSearchParams();
+  const tab = sp.get("tab");
+  const report = sp.get("report") === "1";
+  const opened = useRef(false);
+  useEffect(() => { if (tab && TAB_KEYS.includes(tab as TabKey)) onTab(tab as TabKey); }, [tab, onTab]);
+  useEffect(() => { if (report && !opened.current) { opened.current = true; onReport(); } }, [report, onReport]);
+  return null;
+}
 
 function QuickAction({ icon, label, onClick }: { icon: ReactNode; label: string; onClick: () => void }) {
   return (

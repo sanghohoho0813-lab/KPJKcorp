@@ -8,7 +8,7 @@ import { useStore } from "@/lib/store";
 import { AxInsightButton } from "@/components/ai/AxInsight";
 import { daysLate, fmtDate } from "@/lib/format";
 import type { Task, TaskStatus } from "@/lib/types";
-import { Badge, Button, Card, EmptyState, KpiCard, PageHeader, SegmentedControl, Tabs, cx } from "@/components/ui/ui";
+import { Badge, Button, Card, EmptyState, KpiCard, LinkButton, PageHeader, SegmentedControl, Tabs, cx } from "@/components/ui/ui";
 import { DueText, PriorityBadge, TaskStatusBadge } from "@/components/domain/domain";
 import { NewTaskModal } from "@/components/domain/CreateModals";
 import { EditTaskModal, useMay } from "@/components/domain/EntityModals";
@@ -116,6 +116,8 @@ function TasksInner() {
               const isDone = t.status === "done";
               const actions = (
                 <>
+                  {/* '경과 보고 N일 공백' 규칙 업무 — 그 기업의 보고 창으로 바로. 보내면 업무는 저절로 끝난다 */}
+                  {!isDone && t.companyId && t.ruleKey?.startsWith("progress_report:") && may("notice.write") && <LinkButton size="sm" variant="outline" href={`/ax/clients/${t.companyId}?report=1`}>보고 쓰기</LinkButton>}
                   {t.status === "todo" && <Button size="sm" variant="ghost" onClick={() => setStatus(t, "doing")}>시작</Button>}
                   {t.status === "hold" ? <Button size="sm" variant="ghost" onClick={() => setStatus(t, "todo")}>다시 시작</Button>
                     : !isDone && <Button size="sm" variant="ghost" onClick={() => setStatus(t, "hold")}>보류</Button>}
