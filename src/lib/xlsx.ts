@@ -166,13 +166,18 @@ function crc32(buf: Uint8Array) {
   return (c ^ 0xffffffff) >>> 0;
 }
 
-function zipStore(entries: [string, Uint8Array][]): Uint8Array {
+/** 무압축 zip — 엑셀 파일 속과 신청 서류 묶음(PDF·사진은 이미 압축돼 있다)에 쓴다 */
+export function buildZip(entries: [string, Uint8Array][], when?: Date): Uint8Array {
+  return zipStore(entries, when);
+}
+
+function zipStore(entries: [string, Uint8Array][], when?: Date): Uint8Array {
   const locals: Uint8Array[] = [];
   const centrals: Uint8Array[] = [];
   let offset = 0;
-  // 파일 날짜: 2020-01-01 00:00 (DOS 형식) — 내용과 무관하게 고정해 같은 데이터면 같은 파일이 된다
-  const dosTime = 0;
-  const dosDate = ((2020 - 1980) << 9) | (1 << 5) | 1;
+  // 파일 날짜(DOS 형식): 엑셀은 2020-01-01 00:00 으로 고정해 같은 데이터면 같은 파일이 된다. 서류 묶음은 만든 날짜
+  const dosTime = when ? (when.getHours() << 11) | (when.getMinutes() << 5) | Math.floor(when.getSeconds() / 2) : 0;
+  const dosDate = when ? ((when.getFullYear() - 1980) << 9) | ((when.getMonth() + 1) << 5) | when.getDate() : ((2020 - 1980) << 9) | (1 << 5) | 1;
   for (const [name, data] of entries) {
     const nameBytes = enc.encode(name);
     const crc = crc32(data);

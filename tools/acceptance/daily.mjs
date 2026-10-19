@@ -5,8 +5,10 @@
 //  4) 같은 기업 중복 등록 막기 (이름 표기 차이 · 사업자번호)
 //  5) 휴대폰: 기업 상세 첫 화면에 할 일이 보이는지 · 가로 넘침 · 페이지 오류
 //  8) 정책자금 준비 서류: 묶음 요청(알림 한 번) → 고객 홈 한 줄 → 파일 여러 개 제출 → 검토 발급일 → 서류함·고객 준비됨
+//  9) 공고 신청 묶음: 서류함 파일 → 신청일 기준 상태 → 공고문 서류 더하기 → zip(번호·서류명 + 서류목록) → 모자란 서류 요청(기한은 신청일 앞)
 // 실행: npm run build && npm start (데모 모드) → node tools/acceptance/daily.mjs
 import fs from 'fs';
+import { execFileSync } from 'child_process';
 
 const pw = await import('playwright').then((m) => m.default ?? m).catch(() => import('/opt/node22/lib/node_modules/playwright/index.js').then((m) => m.default));
 const SANDBOX_CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
@@ -16,7 +18,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let okN = 0, failN = 0;
 const ok = (name, cond, info = '') => { console.log(`${name}: ${cond ? 'OK' : 'FAIL'}${info ? ' ' + info : ''}`); cond ? okN++ : failN++; };
 
-const browser = await pw.chromium.launch({ executablePath: CHROME });
+// 한글 파일 이름(내려받기·올리기)은 브라우저가 UTF-8 언어 설정일 때만 그대로 나온다 — 아니면 'download'로 바뀐다
+const browser = await pw.chromium.launch({ executablePath: CHROME, env: { ...process.env, LANG: 'C.UTF-8', LC_ALL: 'C.UTF-8' } });
 async function session(kind, who = ['park@kpjk.co.kr', 'kpjk2026!']) {
   const mobile = kind === 'mobile';
   const ctx = await browser.newContext(mobile ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } : { viewport: { width: 1440, height: 900 } });
@@ -282,7 +285,7 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
   ok('8 기업 상세 빠른 작업에 정책자금 서류', await page.getByTestId('client-quick-actions').getByRole('button', { name: '정책자금 서류' }).isVisible());
   await go(page, '/ax/clients/co_a?tab=vault');
   const badge0 = await page.getByTestId('policy-ready').innerText();
-  await page.getByRole('button', { name: '정책자금 준비 서류 요청' }).click(); await sleep(400);
+  await page.locator('#vault-tab').getByRole('button', { name: '정책자금 서류', exact: true }).click(); await sleep(400);
   const plan = dlg().getByTestId('policy-plan');
   ok('8 요청 창: 서류 목록', (await plan.locator('[data-policy]').count()) >= 8, badge0);
   ok('8 신청 직전 서류(납세증명)는 기본 꺼짐', !(await plan.locator('[data-policy=taxCert] input').isChecked()));
@@ -297,7 +300,7 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
   ok('8 고객 알림은 한 번', notes.length === 1 && notes[0].title === `정책자금 준비 서류 ${n}개를 요청드렸습니다` && notes[0].href.endsWith('#policy-docs'));
   const vault1 = s1.companyVaults.find((v) => v.companyId === 'co_a');
   ok('8 서류함에 없던 칸은 만듦', added.every((d) => [...['사업자등록증', '법인등기부등본', '대표자 신분증 사본', '공동인증서', '중소기업 확인서', '대표자 건강보험 자격득실확인서'], ...(vault1?.customSlots ?? []).map((c) => c.label)].includes(d.name)));
-  await page.getByRole('button', { name: '정책자금 준비 서류 요청' }).click(); await sleep(400);
+  await page.locator('#vault-tab').getByRole('button', { name: '정책자금 서류', exact: true }).click(); await sleep(400);
   ok('8 다시 열면 요청한 서류는 잠김', (await dlg().getByTestId('policy-plan').locator('input:disabled').count()) >= n);
   await dlg().getByRole('button', { name: '취소' }).click(); await sleep(300);
 
@@ -350,6 +353,65 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
   await page.setViewportSize({ width: 390, height: 844 }); await sleep(500);
   ok('8 휴대폰 자료제출 가로 넘침 없음', (await overflow(page)) <= 0);
   ok('8 페이지 오류 없음', page.errs.length === 0, page.errs.slice(0, 2).join(' | '));
+}
+
+// ---------- 공고 신청 묶음 (대표 PC: 서류함 파일 → 신청일 기준 점검 → zip → 모자란 서류 요청) ----------
+{
+  const page = await session('pc', ['ceo@kpjk.co.kr', 'kpjk2026!']);
+  const dlg = () => page.locator('[role=dialog]:visible').last();
+  const ymdOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const applyOn = ymdOf(new Date(Date.now() + 20 * 864e5));
+  await go(page, '/ax/clients/co_a?tab=vault');
+  // 서류함 사업자등록증 칸에 파일 하나
+  await page.getByRole('button', { name: '사업자등록증 파일 올리기' }).click(); await sleep(400);
+  await dlg().getByLabel('서류 파일').setInputFiles({ name: '사업자등록증.txt', mimeType: 'text/plain', buffer: Buffer.from('사업자등록증 시험 파일 KIT-OK') });
+  await dlg().getByRole('button', { name: /고른 것 전부 올리기 \(1\)/ }).click({ timeout: 8000 }); await sleep(900);
+  let st = await dump(page);
+  ok('9 서류함에 파일 올림', st.companyFiles.some((f) => f.companyId === 'co_a' && f.slot === 'bizReg' && f.fileName === '사업자등록증.txt'));
+
+  await page.locator('#vault-tab').getByRole('button', { name: '정책자금 서류', exact: true }).click(); await sleep(400);
+  await dlg().getByTestId('policy-mode').getByRole('button', { name: '공고 신청 묶음' }).click(); await sleep(300);
+  ok('9 공고 신청 묶음 열림', await dlg().getByTestId('apply-kit').isVisible());
+  await dlg().getByLabel('공고', { exact: true }).selectOption('__manual');
+  await dlg().getByLabel('공고명').fill('시험용 공고(자동 검수)');
+  await dlg().getByLabel('신청 예정일').fill(applyOn); await sleep(300);
+  const state = (k) => dlg().locator(`[data-kit="${k}"]`).getAttribute('data-state');
+  ok('9 사업자등록증: 파일 있음', (await state('bizReg')) === 'ready');
+  ok('9 신청 직전 서류(납세증명): 20일 뒤 신청이면 지금 요청 체크', (await state('taxCert')) === 'justBefore' && await dlg().getByLabel('납세증명서 요청', { exact: true }).isChecked());
+  await dlg().getByLabel('더할 서류 이름').fill('수출실적증명서');
+  await dlg().getByRole('button', { name: '더하기' }).click(); await sleep(300);
+  ok('9 공고문 서류 더하기', (await state('x:수출실적증명서')) === 'missing');
+  ok('9 요약판: 파일 준비 1개 이상', /파일 준비/.test(await dlg().getByTestId('kit-summary').innerText()));
+
+  // zip 내려받기 → 열어 본다
+  const [dl] = await Promise.all([page.waitForEvent('download'), dlg().getByRole('button', { name: /내려받기$/ }).click()]);
+  const zpath = await dl.path();
+  const inside = JSON.parse(execFileSync('python3', ['-I', '-c', 'import zipfile,sys,json; z=zipfile.ZipFile(sys.argv[1]); print(json.dumps({n: z.read(n)[:40].decode("utf-8","replace") for n in z.namelist()}))', zpath]).toString());
+  const names = Object.keys(inside);
+  ok('9 zip 이름: 기업_공고_날짜', /^에이정밀\(주\)_시험용공고\(자동검수\)_\d{8}\.zip$/.test(dl.suggestedFilename()), dl.suggestedFilename());
+  ok('9 zip 안: 서류목록 + 번호·서류명 파일(내용 그대로)', names[0] === '00_서류목록.xlsx' && inside['01_사업자등록증.txt']?.includes('KIT-OK'), names.join(', '));
+  st = await dump(page);
+  ok('9 내려받은 기록(내부 전용)', st.activities.some((a) => a.type === 'vault_updated' && a.companyId === 'co_a' && a.text.includes('신청 서류 묶음 내려받음: 시험용 공고(자동 검수)')));
+
+  // 모자란 서류 요청 — 기한은 신청일 앞, 알림 한 번(공고명)
+  const s0 = st;
+  const reqBtn = dlg().getByRole('button', { name: /모자란 서류 \d+개 요청/ });
+  const n = Number((await reqBtn.innerText()).match(/(\d+)개/)?.[1] ?? 0);
+  await reqBtn.click(); await sleep(600);
+  st = await dump(page);
+  const added = st.docRequests.filter((d) => !s0.docRequests.some((x) => x.id === d.id));
+  const notes = st.notifications.filter((x) => !s0.notifications.some((y) => y.id === x.id) && x.audience === 'client');
+  ok('9 요청 N건 · 기한은 모두 신청일 이전', n >= 2 && added.length === n && added.every((d) => d.companyId === 'co_a' && d.dueDate.slice(0, 10) <= applyOn), `${n}건`);
+  ok('9 더한 서류 요청 문구에 공고명', added.some((d) => d.name === '수출실적증명서' && d.description.includes('시험용 공고(자동 검수)')));
+  ok('9 고객 알림 한 번 · 공고명', notes.length === 1 && notes[0].title.includes('시험용 공고(자동 검수)'), notes[0]?.title);
+  ok('9 요청한 서류는 요청 중으로', (await state('x:수출실적증명서')) === 'open');
+
+  // 지원사업 매칭의 '서류 묶음' 링크(?kit=)로 들어오면 바로 신청 묶음이 열린다
+  await go(page, '/ax/clients/co_a?tab=vault&kit=none');
+  ok('9 ?kit= 로 들어오면 신청 묶음으로 열림', await dlg().getByTestId('apply-kit').isVisible());
+  await page.setViewportSize({ width: 390, height: 844 }); await sleep(500);
+  ok('9 휴대폰 신청 묶음 가로 넘침 없음', (await overflow(page)) <= 0);
+  ok('9 페이지 오류 없음', page.errs.length === 0, page.errs.slice(0, 2).join(' | '));
 }
 
 await browser.close();

@@ -222,7 +222,9 @@ export default function ProgramsPage() {
                   {ms.some((m) => m.deadline.urgent) && <Badge tone="error">마감 임박 {ms.filter((m) => m.deadline.urgent).length}</Badge>}
                   {missing.length > 0 && <span className="text-[0.75rem] text-warning">기업정보의 {missing.join("·")} 칸이 비어 덜 정확합니다</span>}
                 </div>
-                {ms.slice(0, 3).map((m) => <div key={m.program.id} className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[0.82rem]"><span className={cx("shrink-0 rounded px-1.5 text-[0.72rem] font-bold", m.deadline.urgent ? "bg-error-bg text-error" : "bg-surface-2 text-ink-3")}>{m.deadline.label}</span><span className="min-w-0 flex-1 truncate">{m.program.title}</span><span className="text-[0.72rem] text-ink-3">{m.reasons.slice(0, 2).join(" · ")}</span></div>)}
+                {ms.slice(0, 3).map((m) => <div key={m.program.id} className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[0.82rem]"><span className={cx("shrink-0 rounded px-1.5 text-[0.72rem] font-bold", m.deadline.urgent ? "bg-error-bg text-error" : "bg-surface-2 text-ink-3")}>{m.deadline.label}</span><span className="min-w-0 flex-1 truncate">{m.program.title}</span><span className="text-[0.72rem] text-ink-3">{m.reasons.slice(0, 2).join(" · ")}</span>
+                  {/* 이 공고로 이 기업 서류를 바로 점검 — 신청일 기준 준비 상태·모자란 서류 요청·파일 묶음 */}
+                  <Link href={`/ax/clients/${c.id}?tab=vault&kit=${encodeURIComponent(m.program.id)}`} className="link-more shrink-0" data-kit-link={m.program.id}>서류 묶음 →</Link></div>)}
               </div>
             );
           })}

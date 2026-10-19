@@ -8,6 +8,7 @@ import { POLICY_NOTE, policyPlan, policyRequestText, type PlanRow } from "@/lib/
 import type { Company } from "@/lib/types";
 import { Badge, Button, SegmentedControl, cx } from "@/components/ui/ui";
 import { Modal } from "@/components/ui/overlay";
+import { useKitPanel } from "./ApplyKit";
 
 /**
  * 정책자금 준비 서류 요청 (내부) — 공고가 나오기 전에 고객이 미리 모아 두게 한 번에 요청한다.
@@ -30,12 +31,17 @@ const STATE_UI: Record<PlanRow["state"], { label: (r: PlanRow) => string; tone: 
   open: { label: (r) => (r.openStatus === "submitted" || r.openStatus === "reviewing" ? "요청 중 · 고객 제출함" : r.openStatus === "revision" ? "요청 중 · 보완 요청" : "요청 중"), tone: "info" },
 };
 
-export function PolicyDocsModal({ company, open, onClose }: { company: Company; open: boolean; onClose: () => void }) {
+export type PolicyMode = "prepare" | "kit";
+
+/** 정책자금 서류 — 미리 모아 두기(공고 전) / 공고 신청 묶음(공고가 나왔을 때). 한 창에서 오간다 */
+export function PolicyDocsModal({ company, open, onClose, initialMode = "prepare", initialProgramId }: { company: Company; open: boolean; onClose: () => void; initialMode?: PolicyMode; initialProgramId?: string }) {
   if (!open) return null;
-  return <Inner company={company} onClose={onClose} />;
+  return <Inner company={company} onClose={onClose} initialMode={initialMode} initialProgramId={initialProgramId} />;
 }
 
-function Inner({ company, onClose }: { company: Company; onClose: () => void }) {
+function Inner({ company, onClose, initialMode, initialProgramId }: { company: Company; onClose: () => void; initialMode: PolicyMode; initialProgramId?: string }) {
+  const [mode, setMode] = useState<PolicyMode>(initialMode);
+  const kit = useKitPanel(company, initialProgramId, onClose);
   const plan = usePolicyPlan(company);
   const request = useStore((s) => s.requestPolicyDocs);
   const toast = useStore((s) => s.toast);
@@ -50,8 +56,12 @@ function Inner({ company, onClose }: { company: Company; onClose: () => void }) 
     onClose();
   };
   return (
-    <Modal open onClose={onClose} size="md" title={<span className="flex items-center gap-2"><Landmark size={18} className="text-accent" /> 정책자금 준비 서류 요청</span>}
-      footer={<><Button variant="ghost" onClick={onClose}>취소</Button><Button variant="accent" icon={<Send size={15} />} disabled={!picks.length} onClick={submit}>{picks.length ? `${picks.length}개 요청` : "고른 서류 없음"}</Button></>}>
+    <Modal open onClose={onClose} size={mode === "kit" ? "lg" : "md"} title={<span className="flex items-center gap-2"><Landmark size={18} className="text-accent" /> 정책자금 서류</span>}
+      footer={mode === "kit" ? kit.footer : <><Button variant="ghost" onClick={onClose}>취소</Button><Button variant="accent" icon={<Send size={15} />} disabled={!picks.length} onClick={submit}>{picks.length ? `${picks.length}개 요청` : "고른 서류 없음"}</Button></>}>
+      <div className="mb-3" data-testid="policy-mode">
+        <SegmentedControl value={mode} onChange={setMode} options={[{ key: "prepare", label: "미리 모아 두기" }, { key: "kit", label: "공고 신청 묶음" }]} />
+      </div>
+      {mode === "kit" ? kit.body : <>
       <p className="text-[0.88rem] leading-relaxed text-ink-2">
         공고가 나오면 바로 신청할 수 있게 <b className="text-ink">{company.name}</b>이(가) 미리 모아 두는 서류입니다. 고른 서류만 고객 화면 <b className="text-ink">자료제출</b>에 발급 방법과 함께 올라가고, 알림은 한 번 갑니다.
       </p>
@@ -84,6 +94,7 @@ function Inner({ company, onClose }: { company: Company; onClose: () => void }) 
         <SegmentedControl size="sm" value={days} onChange={setDays} options={[{ key: "14", label: "2주 뒤" }, { key: "30", label: "한 달 뒤" }]} />
         <span className="text-[0.78rem] text-ink-3">미리 모아 두는 서류라 넉넉하게 둡니다</span>
       </div>
+      </>}
     </Modal>
   );
 }

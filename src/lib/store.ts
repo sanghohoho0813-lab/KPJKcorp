@@ -133,7 +133,7 @@ export interface StoreState extends SeedData {
   /** 기업에 바로 자료 요청 (서류함 칸에서) — 진행 중인 프로젝트가 있으면 거기에 붙이고, 없으면 기업에만 붙인다 */
   requestCompanyDoc: (companyId: string, data: { name: string; description: string; dueDate: string }, byUserId: string) => string | null;
   /** 정책자금 준비 서류 묶음 요청 — 서류함 칸이 없으면 만들고, 요청 N건에 고객 알림은 한 번 */
-  requestPolicyDocs: (companyId: string, items: { label: string; description: string; validMonths?: number }[], dueDate: string, byUserId: string) => number;
+  requestPolicyDocs: (companyId: string, items: { label: string; description: string; validMonths?: number; dueDate?: string }[], dueDate: string, byUserId: string, opts?: { notifyTitle?: string; notifyBody?: string; tag?: string }) => number;
 
   // ---- 기업고객 / 프로젝트 등록·수정 ----
   createCompany: (data: Omit<Company, "id" | "code">, byUserId: string) => string | null;
@@ -773,7 +773,7 @@ export const useStore = create<StoreState>()(
         return req.id;
       },
 
-      requestPolicyDocs: (companyId, items, dueDate, byUserId) => {
+      requestPolicyDocs: (companyId, items, dueDate, byUserId, opts) => {
         const st = get();
         const c = st.companies.find((x) => x.id === companyId);
         if (!c || !items.length) return 0;
@@ -788,17 +788,18 @@ export const useStore = create<StoreState>()(
           : undefined;
         const p = st.projects.find((x) => x.companyId === companyId && !x.archived && x.clientVisible && x.stage !== "done" && x.stage !== "aftercare");
         const now = nowIso();
-        const reqs: DocumentRequest[] = items.map((it) => ({ id: uid("dr"), projectId: p?.id ?? "", companyId, name: it.label, description: it.description, requestedAt: now, dueDate, status: "requested", assigneeId: p?.consultantId ?? c.consultantId, files: [] }));
+        // 서류마다 기한이 다를 수 있다(신청 서류 묶음: 신청 직전 서류는 신청일 이틀 전)
+        const reqs: DocumentRequest[] = items.map((it) => ({ id: uid("dr"), projectId: p?.id ?? "", companyId, name: it.label, description: it.description, requestedAt: now, dueDate: it.dueDate ?? dueDate, status: "requested", assigneeId: p?.consultantId ?? c.consultantId, files: [] }));
         set({
           docRequests: [...reqs, ...st.docRequests],
           ...(vault ? { companyVaults: [...st.companyVaults.filter((v) => v.companyId !== companyId), vault] } : {}),
           activities: [
-            ...reqs.map((r) => makeActivity({ type: "document_requested", companyId, projectId: p?.id, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `자료 요청: ${r.name} (정책자금 준비)` })),
+            ...reqs.map((r) => makeActivity({ type: "document_requested", companyId, projectId: p?.id, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `자료 요청: ${r.name} (${opts?.tag ?? "정책자금 준비"})` })),
             ...(vault ? [makeActivity({ type: "vault_updated", companyId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `서류함: 정책자금 준비 칸 ${add.length}개 만듦` })] : []),
             ...st.activities,
           ],
           // 서류가 여럿이어도 알림은 한 번 — 고객 휴대폰에 알림이 줄줄이 오지 않게
-          notifications: [makeNotification({ audience: "client", companyId, title: `정책자금 준비 서류 ${reqs.length}개를 요청드렸습니다`, body: "공고가 나오면 바로 신청할 수 있게 미리 모아 두는 서류입니다. 자료제출에서 발급 방법을 보고 하나씩 올려 주세요.", href: "/portal/documents#policy-docs" }), ...st.notifications],
+          notifications: [makeNotification({ audience: "client", companyId, title: opts?.notifyTitle ?? `정책자금 준비 서류 ${reqs.length}개를 요청드렸습니다`, body: opts?.notifyBody ?? "공고가 나오면 바로 신청할 수 있게 미리 모아 두는 서류입니다. 자료제출에서 발급 방법을 보고 하나씩 올려 주세요.", href: "/portal/documents#policy-docs" }), ...st.notifications],
         });
         return reqs.length;
       },

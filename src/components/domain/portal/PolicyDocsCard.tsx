@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ChevronDown, FileText, Landmark, Upload } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { fmtDate } from "@/lib/format";
+import { daysBetween, fmtDate } from "@/lib/format";
 import { POLICY_NOTE, READY_LABEL, policyReadiness, type ReadyRow } from "@/lib/policy-docs";
 import type { DocumentRequest } from "@/lib/types";
 import { Badge, Button, Card, cx } from "@/components/ui/ui";
@@ -60,6 +60,8 @@ function Row({ r, onUpload, onView }: { r: ReadyRow; onUpload: (r: DocumentReque
           <span className="font-bold">{r.doc.label}</span>
         </div>
         <div className="mt-0.5 text-[0.8rem] leading-snug text-ink-3">{r.doc.where}{r.doc.validText ? ` · ${r.doc.validText}` : ""}</div>
+        {/* 공고 신청 묶음으로 요청한 서류는 기한이 신청일에 맞춰 짧다 — 2주 안이면 기한을 보인다 */}
+        {(r.state === "todo" || r.state === "revision") && daysBetween(new Date().toISOString(), r.req.dueDate) <= 14 && <div className="mt-0.5 text-[0.8rem] font-semibold text-error">기한 {fmtDate(r.req.dueDate)}</div>}
         {r.state === "revision" && r.req.reviewNote && <div className="mt-1.5 rounded-lg bg-error-bg px-3 py-2 text-[0.82rem] text-error"><b>보완 요청:</b> {r.req.reviewNote}</div>}
         {r.state === "stale" && <div className="mt-1 text-[0.8rem] font-semibold text-warning">유효기간이 지났습니다 — 신청할 때 새로 발급받아 주시면 담당 컨설턴트가 다시 요청드립니다.</div>}
         {r.state === "ready" && r.req.submittedAt && <div className="mt-0.5 text-[0.78rem] text-ink-3">{fmtDate(r.req.submittedAt)} 제출 · 확인 완료</div>}

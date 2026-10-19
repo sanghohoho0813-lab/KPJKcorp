@@ -55,7 +55,9 @@ export function VaultTab({ company }: { company: Company }) {
   // 정책자금 준비 — 공통 서류가 몇 개나 쓸 수 있는 상태인지 (자격 판단 아님)
   const plan = usePolicyPlan(company);
   const policyReady = plan.filter((r) => r.state === "usable" || r.state === "expiring").length;
-  const [policyOpen, setPolicyOpen] = useState(false);
+  // 지원사업 매칭에서 "서류 묶음"으로 들어오면(?kit=공고) 신청 묶음이 그 공고로 바로 열린다
+  const [kitProgram] = useState(() => (typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("kit")));
+  const [policyOpen, setPolicyOpen] = useState(!!kitProgram);
 
   return (
     <div className="space-y-4" id="vault-tab">
@@ -67,7 +69,7 @@ export function VaultTab({ company }: { company: Company }) {
             <p className="mt-0.5 text-[0.8rem] text-ink-3">발급일을 넣으면 유효기간이 지났는지 먼저 알려 드립니다. 서류함 자체는 내부 전용이고, <b className="text-ink-2">고객에게 요청</b>한 서류만 고객 화면 요청자료에 나타납니다.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {mayRequest && <Button variant="outline" icon={<Landmark size={16} />} onClick={() => setPolicyOpen(true)}>정책자금 준비 서류 요청</Button>}
+            {mayRequest && <Button variant="outline" icon={<Landmark size={16} />} onClick={() => setPolicyOpen(true)}>정책자금 서류</Button>}
             {mayRequest && missing.length > 0 && <Button variant="outline" icon={<Send size={16} />} onClick={() => setConfirmMany(true)}>빈 서류 {missing.length}개 고객에게 요청</Button>}
             {may && <Button variant="accent" icon={<Upload size={16} />} onClick={() => setBulk({})}>한꺼번에 올리기</Button>}
           </div>
@@ -106,7 +108,7 @@ export function VaultTab({ company }: { company: Company }) {
           toast(`${n}개 서류를 고객에게 요청했습니다. 고객 화면에 알림이 갑니다.`);
         }} />
       <BulkUploadModal company={company} vault={vault} open={!!bulk} initialSlot={bulk?.slot} onClose={() => setBulk(null)} />
-      <PolicyDocsModal company={company} open={policyOpen} onClose={() => setPolicyOpen(false)} />
+      <PolicyDocsModal company={company} open={policyOpen} onClose={() => setPolicyOpen(false)} initialMode={kitProgram ? "kit" : "prepare"} initialProgramId={kitProgram ?? undefined} />
       <PreviewModal file={preview} onClose={() => setPreview(null)} />
     </div>
   );
