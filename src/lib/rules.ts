@@ -62,6 +62,13 @@ export const AUTO_RULES: AutoRuleDef[] = [
     why: "고객은 연락이 끊긴 컨설턴트를 잊습니다. 진행이 멈춘 듯 보이면 재계약 · 추가 의뢰도 멈춥니다.",
     days: { default: 21, options: [7, 14, 21, 30, 45, 60] },
   },
+  {
+    key: "progress_report", short: "경과 보고",
+    label: (n) => `경과 보고 ${n}일 공백 → 보내기`,
+    when: (n) => `고객에게 보이는 진행 중 프로젝트가 있는데 경과 보고를 ${n}일 동안 보내지 않은 기업에 '경과 보고' 업무 (보내면 업무가 자동으로 끝남)`,
+    why: "대표가 진행 상황을 모르면 중도금 · 재계약이 흔들립니다. 보고는 기록으로 채워져 확인하고 보내는 데 1~2분이면 됩니다.",
+    days: { default: 14, options: [7, 14, 21, 30] },
+  },
 ];
 
 export const RULE_BY_KEY: Record<string, AutoRuleDef> = Object.fromEntries(AUTO_RULES.map((r) => [r.key, r]));

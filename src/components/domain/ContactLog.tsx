@@ -18,8 +18,9 @@ export function useContactSources(): { src: ContactSources; cycle: number } {
   const schedules = useStore((s) => s.schedules);
   const tasks = useStore((s) => s.tasks);
   const journal = useStore((s) => s.journal);
+  const notices = useStore((s) => s.notices);
   const autoRules = useStore((s) => s.settings.autoRules);
-  const src = useMemo(() => ({ consultations, inquiries, schedules, tasks, journal }), [consultations, inquiries, schedules, tasks, journal]);
+  const src = useMemo(() => ({ consultations, inquiries, schedules, tasks, journal, notices }), [consultations, inquiries, schedules, tasks, journal, notices]);
   return { src, cycle: ruleDays(autoRules, "no_contact") };
 }
 

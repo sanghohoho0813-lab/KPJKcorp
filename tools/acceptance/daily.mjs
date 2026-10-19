@@ -428,6 +428,8 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
   const sections = await lines.locator('[data-report-section]').evaluateAll((els) => els.map((e) => e.getAttribute('data-report-section')));
   ok('10 진행 상황 · 한 일 · 부탁드릴 것 묶음이 채워짐', sections.includes('now') && sections.includes('done') && sections.includes('ask'), sections.join(','));
   let st = await dump(page);
+  const ruleTask = st.tasks.find((t) => t.companyId === 'co_a' && t.ruleKey?.startsWith('progress_report:') && t.status === 'todo');
+  ok('10 규칙 업무: 경과 보고 공백 → 보내기 업무가 있음', !!ruleTask && ruleTask.type === '보고서' && ruleTask.source === 'auto', ruleTask?.title);
   const openReqs = st.docRequests.filter((d) => d.companyId === 'co_a' && (d.status === 'requested' || d.status === 'revision'));
   const askN = await lines.locator('[data-report-section=ask] [data-line]').count();
   ok('10 부탁드릴 것 = 남은 요청자료', askN === Math.min(openReqs.length, 5) + (openReqs.length > 5 ? 1 : 0), `${askN} / ${openReqs.length}`);
@@ -456,6 +458,7 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
   ok('10 내부 일정 · 업무 · 업무 일기는 본문에 없음', hidden.length > 0 && hidden.every((t) => !r1.body.includes(t)), `${hidden.length}건 확인`);
   const notes = st.notifications.filter((x) => !s0.notifications.some((y) => y.id === x.id));
   ok('10 고객 알림 한 번', notes.length === 1 && notes[0].audience === 'client' && notes[0].companyId === 'co_a');
+  ok('10 보내면 규칙 업무는 끝남', st.tasks.find((t) => t.id === ruleTask?.id)?.status === 'done');
   // 다시 열면 '지난 보고 이후'가 기본 · 두 번째로 보내면 앞 보고 고정은 풀림
   await qa.click(); await sleep(500);
   ok('10 다시 열면 지난 보고 이후', /지난 보고 \d+\/\d+ \(0일 전\)/.test(await dlg().getByTestId('report-range').innerText()));
@@ -463,6 +466,8 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
   st = await dump(page);
   const reports = st.notices.filter((n) => n.companyId === 'co_a' && n.title.startsWith('경과 보고'));
   ok('10 홈 고정은 가장 최근 보고 하나', reports.length === 2 && reports.filter((n) => n.pinned).length === 1 && !st.notices.find((n) => n.id === r1.id).pinned);
+  await go(page, '/ax/tasks'); st = await dump(page);
+  ok('10 보낸 뒤에는 규칙 업무를 다시 만들지 않음', st.tasks.filter((t) => t.companyId === 'co_a' && t.ruleKey?.startsWith('progress_report:') && t.status !== 'done').length === 0);
 
   // 고객: 홈 고정 띠 → 일정 · 공지에서 제목 · 목록으로 보임
   const storeKey = await page.evaluate(() => Object.keys(localStorage).find((k) => { try { return !!JSON.parse(localStorage.getItem(k) ?? 'null')?.state; } catch { return false; } }));

@@ -35,4 +35,11 @@ const sp = contactStatus(co, planned, 7, now);
 ok(!sp.due && !!sp.planned, "공백이어도 7일 안에 고객 미팅이 잡혀 있으면 연락 필요 아님");
 const far = { ...src, schedules: [{ companyId: "a", type: "meeting" as const, start: at(20) }] };
 ok(contactStatus(co, far, 7, now).due, "미팅이 7일보다 멀면 연락 필요");
+const withReport = { ...src, notices: [
+  { companyId: "a", title: "경과 보고 · 9/28 ~ 10/1", publishedAt: at(-5) },
+  { companyId: "a", title: "휴무 안내", publishedAt: at(-1) },
+  { companyId: "b", title: "경과 보고 · 다른 회사", publishedAt: at(-1) },
+] };
+const lr = lastContact(co, withReport, now);
+ok(lr?.how === "경과 보고" && daysSince(lr.at, now) === 5, "보낸 경과 보고도 연락 (일반 공지 · 다른 회사 제외)");
 if (fail) { console.log(`\n실패 ${fail}`); process.exit(1); } else console.log("\n전부 통과");

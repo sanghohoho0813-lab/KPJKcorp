@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { ClipboardList, Copy, Send } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { can } from "@/lib/permissions";
 import { daysFromTo, todayYmd } from "@/lib/vault";
 import { buildReport, isReport, lastReportFor, localDay, md, reportBody, reportFrom, reportTitle, type ReportRange } from "@/lib/progress-report";
 import type { Company } from "@/lib/types";
@@ -54,6 +55,8 @@ function Inner({ company: c, onClose }: { company: Company; onClose: () => void 
     if (!id) return;
     // 홈 맨 위에는 가장 최근 경과 보고 하나만
     if (pinned) for (const n of before) st.updateNotice(n.id, { pinned: false }, me);
+    // '경과 보고 N일 공백' 규칙 업무는 보냈으니 끝
+    if (can(st.session?.role, "task.update")) for (const t of st.tasks) if (t.companyId === c.id && t.ruleKey?.startsWith("progress_report:") && (t.status === "todo" || t.status === "doing")) st.updateTaskStatus(t.id, "done", me);
     st.toast(`경과 보고를 보냈습니다. 고객 화면 '일정 · 공지'${pinned ? "와 홈 맨 위" : ""}에 보이고 알림이 갑니다.`);
     onClose();
   };

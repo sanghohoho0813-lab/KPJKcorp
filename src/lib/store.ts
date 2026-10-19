@@ -48,7 +48,8 @@ import type {
 } from "./types";
 import { nowIso, uid, addDays, iso, daysBetween, fmtDate } from "./format";
 import { followKey, type FollowKind } from "./consult-followups";
-import { contactStatus } from "./contact";
+import { contactStatus, daysSince } from "./contact";
+import { REPORT_PREFIX, lastReportFor, localDay } from "./progress-report";
 import { guessTaskType } from "./quick-task";
 import { CUSTOMER_STEPS, stageLabel, stageToCustomerStep } from "./stages";
 import { RULE_BY_KEY, ruleDays, ruleOn } from "./rules";
@@ -1208,7 +1209,7 @@ export const useStore = create<StoreState>()(
         // 6) 고객 연락 N일(기본 21) 공백 → 연락. 열쇠에 마지막 연락일을 넣는다 — 연락하면 다음 공백은 새 업무가 된다
         if (on("no_contact")) {
           const n = N("no_contact");
-          const src = { consultations: st.consultations, inquiries: st.inquiries, schedules: st.schedules, tasks: st.tasks, journal: st.journal };
+          const src = { consultations: st.consultations, inquiries: st.inquiries, schedules: st.schedules, tasks: st.tasks, journal: st.journal, notices: st.notices };
           for (const c of st.companies) {
             if (c.archived || !c.consultantId) continue;
             const cs = contactStatus(c, src, n, now);
@@ -1218,6 +1219,26 @@ export const useStore = create<StoreState>()(
             const key = `no_contact:${c.id}:${cs.last.at.slice(0, 10)}`;
             if (has(key)) continue;
             push({ companyId: c.id, title: `${c.name} 연락 ${cs.days}일 없음 — 진행 안내 · 안부 연락`, type: "후속연락", dueDate: iso(addDays(now, 1, 18)), assigneeId: c.consultantId, priority: "normal", ruleKey: key, memo: `마지막 연락: ${fmtDate(cs.last.at)} (${cs.last.how}). 진행 상황을 짧게 공유하고 다음 일정을 잡습니다.` }, lbl("no_contact"));
+          }
+        }
+
+        // 7) 경과 보고 N일(기본 14) 공백 → 보내기. 고객에게 보이는 진행 중 프로젝트가 있는 기업만.
+        //    기준은 마지막 경과 보고(없으면 가장 먼저 시작한 진행 프로젝트). 보내면 열린 업무는 보고 창이 끝낸다.
+        if (on("progress_report")) {
+          const n = N("progress_report");
+          for (const c of st.companies) {
+            if (c.archived || !c.consultantId) continue;
+            const active = st.projects.filter((p) => p.companyId === c.id && !p.archived && p.clientVisible && !["inquiry", "consult", "done", "aftercare"].includes(p.stage));
+            if (!active.length) continue;
+            const last = lastReportFor(st.notices, c.id);
+            const base = last?.publishedAt ?? active.map((p) => p.startDate).sort()[0];
+            if (!base) continue;
+            const d = daysSince(base.length <= 10 ? `${base}T12:00:00` : base, now);
+            if (d < n) continue;
+            if (st.tasks.some((t) => t.companyId === c.id && t.ruleKey?.startsWith("progress_report:") && (t.status === "todo" || t.status === "doing"))) continue;
+            const key = `progress_report:${c.id}:${localDay(base)}`;
+            if (has(key)) continue;
+            push({ companyId: c.id, title: last ? `${c.name} ${REPORT_PREFIX} 보내기 (지난 보고 ${d}일 전)` : `${c.name} 첫 ${REPORT_PREFIX} 보내기`, type: "보고서", dueDate: iso(addDays(now, 2, 18)), assigneeId: c.consultantId, priority: "normal", ruleKey: key, memo: `${last ? `지난 경과 보고 ${fmtDate(last.publishedAt)}. ` : ""}기업 상세 › 빠른 작업 '경과 보고'에서 기록으로 채워진 내용을 확인하고 보내면 이 업무는 끝납니다.` }, lbl("progress_report"));
           }
         }
 
