@@ -1,6 +1,6 @@
 "use client";
 
-import { HUB_TONE } from "@/components/domain/portal/PortalHome";
+import { Icon3D, PORTAL_ICON } from "@/components/domain/portal/Icon3D";
 import { type ReactNode, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -187,17 +187,18 @@ export function PortalShell({ children }: { children: ReactNode }) {
       {/* Mobile bottom nav: 홈 / 진행현황 / 자료제출 / 문의 / MY — 지금 화면은 알약 바탕, 낼 자료는 숫자 동그라미 */}
       <nav className="pb-safe fixed inset-x-0 bottom-0 z-30 flex border-t border-line/70 bg-surface/95 shadow-[0_-8px_24px_-18px_rgba(23,27,32,0.35)] backdrop-blur lg:hidden" data-testid="portal-tabbar">
         {[
-          { href: "/portal", label: "홈", icon: <Home size={21} /> },
-          { href: "/portal/projects", label: "진행현황", icon: <Briefcase size={21} /> },
-          { href: "/portal/documents", label: "자료제출", icon: <FolderUp size={21} />, badge: docsOpen },
-          { href: "/portal/inquiries", label: "문의", icon: <MessageSquare size={21} /> },
-          { href: "/portal/me", label: "MY", icon: <UserRound size={21} /> },
+          { href: "/portal", label: "홈" },
+          { href: "/portal/projects", label: "진행현황" },
+          { href: "/portal/documents", label: "자료제출", badge: docsOpen },
+          { href: "/portal/inquiries", label: "문의" },
+          { href: "/portal/me", label: "MY" },
         ].map((i) => {
           const on = isActive(pathname, i.href);
           return (
             <Link key={i.href} href={i.href} aria-current={on ? "page" : undefined} className={cx("pressable flex flex-1 flex-col items-center gap-0.5 pb-1 pt-1.5 text-[0.68rem]", on ? "font-bold text-accent" : "font-semibold text-ink-3")}>
+              {/* 3D 그림은 지금 화면만 컬러 — 나머지는 흐리게 */}
               <span className={cx("relative flex h-8 w-14 items-center justify-center rounded-full transition-colors", on && "bg-soft")}>
-                {i.icon}
+                <Icon3D name={PORTAL_ICON[i.href]} size="1.55rem" muted={!on} />
                 {!!i.badge && <span className="tnum absolute -top-1 right-1.5 flex h-[1.15rem] min-w-[1.15rem] items-center justify-center rounded-full bg-error px-1 text-[0.62rem] font-bold text-white ring-2 ring-surface" aria-label={`낼 자료 ${i.badge}건`}>{i.badge}</span>}
               </span>
               {i.label}
@@ -215,7 +216,7 @@ export function PortalShell({ children }: { children: ReactNode }) {
   );
 }
 
-/** 하위 화면 위 길잡이 — 홈 › 메뉴. 메뉴판과 같은 색 아이콘으로 "한 플랫폼 안"이라는 것을 보인다 */
+/** 하위 화면 위 길잡이 — 홈 › 메뉴. 바로가기와 같은 3D 그림으로 "한 플랫폼 안"이라는 것을 보인다 */
 function PortalCrumb({ pathname }: { pathname: string }) {
   const n = NAV.filter((x) => x.href !== "/portal").find((x) => isActive(pathname, x.href));
   if (!n) return null;
@@ -224,7 +225,7 @@ function PortalCrumb({ pathname }: { pathname: string }) {
     <nav aria-label="현재 위치" className="mb-3 hidden items-center gap-1.5 text-[0.82rem] text-ink-3 lg:flex" data-testid="portal-crumb">
       <Link href="/portal" className="pressable inline-flex min-h-8 items-center rounded-lg px-1.5 font-semibold hover:bg-surface-2 hover:text-ink">우리 회사 홈</Link>
       <ChevronRight size={14} className="shrink-0" />
-      <span className={cx("flex h-6 w-6 items-center justify-center rounded-lg [&>svg]:h-3.5 [&>svg]:w-3.5", HUB_TONE[n.href] ?? "bg-surface-2 text-ink-2")}>{n.icon}</span>
+      {PORTAL_ICON[n.href] ? <Icon3D name={PORTAL_ICON[n.href]} size="1.5rem" /> : <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-surface-2 text-ink-2 [&>svg]:h-3.5 [&>svg]:w-3.5">{n.icon}</span>}
       <span className="font-semibold text-ink-2">{n.label}</span>
     </nav>
   );

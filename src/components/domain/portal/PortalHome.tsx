@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { ArrowRight, Briefcase, Building2, CalendarDays, Check, ChevronRight, FileCheck2, FolderUp, Megaphone, MessageSquare, Phone, Pin, Sparkles, TrendingUp } from "lucide-react";
+import { ArrowRight, CalendarDays, Check, ChevronRight, FileCheck2, Megaphone, MessageSquare, Phone, Pin } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { ENTITY_TYPES } from "@/lib/company-options";
 import { fmtDate, fmtTime } from "@/lib/format";
@@ -10,6 +10,7 @@ import { profileOfCompany, programsForCompany } from "@/lib/programs";
 import { openOnly } from "@/lib/programs-client";
 import type { Company } from "@/lib/types";
 import { CUSTOMER_STEPS, stageToCustomerStep } from "@/lib/stages";
+import { Icon3D, PORTAL_ICON } from "./Icon3D";
 import { Avatar, cx } from "@/components/ui/ui";
 import type { useGrowth } from "./GrowthBoard";
 
@@ -78,7 +79,7 @@ export function PortalHero({ company: c, board, displayName }: { company: Compan
         <div className="card p-4 md:p-5">
           {active.length === 0 ? (
             <Link href="/portal/services" className="flex items-center gap-3">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-soft text-accent"><Sparkles size={20} /></span>
+              <Icon3D name="together" size="2.6rem" />
               <span className="min-w-0 flex-1"><b className="block">진행 중인 과제가 없습니다</b><span className="text-[0.82rem] text-ink-2">담당 컨설턴트와 함께 검토할 과제를 보세요</span></span>
               <ChevronRight size={18} className="shrink-0 text-ink-3" />
             </Link>
@@ -130,7 +131,7 @@ function Tracker({ it, big }: { it: Board["active"][number]; big: boolean }) {
   return (
     <Link href={`/portal/projects?p=${it.project!.id}`} data-growth-active={it.area} className={cx("block", !big && "border-t border-line pt-3")}>
       <div className="flex items-center gap-3">
-        {big && <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-soft text-accent"><TrendingUp size={20} /></span>}
+        {big && <Icon3D name="growth" size="2.6rem" />}
         <span className="min-w-0 flex-1 leading-tight">
           <b className={cx("block truncate", big ? "text-[1.05rem]" : "text-[0.92rem]")}>{it.area}</b>
           <span className="mt-0.5 block truncate text-[0.8rem] text-ink-2">지금 <b className="text-accent">{it.stepLabel}</b> 단계{ms?.label ? ` · 다음 ${ms.label}${ms.date ? ` ${fmtDate(ms.date)}` : ""}` : ""}</span>
@@ -154,20 +155,6 @@ function Tracker({ it, big }: { it: Board["active"][number]; big: boolean }) {
 
 /* ------------------------------ 바로 가기 — 앱 첫 화면의 아이콘 메뉴 ------------------------------ */
 
-/** 아이콘 메뉴와 각 화면 위 길잡이가 같은 색을 쓴다 — 어디에 있는지 색으로도 안다 */
-export const HUB_TONE: Record<string, string> = {
-  "/portal/projects": "bg-[#e8f0ff] text-[#2f5bd3]",
-  "/portal/documents": "bg-[#fff1e6] text-[#c25a12]",
-  "/portal/programs": "bg-[#eafaf1] text-[#1f8a4c]",
-  "/portal/services": "bg-[#f3ecff] text-[#6b3fd1]",
-  "/portal/results": "bg-[#e9f7f7] text-[#13807f]",
-  "/portal/inquiries": "bg-[#fdecef] text-[#c0304a]",
-  "/portal/schedule": "bg-[#eef3fb] text-[#3b5b8c]",
-  "/portal/notifications": "bg-[#eef1f5] text-[#4a5568]",
-  "/portal/me": "bg-[#eef1f5] text-[#4a5568]",
-  "/portal/company": "bg-[#fff4e5] text-[#a8541e]",
-};
-
 export function PortalHub({ company: c, board }: { company: Company; board: Board }) {
   const st = useStore();
   const programs = useMemo(() => programsForCompany(openOnly(st.programs), c.id, profileOfCompany(c)), [st.programs, c]);
@@ -175,28 +162,28 @@ export function PortalHub({ company: c, board }: { company: Company; board: Boar
   // 담당자가 올린 제안 중 아직 답하지 않은 것
   const proposals = board.proposed.length;
   // 빨간 숫자는 "고객이 할 것"에만 — 낼 자료 · 담당자가 보낸 공고 · 담당자 제안
-  const items: { href: string; label: string; icon: React.ReactNode; badge?: number }[] = [
-    { href: "/portal/documents", label: "자료제출", icon: <FolderUp size={22} />, badge: docsOpen },
-    { href: "/portal/projects", label: "진행현황", icon: <Briefcase size={22} /> },
-    { href: "/portal/schedule", label: "일정", icon: <CalendarDays size={22} /> },
-    { href: "/portal/inquiries", label: "문의하기", icon: <MessageSquare size={22} /> },
-    { href: "/portal/results", label: "완료자료", icon: <FileCheck2 size={22} /> },
-    { href: "/portal/programs", label: "지원사업", icon: <Megaphone size={22} />, badge: programs.sent.length },
-    { href: "/portal/services", label: "함께 검토", icon: <Sparkles size={22} />, badge: proposals },
-    { href: "/portal/company", label: "우리 회사", icon: <Building2 size={22} /> },
+  const items: { href: string; label: string; badge?: number }[] = [
+    { href: "/portal/documents", label: "자료제출", badge: docsOpen },
+    { href: "/portal/projects", label: "진행현황" },
+    { href: "/portal/schedule", label: "일정" },
+    { href: "/portal/inquiries", label: "문의하기" },
+    { href: "/portal/results", label: "완료자료" },
+    { href: "/portal/programs", label: "지원사업", badge: programs.sent.length },
+    { href: "/portal/services", label: "함께 검토", badge: proposals },
+    { href: "/portal/company", label: "우리 회사" },
   ];
   return (
-    // PC는 위 메뉴줄에 같은 메뉴가 늘 보인다 — 아이콘 메뉴는 휴대폰·태블릿에서만
-    <nav data-testid="portal-hub" aria-label="바로 가기" className="lg:hidden">
-      <ul className="grid grid-cols-4 gap-x-1 gap-y-3">
+    // PC는 위 메뉴줄에 같은 메뉴가 늘 보인다 — 아이콘 메뉴는 휴대폰·태블릿에서만. 흰 카드 안에 작은 3D 그림(앱 바로가기 정도)
+    <nav data-testid="portal-hub" aria-label="바로 가기" className="card px-2 py-3.5 lg:hidden">
+      <ul className="grid grid-cols-4 gap-y-3">
         {items.map((it) => (
           <li key={it.href}>
-            <Link href={it.href} data-hub={it.label} className="pressable flex flex-col items-center gap-1.5 rounded-2xl py-1 text-center">
-              <span className={cx("relative flex h-[3.4rem] w-[3.4rem] items-center justify-center rounded-[1.15rem]", HUB_TONE[it.href])}>
-                {it.icon}
-                {!!it.badge && <span className="tnum absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-error px-1 text-[0.66rem] font-bold text-white ring-2 ring-canvas">{it.badge}</span>}
+            <Link href={it.href} data-hub={it.label} className="pressable flex flex-col items-center gap-1 rounded-2xl py-1 text-center">
+              <span className="relative">
+                <Icon3D name={PORTAL_ICON[it.href]} size="2.35rem" />
+                {!!it.badge && <span className="tnum absolute -right-2 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-error px-1 text-[0.66rem] font-bold text-white ring-2 ring-surface">{it.badge}</span>}
               </span>
-              <span className="text-[0.74rem] font-semibold text-ink-2">{it.label}</span>
+              <span className="text-[0.74rem] font-semibold text-ink">{it.label}</span>
             </Link>
           </li>
         ))}
@@ -228,7 +215,7 @@ export function ProgramsPreview({ company: c }: { company: Company }) {
     <section data-testid="program-teaser">
       <div className="mb-2.5 flex items-end gap-2 px-0.5">
         <div className="min-w-0 flex-1">
-          <h2 className="text-[1.1rem] font-bold">우리 회사에 맞는 지원사업 {ms.length}건</h2>
+          <h2 className="flex items-center gap-2 text-[1.1rem] font-bold"><Icon3D name="funding" size="1.7rem" />우리 회사에 맞는 지원사업 {ms.length}건</h2>
           <p className="text-[0.78rem] text-ink-3">{sent.length > 0 ? `담당자 추천 ${sent.length}건 · ` : ""}{urgent > 0 ? <span className="font-semibold text-error">마감 임박 {urgent}건 · </span> : null}실제 공고 · 자격은 담당자가 확인합니다</p>
         </div>
         <Link href="/portal/programs" className="link-more shrink-0">전체 보기 →</Link>

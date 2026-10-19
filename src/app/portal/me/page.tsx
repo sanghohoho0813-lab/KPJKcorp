@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, Building2, CalendarDays, ChevronRight, FileCheck2, HelpCircle, LogOut, Mail, Megaphone, MessageSquare, Phone, ShieldCheck, Sparkles } from "lucide-react";
+import { ChevronRight, HelpCircle, LogOut, Mail, MessageSquare, Phone } from "lucide-react";
 import { FontScalePicker } from "@/components/shell/FontScale";
 import { useStore, usePortalCompanyId, useCurrentUser } from "@/lib/store";
 import { useUi } from "@/lib/ui-store";
 import { fmtDate } from "@/lib/format";
 import { MyPasswordForm } from "@/components/domain/MyPassword";
-import { Avatar, Button, Card, SegmentedControl, DemoBadge, cx } from "@/components/ui/ui";
-import { HUB_TONE } from "@/components/domain/portal/PortalHome";
+import { Avatar, Button, Card, SegmentedControl, DemoBadge } from "@/components/ui/ui";
+import { Icon3D, PORTAL_ICON } from "@/components/domain/portal/Icon3D";
 
 export default function PortalMePage() {
   const st = useStore();
@@ -31,12 +31,12 @@ export default function PortalMePage() {
 
   // 아래 탭에 없는 화면은 여기서 — 앱의 "내 정보" 메뉴처럼 한 줄씩
   const menu = [
-    { href: "/portal/company", label: "우리 회사 정보", icon: <Building2 size={19} /> },
-    { href: "/portal/schedule", label: "일정 · 공지", icon: <CalendarDays size={19} /> },
-    { href: "/portal/results", label: "완료자료", icon: <FileCheck2 size={19} /> },
-    { href: "/portal/programs", label: "지원사업", icon: <Megaphone size={19} /> },
-    { href: "/portal/services", label: "함께 검토", icon: <Sparkles size={19} /> },
-    { href: "/portal/notifications", label: "알림", icon: <Bell size={19} /> },
+    { href: "/portal/company", label: "우리 회사 정보" },
+    { href: "/portal/schedule", label: "일정 · 공지" },
+    { href: "/portal/results", label: "완료자료" },
+    { href: "/portal/programs", label: "지원사업" },
+    { href: "/portal/services", label: "함께 검토" },
+    { href: "/portal/notifications", label: "알림" },
   ];
 
   return (
@@ -79,7 +79,7 @@ export default function PortalMePage() {
               {menu.map((m) => (
                 <li key={m.href}>
                   <Link href={m.href} className="pressable flex items-center gap-3 px-4 py-3.5 hover:bg-surface-2/70">
-                    <span className={cx("flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl", HUB_TONE[m.href] ?? "bg-surface-2 text-ink-2")}>{m.icon}</span>
+                    <Icon3D name={PORTAL_ICON[m.href]} size="2.1rem" />
                     <span className="flex-1 font-semibold">{m.label}</span>
                     <ChevronRight size={17} className="text-ink-3" />
                   </Link>
@@ -87,7 +87,7 @@ export default function PortalMePage() {
               ))}
               <li>
                 <button type="button" onClick={() => openTutorial("portal")} className="pressable flex w-full items-center gap-3 px-4 py-3.5 text-left hover:bg-surface-2/70">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-surface-2 text-ink-2"><HelpCircle size={19} /></span>
+                  <span className="flex h-[2.1rem] w-[2.1rem] shrink-0 items-center justify-center rounded-xl bg-surface-2 text-ink-2"><HelpCircle size={18} /></span>
                   <span className="flex-1 font-semibold">이용 안내 다시 보기</span>
                   <ChevronRight size={17} className="text-ink-3" />
                 </button>
@@ -100,7 +100,7 @@ export default function PortalMePage() {
           <Card className="p-5">
             <div className="font-bold">회사 정보</div>
             <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-[0.85rem] text-ink-2"><span>대표 {c.ceo}</span><span>업종 {c.industry}</span><span>사업자번호 {c.bizNo}</span><span>첫 상담 {fmtDate(c.firstConsultDate, { year: true })}</span></div>
-            <div className="mt-3 flex items-start gap-2 text-[0.8rem] text-ink-3"><ShieldCheck size={14} className="mt-0.5 shrink-0" /> 귀사의 프로젝트·자료·일정·문의만 표시됩니다. 다른 기업의 정보는 접근할 수 없습니다.</div>
+            <div className="mt-3 flex items-center gap-2 text-[0.8rem] text-ink-3"><Icon3D name="secure" size="1.6rem" /> 귀사의 프로젝트·자료·일정·문의만 표시됩니다. 다른 기업의 정보는 접근할 수 없습니다.</div>
           </Card>
           {isClient && (
             <Card className="p-5">

@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, FileText, Landmark, Upload } from "lucide-react";
+import { ChevronDown, FileText, Upload } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { daysBetween, fmtDate } from "@/lib/format";
 import { POLICY_NOTE, READY_LABEL, policyReadiness, type ReadyRow } from "@/lib/policy-docs";
 import type { DocumentRequest } from "@/lib/types";
 import { Badge, Button, Card, cx } from "@/components/ui/ui";
+import { Icon3D } from "./Icon3D";
 
 const TONE: Record<ReadyRow["state"], "success" | "warning" | "error" | "info" | "neutral"> = { ready: "success", stale: "warning", checking: "info", todo: "neutral", revision: "error" };
 
@@ -25,7 +26,7 @@ export function PolicyDocsCard({ companyId, onUpload, onView }: { companyId: str
   return (
     <Card className="scroll-mt-20 p-4 md:p-5" id="policy-docs">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-soft text-accent-strong"><Landmark size={18} /></span>
+        <Icon3D name="tray" size="2rem" />
         <h2 className="text-[1.1rem] font-extrabold">정책자금 준비 서류</h2>
         <span className="tnum ml-auto text-[0.95rem] font-bold" data-testid="policy-count">준비 {ready}/{total}</span>
       </div>

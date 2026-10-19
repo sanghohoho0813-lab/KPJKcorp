@@ -1,5 +1,6 @@
 "use client";
 
+import { Icon3D } from "./Icon3D";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ArrowDownRight, ArrowRight, ArrowUpRight, BadgeCheck, Building2, Check, ChevronDown, ClipboardCopy, FileCheck2, Lock, Minus, Sparkles, TrendingUp, Users } from "lucide-react";
@@ -56,7 +57,7 @@ export function CompanySnapshot({ company: c, board, showFactsLink = true, colla
     <section className="card overflow-hidden" data-testid="company-snapshot">
       {/* 휴대폰: 제목 한 줄 + 꼬리표는 옆으로 넘기는 한 줄 / PC: 한 줄에 모두 */}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-2.5 border-b border-line px-4 py-3.5 md:px-6 md:py-4">
-        <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-soft text-accent-strong"><Building2 size={18} /></span>
+        <Icon3D name="company" size="1.9rem" />
         <h2 className="text-[1.1rem] font-extrabold md:text-[1.15rem]">우리 회사 한눈에</h2>
         {c.sample && <span className="rounded-full bg-warning-bg px-2.5 py-0.5 text-[0.72rem] font-bold text-warning" data-testid="sample-figures">샘플 회사 · 예시 수치</span>}
         <div className="hide-scrollbar flex w-full gap-1.5 overflow-x-auto md:ml-auto md:w-auto">
@@ -234,7 +235,7 @@ export function GrowthQuests({ company: c, board, limit }: { company: Company; b
         <Ring pct={level.pct} label={`${level.done}/${level.total}`} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-            <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-soft text-accent-strong"><Sparkles size={15} /></span>
+            <Icon3D name="checklist" size="1.7rem" />
             <h2 className="text-[1.1rem] font-extrabold">성장 체크리스트</h2>
             <span className="tnum ml-auto text-[0.85rem] font-bold text-ink-2" data-testid="quest-count">{level.done}/{level.total} 완료</span>
           </div>

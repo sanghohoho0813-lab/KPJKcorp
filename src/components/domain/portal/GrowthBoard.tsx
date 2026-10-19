@@ -14,6 +14,7 @@ import { CUSTOMER_STEPS, stageToCustomerStep } from "@/lib/stages";
 import { Badge, Button, Card, Progress, Textarea, cx } from "@/components/ui/ui";
 import { Modal } from "@/components/ui/overlay";
 import { UploadModal } from "@/components/domain/DocActions";
+import { Icon3D } from "./Icon3D";
 
 /** 고객 홈의 성장과제 판에 필요한 것을 한 번에 계산한다 */
 export function useGrowth(c: Company | undefined) {
@@ -158,7 +159,7 @@ export function NextGrowth({ board, companyId, compact, only, title }: { board: 
   return (
     <Card className="scroll-mt-20 p-5" id={only ? "portal-suggested-growth" : "portal-next-growth"}>
       <div className="mb-1 flex items-center justify-between gap-2">
-        <h2 className="flex items-center gap-2 text-[1.1rem] font-bold"><Sparkles size={18} className="text-accent" /> {title ?? "다음으로 검토할 성장과제"}</h2>
+        <h2 className="flex items-center gap-2 text-[1.1rem] font-bold"><Icon3D name="together" size="1.7rem" /> {title ?? "다음으로 검토할 성장과제"}</h2>
         {!only && <Link href="/portal/services" className="link-more whitespace-nowrap">분야 전체 →</Link>}
       </div>
       <p className="mb-3 text-[0.8rem] text-ink-3">기업정보·진행 이력·담당자 제안을 근거로 골랐습니다. 될지 안 될지는 담당 컨설턴트가 함께 확인합니다.</p>
