@@ -510,3 +510,9 @@ html[data-motion="reduce"] .coach-glow { animation: none; }
 .ax-ui .kpi-row { gap: 1px; background: var(--ax-line); border: 1px solid var(--ax-line); border-radius: var(--radius-card); overflow: hidden; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05); }
 .ax-ui .kpi-row > .card, .ax-ui .kpi-row > a.card, .ax-ui .kpi-row > div > .card { border: 0; border-radius: 0; box-shadow: none; }
 .ax-ui .kpi-row > .card-hover:hover, .ax-ui .kpi-row .card-hover:hover { box-shadow: none; background: var(--ax-head); }
+/* 표 — 줄 간격은 조금 촘촘하게, 글자는 한 단계 작게(ERP 표 밀도) */
+.ax-ui .tbl td { padding: 0.68rem 0.9rem; font-size: 0.92rem; }
+.ax-ui .tbl th { padding: 0.62rem 0.9rem; }
+/* ERP 그리드 — 표 안에서만 가로·세로로 넘기고 열 이름 줄은 위에 붙는다(페이지가 옆으로 밀리지 않게) */
+.tbl-scroll { max-height: calc(100dvh - var(--header-h) - 1.5rem); overflow: auto; }
+.tbl-scroll .tbl thead th { position: sticky; top: 0; z-index: 1; }

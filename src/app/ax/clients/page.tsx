@@ -17,13 +17,24 @@ import { StatusBoard } from "@/components/domain/client/StatusBoard";
 import { SearchBox, StageBadge, StageProgressBar } from "@/components/domain/domain";
 import { RestoreSamplesButton, SampleBanner } from "@/components/domain/SampleData";
 import { CONSULT_AREA_LABEL, companySummary } from "@/lib/company-options";
+import { useIsMobile } from "@/lib/hooks";
+
+const VIEW_KEY = "kpjk-clients-view";
 
 function ClientsInner() {
   const st = useStore();
   const router = useRouter();
   const params = useSearchParams();
   const [q, setQ] = useState("");
-  const [view, setView] = useState<"card" | "table" | "board">(params.get("view") === "board" ? "board" : "card");
+  // 기본은 표(ERP 처럼 한눈에 비교). 주소로 정한 보기가 먼저, 없으면 이 브라우저에서 마지막으로 고른 보기
+  const [view, setViewState] = useState<"card" | "table" | "board">(() => {
+    const p = params.get("view");
+    if (p === "board" || p === "card" || p === "table") return p;
+    try { const v = window.localStorage.getItem(VIEW_KEY); if (v === "card" || v === "board" || v === "table") return v; } catch { /* 저장소 막힘 */ }
+    return "table";
+  });
+  const setView = (v: "card" | "table" | "board") => { setViewState(v); try { window.localStorage.setItem(VIEW_KEY, v); } catch { /* 저장소 막힘 */ } };
+  const isMobile = useIsMobile();
   const [filter, setFilter] = useState<"all" | "mine" | "issue" | "contact" | "archived">(() => (params.get("filter") === "contact" ? "contact" : "all"));
   // 대시보드 "처음 시작하기"에서 오면 등록 창이 바로 열린다
   const [newOpen, setNewOpen] = useState(params.get("new") === "1");
@@ -61,7 +72,7 @@ function ClientsInner() {
     <div>
       <PageHeader title="기업고객" desc="기업고객 단위로 상담·계약·프로젝트·자료·일정·문의를 연결합니다." badge={<><Badge>{st.companies.filter((c) => !c.archived).length}개 기업</Badge><AxInsightButton topic="clients" /></>} actions={
         <div className="flex flex-wrap items-center gap-2">
-          <SegmentedControl value={view} onChange={setView} options={[{ key: "card", label: <span className="flex items-center gap-1"><LayoutGrid size={14} /> 카드</span> }, { key: "table", label: <span className="flex items-center gap-1"><List size={14} /> 목록</span> }, { key: "board", label: <span className="flex items-center gap-1"><Table2 size={14} /> 현황표</span> }]} />
+          <SegmentedControl value={view} onChange={setView} options={[{ key: "table", label: <span className="flex items-center gap-1"><List size={14} /> 표</span> }, { key: "card", label: <span className="flex items-center gap-1"><LayoutGrid size={14} /> 카드</span> }, { key: "board", label: <span className="flex items-center gap-1"><Table2 size={14} /> 현황표</span> }]} />
           {/* 비어 있을 때는 빈 상태 카드 안의 버튼 하나만 둔다 — 같은 버튼이 두 개면 어느 쪽을 눌러야 할지 고민하게 된다 */}
           {totalActive > 0 && <RestoreSamplesButton />}
           {may("company.create") && totalActive > 0 && <Button variant="outline" icon={<FileSpreadsheet size={16} />} onClick={() => setImportOpen(true)}>엑셀로 등록</Button>}
@@ -126,8 +137,9 @@ function ClientsInner() {
         </div>
       ) : (
         <>
-        {/* 모바일에서는 표를 가로로 밀지 않는다 — 한 기업 = 한 줄 카드 */}
-        <div className="space-y-2 lg:hidden">
+        {/* 모바일에서는 표를 가로로 밀지 않는다 — 한 기업 = 한 줄 카드. 둘 중 하나만 그린다(숨긴 쪽 링크가 겹쳐 세지지 않게) */}
+        {isMobile ? (
+        <div className="space-y-2">
           {rows.map(({ c, active, missing, overdue, openIq, next, consultant, contact }) => (
             <Link key={c.id} href={`/ax/clients/${c.id}`} className="card card-hover block p-4">
               <div className="flex items-center gap-2">
@@ -146,26 +158,38 @@ function ClientsInner() {
             </Link>
           ))}
         </div>
-        <Card className="hidden lg:block">
-          <table className="tbl">
-            <thead><tr><th>기업명</th><th>업종</th><th>담당</th><th>진행 프로젝트</th><th>현재 단계</th><th>미제출</th><th>문의</th><th>다음 일정</th><th>마지막 연락</th></tr></thead>
+        ) : (
+        <Card className="overflow-hidden">
+          {/* ERP 그리드처럼 — 표 안에서만 넘기고(가로·세로), 열 이름 줄은 위에 붙어 따라온다 */}
+          <div className="tbl-scroll">
+          <table className="tbl" data-testid="clients-table">
+            <thead><tr><th>기업</th><th>담당</th><th>진행 프로젝트</th><th>현재 단계</th><th className="text-right">미제출</th><th className="text-right">문의</th><th>다음 일정</th><th>마지막 연락</th></tr></thead>
             <tbody>
               {rows.map(({ c, active, missing, overdue, openIq, next, consultant, contact }) => (
                 <tr key={c.id} className="row-clickable" onClick={() => router.push(`/ax/clients/${c.id}`)}>
-                  <td className="font-semibold">{c.name}{c.sample && <Badge tone="info" className="ml-1.5">샘플</Badge>}</td>
-                  <td className="min-w-[7.5rem] text-ink-2">{c.industry || <span className="text-ink-3">-</span>}</td>
+                  {/* 이름은 진짜 링크 — 새 탭으로 열기·주소 복사가 된다. 업종·지역은 이름 아래 한 줄 */}
+                  <td>
+                    <div className="flex items-center gap-2">
+                      <span className="tnum flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-shell text-[0.7rem] font-bold text-white">{c.code}</span>
+                      <Link href={`/ax/clients/${c.id}`} onClick={(e) => e.stopPropagation()} className="font-semibold hover:text-accent">{c.name}</Link>
+                      {c.sample && <Badge tone="info">샘플</Badge>}
+                    </div>
+                    <div className="mt-0.5 max-w-[18rem] truncate pl-8 text-[0.78rem] text-ink-3">{[c.industry, c.region].filter(Boolean).join(" · ") || "기본 정보 미입력"}</div>
+                  </td>
                   <td className="nowrap">{consultant?.name}</td>
-                  <td>{active[0]?.name ?? <span className="text-ink-3">-</span>}{active.length > 1 && <span className="text-ink-3"> 외 {active.length - 1}</span>}</td>
-                  <td>{active[0] ? <StageBadge stage={active[0].stage} /> : "-"}</td>
-                  <td>{overdue ? <Badge tone="error">{missing.length} (초과 {overdue})</Badge> : missing.length ? <Badge tone="warning">{missing.length}</Badge> : <span className="text-ink-3">0</span>}</td>
-                  <td>{openIq ? <Badge tone="error">{openIq}</Badge> : <span className="text-ink-3">0</span>}</td>
+                  <td className="nowrap"><span className="inline-block max-w-[15rem] truncate align-bottom" title={active.map((p) => p.name).join(", ") || undefined}>{active[0]?.name ?? <span className="text-ink-3">-</span>}</span>{active.length > 1 && <span className="text-ink-3"> 외 {active.length - 1}</span>}</td>
+                  <td className="nowrap">{active[0] ? <StageBadge stage={active[0].stage} /> : "-"}</td>
+                  <td className="nowrap text-right">{overdue ? <Badge tone="error">{missing.length} (초과 {overdue})</Badge> : missing.length ? <Badge tone="warning">{missing.length}</Badge> : <span className="tnum text-ink-3">0</span>}</td>
+                  <td className="nowrap text-right">{openIq ? <Badge tone="error">{openIq}</Badge> : <span className="tnum text-ink-3">0</span>}</td>
                   <td className="tnum nowrap">{next ? fmtDate(next.start) : "-"}</td>
                   <td className={cx("tnum nowrap", contact.due ? "font-semibold text-error" : "text-ink-3")} title={contact.last ? `${fmtDate(contact.last.at)} · ${contact.last.how}` : undefined}>{contact.days === undefined ? "-" : contact.days === 0 ? "오늘" : `${contact.days}일 전`}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
         </Card>
+        )}
         </>
       )}
       <CompanyModal open={newOpen} onClose={() => setNewOpen(false)} onCreated={(id) => router.push(`/ax/clients/${id}`)} />

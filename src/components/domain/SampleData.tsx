@@ -28,7 +28,8 @@ export function SampleBanner({ className }: { className?: string }) {
     <>
       <div className={cx("flex flex-wrap items-center gap-2 rounded-xl border border-info/30 bg-info-bg/60 px-4 py-2.5 text-[0.85rem]", className)}>
         <FlaskConical size={16} className="shrink-0 text-info" />
-        <span className="min-w-0 flex-1 text-ink-2">
+        {/* 기본 폭을 줘서 좁은 화면에서는 버튼이 아래 줄로 내려간다 — 글이 한 뼘 폭으로 눌리지 않게 */}
+        <span className="min-w-0 flex-1 basis-[15rem] text-ink-2">
           <b className="text-ink">샘플 기업 {samples.length}개</b>가 함께 표시되고 있습니다. {own > 0 ? `직접 등록한 ${own}개는 그대로 두고 샘플만 지울 수 있습니다.` : "실제 고객을 넣기 시작하면 지워도 됩니다. 언제든 다시 볼 수 있습니다."}
         </span>
         {manage ? (
