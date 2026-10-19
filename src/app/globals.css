@@ -254,6 +254,8 @@ h1, h2, h3, h4 { letter-spacing: -0.01em; line-height: 1.25; }
 
 /* Safe area */
 .pb-safe { padding-bottom: max(0.5rem, env(safe-area-inset-bottom)); }
+/* 휴대폰 내부 화면: 아래 탭 위에 '대표 승인 대기' 막대가 떠 있으면 그만큼 아래 여백을 더 둔다 — 마지막 내용이 가리지 않게 */
+@media (max-width: 1023.98px) { html.qa-bar main { padding-bottom: calc(var(--bottomnav-h) + 6rem); } }
 
 /* Progress */
 .progress { height: 10px; background: var(--neutral-surface-2); border-radius: 999px; overflow: hidden; }

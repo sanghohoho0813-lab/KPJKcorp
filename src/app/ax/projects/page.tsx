@@ -68,20 +68,15 @@ function ProjectsInner() {
         </Card>
       ) : view === "board" ? (
         <>
-        {/* 모바일: 가로로 미는 Kanban 대신 단계 요약 → 선택 → 목록 */}
+        {/* 모바일: 가로로 미는 Kanban 대신 단계 칩 한 줄 → 선택 → 목록. 첫 화면에 프로젝트가 보이도록 칸 격자는 쓰지 않는다 */}
         <div className="lg:hidden">
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-            <button onClick={() => setStage("all")} className={cx("pressable rounded-xl border px-3 py-2.5 text-left transition-colors", stage === "all" ? "border-accent bg-soft/60" : "border-line hover:bg-surface-2")}>
-              <div className="text-[0.75rem] font-bold text-ink-3">전체</div>
-              <div className="tnum text-[1.3rem] font-bold">{rows.length}</div>
-            </button>
-            {KANBAN_STAGES.map((k) => {
-              const items = grouped(k);
-              const hot = items.some((i) => i.delayed);
+          <div className="hide-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1" data-testid="stage-chips" role="group" aria-label="단계로 거르기">
+            {([["all", "전체", rows.length, false], ...KANBAN_STAGES.map((k) => { const items = grouped(k); return [k, stageLabel(k), items.length, items.some((i) => i.delayed)] as const; })] as const).map(([k, label, n, hot]) => {
+              const on = stage === k;
               return (
-                <button key={k} onClick={() => setStage(k)} className={cx("pressable rounded-xl border px-3 py-2.5 text-left transition-colors", stage === k ? "border-accent bg-soft/60" : "border-line hover:bg-surface-2")}>
-                  <div className="truncate text-[0.75rem] font-bold text-ink-3">{stageLabel(k)}</div>
-                  <div className={cx("tnum text-[1.3rem] font-bold", hot && "text-error")}>{items.length}</div>
+                <button key={k} type="button" aria-pressed={on} onClick={() => setStage(k as InternalStage | "all")}
+                  className={cx("pressable flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[0.82rem] font-semibold transition-colors", on ? "border-accent bg-soft text-accent-strong" : "border-line bg-surface text-ink-2")}>
+                  {label}<span className={cx("tnum font-bold", hot ? "text-error" : n === 0 ? "text-ink-3" : on ? "" : "text-ink")}>{n}</span>
                 </button>
               );
             })}

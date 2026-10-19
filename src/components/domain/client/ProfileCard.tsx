@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, ClipboardCopy, FileCheck2, Hash, Pencil, Plus, X } from "lucide-react";
+import { Check, ChevronDown, ClipboardCopy, FileCheck2, Hash, Pencil, Plus, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { can } from "@/lib/permissions";
 import type { Company, CustomField, ProfileGroup } from "@/lib/types";
@@ -18,6 +18,8 @@ export function ProfileCard({ company }: { company: Company }) {
   const role = useStore((s) => s.session?.role);
   const may = can(role, "company.update");
   const [showEmpty, setShowEmpty] = useState(false);
+  // 휴대폰: 칸이 20개 남짓이라 펼쳐 두면 기업 상세가 한없이 길어진다 — 접어 두고 '전체 복사'는 그대로 쓴다
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [adding, setAdding] = useState<ProfileGroup | null>(null);
@@ -46,9 +48,13 @@ export function ProfileCard({ company }: { company: Company }) {
       }>
         <span className="flex flex-wrap items-center gap-2">회사 기본 정보 <Badge>{filled}/{total} 입력됨</Badge></span>
       </SectionTitle>
-      <p className="-mt-1 mb-3 text-[0.8rem] text-ink-3">번호는 <b className="text-ink-2">조각마다 따로</b> 복사됩니다 — 칸이 나뉜 신청서에 하나씩 붙이세요. 값을 누르면 보이는 그대로 복사됩니다.</p>
+      <p className={cx("-mt-1 mb-3 text-[0.8rem] text-ink-3", !mobileOpen && "max-md:hidden")}>번호는 <b className="text-ink-2">조각마다 따로</b> 복사됩니다 — 칸이 나뉜 신청서에 하나씩 붙이세요. 값을 누르면 보이는 그대로 복사됩니다.</p>
+      <button type="button" onClick={() => setMobileOpen((v) => !v)} aria-expanded={mobileOpen} data-testid="profile-toggle"
+        className="pressable flex min-h-11 w-full items-center justify-between rounded-xl border border-line px-3.5 text-left text-[0.86rem] font-semibold text-ink-2 md:hidden">
+        {mobileOpen ? "회사 정보 접기" : "사업자번호 · 연락처 · 인증서 보기"} <ChevronDown size={16} className={cx("shrink-0 transition-transform", mobileOpen && "rotate-180")} />
+      </button>
 
-      <div className="grid gap-x-8 gap-y-4 md:grid-cols-2">
+      <div className={cx("gap-x-8 gap-y-4 md:grid md:grid-cols-2", mobileOpen ? "mt-3 grid" : "hidden")}>
         {GROUP_ORDER.map((g) => {
           const list = rows.filter((r) => r.group === g && (showEmpty || allEmpty || r.value || editing === r.key));
           // 이 묶음에 채운 칸이 하나도 없으면 "칸 채우기"를 열기 전까지 숨긴다
@@ -71,7 +77,7 @@ export function ProfileCard({ company }: { company: Company }) {
       </div>
 
       {!allEmpty && empties > 0 && (
-        <button type="button" onClick={() => setShowEmpty((v) => !v)} className="pressable mt-2 inline-flex min-h-9 items-center sm:min-h-0 text-[0.82rem] font-semibold text-accent">
+        <button type="button" onClick={() => setShowEmpty((v) => !v)} className={cx("pressable mt-2 min-h-9 items-center sm:min-h-0 text-[0.82rem] font-semibold text-accent", mobileOpen ? "inline-flex" : "hidden md:inline-flex")}>
           {showEmpty ? "아직 안 적은 칸 접기" : `아직 안 적은 ${empties}칸 채우기 · 칸 추가`}
         </button>
       )}

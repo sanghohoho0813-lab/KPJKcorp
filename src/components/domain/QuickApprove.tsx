@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, ChevronRight, ShieldCheck, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { can } from "@/lib/permissions";
@@ -14,27 +14,43 @@ const KIND_LABEL: Record<string, string> = { discount: "할인", proposal: "제�
  * 모바일 빠른 승인 — 대표가 휴대폰에서 승인을 끝낸다.
  * 한 번에 한 건만 보여준다. 목록을 스크롤하며 고르게 하지 않는다 — 판단할 것 하나, 버튼 둘.
  */
+const HIDE_KEY = "kpjk-quick-approve-hidden";
+
 export function QuickApproveBar() {
   const st = useStore();
   const [open, setOpen] = useState(false);
+  // 접으면 이 세션 동안 숨긴다 — 접을 때보다 대기 건이 늘면 다시 뜬다
+  const [hiddenAt, setHiddenAt] = useState<number>(() => {
+    try { return Number(sessionStorage.getItem(HIDE_KEY) ?? -1); } catch { return -1; }
+  });
   const pending = st.approvals.filter((a) => a.status === "pending").sort((a, b) => a.requestedAt.localeCompare(b.requestedAt));
-  if (!can(st.session?.role, "approval.decide") || pending.length === 0) return null;
+  const show = can(st.session?.role, "approval.decide") && pending.length > 0 && pending.length > hiddenAt;
+  // 떠 있는 동안에는 화면 아래 여백을 늘려 마지막 내용이 가리지 않게(globals.css html.qa-bar)
+  useEffect(() => {
+    if (!show) return;
+    document.documentElement.classList.add("qa-bar");
+    return () => document.documentElement.classList.remove("qa-bar");
+  }, [show]);
+  if (!show) return <QuickApproveSheet open={open} onClose={() => setOpen(false)} />;
+  const hide = () => { setHiddenAt(pending.length); try { sessionStorage.setItem(HIDE_KEY, String(pending.length)); } catch { /* 무시 */ } };
 
   return (
     <>
       {/* 하단 Nav 바로 위에 붙는다. lg 이상(PC)에서는 승인 화면이 있으므로 숨긴다 */}
-      <div className="fixed inset-x-0 z-30 px-3 lg:hidden" style={{ bottom: "calc(var(--bottomnav-h) + 8px)" }}>
-        <button
-          onClick={() => setOpen(true)}
-          className="pressable lift anim-rise flex w-full items-center gap-3 rounded-2xl border border-accent/40 bg-surface px-4 py-3 text-left shadow-lg"
-        >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-ink"><ShieldCheck size={18} /></span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-[0.92rem] font-bold">대표 승인 대기 {pending.length}건</span>
-            <span className="block truncate text-[0.78rem] text-ink-3">{pending[0].title}</span>
-          </span>
-          <span className="flex shrink-0 items-center gap-1 text-[0.82rem] font-semibold text-accent">처리 <ChevronRight size={15} /></span>
-        </button>
+      <div className="fixed inset-x-0 z-30 px-3 lg:hidden" style={{ bottom: "calc(var(--bottomnav-h) + 8px)" }} data-testid="quick-approve-bar">
+        <div className="lift anim-rise flex w-full items-center rounded-2xl border border-accent/40 bg-surface shadow-lg">
+          <button onClick={() => setOpen(true)} className="pressable flex min-w-0 flex-1 items-center gap-3 rounded-2xl py-3 pl-4 pr-2 text-left">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-ink"><ShieldCheck size={18} /></span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[0.92rem] font-bold">대표 승인 대기 {pending.length}건</span>
+              <span className="block truncate text-[0.78rem] text-ink-3">{pending[0].title}</span>
+            </span>
+            <span className="flex shrink-0 items-center gap-1 text-[0.82rem] font-semibold text-accent">처리 <ChevronRight size={15} /></span>
+          </button>
+          <button onClick={hide} aria-label="승인 알림 접기 — 새 승인이 오면 다시 보입니다" className="pressable mr-1.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-ink-3 hover:bg-surface-2">
+            <X size={16} />
+          </button>
+        </div>
       </div>
       <QuickApproveSheet open={open} onClose={() => setOpen(false)} />
     </>

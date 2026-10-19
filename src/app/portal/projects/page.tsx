@@ -8,7 +8,7 @@ import { Check } from "lucide-react";
 import { useStore, usePortalCompanyId } from "@/lib/store";
 import { CUSTOMER_STEPS, customerStageMessage, stageProgress, stageToCustomerStep } from "@/lib/stages";
 import { fmtDate, fmtRelative, relativeDay } from "@/lib/format";
-import { Badge, Card, PageHeader, SegmentedControl, cx, Progress } from "@/components/ui/ui";
+import { Badge, Card, EmptyState, LinkButton, PageHeader, SegmentedControl, cx, Progress } from "@/components/ui/ui";
 
 function Inner() {
   const st = useStore();
@@ -19,7 +19,17 @@ function Inner() {
   const [sel, setSel] = useState<string>(params.get("p") ?? projects.find((p) => !["done", "aftercare"].includes(p.stage))?.id ?? projects[0]?.id ?? "");
   const p = projects.find((x) => x.id === sel) ?? projects[0];
   if (!c) return null;
-  if (!p) return <Card className="p-8 text-center text-ink-2">진행 중인 프로젝트가 없습니다.</Card>;
+  // 막 등록한 고객 — 프로젝트가 시작되기 전. 무엇이 여기에 보일지와 지금 할 수 있는 것을 알려 준다
+  if (!p) return (
+    <div>
+      <PageHeader icon={<Icon3D name="flow" size="2.4rem" />} title="프로젝트 진행현황" desc="담당 컨설턴트가 프로젝트를 시작하면 여기서 단계별 진행을 보실 수 있습니다." />
+      <Card>
+        <EmptyState icon={<Icon3D name="flow" size="3rem" />} title="아직 시작한 프로젝트가 없습니다"
+          desc="자료 요청 → 자료 검토 → 진행 → 완료, 네 단계로 지금 어디쯤인지와 다음 일정이 여기에 보입니다. 궁금한 점은 담당 컨설턴트에게 물어보세요."
+          action={<div className="flex flex-wrap justify-center gap-2"><LinkButton href="/portal/inquiries" variant="accent">문의하기</LinkButton><LinkButton href="/portal/services" variant="outline">함께 검토할 수 있는 것</LinkButton></div>} />
+      </Card>
+    </div>
+  );
   const step = stageToCustomerStep(p.stage);
   const consultant = st.users.find((u) => u.id === p.consultantId);
   const now = new Date().toISOString();

@@ -9,6 +9,7 @@
 // 10) 경과 보고: 기업 상세 빠른 작업 → 기간 · 줄 고르기 · 한마디 → 미리 보기 · 카톡용 복사 → 고객에게 보내기(공지 · 홈 맨 위) → 고객 화면
 // 11) 앱 안에서 넘어올 때 주소의 탭 · 창 열기(?tab= · ?kit= · ?report=1 · 지원사업 ?tab=leads) — 새로 고침 없이도 맞는 화면
 // 12) 경과 보고 미확인 → 확인 연락 업무(규칙) → 대표가 보면 업무 자동 완료
+// 13) 휴대폰 화면 정리: 프로젝트 단계 칩(첫 화면에 프로젝트) · 승인 막대 접기 · 회사 정보 접기 · 막 등록한 고객의 빈 화면
 // 실행: npm run build && npm start (데모 모드) → node tools/acceptance/daily.mjs
 import fs from 'fs';
 import { execFileSync } from 'child_process';
@@ -591,6 +592,57 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
   const after = st.tasks.filter((t) => t.ruleKey === `report_unseen:${rep.id}`);
   ok('12 대표가 보면 확인 연락 업무 자동 완료 · 다시 안 만듦', after.length === 1 && after[0].status === 'done' && st.activities.some((a) => a.type === 'task_completed' && a.text.includes('대표가 경과 보고 확인')));
   ok('12 페이지 오류 없음', page.errs.length === 0, page.errs.slice(0, 2).join(' | '));
+}
+
+// ---------- 휴대폰 화면 정리 (대표 휴대폰 → 막 등록한 고객) ----------
+{
+  const page = await session('mobile', ['ceo@kpjk.co.kr', 'kpjk2026!']);
+  await go(page, '/ax/projects');
+  ok('13 프로젝트: 단계는 칩 한 줄', await page.getByTestId('stage-chips').isVisible() && (await page.getByTestId('stage-chips').getByRole('button').count()) === 9);
+  const firstCard = page.locator('a[href^="/ax/projects/"]').first();
+  ok('13 프로젝트: 첫 화면에 프로젝트 카드', (await firstCard.boundingBox())?.y < 844);
+  await page.getByTestId('stage-chips').getByRole('button', { name: /^완료/ }).click(); await sleep(300);
+  ok('13 프로젝트: 칩으로 거르기', (await page.locator('a[href^="/ax/projects/"]').filter({ hasText: '완료' }).count()) >= 1 && (await page.getByTestId('stage-chips').getByRole('button', { name: /^완료/ }).getAttribute('aria-pressed')) === 'true');
+  const bar = page.getByTestId('quick-approve-bar');
+  ok('13 승인 막대가 떠 있으면 아래 여백을 더 둔다', await bar.isVisible() && await page.evaluate(() => document.documentElement.classList.contains('qa-bar')));
+  await bar.getByRole('button', { name: /승인 알림 접기/ }).click(); await sleep(300);
+  ok('13 승인 막대 접기 → 사라지고 여백도 원래대로', (await page.getByTestId('quick-approve-bar').count()) === 0 && !(await page.evaluate(() => document.documentElement.classList.contains('qa-bar'))));
+  await go(page, '/ax/dashboard');
+  ok('13 접은 승인 막대는 이 세션 동안 다시 안 뜸', (await page.getByTestId('quick-approve-bar').count()) === 0);
+  await go(page, '/ax/clients/co_a');
+  const toggle = page.getByTestId('profile-toggle');
+  const firstRow = page.locator('#profile-card section').first();
+  ok('13 기업 상세: 회사 정보는 접힌 한 줄', await toggle.isVisible() && !(await firstRow.isVisible()));
+  await toggle.click(); await sleep(300);
+  ok('13 기업 상세: 누르면 회사 정보 펼침', await firstRow.isVisible());
+  ok('13 휴대폰 가로 넘침 없음', (await overflow(page)) <= 0);
+
+  // 막 등록한 고객 — 프로젝트·자료·일정이 하나도 없는 기업과 그 담당자 계정
+  const storeKey = await page.evaluate(() => Object.keys(localStorage).find((k) => { try { return !!JSON.parse(localStorage.getItem(k) ?? 'null')?.state; } catch { return false; } }));
+  const { createHash } = await import('crypto');
+  const h = createHash('sha256').update('kpjk-ax::v1::new@new.demo::client2026!').digest('hex');
+  await page.evaluate(([key, hash]) => { const s = JSON.parse(localStorage.getItem(key));
+    s.state.companies.push({ id: 'co_new', code: 'Z', name: '새로운테크(주)', ceo: '시험대표', industry: '소프트웨어', bizNo: '000-81-99999', contactName: '시험대표', contactTitle: '대표이사', contactPhone: '', contactEmail: 'new@new.demo', address: '서울', employees: 5, revenue: '', firstConsultDate: new Date().toISOString().slice(0, 10), consultantId: 'u_park', memo: '' });
+    s.state.users.push({ id: 'c_new', name: '시험대표', role: 'client', title: '대표이사', email: 'new@new.demo', companyId: 'co_new', passwordHash: hash, active: true });
+    localStorage.setItem(key, JSON.stringify(s)); }, [storeKey, h]);
+  // 기업고객 '포털 미사용': 막 등록해 아직 안 들어온 기업 → 접속 전, 누르면 고객 플랫폼 탭으로
+  await go(page, '/ax/clients');
+  await page.getByRole('button', { name: /^포털 미사용 \d+$/ }).click(); await sleep(400);
+  const newCard = page.locator('a[href="/ax/clients/co_new?tab=portal"]');
+  ok('13 기업고객 포털 미사용: 막 등록한 기업은 접속 전 · 고객 플랫폼 탭으로', await newCard.isVisible() && /포털 접속 전/.test(await newCard.innerText()));
+  ok('13 기업고객 포털 미사용: 최근 접속한 에이정밀은 빠짐', (await page.locator('a[href="/ax/clients/co_a?tab=portal"]').count()) === 0);
+  await page.evaluate((key) => { const s = JSON.parse(localStorage.getItem(key)); s.state.session = null; localStorage.setItem(key, JSON.stringify(s)); }, storeKey);
+  await page.goto(B + '/login', { waitUntil: 'networkidle' });
+  await page.getByLabel('아이디 (이메일)').fill('new@new.demo');
+  await page.locator('input[type=password]').first().fill('client2026!');
+  await page.getByRole('button', { name: '로그인' }).click();
+  await page.waitForURL(/\/portal/); await sleep(1200);
+  await page.getByRole('button', { name: /건너뛰기/ }).first().click({ timeout: 800 }).catch(() => {});
+  await page.getByLabel(/튜토리얼 닫기|이용 안내 닫기/).click({ timeout: 800 }).catch(() => {});
+  await go(page, '/portal/projects');
+  ok('13 막 등록한 고객: 진행현황은 안내 + 문의하기', await page.getByText('아직 시작한 프로젝트가 없습니다').isVisible() && await page.getByRole('link', { name: '문의하기' }).first().isVisible());
+  for (const u of ['/portal', '/portal/documents', '/portal/schedule', '/portal/results', '/portal/company']) { await go(page, u); }
+  ok('13 막 등록한 고객: 고객 화면 전부 오류 없음 · 넘침 없음', page.errs.length === 0 && (await overflow(page)) <= 0, page.errs.slice(0, 2).join(' | '));
 }
 
 await browser.close();

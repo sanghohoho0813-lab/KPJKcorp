@@ -9,6 +9,7 @@ DIR="$(cd "$(dirname "$0")" && pwd)"
 TMP="$(mktemp -d)"
 cp "$DIR/000_supabase_stub.sql" "$DIR/../setup.sql" "$DIR/010_rls_test.sql" "$TMP/" && chmod -R a+rX "$TMP"
 run() { if [ "$(id -un)" = postgres ]; then psql "$@"; else su postgres -c "psql $(printf '%q ' "$@")"; fi; }
+run -qtAc "select 1" >/dev/null 2>&1 || { echo "로컬 Postgres 가 꺼져 있습니다 — 켜고 다시 실행하세요 (예: pg_ctlcluster 16 main start)"; exit 1; }
 run -q -c "drop database if exists $DB" -c "create database $DB" >/dev/null || exit 1
 # 역할(anon · authenticated)은 서버 전체에 남아 있어 두 번째부터 "이미 있음"이 난다 — 그 줄만 넘긴다
 run -q -d $DB -f "$TMP/000_supabase_stub.sql" 2>&1 | grep -v "already exists" | grep -i error && exit 1

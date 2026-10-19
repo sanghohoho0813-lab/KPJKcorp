@@ -11,6 +11,7 @@ import { stageLabel } from "@/lib/stages";
 import { PageHeader, Badge, Button, SegmentedControl, EmptyState, Card, cx } from "@/components/ui/ui";
 import { ContactLine, useContactSources } from "@/components/domain/ContactLog";
 import { contactStatus } from "@/lib/contact";
+import { portalUsage, portalUseLabel, portalUseRank } from "@/lib/portal-usage";
 import { CompanyModal, useMay } from "@/components/domain/EntityModals";
 import { CompanyImportModal } from "@/components/domain/CompanyImport";
 import { StatusBoard } from "@/components/domain/client/StatusBoard";
@@ -35,7 +36,7 @@ function ClientsInner() {
   });
   const setView = (v: "card" | "table" | "board") => { setViewState(v); try { window.localStorage.setItem(VIEW_KEY, v); } catch { /* 저장소 막힘 */ } };
   const isMobile = useIsMobile();
-  const [filter, setFilter] = useState<"all" | "mine" | "issue" | "contact" | "archived">(() => (params.get("filter") === "contact" ? "contact" : "all"));
+  const [filter, setFilter] = useState<"all" | "mine" | "issue" | "contact" | "portal" | "archived">(() => (params.get("filter") === "contact" ? "contact" : params.get("filter") === "portal" ? "portal" : "all"));
   // 대시보드 "처음 시작하기"에서 오면 등록 창이 바로 열린다
   const [newOpen, setNewOpen] = useState(params.get("new") === "1");
   const [importOpen, setImportOpen] = useState(params.get("import") === "1");
@@ -56,17 +57,22 @@ function ClientsInner() {
         const last = st.activities.filter((a) => a.companyId === c.id).sort((a, b) => b.at.localeCompare(a.at))[0];
         const consultant = st.users.find((u) => u.id === c.consultantId);
         const contact = contactStatus(c, contactSrc, cycle);
-        return { c, projects, active, missing, overdue, openIq, next, last, consultant, contact, hasIssue: overdue > 0 || openIq > 0 };
+        const portal = portalUsage(c.id, st.users, st.activities);
+        return { c, projects, active, missing, overdue, openIq, next, last, consultant, contact, portal, hasIssue: overdue > 0 || openIq > 0 };
       })
       // 보관된 기업은 "보관" 필터에서만 보인다.
       .filter((r) => (filter === "archived" ? !!r.c.archived : !r.c.archived))
-      .filter((r) => (filter === "mine" ? r.c.consultantId === me : filter === "issue" ? r.hasIssue : filter === "contact" ? r.contact.due : true))
-      // 연락 필요는 오래된 순으로 — 가장 오래 연락 안 한 기업부터
-      .sort((a, b) => (filter === "contact" ? (b.contact.days ?? 0) - (a.contact.days ?? 0) : 0))
+      .filter((r) => (filter === "mine" ? r.c.consultantId === me : filter === "issue" ? r.hasIssue : filter === "contact" ? r.contact.due : filter === "portal" ? r.portal.state !== "active" : true))
+      // 연락 필요는 오래된 순으로 — 가장 오래 연락 안 한 기업부터. 포털 미사용은 계정 없음 → 접속 전 → 오래 안 들어온 순
+      .sort((a, b) => (filter === "contact" ? (b.contact.days ?? 0) - (a.contact.days ?? 0) : filter === "portal" ? portalUseRank(b.portal) - portalUseRank(a.portal) : 0))
       .filter((r) => !q || r.c.name.includes(q) || r.c.ceo.includes(q) || r.c.industry.includes(q) || r.c.contactName.includes(q) || r.c.bizNo.includes(q) || (r.c.region ?? "").includes(q) || (r.c.interests ?? []).some((k) => (CONSULT_AREA_LABEL[k] ?? "").includes(q)));
   }, [st, q, filter, me, now, contactSrc, cycle]);
   const totalActive = st.companies.filter((c) => !c.archived).length;
   const needContact = useMemo(() => st.companies.filter((c) => !c.archived && contactStatus(c, contactSrc, cycle).due).length, [st.companies, contactSrc, cycle]);
+  // 자료 제출 · 경과 보고 확인은 고객이 Portal 을 써야 돈다 — 안 쓰는 곳을 한 번에 모아 계정 만들기 · 안내로 잇는다
+  const needPortal = useMemo(() => st.companies.filter((c) => !c.archived && portalUsage(c.id, st.users, st.activities).state !== "active").length, [st.companies, st.users, st.activities]);
+  const portalView = filter === "portal";
+  const hrefOf = (id: string) => (portalView ? `/ax/clients/${id}?tab=portal` : `/ax/clients/${id}`);
 
   return (
     <div>
@@ -82,7 +88,7 @@ function ClientsInner() {
       <SampleBanner className="mb-4" />
       <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center">
         <div className="md:w-80"><SearchBox value={q} onChange={setQ} placeholder="기업명, 대표, 업종, 지역, 관심 분야 검색" /></div>
-        <SegmentedControl size="sm" value={filter} onChange={setFilter} options={[{ key: "all", label: "전체" }, { key: "mine", label: "내 담당" }, { key: "issue", label: "확인 필요" }, { key: "contact", label: needContact ? `연락 필요 ${needContact}` : "연락 필요" }, { key: "archived", label: "보관" }]} />
+        <SegmentedControl size="sm" value={filter} onChange={setFilter} options={[{ key: "all", label: "전체" }, { key: "mine", label: "내 담당" }, { key: "issue", label: "확인 필요" }, { key: "contact", label: needContact ? `연락 필요 ${needContact}` : "연락 필요" }, { key: "portal", label: needPortal ? `포털 미사용 ${needPortal}` : "포털 미사용" }, { key: "archived", label: "보관" }]} />
       </div>
 
       {rows.length === 0 ? (
@@ -101,8 +107,8 @@ function ClientsInner() {
         <StatusBoard companies={rows.map((r) => r.c)} />
       ) : view === "card" ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {rows.map(({ c, active, missing, overdue, openIq, next, last, consultant, contact }) => (
-            <Link key={c.id} href={`/ax/clients/${c.id}`} className="card card-hover flex flex-col p-5">
+          {rows.map(({ c, active, missing, overdue, openIq, next, last, consultant, contact, portal }) => (
+            <Link key={c.id} href={hrefOf(c.id)} className="card card-hover flex flex-col p-5">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2"><span className="tnum flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-shell text-[0.75rem] font-bold text-white">{c.code}</span><span className="truncate text-[1.05rem] font-bold">{c.name}</span>{c.sample && <Badge tone="info" className="shrink-0">샘플</Badge>}</div>
@@ -111,6 +117,7 @@ function ClientsInner() {
                 <ChevronRight size={18} className="shrink-0 text-ink-3" />
               </div>
               <div className="mt-3 flex flex-wrap gap-1.5">
+                {portalView && <Badge tone="warning">{portalUseLabel(portal)}</Badge>}
                 {overdue > 0 && <Badge tone="error">기한초과 {overdue}</Badge>}
                 {missing.length > 0 && overdue === 0 && <Badge tone="warning">미제출 {missing.length}</Badge>}
                 {openIq > 0 && <Badge tone="error">미답변 문의 {openIq}</Badge>}
@@ -140,8 +147,8 @@ function ClientsInner() {
         {/* 모바일에서는 표를 가로로 밀지 않는다 — 한 기업 = 한 줄 카드. 둘 중 하나만 그린다(숨긴 쪽 링크가 겹쳐 세지지 않게) */}
         {isMobile ? (
         <div className="space-y-2">
-          {rows.map(({ c, active, missing, overdue, openIq, next, consultant, contact }) => (
-            <Link key={c.id} href={`/ax/clients/${c.id}`} className="card card-hover block p-4">
+          {rows.map(({ c, active, missing, overdue, openIq, next, consultant, contact, portal }) => (
+            <Link key={c.id} href={hrefOf(c.id)} className="card card-hover block p-4">
               <div className="flex items-center gap-2">
                 <span className="tnum flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-shell text-[0.7rem] font-bold text-white">{c.code}</span>
                 <span className="truncate font-bold">{c.name}</span>
@@ -150,6 +157,7 @@ function ClientsInner() {
               </div>
               <div className="mt-1 truncate text-[0.82rem] text-ink-2">{active[0]?.name ?? "진행 중 프로젝트 없음"}{active.length > 1 ? ` 외 ${active.length - 1}` : ""}</div>
               <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[0.78rem] text-ink-3">
+                {portalView && <Badge tone="warning">{portalUseLabel(portal)}</Badge>}
                 {overdue > 0 ? <Badge tone="error">기한초과 {overdue}</Badge> : missing.length > 0 ? <Badge tone="warning">미제출 {missing.length}</Badge> : null}
                 {openIq > 0 && <Badge tone="error">미답변 {openIq}</Badge>}
                 {contact.due && <Badge tone="warning">연락 {contact.days}일 없음</Badge>}
@@ -165,14 +173,15 @@ function ClientsInner() {
           <table className="tbl" data-testid="clients-table">
             <thead><tr><th>기업</th><th>담당</th><th>진행 프로젝트</th><th>현재 단계</th><th className="text-right">미제출</th><th className="text-right">문의</th><th>다음 일정</th><th>마지막 연락</th></tr></thead>
             <tbody>
-              {rows.map(({ c, active, missing, overdue, openIq, next, consultant, contact }) => (
-                <tr key={c.id} className="row-clickable" onClick={() => router.push(`/ax/clients/${c.id}`)}>
+              {rows.map(({ c, active, missing, overdue, openIq, next, consultant, contact, portal }) => (
+                <tr key={c.id} className="row-clickable" onClick={() => router.push(hrefOf(c.id))}>
                   {/* 이름은 진짜 링크 — 새 탭으로 열기·주소 복사가 된다. 업종·지역은 이름 아래 한 줄 */}
                   <td>
                     <div className="flex items-center gap-2">
                       <span className="tnum flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-shell text-[0.7rem] font-bold text-white">{c.code}</span>
-                      <Link href={`/ax/clients/${c.id}`} onClick={(e) => e.stopPropagation()} className="font-semibold hover:text-accent">{c.name}</Link>
+                      <Link href={hrefOf(c.id)} onClick={(e) => e.stopPropagation()} className="font-semibold hover:text-accent">{c.name}</Link>
                       {c.sample && <Badge tone="info">샘플</Badge>}
+                      {portalView && <Badge tone="warning">{portalUseLabel(portal)}</Badge>}
                     </div>
                     <div className="mt-0.5 max-w-[18rem] truncate pl-8 text-[0.78rem] text-ink-3">{[c.industry, c.region].filter(Boolean).join(" · ") || "기본 정보 미입력"}</div>
                   </td>
