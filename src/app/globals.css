@@ -401,3 +401,47 @@ html[data-motion="reduce"] .coach-glow { animation: none; }
   a[href]::after { content: none !important; }
 }
 .print-sheet { min-height: 297mm; border-radius: 4px; }
+
+/* ------------------------------------------------------------------
+   고객 화면(Portal) — 앱처럼: 둥근 카드 · 알약 버튼 · 알약 필터 · 부드러운 그림자.
+   PortalShell 이 html 과 바깥 div 에 .portal-ui 를 붙인다(창은 body 로 나가므로 html 에도).
+   내부 AX 에는 이 클래스가 없어 아무것도 바뀌지 않는다.
+   ------------------------------------------------------------------ */
+.portal-ui {
+  --radius-card: 22px;
+  --radius-btn: 9999px;
+  --neutral-canvas: #f6f5f2;
+  --portal-shadow: 0 1px 2px rgba(23, 27, 32, 0.04), 0 12px 32px -20px rgba(23, 27, 32, 0.22);
+}
+.portal-ui .card { border-color: rgba(23, 27, 32, 0.05); box-shadow: var(--portal-shadow); }
+.portal-ui .card-hover:hover { border-color: rgba(23, 27, 32, 0.08); }
+/* 필터 — 회색 통 안의 탭 대신 알약 칩 한 줄 */
+.portal-ui .seg { background: transparent; padding: 0; gap: 0.45rem; border-radius: 0; }
+.portal-ui .seg-btn { border: 1px solid var(--neutral-border-2); background: var(--neutral-surface); color: var(--neutral-text-2); border-radius: 9999px; padding-inline: 1rem; box-shadow: none; }
+.portal-ui .seg-btn.seg-on { background: var(--theme-shell); border-color: var(--theme-shell); color: #fff; }
+/* 창 — 휴대폰에서는 아래에서 올라오는 둥근 시트 */
+.portal-ui .modal-panel { border-top-left-radius: 28px; border-top-right-radius: 28px; }
+@media (min-width: 768px) { .portal-ui .modal-panel { border-radius: 24px; } }
+/* 휴대폰 하위 화면: 제목과 숫자 칸을 낮게 — 첫 화면에 목록이 보이도록 */
+@media (max-width: 767px) {
+  .portal-ui .page-header { margin-bottom: 1rem; gap: 0.75rem; }
+  .portal-ui .page-header h1 { font-size: 1.45rem; line-height: 1.25; font-weight: 800; letter-spacing: -0.01em; }
+  .portal-ui .page-header p { font-size: 0.85rem; }
+  .portal-ui .kpi { padding: 0.8rem 0.95rem; gap: 0.3rem; }
+  .portal-ui .kpi-value { font-size: 1.45rem; }
+  .portal-ui .kpi .mt-2 { margin-top: 0.25rem; font-size: 0.75rem; }
+}
+/* 고객 홈 머리 영역 — 테마의 진한 강조색(흰 글자 대비 4.5:1 이상) */
+.portal-hero-bg {
+  /* 둥근 무늬도 배경으로 — 요소로 두면 잘린 내용으로 잡히고 읽기 도구에도 걸린다 */
+  background:
+    radial-gradient(circle at 104% -12%, rgba(255, 255, 255, 0.09) 0 26%, transparent 26.3%),
+    radial-gradient(circle at 72% 128%, rgba(255, 255, 255, 0.06) 0 21%, transparent 21.3%),
+    radial-gradient(90% 120% at 100% 0%, color-mix(in srgb, var(--theme-accent) 55%, transparent) 0%, transparent 60%),
+    linear-gradient(160deg, var(--theme-accent-strong) 0%, color-mix(in srgb, var(--theme-accent-strong) 82%, black) 100%);
+}
+/* 가로로 넘기는 카드 줄 */
+.snap-row { scroll-snap-type: x mandatory; scroll-padding-inline: 1rem; }
+.snap-row > * { scroll-snap-align: start; }
+/* 입력칸 — 고객 화면은 조금 더 둥글게 */
+.portal-ui .field-input { border-radius: 14px; }

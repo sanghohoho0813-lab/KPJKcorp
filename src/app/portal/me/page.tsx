@@ -1,13 +1,15 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { HelpCircle, LogOut, Mail, Phone, ShieldCheck, UserRound } from "lucide-react";
+import { Bell, Building2, CalendarDays, ChevronRight, FileCheck2, HelpCircle, LogOut, Mail, Megaphone, MessageSquare, Phone, ShieldCheck, Sparkles } from "lucide-react";
 import { FontScalePicker } from "@/components/shell/FontScale";
 import { useStore, usePortalCompanyId, useCurrentUser } from "@/lib/store";
 import { useUi } from "@/lib/ui-store";
 import { fmtDate } from "@/lib/format";
 import { MyPasswordForm } from "@/components/domain/MyPassword";
-import { Avatar, Button, Card, PageHeader, SegmentedControl, DemoBadge } from "@/components/ui/ui";
+import { Avatar, Button, Card, SegmentedControl, DemoBadge, cx } from "@/components/ui/ui";
+import { HUB_TONE } from "@/components/domain/portal/PortalHome";
 
 export default function PortalMePage() {
   const st = useStore();
@@ -27,24 +29,79 @@ export default function PortalMePage() {
   const consultant = st.users.find((u) => u.id === c.consultantId);
   const logins = st.activities.filter((a) => a.type === "portal_login" && a.companyId === c.id).length;
 
+  // 아래 탭에 없는 화면은 여기서 — 앱의 "내 정보" 메뉴처럼 한 줄씩
+  const menu = [
+    { href: "/portal/company", label: "우리 회사 정보", icon: <Building2 size={19} /> },
+    { href: "/portal/schedule", label: "일정 · 공지", icon: <CalendarDays size={19} /> },
+    { href: "/portal/results", label: "완료자료", icon: <FileCheck2 size={19} /> },
+    { href: "/portal/programs", label: "지원사업", icon: <Megaphone size={19} /> },
+    { href: "/portal/services", label: "함께 검토", icon: <Sparkles size={19} /> },
+    { href: "/portal/notifications", label: "알림", icon: <Bell size={19} /> },
+  ];
+
   return (
     <div>
-      <PageHeader title="내 정보" desc="계정·회사 정보와 화면 설정입니다." />
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Card className="p-5">
-          <div className="flex items-center gap-4"><Avatar name={name ?? "K"} size={56} /><div><div className="text-[1.2rem] font-bold">{name} {title}</div><div className="text-[0.88rem] text-ink-2">{c.name}</div></div></div>
-          <dl className="mt-5 space-y-2 text-[0.9rem]">
-            <div className="flex items-center gap-2"><Mail size={15} className="text-ink-3" /><dd>{email}</dd></div>
-            <div className="flex items-center gap-2"><Phone size={15} className="text-ink-3" /><dd>{c.contactPhone}</dd></div>
-            <div className="flex items-center gap-2"><UserRound size={15} className="text-ink-3" /><dd>담당 컨설턴트: {consultant?.name} {consultant?.title} · {consultant?.email}</dd></div>
-          </dl>
-          <div className="mt-5 rounded-xl bg-surface-2 p-4 text-[0.85rem]">
-            <div className="font-bold">회사 정보</div>
-            <div className="mt-1 grid grid-cols-2 gap-1 text-ink-2"><span>대표 {c.ceo}</span><span>업종 {c.industry}</span><span>사업자번호 {c.bizNo}</span><span>첫 상담 {fmtDate(c.firstConsultDate, { year: true })}</span></div>
-          </div>
-          <div className="mt-3 flex items-center gap-2 text-[0.8rem] text-ink-3"><ShieldCheck size={14} /> 귀사의 프로젝트·자료·일정·문의만 표시됩니다. 다른 기업의 정보는 접근할 수 없습니다.</div>
-        </Card>
+      <h1 className="sr-only">내 정보</h1>
+      <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
         <div className="space-y-5">
+          {/* 머리 — 브랜드 색 카드에 이름·회사 */}
+          <section className="portal-hero-bg relative overflow-hidden rounded-[1.75rem] p-5 text-white md:p-6" data-testid="me-profile">
+            <div className="relative flex items-center gap-4">
+              <Avatar name={name ?? "K"} size={58} className="ring-4 ring-white/20" />
+              <div className="min-w-0">
+                <div className="truncate text-[1.25rem] font-extrabold">{name} {title}</div>
+                <div className="truncate text-[0.88rem] text-white/85">{c.name}</div>
+              </div>
+            </div>
+            <dl className="relative mt-4 space-y-1.5 text-[0.85rem] text-white/90">
+              {email && <div className="flex items-center gap-2"><Mail size={14} className="shrink-0 text-white/70" /><dd className="truncate">{email}</dd></div>}
+              {c.contactPhone && <div className="flex items-center gap-2"><Phone size={14} className="shrink-0 text-white/70" /><dd>{c.contactPhone}</dd></div>}
+            </dl>
+          </section>
+
+          {/* 담당 컨설턴트 */}
+          {consultant && (
+            <Card className="flex items-center gap-3 p-4">
+              <Avatar name={consultant.name} size={44} />
+              <div className="min-w-0 flex-1 leading-tight">
+                <div className="text-[0.72rem] font-bold text-ink-3">담당 컨설턴트</div>
+                <div className="truncate font-bold">{consultant.name} {consultant.title}</div>
+                <div className="truncate text-[0.78rem] text-ink-3">{consultant.email}</div>
+              </div>
+              {consultant.phone && <a href={`tel:${consultant.phone.replace(/[^0-9+]/g, "")}`} aria-label="담당 컨설턴트에게 전화" className="pressable flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line-2"><Phone size={17} /></a>}
+              <Link href="/portal/inquiries" aria-label="문의하기" className="pressable flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-accent-ink"><MessageSquare size={17} /></Link>
+            </Card>
+          )}
+
+          {/* 메뉴 */}
+          <Card className="overflow-hidden">
+            <ul className="divide-y divide-line" data-testid="me-menu">
+              {menu.map((m) => (
+                <li key={m.href}>
+                  <Link href={m.href} className="pressable flex items-center gap-3 px-4 py-3.5 hover:bg-surface-2/70">
+                    <span className={cx("flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl", HUB_TONE[m.href] ?? "bg-surface-2 text-ink-2")}>{m.icon}</span>
+                    <span className="flex-1 font-semibold">{m.label}</span>
+                    <ChevronRight size={17} className="text-ink-3" />
+                  </Link>
+                </li>
+              ))}
+              <li>
+                <button type="button" onClick={() => openTutorial("portal")} className="pressable flex w-full items-center gap-3 px-4 py-3.5 text-left hover:bg-surface-2/70">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-surface-2 text-ink-2"><HelpCircle size={19} /></span>
+                  <span className="flex-1 font-semibold">이용 안내 다시 보기</span>
+                  <ChevronRight size={17} className="text-ink-3" />
+                </button>
+              </li>
+            </ul>
+          </Card>
+        </div>
+
+        <div className="space-y-5">
+          <Card className="p-5">
+            <div className="font-bold">회사 정보</div>
+            <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-[0.85rem] text-ink-2"><span>대표 {c.ceo}</span><span>업종 {c.industry}</span><span>사업자번호 {c.bizNo}</span><span>첫 상담 {fmtDate(c.firstConsultDate, { year: true })}</span></div>
+            <div className="mt-3 flex items-start gap-2 text-[0.8rem] text-ink-3"><ShieldCheck size={14} className="mt-0.5 shrink-0" /> 귀사의 프로젝트·자료·일정·문의만 표시됩니다. 다른 기업의 정보는 접근할 수 없습니다.</div>
+          </Card>
           {isClient && (
             <Card className="p-5">
               <div className="mb-3 font-bold">비밀번호 바꾸기</div>
@@ -57,19 +114,16 @@ export default function PortalMePage() {
               <div><div className="mb-1.5 text-[0.85rem] font-semibold text-ink-2">글자 크기</div><FontScalePicker /></div>
               <div><div className="mb-1.5 text-[0.85rem] font-semibold text-ink-2">모션 줄이기</div><SegmentedControl value={settings.reduceMotion ? "on" : "off"} onChange={(k) => setSettings({ reduceMotion: k === "on" })} options={[{ key: "off", label: "Off" }, { key: "on", label: "On" }]} /></div>
             </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" icon={<HelpCircle size={15} />} onClick={() => openTutorial("portal")}>이용 안내 다시 보기</Button>
-              {isClient && <Button variant="ghost" size="sm" icon={<LogOut size={15} />} onClick={() => { logout(); router.push("/login"); }}>로그아웃</Button>}
-            </div>
           </Card>
           <Card className="p-5">
             <div className="mb-2 flex items-center gap-2 font-bold">이용 현황 <DemoBadge /></div>
-            <div className="grid grid-cols-3 gap-3 text-center">
-              <div className="rounded-xl bg-surface-2 p-3"><div className="tnum text-[1.4rem] font-bold">{logins}</div><div className="text-[0.75rem] text-ink-3">Portal 접속</div></div>
-              <div className="rounded-xl bg-surface-2 p-3"><div className="tnum text-[1.4rem] font-bold">{st.activities.filter((a) => a.type === "document_uploaded" && a.companyId === c.id).length}</div><div className="text-[0.75rem] text-ink-3">자료 제출</div></div>
-              <div className="rounded-xl bg-surface-2 p-3"><div className="tnum text-[1.4rem] font-bold">{st.inquiries.filter((i) => i.companyId === c.id).length}</div><div className="text-[0.75rem] text-ink-3">문의</div></div>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-2xl bg-surface-2 p-3"><div className="tnum text-[1.4rem] font-bold">{logins}</div><div className="text-[0.75rem] text-ink-3">Portal 접속</div></div>
+              <div className="rounded-2xl bg-surface-2 p-3"><div className="tnum text-[1.4rem] font-bold">{st.activities.filter((a) => a.type === "document_uploaded" && a.companyId === c.id).length}</div><div className="text-[0.75rem] text-ink-3">자료 제출</div></div>
+              <div className="rounded-2xl bg-surface-2 p-3"><div className="tnum text-[1.4rem] font-bold">{st.inquiries.filter((i) => i.companyId === c.id).length}</div><div className="text-[0.75rem] text-ink-3">문의</div></div>
             </div>
           </Card>
+          {isClient && <Button variant="outline" full icon={<LogOut size={16} />} onClick={() => { logout(); router.push("/login"); }}>로그아웃</Button>}
         </div>
       </div>
     </div>

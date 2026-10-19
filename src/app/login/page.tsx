@@ -165,7 +165,8 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen lg:grid lg:grid-cols-[1.1fr_1fr]">
+    // portal-ui — 고객이 처음 보는 화면이라 고객 화면과 같은 둥근 버튼·카드로
+    <div className="portal-ui min-h-screen bg-canvas lg:grid lg:grid-cols-[1.1fr_1fr]">
       <div className="relative hidden overflow-hidden bg-shell lg:block">
         <Image src="/assets/hero_main.jpg" alt="KPJK 컨설팅 미팅" fill priority className="object-cover object-[60%_center] opacity-80" sizes="55vw" />
         <div className="absolute inset-0 bg-gradient-to-t from-shell via-shell/40 to-transparent" />
@@ -176,9 +177,19 @@ export default function LoginPage() {
         </div>
       </div>
 
-      <div className="flex min-h-screen flex-col justify-center px-6 py-10 md:px-14">
+      <div className="flex min-h-screen flex-col px-6 pb-10 md:px-14 lg:justify-center lg:py-10">
+        {/* 휴대폰 첫 화면 — 브랜드 색 머리(PC 는 왼쪽 사진 칸이 이 역할) */}
+        <div className="portal-hero-bg relative -mx-6 mb-7 overflow-hidden rounded-b-[2rem] px-6 pb-8 pt-8 text-white md:-mx-14 md:px-14 lg:hidden" data-testid="login-brand">
+          <div className="relative flex items-center gap-2.5">
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-[0.7rem] font-black tracking-wider text-shell">KPJK</span>
+            <div className="leading-tight"><div className="text-[0.68rem] font-bold tracking-[0.12em] text-white/75">KPJK CORPORATION</div><div className="text-[1.05rem] font-bold">성장 플랫폼</div></div>
+            <DemoBadge className="ml-auto" compact />
+          </div>
+          <h2 className="relative mt-6 text-[1.55rem] font-extrabold leading-snug">우리 회사 컨설팅 진행,<br />이제 한 곳에서 확인하세요</h2>
+          <p className="relative mt-1.5 text-[0.85rem] text-white/85">진행 단계 · 요청자료 · 일정 · 결과자료</p>
+        </div>
         <div className="mx-auto w-full max-w-md">
-          <div className="mb-8 flex items-center gap-3">
+          <div className="mb-8 hidden items-center gap-3 lg:flex">
             <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-shell text-[0.75rem] font-black tracking-wider text-white">KPJK</span>
             <div className="leading-tight">
               <div className="text-[0.72rem] font-bold tracking-[0.1em] text-ink-3">KPJK CORPORATION</div>

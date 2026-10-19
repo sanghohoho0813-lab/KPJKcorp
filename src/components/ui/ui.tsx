@@ -115,13 +115,13 @@ export function Card({ children, className, hover, onClick, id }: { children: Re
 
 export function KpiCard({ label, value, sub, tone, href, icon, id, accentValue }: { label: string; value: ReactNode; sub?: ReactNode; tone?: Tone; href?: string; icon?: ReactNode; id?: string; accentValue?: boolean }) {
   const inner = (
-    <div className="flex h-full flex-col justify-between gap-2 p-5">
+    <div className="kpi flex h-full flex-col justify-between gap-2 p-5">
       <div className="flex items-center justify-between">
         <span className="text-[0.85rem] font-semibold text-ink-2">{label}</span>
         {icon && <span className="hover-pop flex items-center">{icon}</span>}
       </div>
       <div>
-        <div className={cx("tnum text-[2.1rem] font-bold leading-none", accentValue ? "text-accent" : tone === "error" ? "text-error" : "text-ink")}>
+        <div className={cx("kpi-value tnum text-[2.1rem] font-bold leading-none", accentValue ? "text-accent" : tone === "error" ? "text-error" : "text-ink")}>
           {typeof value === "number" ? <CountUp value={value} /> : value}
         </div>
         {sub && <div className="mt-2 text-[0.85rem] text-ink-2">{sub}</div>}
@@ -152,7 +152,7 @@ export function IconTile({ color, children, size = 40 }: { color: string; childr
 /* ---------- Page header ---------- */
 export function PageHeader({ title, desc, actions, badge, id }: { title: ReactNode; desc?: ReactNode; actions?: ReactNode; badge?: ReactNode; id?: string }) {
   return (
-    <div id={id} className="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+    <div id={id} className="page-header mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
       <div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
           <h1 className="text-[1.75rem] font-bold md:text-[2rem]">{title}</h1>
@@ -195,16 +195,17 @@ export function Tabs<T extends string>({ tabs, value, onChange, id }: { tabs: { 
 
 export function SegmentedControl<T extends string>({ options, value, onChange, size = "md" }: { options: { key: T; label: ReactNode }[]; value: T; onChange: (k: T) => void; size?: "sm" | "md" }) {
   return (
-    <div className="hide-scrollbar inline-flex max-w-full overflow-x-auto rounded-[10px] bg-surface-2 p-1">
+    // seg / seg-btn / seg-on — 고객 화면(.portal-ui)에서만 알약 모양 필터로 바뀐다(globals.css). 내부 화면은 그대로
+    <div className="seg hide-scrollbar inline-flex max-w-full overflow-x-auto rounded-[10px] bg-surface-2 p-1">
       {options.map((o) => (
         <button
           key={o.key}
           onClick={() => onChange(o.key)}
           // 모바일에서 31px짜리 칩은 손가락으로 정확히 누르기 어렵다. 터치 기기에서만 40px로 키운다.
           className={cx(
-            "pressable flex items-center justify-center whitespace-nowrap rounded-lg font-semibold transition-colors",
+            "seg-btn pressable flex items-center justify-center whitespace-nowrap rounded-lg font-semibold transition-colors",
             size === "sm" ? "min-h-8 px-2.5 text-[0.75rem] md:min-h-0 md:py-1" : "min-h-10 px-3.5 text-[0.85rem] md:min-h-0 md:py-1.5",
-            o.key === value ? "bg-surface text-ink shadow-sm" : "text-ink-3 hover:text-ink-2",
+            o.key === value ? "seg-on bg-surface text-ink shadow-sm" : "text-ink-3 hover:text-ink-2",
           )}
         >
           {o.label}
@@ -263,14 +264,14 @@ export function PageSkeleton() {
 
 /* ---------- Forms ---------- */
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input({ className, ...rest }, ref) {
-  return <input ref={ref} className={cx("h-11 w-full rounded-[10px] border border-line-2 bg-surface px-3.5 text-[0.95rem] text-ink placeholder:text-ink-3 focus:border-accent", className)} {...rest} />;
+  return <input ref={ref} className={cx("field-input h-11 w-full rounded-[10px] border border-line-2 bg-surface px-3.5 text-[0.95rem] text-ink placeholder:text-ink-3 focus:border-accent", className)} {...rest} />;
 });
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(function Textarea({ className, ...rest }, ref) {
-  return <textarea ref={ref} className={cx("min-h-28 w-full rounded-[10px] border border-line-2 bg-surface px-3.5 py-2.5 text-[0.95rem] text-ink placeholder:text-ink-3 focus:border-accent", className)} {...rest} />;
+  return <textarea ref={ref} className={cx("field-input min-h-28 w-full rounded-[10px] border border-line-2 bg-surface px-3.5 py-2.5 text-[0.95rem] text-ink placeholder:text-ink-3 focus:border-accent", className)} {...rest} />;
 });
 export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(function Select({ className, children, ...rest }, ref) {
   return (
-    <select ref={ref} className={cx("h-11 w-full rounded-[10px] border border-line-2 bg-surface px-3 text-[0.95rem] text-ink focus:border-accent", className)} {...rest}>
+    <select ref={ref} className={cx("field-input h-11 w-full rounded-[10px] border border-line-2 bg-surface px-3 text-[0.95rem] text-ink focus:border-accent", className)} {...rest}>
       {children}
     </select>
   );

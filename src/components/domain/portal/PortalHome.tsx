@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { ArrowRight, CalendarDays, ChevronRight, FileCheck2, FolderUp, Megaphone, MessageSquare, Phone, Sparkles, TrendingUp } from "lucide-react";
+import { ArrowRight, Briefcase, Building2, CalendarDays, Check, ChevronRight, FileCheck2, FolderUp, Megaphone, MessageSquare, Phone, Pin, Sparkles, TrendingUp } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { ENTITY_TYPES } from "@/lib/company-options";
 import { fmtDate, fmtTime } from "@/lib/format";
 import { profileOfCompany, programsForCompany } from "@/lib/programs";
 import { openOnly } from "@/lib/programs-client";
 import type { Company } from "@/lib/types";
+import { CUSTOMER_STEPS, stageToCustomerStep } from "@/lib/stages";
 import { Avatar, cx } from "@/components/ui/ui";
 import type { useGrowth } from "./GrowthBoard";
 
@@ -21,6 +22,10 @@ type Board = NonNullable<ReturnType<typeof useGrowth>>;
 
 /* ------------------------------ 상단: 우리 회사 성장 홈 ------------------------------ */
 
+/**
+ * 머리 영역 — 앱 첫 화면처럼: 브랜드 색 위에 인사·회사·숫자, 그 아래 떠 있는 흰 카드 두 장
+ * (지금 진행 중인 과제를 배달 추적처럼 단계 점으로 / 담당 컨설턴트에게 바로 연락).
+ */
 export function PortalHero({ company: c, board, displayName }: { company: Company; board: Board; displayName: string }) {
   const users = useStore((s) => s.users);
   const schedules = useStore((s) => s.schedules);
@@ -30,7 +35,7 @@ export function PortalHero({ company: c, board, displayName }: { company: Compan
   const next = schedules.filter((s) => s.companyId === c.id && s.visibleToClient && s.start >= nowIso).sort((a, b) => a.start.localeCompare(b.start))[0];
   // 함께한 날 — 첫 상담일 기준(실제 기록). 없으면 보이지 않는다
   const since = c.firstConsultDate ? Math.floor((now.getTime() - Date.parse(c.firstConsultDate)) / 864e5) + 1 : undefined;
-  // 업력·임직원은 바로 아래 "우리 회사 한눈에"에 크게 나온다 — 여기서는 업종·형태·지역만 (같은 숫자를 두 번 보이지 않게)
+  // 업력·임직원은 아래 "우리 회사 한눈에"에 크게 나온다 — 여기서는 업종·형태·지역만 (같은 숫자를 두 번 보이지 않게)
   const chips = [
     c.industry || c.bizCategory,
     ENTITY_TYPES.find((e) => e.key === c.entityType)?.label,
@@ -46,69 +51,110 @@ export function PortalHero({ company: c, board, displayName }: { company: Compan
   ];
 
   return (
-    <section id="tut-p-progress" data-testid="portal-hero"
-      className="relative overflow-hidden rounded-[1.6rem] p-5 text-shell-text shadow-[0_18px_50px_-24px_rgba(0,0,0,0.55)] md:p-8"
-      style={{ background: "radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--theme-accent) 34%, transparent) 0%, transparent 46%), linear-gradient(135deg, var(--theme-shell) 0%, var(--theme-shell-2) 100%)" }}>
-      <div className="relative grid gap-6 lg:grid-cols-[1.35fr_1fr] lg:items-end">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2 text-[0.78rem] font-semibold text-shell-text-3">
-            <span className="rounded-full border border-white/15 px-2.5 py-0.5 tracking-[0.12em]">KPJK 성장 파트너</span>
-            {since !== undefined && since > 0 && <span data-testid="partnership-days">함께한 지 <b className="text-shell-text">{since.toLocaleString("ko-KR")}일</b></span>}
+    <section id="tut-p-progress" data-testid="portal-hero" className="-mx-4 -mt-5 md:mx-0 md:mt-0">
+      <div className="portal-hero-bg relative overflow-hidden rounded-b-[2rem] px-5 pb-16 pt-5 text-white md:rounded-[1.75rem] md:px-8 md:pb-20 md:pt-7">
+        <div className="relative">
+          <div className="flex flex-wrap items-center gap-2 text-[0.75rem] font-semibold text-white/80">
+            <span className="rounded-full bg-white/15 px-2.5 py-1 tracking-[0.06em] text-white">KPJK 성장 파트너</span>
+            {since !== undefined && since > 0 && <span data-testid="partnership-days">함께한 지 <b className="text-white">{since.toLocaleString("ko-KR")}일</b></span>}
           </div>
-          <p className="mt-3 text-[0.92rem] text-shell-text-2">안녕하세요, <b className="text-shell-text">{c.name} {displayName}</b>님.</p>
-          <h1 className="mt-1 text-[1.6rem] font-extrabold leading-tight tracking-tight md:text-[2.3rem]">{c.name} 현재 상태</h1>
-          {chips.length > 0 && <div className="mt-3 flex flex-wrap gap-1.5">{chips.map((t) => <span key={t} className="rounded-full bg-white/10 px-2.5 py-1 text-[0.78rem] font-semibold text-shell-text-2 ring-1 ring-white/10">{t}</span>)}</div>}
-          {active.length > 0 && (
-            <div className="mt-5 space-y-2">
-              {active.map((it) => (
-                <Link key={it.project!.id} href={`/portal/projects?p=${it.project!.id}`} data-growth-active={it.area} className="block rounded-2xl bg-white/[0.08] px-4 py-3 ring-1 ring-white/10 transition-colors hover:bg-white/[0.12]">
-                  <div className="flex items-center gap-2 text-[0.88rem]"><TrendingUp size={16} className="shrink-0 text-highlight" /><span className="min-w-0 flex-1"><b className="block truncate sm:inline">{it.area}</b><span className="block truncate text-[0.78rem] text-shell-text-3 sm:ml-1.5 sm:inline sm:text-[0.88rem]">지금 {it.stepLabel} 단계</span></span><span className="tnum shrink-0 text-[1.2rem] font-extrabold text-highlight">{it.progress}%</span></div>
-                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/15"><div className="h-full rounded-full bg-highlight transition-[width] duration-700" style={{ width: `${it.progress ?? 0}%` }} /></div>
-                </Link>
-              ))}
-              {board.active.length > active.length && <Link href="/portal/projects" className="block px-1 text-[0.82rem] font-semibold text-shell-text-2 hover:text-shell-text">진행 중인 과제 {board.active.length - active.length}건 더 보기 →</Link>}
-            </div>
-          )}
-        </div>
-
-        {/* 담당 컨설턴트 — 누구에게 물으면 되는지가 늘 보이게 */}
-        <div className="rounded-2xl bg-white/[0.08] p-4 ring-1 ring-white/10" data-testid="hero-consultant">
-          <div className="text-[0.72rem] font-bold tracking-[0.12em] text-shell-text-3">담당 컨설턴트</div>
-          <div className="mt-2 flex items-center gap-3">
-            <Avatar name={consultant?.name ?? "K"} size={44} />
-            <div className="min-w-0 leading-tight"><div className="truncate text-[1.05rem] font-bold">{consultant ? `${consultant.name} ${consultant.title}` : "배정 전"}</div><div className="mt-0.5 text-[0.78rem] text-shell-text-3">KPJK Consulting</div></div>
-          </div>
-          {next && (
-            <Link href="/portal/schedule" className="mt-3 flex items-center gap-2 rounded-xl bg-white/[0.07] px-3 py-2 text-[0.82rem] hover:bg-white/[0.12]">
-              <CalendarDays size={15} className="shrink-0 text-highlight" />
-              <span className="min-w-0 flex-1 truncate">다음 일정 <b>{fmtDate(next.start)} {fmtTime(next.start)}</b> · {next.title.replace(c.name, "").trim()}</span>
-            </Link>
-          )}
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <Link href="/portal/inquiries" className="pressable inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-white px-3 text-[0.85rem] font-bold text-shell"><MessageSquare size={15} /> 문의하기</Link>
-            {consultant?.phone
-              ? <a href={`tel:${consultant.phone.replace(/[^0-9+]/g, "")}`} className="pressable inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-white/10 px-3 text-[0.85rem] font-bold ring-1 ring-white/15 hover:bg-white/15"><Phone size={15} /> 전화</a>
-              : <Link href="/portal/schedule" className="pressable inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-white/10 px-3 text-[0.85rem] font-bold ring-1 ring-white/15 hover:bg-white/15"><CalendarDays size={15} /> 일정</Link>}
+          <p className="mt-3 text-[0.9rem] text-white/85">안녕하세요, <b className="font-semibold text-white">{displayName}</b>님</p>
+          <h1 className="mt-0.5 text-[1.75rem] font-extrabold leading-tight tracking-tight md:text-[2.4rem]">{c.name}</h1>
+          {chips.length > 0 && <div className="mt-2.5 flex flex-wrap gap-1.5">{chips.map((t) => <span key={t} className="rounded-full bg-white/15 px-2.5 py-1 text-[0.75rem] font-semibold text-white">{t}</span>)}</div>}
+          <div className="mt-5 grid grid-cols-4 gap-1.5 md:max-w-[44rem] md:gap-2" data-testid="growth-tiles">
+            {/* 숫자를 누르면 그 목록으로 간다 — 보기만 하는 숫자로 두지 않는다 */}
+            {tiles.map((t) => (
+              <Link key={t.label} href={t.href} className={cx("pressable rounded-2xl px-2.5 py-2 transition-colors md:px-4 md:py-2.5", t.hot ? "bg-white text-ink" : "bg-white/12 hover:bg-white/20")}>
+                <div className={cx("truncate text-[0.7rem] font-bold md:text-[0.75rem]", t.hot ? "text-accent" : "text-white/80")}><span className="md:hidden">{t.short}</span><span className="hidden md:inline">{t.label}</span></div>
+                <div className={cx("tnum mt-0.5 text-[1.35rem] font-extrabold leading-none md:text-[1.6rem]", t.hot && "text-accent")}>{t.value}</div>
+              </Link>
+            ))}
           </div>
         </div>
       </div>
 
-      <div className="relative mt-5 grid grid-cols-4 gap-1.5 md:gap-2" data-testid="growth-tiles">
-        {/* 숫자를 누르면 그 목록으로 간다 — 보기만 하는 숫자로 두지 않는다 */}
-        {tiles.map((t) => (
-          <Link key={t.label} href={t.href} className={cx("pressable rounded-2xl px-2.5 py-2.5 ring-1 transition-colors md:px-4 md:py-3", t.hot ? "bg-highlight/15 ring-highlight/30 hover:bg-highlight/20" : "bg-white/[0.06] ring-white/10 hover:bg-white/[0.1]")}>
-            <div className="truncate text-[0.72rem] font-bold text-shell-text-3 md:text-[0.75rem]"><span className="md:hidden">{t.short}</span><span className="hidden md:inline">{t.label}</span></div>
-            <div className={cx("tnum mt-1 text-[1.35rem] font-extrabold leading-none md:text-[1.7rem]", t.hot ? "text-highlight" : "text-shell-text")}>{t.value}</div>
-          </Link>
-        ))}
+      {/* 떠 있는 카드 — 진행 추적 · 담당 컨설턴트 */}
+      <div className="relative z-[1] mx-4 -mt-11 grid gap-3 md:mx-6 md:-mt-14 lg:grid-cols-[1.45fr_1fr] lg:items-start">
+        <div className="card p-4 md:p-5">
+          {active.length === 0 ? (
+            <Link href="/portal/services" className="flex items-center gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-soft text-accent"><Sparkles size={20} /></span>
+              <span className="min-w-0 flex-1"><b className="block">진행 중인 과제가 없습니다</b><span className="text-[0.82rem] text-ink-2">담당 컨설턴트와 함께 검토할 과제를 보세요</span></span>
+              <ChevronRight size={18} className="shrink-0 text-ink-3" />
+            </Link>
+          ) : (
+            <div className="space-y-3">
+              {active.map((it, i) => <Tracker key={it.project!.id} it={it} big={i === 0} />)}
+              {board.active.length > active.length && <Link href="/portal/projects" className="link-more block">진행 중인 과제 {board.active.length - active.length}건 더 보기 →</Link>}
+            </div>
+          )}
+        </div>
+
+        {/* 담당 컨설턴트 — 누구에게 물으면 되는지가 늘 보이게. 휴대폰은 한 줄(이름 + 둥근 버튼 둘)로 낮게 — 아이콘 메뉴가 첫 화면에 들어오게 */}
+        <div className="card p-3.5 md:p-5" data-testid="hero-consultant">
+          <div className="flex items-center gap-3">
+            <Avatar name={consultant?.name ?? "K"} size={44} />
+            <div className="min-w-0 flex-1 leading-tight">
+              <div className="text-[0.72rem] font-bold text-ink-3">담당 컨설턴트</div>
+              <div className="mt-0.5 truncate text-[1.02rem] font-bold">{consultant ? `${consultant.name} ${consultant.title}` : "배정 전"}</div>
+            </div>
+            <div className="flex shrink-0 gap-2 md:hidden">
+              <Link href="/portal/inquiries" aria-label="문의하기" className="pressable flex h-11 w-11 items-center justify-center rounded-full bg-accent text-accent-ink"><MessageSquare size={18} /></Link>
+              {consultant?.phone
+                ? <a href={`tel:${consultant.phone.replace(/[^0-9+]/g, "")}`} aria-label="전화" className="pressable flex h-11 w-11 items-center justify-center rounded-full border border-line-2 text-ink"><Phone size={18} /></a>
+                : <Link href="/portal/schedule" aria-label="일정" className="pressable flex h-11 w-11 items-center justify-center rounded-full border border-line-2 text-ink"><CalendarDays size={18} /></Link>}
+            </div>
+          </div>
+          {next && (
+            <Link href="/portal/schedule" className="mt-3 hidden items-center gap-2 rounded-2xl bg-surface-2 px-3 py-2.5 text-[0.82rem] hover:bg-line/60 md:flex">
+              <CalendarDays size={15} className="shrink-0 text-accent" />
+              <span className="min-w-0 flex-1 truncate">다음 일정 <b>{fmtDate(next.start)} {fmtTime(next.start)}</b> · {next.title.replace(c.name, "").trim()}</span>
+            </Link>
+          )}
+          <div className="mt-3 hidden grid-cols-2 gap-2 md:grid">
+            <Link href="/portal/inquiries" className="pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full bg-accent px-3 text-[0.88rem] font-bold text-accent-ink hover:brightness-110"><MessageSquare size={16} /> 문의하기</Link>
+            {consultant?.phone
+              ? <a href={`tel:${consultant.phone.replace(/[^0-9+]/g, "")}`} className="pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full border border-line-2 px-3 text-[0.88rem] font-bold hover:bg-surface-2"><Phone size={16} /> 전화</a>
+              : <Link href="/portal/schedule" className="pressable inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full border border-line-2 px-3 text-[0.88rem] font-bold hover:bg-surface-2"><CalendarDays size={16} /> 일정</Link>}
+          </div>
+        </div>
       </div>
     </section>
   );
 }
 
-/* ------------------------------ 성장 플랫폼 — 한눈에 들어가는 메뉴판 ------------------------------ */
+/** 진행 추적 — 자료 요청 · 자료 검토 · 진행 · 완료 네 점 중 지금 어디인지 (배달 앱의 주문 추적처럼) */
+function Tracker({ it, big }: { it: Board["active"][number]; big: boolean }) {
+  const step = it.project ? stageToCustomerStep(it.project.stage) : 0;
+  const ms = it.project?.nextMilestone;
+  return (
+    <Link href={`/portal/projects?p=${it.project!.id}`} data-growth-active={it.area} className={cx("block", !big && "border-t border-line pt-3")}>
+      <div className="flex items-center gap-3">
+        {big && <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-soft text-accent"><TrendingUp size={20} /></span>}
+        <span className="min-w-0 flex-1 leading-tight">
+          <b className={cx("block truncate", big ? "text-[1.05rem]" : "text-[0.92rem]")}>{it.area}</b>
+          <span className="mt-0.5 block truncate text-[0.8rem] text-ink-2">지금 <b className="text-accent">{it.stepLabel}</b> 단계{ms?.label ? ` · 다음 ${ms.label}${ms.date ? ` ${fmtDate(ms.date)}` : ""}` : ""}</span>
+        </span>
+        <span className="tnum shrink-0 text-[1.2rem] font-extrabold text-accent">{it.progress}%</span>
+      </div>
+      <ol className="mt-3 flex items-start" aria-label={`${it.area} 진행 단계`}>
+        {CUSTOMER_STEPS.map((s, i) => (
+          <li key={s.key} className="flex min-w-0 flex-1 flex-col items-center gap-1 text-center" aria-current={i === step ? "step" : undefined}>
+            <span className="relative flex w-full items-center justify-center">
+              {i > 0 && <span className={cx("absolute right-1/2 top-1/2 h-[3px] w-full -translate-y-1/2", i <= step ? "bg-accent" : "bg-line")} />}
+              <span className={cx("relative z-[1] flex h-5 w-5 items-center justify-center rounded-full", i < step ? "bg-accent text-accent-ink" : i === step ? "bg-surface ring-[5px] ring-accent" : "bg-line")}>{i < step && <Check size={12} strokeWidth={3} />}</span>
+            </span>
+            {big && <span className={cx("w-full truncate px-0.5 text-[0.68rem] font-semibold", i === step ? "text-accent" : i < step ? "text-ink-2" : "text-ink-3")}>{s.label.replace(" 중", "")}</span>}
+          </li>
+        ))}
+      </ol>
+    </Link>
+  );
+}
 
-/** 메뉴판과 각 화면 위 길잡이가 같은 색을 쓴다 — 어디에 있는지 색으로도 안다 */
+/* ------------------------------ 바로 가기 — 앱 첫 화면의 아이콘 메뉴 ------------------------------ */
+
+/** 아이콘 메뉴와 각 화면 위 길잡이가 같은 색을 쓴다 — 어디에 있는지 색으로도 안다 */
 export const HUB_TONE: Record<string, string> = {
   "/portal/projects": "bg-[#e8f0ff] text-[#2f5bd3]",
   "/portal/documents": "bg-[#fff1e6] text-[#c25a12]",
@@ -116,7 +162,7 @@ export const HUB_TONE: Record<string, string> = {
   "/portal/services": "bg-[#f3ecff] text-[#6b3fd1]",
   "/portal/results": "bg-[#e9f7f7] text-[#13807f]",
   "/portal/inquiries": "bg-[#fdecef] text-[#c0304a]",
-  "/portal/schedule": "bg-[#eef1f5] text-[#4a5568]",
+  "/portal/schedule": "bg-[#eef3fb] text-[#3b5b8c]",
   "/portal/notifications": "bg-[#eef1f5] text-[#4a5568]",
   "/portal/me": "bg-[#eef1f5] text-[#4a5568]",
   "/portal/company": "bg-[#fff4e5] text-[#a8541e]",
@@ -126,36 +172,47 @@ export function PortalHub({ company: c, board }: { company: Company; board: Boar
   const st = useStore();
   const programs = useMemo(() => programsForCompany(openOnly(st.programs), c.id, profileOfCompany(c)), [st.programs, c]);
   const docsOpen = st.docRequests.filter((d) => d.companyId === c.id && (d.status === "requested" || d.status === "revision")).length;
-  const proposals = st.opportunities.filter((o) => o.companyId === c.id && o.source === "proposal" && o.status !== "dropped").length;
-  const results = st.results.filter((r) => r.companyId === c.id).length;
-  const openIq = st.inquiries.filter((i) => i.companyId === c.id && i.status === "open").length;
-  const progTotal = programs.sent.length + programs.matches.length;
-  const progUrgent = [...programs.sent, ...programs.matches].filter((m) => m.deadline.urgent).length;
-  const items: { href: string; label: string; icon: React.ReactNode; tone: string; big: string; sub: string; hot?: boolean }[] = [
-    { href: "/portal/projects", label: "성장과제", icon: <TrendingUp size={18} />, tone: HUB_TONE["/portal/projects"], big: `${board.active.length}`, sub: board.active.length ? "진행 중" : "진행 중인 과제 없음" },
-    { href: "/portal/documents", label: "요청자료", icon: <FolderUp size={18} />, tone: HUB_TONE["/portal/documents"], big: `${docsOpen}`, sub: docsOpen ? "제출할 자료" : "모두 제출함", hot: docsOpen > 0 },
-    { href: "/portal/programs", label: "지원사업", icon: <Megaphone size={18} />, tone: HUB_TONE["/portal/programs"], big: `${progTotal}`, sub: progUrgent ? `마감 임박 ${progUrgent}` : "맞는 공고", hot: programs.sent.length > 0 },
-    { href: "/portal/services", label: "함께 검토", icon: <Sparkles size={18} />, tone: HUB_TONE["/portal/services"], big: `${proposals + board.suggested.length}`, sub: proposals ? `담당자 제안 ${proposals}` : "검토해 볼 과제" },
-    { href: "/portal/results", label: "완료자료", icon: <FileCheck2 size={18} />, tone: HUB_TONE["/portal/results"], big: `${results}`, sub: "받은 결과물" },
-    { href: "/portal/inquiries", label: "문의", icon: <MessageSquare size={18} />, tone: HUB_TONE["/portal/inquiries"], big: `${openIq}`, sub: openIq ? "답변 기다리는 중" : "궁금하면 바로" },
+  // 담당자가 올린 제안 중 아직 답하지 않은 것
+  const proposals = board.proposed.length;
+  // 빨간 숫자는 "고객이 할 것"에만 — 낼 자료 · 담당자가 보낸 공고 · 담당자 제안
+  const items: { href: string; label: string; icon: React.ReactNode; badge?: number }[] = [
+    { href: "/portal/documents", label: "자료제출", icon: <FolderUp size={22} />, badge: docsOpen },
+    { href: "/portal/projects", label: "진행현황", icon: <Briefcase size={22} /> },
+    { href: "/portal/schedule", label: "일정", icon: <CalendarDays size={22} /> },
+    { href: "/portal/inquiries", label: "문의하기", icon: <MessageSquare size={22} /> },
+    { href: "/portal/results", label: "완료자료", icon: <FileCheck2 size={22} /> },
+    { href: "/portal/programs", label: "지원사업", icon: <Megaphone size={22} />, badge: programs.sent.length },
+    { href: "/portal/services", label: "함께 검토", icon: <Sparkles size={22} />, badge: proposals },
+    { href: "/portal/company", label: "우리 회사", icon: <Building2 size={22} /> },
   ];
   return (
-    // PC는 위 메뉴줄에 같은 메뉴가 늘 보인다 — 메뉴판은 휴대폰에서만, 한 칸을 낮게
-    <section data-testid="portal-hub" className="lg:hidden">
-      <h2 className="mb-2.5 px-0.5 text-[1.1rem] font-bold">바로 가기</h2>
-      <div className="grid grid-cols-2 gap-2">
+    // PC는 위 메뉴줄에 같은 메뉴가 늘 보인다 — 아이콘 메뉴는 휴대폰·태블릿에서만
+    <nav data-testid="portal-hub" aria-label="바로 가기" className="lg:hidden">
+      <ul className="grid grid-cols-4 gap-x-1 gap-y-3">
         {items.map((it) => (
-          <Link key={it.href} href={it.href} data-hub={it.label}
-            className={cx("card card-hover flex items-center gap-2.5 px-3 py-2.5", it.hot && "ring-1 ring-accent/40")}>
-            <span className={cx("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl", it.tone)}>{it.icon}</span>
-            <span className="min-w-0 flex-1 leading-tight">
-              <span className="flex items-baseline justify-between gap-1"><span className="truncate text-[0.85rem] font-bold">{it.label}</span><span className={cx("tnum text-[1.05rem] font-extrabold", it.hot && "text-accent")}>{it.big}</span></span>
-              <span className={cx("mt-0.5 block truncate text-[0.72rem]", it.hot ? "font-semibold text-accent" : "text-ink-3")}>{it.sub}</span>
-            </span>
-          </Link>
+          <li key={it.href}>
+            <Link href={it.href} data-hub={it.label} className="pressable flex flex-col items-center gap-1.5 rounded-2xl py-1 text-center">
+              <span className={cx("relative flex h-[3.4rem] w-[3.4rem] items-center justify-center rounded-[1.15rem]", HUB_TONE[it.href])}>
+                {it.icon}
+                {!!it.badge && <span className="tnum absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-error px-1 text-[0.66rem] font-bold text-white ring-2 ring-canvas">{it.badge}</span>}
+              </span>
+              <span className="text-[0.74rem] font-semibold text-ink-2">{it.label}</span>
+            </Link>
+          </li>
         ))}
-      </div>
-    </section>
+      </ul>
+    </nav>
+  );
+}
+
+/** 담당자가 "꼭 읽어 주세요"로 고정한 공지 — 홈에서는 한 줄 띠로 */
+export function PinnedStrip({ title, more }: { title: string; more: number }) {
+  return (
+    <Link href="/portal/schedule#notices" data-testid="pinned-strip" className="pressable flex items-center gap-3 rounded-2xl bg-soft px-4 py-3 ring-1 ring-accent/15">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface text-accent"><Pin size={15} /></span>
+      <span className="min-w-0 flex-1 leading-tight"><span className="block text-[0.7rem] font-bold text-accent">담당자 공지{more > 0 ? ` · ${more + 1}건` : ""}</span><span className="block truncate text-[0.9rem] font-semibold">{title}</span></span>
+      <ChevronRight size={17} className="shrink-0 text-ink-3" />
+    </Link>
   );
 }
 
@@ -168,23 +225,24 @@ export function ProgramsPreview({ company: c }: { company: Company }) {
   if (!ms.length) return null;
   const urgent = ms.filter((m) => m.deadline.urgent).length;
   return (
-    <section className="card p-5" data-testid="program-teaser">
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#eafaf1] text-[#1f8a4c]"><Megaphone size={18} /></span>
-        <h2 className="text-[1.1rem] font-bold">우리 회사에 맞는 지원사업 {ms.length}건</h2>
-        {sent.length > 0 && <span className="rounded-full bg-soft px-2.5 py-0.5 text-[0.78rem] font-bold text-accent">담당자 추천 {sent.length}건</span>}
-        {urgent > 0 && <span className="text-[0.82rem] font-semibold text-error">마감 임박 {urgent}</span>}
-        <Link href="/portal/programs" className="link-more ml-auto">전체 보기 →</Link>
+    <section data-testid="program-teaser">
+      <div className="mb-2.5 flex items-end gap-2 px-0.5">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-[1.1rem] font-bold">우리 회사에 맞는 지원사업 {ms.length}건</h2>
+          <p className="text-[0.78rem] text-ink-3">{sent.length > 0 ? `담당자 추천 ${sent.length}건 · ` : ""}{urgent > 0 ? <span className="font-semibold text-error">마감 임박 {urgent}건 · </span> : null}실제 공고 · 자격은 담당자가 확인합니다</p>
+        </div>
+        <Link href="/portal/programs" className="link-more shrink-0">전체 보기 →</Link>
       </div>
-      <div className="grid gap-2 md:grid-cols-3">
-        {ms.slice(0, 3).map((m) => (
-          <Link key={m.program.id} href="/portal/programs" className="flex flex-col rounded-2xl border border-line p-3.5 hover:border-accent">
+      {/* 휴대폰: 옆으로 넘기는 카드 / PC: 세 칸 */}
+      <div className="snap-row hide-scrollbar -mx-4 flex gap-3 overflow-x-auto px-4 pb-1 md:mx-0 md:grid md:grid-cols-3 md:overflow-visible md:px-0">
+        {ms.slice(0, 6).map((m, i) => (
+          <Link key={m.program.id} href="/portal/programs" className={cx("card card-hover flex w-[78%] shrink-0 flex-col p-4 md:w-auto", i >= 3 && "md:hidden")}>
             <div className="flex items-center gap-1.5 text-[0.72rem] font-bold">
-              <span className={cx("rounded-md px-1.5 py-0.5", m.deadline.urgent ? "bg-error-bg text-error" : "bg-surface-2 text-ink-2")}>{m.deadline.label}</span>
-              {sent.includes(m) && <span className="rounded-md bg-soft px-1.5 py-0.5 text-accent">담당자 추천</span>}
+              <span className={cx("rounded-full px-2 py-0.5", m.deadline.urgent ? "bg-error-bg text-error" : "bg-[#eafaf1] text-[#1f6f42]")}>{m.deadline.label}</span>
+              {sent.includes(m) && <span className="rounded-full bg-soft px-2 py-0.5 text-accent">담당자 추천</span>}
             </div>
-            <div className="mt-2 line-clamp-2 text-[0.9rem] font-semibold leading-snug">{m.program.title}</div>
-            <div className="mt-auto pt-2 text-[0.75rem] text-ink-3">{m.program.agency}</div>
+            <div className="mt-2.5 line-clamp-2 text-[0.95rem] font-bold leading-snug">{m.program.title}</div>
+            <div className="mt-auto flex items-center gap-1 pt-3 text-[0.75rem] text-ink-3"><Megaphone size={12} className="shrink-0" /><span className="truncate">{m.program.agency}</span></div>
           </Link>
         ))}
       </div>

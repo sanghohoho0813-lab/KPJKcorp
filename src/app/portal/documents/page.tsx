@@ -5,7 +5,8 @@ import { FileText, FolderUp, Upload } from "lucide-react";
 import { useStore, usePortalCompanyId } from "@/lib/store";
 import { daysBetween, fmtDate, fmtDateTime, fmtSize, relativeDay } from "@/lib/format";
 import type { DocumentRequest } from "@/lib/types";
-import { Badge, Button, Card, EmptyState, KpiCard, PageHeader, SegmentedControl, cx } from "@/components/ui/ui";
+import { Badge, Button, Card, EmptyState, PageHeader, SegmentedControl, cx } from "@/components/ui/ui";
+import { StatStrip } from "@/components/domain/portal/StatStrip";
 import { Modal } from "@/components/ui/overlay";
 import { DocStatusBadge } from "@/components/domain/domain";
 import { UploadModal } from "@/components/domain/DocActions";
@@ -42,11 +43,13 @@ export default function PortalDocumentsPage() {
   return (
     <div>
       <PageHeader title="요청자료 제출" desc="검토에 필요한 파일을 상태별로 확인하고 업로드하세요. 제출하면 담당 컨설턴트에게 바로 전달됩니다." actions={todo[0] && <Button variant="accent" icon={<Upload size={16} />} onClick={() => setUpload(todo[0])}>파일 업로드</Button>} />
-      <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <KpiCard label="미제출" value={todo.filter((d) => d.status === "requested").length} sub={todo.some((d) => daysBetween(d.dueDate, now) > 0) ? "기한 지난 자료 있음" : "기한 내"} tone={todo.length ? "error" : undefined} />
-        <KpiCard label="제출완료" value={submitted.length + docs.filter((d) => d.status === "done").length} sub="담당자에게 전달됨" />
-        <KpiCard label="검토중" value={reviewing.length} sub="담당 컨설턴트 확인 중" />
-        <KpiCard label="보완필요" value={revision.length} sub="재제출 필요" tone={revision.length ? "error" : undefined} />
+      <div className="mb-5">
+        <StatStrip items={[
+          { label: "미제출", value: todo.filter((d) => d.status === "requested").length, tone: "error", note: todo.some((d) => daysBetween(d.dueDate, now) > 0) ? "기한 지남" : undefined },
+          { label: "제출완료", value: submitted.length + docs.filter((d) => d.status === "done").length },
+          { label: "검토중", value: reviewing.length, tone: "accent" },
+          { label: "보완필요", value: revision.length, tone: "error" },
+        ]} />
       </div>
       {!otherUrgent && policyCard}
       {hasPolicy && <h2 className="mb-2 text-[1.05rem] font-bold">그 밖의 요청자료</h2>}

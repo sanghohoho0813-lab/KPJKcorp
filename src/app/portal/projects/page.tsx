@@ -32,7 +32,7 @@ function Inner() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="프로젝트 진행 Timeline" desc={`${c.name} ${p.name}${p.type && !p.name.includes(p.type) ? ` (${p.type})` : ""} 프로젝트의 현재 위치를 한눈에 확인합니다.`} badge={<Badge tone="accent">현재 단계: {CUSTOMER_STEPS[step].label}</Badge>} actions={projects.length > 1 ? <SegmentedControl size="sm" value={p.id} onChange={setSel} options={projects.map((x) => ({ key: x.id, label: x.name }))} /> : undefined} />
+      <PageHeader title="프로젝트 진행현황" desc={`${c.name} ${p.name}${p.type && !p.name.includes(p.type) ? ` (${p.type})` : ""} 프로젝트의 현재 위치를 한눈에 확인합니다.`} badge={<Badge tone="accent">현재 단계: {CUSTOMER_STEPS[step].label}</Badge>} actions={projects.length > 1 ? <SegmentedControl size="sm" value={p.id} onChange={setSel} options={projects.map((x) => ({ key: x.id, label: x.name }))} /> : undefined} />
 
       {/* SIGNATURE 04 — Client Journey Timeline */}
       <Card className="p-5 md:p-8" id="tut-p-timeline">

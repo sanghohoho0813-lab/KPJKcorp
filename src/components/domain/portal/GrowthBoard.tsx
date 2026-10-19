@@ -3,7 +3,7 @@
 import { CancelRequestButton, OnBehalfNote, useOnBehalf } from "./CancelRequest";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ArrowRight, CalendarDays, Check, CheckCircle2, ChevronRight, FileCheck2, FolderUp, MessageSquarePlus, Receipt, Sparkles, ThumbsUp, TrendingUp } from "lucide-react";
+import { ArrowRight, CalendarDays, Check, CheckCircle2, FileCheck2, FolderUp, MessageSquarePlus, Receipt, Sparkles, ThumbsUp, TrendingUp } from "lucide-react";
 import { useStore, useCurrentUser } from "@/lib/store";
 import { growthBoard, type GrowthItem, type NowAction } from "@/lib/growth";
 import { ENTITY_TYPES, yearsSince, EMPLOYEE_BANDS } from "@/lib/company-options";
@@ -67,33 +67,49 @@ export function CompanyStatusCard({ company: c, board, greeting, footer }: { com
 /* ------------------------------ 지금 해야 할 일 ------------------------------ */
 
 const ACTION_ICON: Record<NowAction["kind"], React.ReactNode> = {
-  doc: <FolderUp size={17} />, quote: <Receipt size={17} />, proposal: <Sparkles size={17} />, schedule: <CalendarDays size={17} />, result: <FileCheck2 size={17} />,
+  doc: <FolderUp size={19} />, quote: <Receipt size={19} />, proposal: <Sparkles size={19} />, schedule: <CalendarDays size={19} />, result: <FileCheck2 size={19} />,
+};
+/** 줄 오른쪽 버튼 말 — 누르면 무엇을 하는지 (배달 앱의 "다시 주문"·"주문 추적"처럼 한 단어) */
+const ACTION_CTA: Record<NowAction["kind"], string> = { doc: "올리기", quote: "회신", proposal: "보기", schedule: "일정", result: "보기" };
+const ACTION_TONE: Record<NowAction["kind"], string> = {
+  doc: "bg-[#fff1e6] text-[#c25a12]", quote: "bg-[#e8f0ff] text-[#2f5bd3]", proposal: "bg-[#f3ecff] text-[#6b3fd1]", schedule: "bg-[#eef3fb] text-[#3b5b8c]", result: "bg-[#e9f7f7] text-[#13807f]",
 };
 
 export function NowActions({ actions, companyId }: { actions: NowAction[]; companyId: string }) {
   const docs = useStore((s) => s.docRequests);
   const [upload, setUpload] = useState<DocumentRequest | null>(null);
   return (
-    <Card className="scroll-mt-20 p-5" id="tut-p-actions">
-      <div className="mb-3 flex items-center justify-between"><h2 className="text-[1.1rem] font-bold">지금 해야 할 일</h2><span className="text-[0.8rem] text-ink-3">누르면 바로 할 수 있습니다</span></div>
+    <Card className="scroll-mt-20 overflow-hidden" id="tut-p-actions">
+      <div className="flex items-center justify-between gap-2 px-5 pb-2 pt-4">
+        <h2 className="text-[1.1rem] font-bold">지금 해야 할 일{actions.length > 0 && <span className="tnum ml-1.5 text-accent">{actions.length}</span>}</h2>
+        <span className="text-[0.75rem] text-ink-3">누르면 바로 할 수 있습니다</span>
+      </div>
       {actions.length === 0 ? (
-        <div className="flex items-center gap-2 rounded-xl bg-success-bg px-4 py-3 text-[0.9rem] font-semibold text-success"><CheckCircle2 size={18} /> 지금 하실 일은 없습니다. 담당 컨설턴트가 진행하고 있습니다.</div>
+        <div className="mx-5 mb-5 flex items-center gap-2 rounded-2xl bg-success-bg px-4 py-3 text-[0.9rem] font-semibold text-success"><CheckCircle2 size={18} /> 지금 하실 일은 없습니다. 담당 컨설턴트가 진행하고 있습니다.</div>
       ) : (
-        <div className="space-y-2" data-testid="now-actions">
+        <ul className="divide-y divide-line pb-1" data-testid="now-actions">
           {actions.map((a) => {
             const doc = a.kind === "doc" && a.key.startsWith("doc_d") ? docs.find((d) => `doc_${d.id}` === a.key && d.companyId === companyId) : undefined;
             const inner = (
               <>
-                <span className={cx("flex h-9 w-9 shrink-0 items-center justify-center rounded-full", a.urgent ? "bg-error-bg text-error" : "bg-soft text-accent")}>{ACTION_ICON[a.kind]}</span>
-                <span className="min-w-0 flex-1"><span className="block truncate font-semibold">{a.title}</span>{a.sub && <span className={cx("block truncate text-[0.8rem]", a.urgent ? "font-semibold text-error" : "text-ink-3")}>{a.sub}</span>}</span>
-                <ChevronRight size={16} className="shrink-0 text-ink-3" />
+                <span className={cx("flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl", a.urgent ? "bg-error-bg text-error" : ACTION_TONE[a.kind])}>{ACTION_ICON[a.kind]}</span>
+                <span className="min-w-0 flex-1 leading-snug">
+                  <span className="line-clamp-2 font-semibold">{a.title}</span>
+                  {a.sub && <span className={cx("mt-0.5 flex items-center gap-1 truncate text-[0.8rem]", a.urgent ? "font-semibold text-error" : "text-ink-3")}>{a.urgent && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-error" />}<span className="truncate">{a.sub}</span></span>}
+                </span>
+                <span className={cx("shrink-0 rounded-full px-3.5 py-1.5 text-[0.8rem] font-bold", a.urgent || a.kind === "doc" ? "bg-accent text-accent-ink" : "bg-surface-2 text-ink")}>{ACTION_CTA[a.kind]}</span>
               </>
             );
-            return doc
-              ? <button key={a.key} type="button" onClick={() => setUpload(doc)} className="pressable flex w-full items-center gap-3 rounded-xl border border-line px-3.5 py-2.5 text-left hover:border-accent">{inner}</button>
-              : <Link key={a.key} href={a.href} className="flex items-center gap-3 rounded-xl border border-line px-3.5 py-2.5 hover:border-accent">{inner}</Link>;
+            const cls = "pressable flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-surface-2/70";
+            return (
+              <li key={a.key}>
+                {doc
+                  ? <button type="button" onClick={() => setUpload(doc)} className={cls}>{inner}</button>
+                  : <Link href={a.href} className={cls}>{inner}</Link>}
+              </li>
+            );
           })}
-        </div>
+        </ul>
       )}
       <UploadModal req={upload} open={!!upload} onClose={() => setUpload(null)} />
     </Card>

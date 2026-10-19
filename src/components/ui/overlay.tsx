@@ -75,7 +75,7 @@ export function Modal({ open, onClose, title, children, footer, size = "md", id,
   return createPortal(
     <div className="fixed inset-0 z-[60] flex items-end justify-center p-0 md:items-center md:p-6" role="dialog" aria-modal="true" id={id}>
       <div className="anim-fade absolute inset-0 bg-black/45" onClick={soft} />
-      <div ref={panel} className={cx("anim-pop relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl bg-surface shadow-2xl md:rounded-2xl", w)}>
+      <div ref={panel} className={cx("modal-panel anim-pop relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl bg-surface shadow-2xl md:rounded-2xl", w)}>
         <KeepOpenHint n={nudge} />
         {title !== undefined && (
           <div className="flex items-center justify-between gap-2 border-b border-line px-5 py-4">
