@@ -8,6 +8,7 @@
 //  9) 공고 신청 묶음: 서류함 파일 → 신청일 기준 상태 → 공고문 서류 더하기 → zip(번호·서류명 + 서류목록) → 모자란 서류 요청(기한은 신청일 앞)
 // 10) 경과 보고: 기업 상세 빠른 작업 → 기간 · 줄 고르기 · 한마디 → 미리 보기 · 카톡용 복사 → 고객에게 보내기(공지 · 홈 맨 위) → 고객 화면
 // 11) 앱 안에서 넘어올 때 주소의 탭 · 창 열기(?tab= · ?kit= · ?report=1 · 지원사업 ?tab=leads) — 새로 고침 없이도 맞는 화면
+// 12) 경과 보고 미확인 → 확인 연락 업무(규칙) → 대표가 보면 업무 자동 완료
 // 실행: npm run build && npm start (데모 모드) → node tools/acceptance/daily.mjs
 import fs from 'fs';
 import { execFileSync } from 'child_process';
@@ -540,6 +541,51 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
   await push('/ax/programs?tab=leads');
   ok('11 지원사업 ?tab=leads → 가망고객 탭', (await page.getByRole('tab', { name: /가망고객/ }).getAttribute('aria-selected')) === 'true');
   ok('11 페이지 오류 없음', page.errs.length === 0, page.errs.slice(0, 2).join(' | '));
+}
+
+// ---------- 경과 보고 미확인 → 확인 연락 (보낸 지 4일 → 업무 → 대표가 보면 자동 완료) ----------
+{
+  const page = await session('pc', ['ceo@kpjk.co.kr', 'kpjk2026!']);
+  const dlg = () => page.locator('[role=dialog]:visible').last();
+  const storeKey = await page.evaluate(() => Object.keys(localStorage).find((k) => { try { return !!JSON.parse(localStorage.getItem(k) ?? 'null')?.state; } catch { return false; } }));
+  const relogin = async (id, pwd, to) => {
+    await page.evaluate((key) => { const s = JSON.parse(localStorage.getItem(key)); s.state.session = null; localStorage.setItem(key, JSON.stringify(s)); }, storeKey);
+    await page.goto(B + '/login', { waitUntil: 'networkidle' });
+    await page.getByLabel('아이디 (이메일)').fill(id);
+    await page.locator('input[type=password]').first().fill(pwd);
+    await page.getByRole('button', { name: '로그인' }).click();
+    await page.waitForURL(to); await sleep(1200);
+    await page.getByRole('button', { name: /건너뛰기/ }).first().click({ timeout: 800 }).catch(() => {});
+    await page.getByLabel(/튜토리얼 닫기|이용 안내 닫기/).click({ timeout: 800 }).catch(() => {});
+  };
+  await go(page, '/ax/clients/co_a');
+  await page.getByTestId('client-quick-actions').getByRole('button', { name: '경과 보고' }).click(); await sleep(500);
+  await dlg().getByRole('button', { name: '고객에게 보내기' }).click(); await sleep(600);
+  let st = await dump(page);
+  const rep = st.notices.filter((n) => n.companyId === 'co_a' && n.title.startsWith('경과 보고')).sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))[0];
+  await go(page, '/ax/tasks'); await sleep(2200);
+  st = await dump(page);
+  ok('12 보낸 날에는 확인 연락 업무 없음', !st.tasks.some((t) => t.ruleKey === `report_unseen:${rep.id}`));
+  // 4일 전에 보낸 것으로 — 저장된 상태의 게시 시각만 당긴다
+  await page.evaluate(([key, id]) => { const s = JSON.parse(localStorage.getItem(key)); const n = s.state.notices.find((x) => x.id === id); n.publishedAt = new Date(Date.now() - 4 * 864e5).toISOString(); localStorage.setItem(key, JSON.stringify(s)); }, [storeKey, rep.id]);
+  await go(page, '/ax/tasks'); await sleep(2500);
+  st = await dump(page);
+  const task = st.tasks.find((t) => t.ruleKey === `report_unseen:${rep.id}`);
+  ok('12 4일 미확인 → 담당자 확인 연락 업무', task?.status === 'todo' && task.type === '후속연락' && task.assigneeId === 'u_park' && /경과 보고 4일 미확인 — 확인 연락/.test(task.title), task?.title);
+  await page.getByRole('button', { name: '미완료', exact: true }).click(); await sleep(400);
+  ok('12 업무함(미완료)에 규칙 배지 · 보고 확인', await page.locator('div', { hasText: task?.title ?? '-' }).getByText('규칙 · 보고 확인').first().isVisible().catch(() => false));
+  // 대표(고객)가 본다 → 담당자 화면에서 업무가 저절로 끝남
+  await relogin('ceo@a-precision.demo', 'client2026!', /\/portal/);
+  await go(page, '/portal/schedule');
+  // 4일 전 보고는 다른 고정 공지 아래에 있다 — 대표가 내려서 끝까지 읽는다
+  await page.locator('#notices [data-seen-mark]').first().scrollIntoViewIfNeeded(); await sleep(2000);
+  ok('12 고객이 내려 읽으면 확인 기록', (await dump(page)).activities.some((a) => a.type === 'notice_read' && a.meta?.noticeId === rep.id));
+  await relogin('ceo@kpjk.co.kr', 'kpjk2026!', /\/ax\//);
+  await go(page, '/ax/tasks'); await sleep(2500);
+  st = await dump(page);
+  const after = st.tasks.filter((t) => t.ruleKey === `report_unseen:${rep.id}`);
+  ok('12 대표가 보면 확인 연락 업무 자동 완료 · 다시 안 만듦', after.length === 1 && after[0].status === 'done' && st.activities.some((a) => a.type === 'task_completed' && a.text.includes('대표가 경과 보고 확인')));
+  ok('12 페이지 오류 없음', page.errs.length === 0, page.errs.slice(0, 2).join(' | '));
 }
 
 await browser.close();

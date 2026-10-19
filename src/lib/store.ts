@@ -49,7 +49,7 @@ import type {
 import { nowIso, uid, addDays, iso, daysBetween, fmtDate } from "./format";
 import { followKey, type FollowKind } from "./consult-followups";
 import { contactStatus, daysSince } from "./contact";
-import { REPORT_PREFIX, lastReportFor, localDay } from "./progress-report";
+import { REPORT_PREFIX, lastReportFor, localDay, reportSeenAt } from "./progress-report";
 import { guessTaskType } from "./quick-task";
 import { CUSTOMER_STEPS, stageLabel, stageToCustomerStep } from "./stages";
 import { RULE_BY_KEY, ruleDays, ruleOn } from "./rules";
@@ -1244,8 +1244,29 @@ export const useStore = create<StoreState>()(
           }
         }
 
-        if (made.length === 0) return 0;
-        set({ tasks: [...made, ...st.tasks], activities: [...acts, ...st.activities] });
+        // 8) 경과 보고 N일(기본 3) 미확인 → 확인 연락. 고객 계정이 있어야 볼 수 있으니 계정 있는 기업만, 가장 최근 보고만.
+        if (on("report_unseen")) {
+          const n = N("report_unseen");
+          for (const c of st.companies) {
+            if (c.archived || !c.consultantId) continue;
+            if (!st.users.some((u) => u.role === "client" && u.companyId === c.id && u.active !== false)) continue;
+            const last = lastReportFor(st.notices, c.id);
+            if (!last || reportSeenAt(st.activities, last.id)) continue;
+            const d = daysSince(last.publishedAt, now);
+            if (d < n) continue;
+            const key = `report_unseen:${last.id}`;
+            if (has(key)) continue;
+            push({ companyId: c.id, title: `${c.name} ${REPORT_PREFIX} ${d}일 미확인 — 확인 연락`, type: "후속연락", dueDate: iso(addDays(now, 1, 18)), assigneeId: c.consultantId, priority: "normal", ruleKey: key, memo: `'${last.title}'을(를) 대표가 아직 열어 보지 않았습니다. 카톡으로 한 번 더 알리거나 짧게 통화합니다. 대표가 보면 이 업무는 끝납니다.` }, lbl("report_unseen"));
+          }
+        }
+        // 대표가 나중에 본 보고의 '확인 연락' 업무는 저절로 끝낸다 — 할 일이 남아 있지 않게
+        const seenClose = st.tasks.filter((t) => t.ruleKey?.startsWith("report_unseen:") && (t.status === "todo" || t.status === "doing") && reportSeenAt(st.activities, t.ruleKey.slice("report_unseen:".length)));
+        const closedAt = nowIsoStr;
+        for (const t of seenClose) acts.push(makeActivity({ type: "task_completed", companyId: t.companyId, projectId: t.projectId, actorId: "system", actorRole: "system", text: `업무 완료(대표가 경과 보고 확인): ${t.title}` }));
+
+        if (made.length === 0 && seenClose.length === 0) return 0;
+        const closeIds = new Set(seenClose.map((t) => t.id));
+        set({ tasks: [...made, ...st.tasks.map((t) => (closeIds.has(t.id) ? { ...t, status: "done" as const, completedAt: closedAt } : t))], activities: [...acts, ...st.activities] });
         return made.length;
       },
 

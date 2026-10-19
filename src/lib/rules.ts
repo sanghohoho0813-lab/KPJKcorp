@@ -69,6 +69,13 @@ export const AUTO_RULES: AutoRuleDef[] = [
     why: "대표가 진행 상황을 모르면 중도금 · 재계약이 흔들립니다. 보고는 기록으로 채워져 확인하고 보내는 데 1~2분이면 됩니다.",
     days: { default: 14, options: [7, 14, 21, 30] },
   },
+  {
+    key: "report_unseen", short: "보고 확인",
+    label: (n) => `경과 보고 ${n}일 미확인 → 확인 연락`,
+    when: (n) => `고객 계정이 있는 기업에 보낸 가장 최근 경과 보고를 대표가 ${n}일 동안 열어 보지 않으면 '확인 연락' 업무 (대표가 보면 업무가 자동으로 끝남)`,
+    why: "보고를 보내도 읽지 않으면 진행 상황이 전해지지 않습니다. 카톡 한 줄이나 짧은 통화가 자료 제출과 재계약을 지킵니다.",
+    days: { default: 3, options: [2, 3, 5, 7] },
+  },
 ];
 
 export const RULE_BY_KEY: Record<string, AutoRuleDef> = Object.fromEntries(AUTO_RULES.map((r) => [r.key, r]));
