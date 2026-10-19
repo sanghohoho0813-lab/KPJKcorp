@@ -17,7 +17,6 @@ import {
   HelpCircle,
   LayoutDashboard,
   LogOut,
-  MoreHorizontal,
   RotateCcw,
   Settings,
   ChevronDown,
@@ -56,6 +55,7 @@ import { PasswordNudge } from "@/components/domain/MyPassword";
 import { DraftDock } from "./DraftDock";
 import { Modal, Sheet, Confirm, Drawer } from "@/components/ui/overlay";
 import { ConnectionStatus } from "./ConnectionStatus";
+import { Icon3D, type Icon3DName } from "@/components/domain/portal/Icon3D";
 import { Avatar, Badge, Button, DemoBadge, PageSkeleton, cx } from "@/components/ui/ui";
 
 interface NavItem {
@@ -466,25 +466,29 @@ function MobileMenu({ open, onClose, setPick }: { open: boolean; onClose: () => 
 function MobileNav() {
   const pathname = usePathname();
   const setMore = useUi((s) => s.setMoreSheet);
-  const items = [
-    { href: "/ax/dashboard", label: "오늘", icon: <LayoutDashboard size={22} /> },
-    { href: "/ax/clients", label: "고객", icon: <Building2 size={22} /> },
-    { href: "/ax/projects", label: "프로젝트", icon: <Briefcase size={22} /> },
-    { href: "/ax/documents", label: "자료", icon: <FolderOpen size={22} /> },
+  const items: { href: string; label: string; icon: Icon3DName }[] = [
+    { href: "/ax/dashboard", label: "오늘", icon: "ax-today" },
+    { href: "/ax/clients", label: "고객", icon: "ax-clients" },
+    { href: "/ax/projects", label: "프로젝트", icon: "ax-projects" },
+    { href: "/ax/documents", label: "자료", icon: "ax-docs" },
   ];
+  // 3D 그림 — 지금 화면만 진하게, 나머지는 흐리게(고객 화면 아래 탭과 같은 규칙).
+  // 높이는 --bottomnav-h(4rem) 안 — 설문 화면의 아래 고정 줄이 이 높이 위에 붙는다
+  const cell = "pressable flex flex-1 flex-col items-center gap-0.5 pb-0.5 pt-1 text-[0.7rem] font-semibold";
+  const pill = (on: boolean) => cx("flex h-7 w-12 items-center justify-center rounded-full transition-colors", on && "bg-soft");
   return (
-    <nav className="pb-safe fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-surface lg:hidden">
+    <nav className="pb-safe fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-surface lg:hidden" data-testid="ax-tabbar">
       {items.map((i) => {
         const active = pathname.startsWith(i.href);
         return (
-          <Link key={i.href} href={i.href} className={cx("pressable flex flex-1 flex-col items-center gap-0.5 py-2 text-[0.7rem] font-semibold", active ? "text-accent" : "text-ink-3")}>
-            {i.icon}
+          <Link key={i.href} href={i.href} aria-current={active ? "page" : undefined} className={cx(cell, active ? "font-bold text-accent" : "text-ink-3")}>
+            <span className={pill(active)}><Icon3D name={i.icon} size="1.45rem" muted={!active} /></span>
             {i.label}
           </Link>
         );
       })}
-      <button onClick={() => setMore(true)} className="pressable flex flex-1 flex-col items-center gap-0.5 py-2 text-[0.7rem] font-semibold text-ink-3">
-        <MoreHorizontal size={22} />
+      <button onClick={() => setMore(true)} className={cx(cell, "text-ink-3")}>
+        <span className={pill(false)}><Icon3D name="ax-more" size="1.45rem" muted /></span>
         더보기
       </button>
     </nav>

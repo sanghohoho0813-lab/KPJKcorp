@@ -3,7 +3,7 @@ import { cx } from "@/components/ui/ui";
 /**
  * 3D 아이콘 — 대표님이 직접 만든 점토 느낌 그림(128px webp, 개당 4~7KB).
  *  고객 화면: public/assets/portal-icons — 바로가기 · 아래 탭 · 머리글
- *  내부 AX: public/assets/ax-icons (이름 앞에 "ax-") — 대시보드 · 기업 상세의 숫자 칸
+ *  내부 AX: public/assets/ax-icons (이름 앞에 "ax-") — 대시보드 · 기업 상세의 숫자 칸 · 휴대폰 아래 탭
  * 작게 쓴다. 그림은 장식이라 읽기 도구에는 숨기고, 옆 글자가 이름을 말한다.
  * 같은 메뉴는 어디서나 같은 그림 — 아래 탭과 바로가기·내 정보 메뉴가 서로 맞는다.
  */
@@ -13,7 +13,9 @@ export type Icon3DName =
   // 내부 AX — 대시보드(오늘 할 업무 · 승인 대기 · 미답변 문의 · 자료 검토 대기 · 연락 필요)
   | "ax-tasks" | "ax-approval" | "ax-inquiry" | "ax-review" | "ax-call"
   // 내부 AX — 기업 상세(진행 프로젝트 · 자료 · 다음 일정 · 문의 · 마지막 연락)
-  | "ax-doc" | "ax-files" | "ax-deadline" | "ax-talk" | "ax-phone";
+  | "ax-doc" | "ax-files" | "ax-deadline" | "ax-talk" | "ax-phone"
+  // 내부 AX — 휴대폰 아래 탭(오늘 · 고객 · 프로젝트 · 자료 · 더보기)
+  | "ax-today" | "ax-clients" | "ax-projects" | "ax-docs" | "ax-more";
 
 /** 고객 화면 메뉴 → 그림 */
 export const PORTAL_ICON: Record<string, Icon3DName> = {
