@@ -10,6 +10,7 @@
 // 11) 앱 안에서 넘어올 때 주소의 탭 · 창 열기(?tab= · ?kit= · ?report=1 · 지원사업 ?tab=leads) — 새로 고침 없이도 맞는 화면
 // 12) 경과 보고 미확인 → 확인 연락 업무(규칙) → 대표가 보면 업무 자동 완료
 // 13) 휴대폰 화면 정리: 프로젝트 단계 칩(첫 화면에 프로젝트) · 승인 막대 접기 · 회사 정보 접기 · 막 등록한 고객의 빈 화면
+// 14) 휴대폰 더보기 = 메뉴판(맨 위 그림 칸 · 숫자 · 누르면 이동) · 대시보드 첫 화면에 숫자 칸(실증 안내는 한 줄)
 // 실행: npm run build && npm start (데모 모드) → node tools/acceptance/daily.mjs
 import fs from 'fs';
 import { execFileSync } from 'child_process';
@@ -643,6 +644,24 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
   ok('13 막 등록한 고객: 진행현황은 안내 + 문의하기', await page.getByText('아직 시작한 프로젝트가 없습니다').isVisible() && await page.getByRole('link', { name: '문의하기' }).first().isVisible());
   for (const u of ['/portal', '/portal/documents', '/portal/schedule', '/portal/results', '/portal/company']) { await go(page, u); }
   ok('13 막 등록한 고객: 고객 화면 전부 오류 없음 · 넘침 없음', page.errs.length === 0 && (await overflow(page)) <= 0, page.errs.slice(0, 2).join(' | '));
+}
+
+// ---------- 휴대폰 더보기 메뉴판 · 대시보드 첫 화면 (컨설턴트 휴대폰) ----------
+{
+  const page = await session('mobile');
+  await go(page, '/ax/dashboard');
+  await page.getByRole('button', { name: /건너뛰기/ }).first().click({ timeout: 800 }).catch(() => {});
+  const coach = page.getByTestId('coach-start');
+  ok('14 대시보드: 실증 안내는 제목 · 시작만(설명 · 왜는 PC)', await coach.getByRole('button', { name: '실증 시작' }).isVisible() && !(await coach.getByText('하루 1~3개 미션').isVisible()) && !(await coach.getByText('왜 이게 이 시스템의 핵심인가요?').isVisible()), `높이 ${Math.round((await coach.boundingBox())?.height ?? 0)}px`);
+  ok('14 대시보드: 첫 화면에 숫자 칸', (await page.locator('#tut-kpi').boundingBox())?.y < 700);
+  await page.getByRole('button', { name: '더보기' }).click(); await sleep(500);
+  const menu = page.getByTestId('more-menu');
+  const box = await menu.boundingBox();
+  ok('14 더보기: 메뉴판이 맨 위(시트 첫 화면)', !!box && box.y < 400);
+  ok('14 더보기: 아래 탭에 없는 메뉴만 · 업무함 숫자', (await menu.locator('[data-menu-tile]').count()) >= 8 && (await menu.locator('[data-menu-tile="/ax/dashboard"]').count()) === 0 && /\d+/.test(await menu.locator('[data-menu-tile="/ax/tasks"]').innerText()));
+  await menu.locator('[data-menu-tile="/ax/schedule"]').click(); await page.waitForURL(/\/ax\/schedule/); await sleep(500);
+  ok('14 더보기: 메뉴를 누르면 그 화면으로 · 시트 닫힘', /\/ax\/schedule/.test(page.url()) && (await page.getByTestId('more-menu').count()) === 0);
+  ok('14 페이지 오류 없음 · 넘침 없음', page.errs.length === 0 && (await overflow(page)) <= 0, page.errs.slice(0, 2).join(' | '));
 }
 
 await browser.close();

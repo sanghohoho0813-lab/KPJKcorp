@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import { useStore, useCurrentUser } from "@/lib/store";
 import { can, ROLE_LABEL, type Permission } from "@/lib/permissions";
+import type { Role } from "@/lib/types";
 import { useUi } from "@/lib/ui-store";
 import { useIsMobile, useIsPreviewFrame, useNow } from "@/lib/hooks";
 import { LiveClock } from "./LiveClock";
@@ -147,16 +148,35 @@ const NAV_UTILITY: NavItem[] = [
   { href: "/ax/settings", label: "설정", icon: <Settings size={18} />, id: "tut-nav-settings" },
 ];
 
-/** Routes already reachable from the mobile bottom bar — excluded from 더보기. */
-const MOBILE_PRIMARY = ["/ax/dashboard", "/ax/clients", "/ax/projects", "/ax/documents", "/ax/coach"];
-
-function NavLink({ item, color, onClick, mobile, utility }: { item: NavItem; color: string; onClick?: () => void; mobile?: boolean; utility?: boolean }) {
+/** 휴대폰 더보기 — 앱 첫 화면처럼 메뉴 그림 칸. 그룹 색 아이콘 + 짧은 이름 + 숫자 */
+function MenuTile({ item, color, onClick }: { item: NavItem; color: string; onClick: () => void }) {
   const pathname = usePathname();
   const role = useStore((s) => s.session?.role);
-  const badgeCount = useStore((s) => {
-    if (item.badge === "approvals") return s.approvals.filter((a) => a.status === "pending").length;
-    if (item.badge === "leads") return s.leads.filter((l) => l.status === "new").length;
-    if (item.badge === "tasks") {
+  const badgeCount = useNavBadge(item.badge);
+  if (item.perm && !can(role, item.perm)) return null;
+  const active = pathname === item.href || pathname.startsWith(item.href + "/");
+  return (
+    <Link href={item.href} onClick={onClick} aria-current={active ? "page" : undefined} data-menu-tile={item.href}
+      className={cx("pressable flex flex-col items-center gap-1.5 rounded-xl px-1 py-2 text-center", active ? "bg-surface-2" : "hover:bg-surface-2")}>
+      <span className="relative flex h-11 w-11 items-center justify-center rounded-2xl" style={{ color, background: `color-mix(in srgb, ${color} 13%, transparent)` }}>
+        {item.icon}
+        {badgeCount > 0 && <span className={cx("tnum absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[0.66rem] font-bold ring-2 ring-surface", item.badge === "approvals" ? "bg-accent text-accent-ink" : "bg-error text-white")}>{badgeCount}</span>}
+      </span>
+      <span className="line-clamp-2 text-[0.74rem] font-semibold leading-tight text-ink-2">{navLabel(item, role)}</span>
+    </Link>
+  );
+}
+
+/** 아래 탭에 이미 있는 메뉴 — 더보기 메뉴판에서는 뺀다 */
+const BOTTOM_TABS = ["/ax/dashboard", "/ax/clients", "/ax/projects", "/ax/documents"];
+
+
+/** 메뉴 옆 숫자 — 승인 대기 · 새 가망고객 · 내 업무+문의 */
+function useNavBadge(kind: NavItem["badge"]) {
+  return useStore((s) => {
+    if (kind === "approvals") return s.approvals.filter((a) => a.status === "pending").length;
+    if (kind === "leads") return s.leads.filter((l) => l.status === "new").length;
+    if (kind === "tasks") {
       const me = s.session?.role === "consultant" ? s.session.userId : undefined;
       const open = s.tasks.filter((t) => (t.status === "todo" || t.status === "doing") && (!me || t.assigneeId === me)).length;
       const iq = s.inquiries.filter((i) => i.status === "open" && (!me || i.assigneeId === me)).length;
@@ -164,10 +184,20 @@ function NavLink({ item, color, onClick, mobile, utility }: { item: NavItem; col
     }
     return 0;
   });
+}
+
+/** 상담 메뉴 이름 — 계약(금액)은 대표만, 견적은 컨설턴트까지. 보이는 것만 이름에 */
+function navLabel(item: NavItem, role: Role | undefined) {
+  return item.href === "/ax/consultations" ? (can(role, "finance.view") ? item.label : can(role, "quote.create") ? "상담 · 견적" : "상담 기록") : item.label;
+}
+
+function NavLink({ item, color, onClick, mobile, utility }: { item: NavItem; color: string; onClick?: () => void; mobile?: boolean; utility?: boolean }) {
+  const pathname = usePathname();
+  const role = useStore((s) => s.session?.role);
+  const badgeCount = useNavBadge(item.badge);
   const active = pathname === item.href || pathname.startsWith(item.href + "/");
   if (item.perm && !can(role, item.perm)) return null;
-  // 계약(금액)은 대표만, 견적은 컨설턴트까지 — 메뉴 이름도 보이는 것만
-  const label = item.href === "/ax/consultations" ? (can(role, "finance.view") ? item.label : can(role, "quote.create") ? "상담 · 견적" : "상담 기록") : item.label;
+  const label = navLabel(item, role);
   return (
     <Link
       id={item.id}
@@ -512,45 +542,33 @@ function MoreSheet() {
   return (
     <>
       <Sheet open={open} onClose={close} title="더보기">
-        <div className="mb-4 flex items-center gap-3 rounded-xl bg-surface-2 p-3">
+        {/* 휴대폰에서 더보기를 여는 이유는 대개 '다른 메뉴로 가기' — 메뉴판을 맨 위에, 설정·도구는 그 아래 */}
+        <div className="mb-3 flex items-center gap-2.5 px-1">
           <Avatar name={user?.name ?? "K"} />
-          <div className="flex-1 leading-tight">
-            <div className="font-bold">{user?.name} {user?.title}</div>
+          <div className="min-w-0 flex-1 leading-tight">
+            <div className="truncate font-bold">{user?.name} {user?.title}</div>
             <div className="text-[0.75rem] text-ink-3">{session?.realRole ? `${ROLE_LABEL[session.role]} 화면으로 보는 중` : `${ROLE_LABEL[session?.role ?? "consultant"]} 화면`}</div>
           </div>
           <Badge tone={session?.role === "admin" ? "accent" : "neutral"}>{ROLE_LABEL[session?.role ?? "consultant"]}</Badge>
         </div>
-        <ConnectionStatus className="mb-4" />
-        <div className="mb-4"><ViewSwitch onPickClient={() => { close(); setPick(true); }} onDone={close} /></div>
-        <div className="mb-4 rounded-xl border border-line p-3">
+        <nav aria-label="메뉴" className="grid grid-cols-4 gap-x-1 gap-y-1.5 rounded-2xl border border-line p-2" data-testid="more-menu">
+          {NAV_GROUPS.flatMap((g) => g.items.filter((i) => !BOTTOM_TABS.includes(i.href)).map((item) => <MenuTile key={item.href} item={item} color={g.inkColor} onClick={close} />))}
+        </nav>
+
+        <div className="mt-4"><ViewSwitch onPickClient={() => { close(); setPick(true); }} onDone={close} /></div>
+        <div className="mt-4 rounded-xl border border-line p-3">
           <div className="mb-2 text-[0.82rem] font-semibold text-ink-2">글자 크기</div>
           <FontScalePicker />
         </div>
-        <div className="mb-4 grid grid-cols-2 gap-2">
+        <div className="mt-4 grid grid-cols-2 gap-2">
           <button onClick={() => { close(); setPick(true); }} className={btn}><Eye size={18} /> 고객 화면 보기</button>
           <DevicePreviewButton className={btn} />
           <PresentationButton className={btn} />
           <button onClick={() => openTutorial("ax")} className={btn}><HelpCircle size={18} /> 튜토리얼</button>
-          <button onClick={() => setConfirmReset(true)} className={btn}><RotateCcw size={18} /> 데모 초기화</button>
-          <button onClick={() => { logout(); router.push("/login"); }} className={btn}><LogOut size={18} /> 로그아웃</button>
-          <Link href="/ax/coach" onClick={close} className={cx(btn, "col-span-2 border-accent/60")}><Compass size={18} className="text-accent" /> AX 코치 <span className="ml-auto text-[0.75rem] font-normal text-ink-3">오늘의 실증 미션</span></Link>
         </div>
-        {NAV_GROUPS.map((g, gi) => {
-          const items = g.items.filter((i) => !MOBILE_PRIMARY.includes(i.href));
-          if (!items.length) return null;
-          return (
-            <div key={g.key} className={cx(gi > 0 && "mt-3 border-t border-line pt-2.5")}>
-              <div className="px-3 pb-1 pt-0.5 text-[0.73rem] font-bold tracking-[0.14em] text-ink-3">{g.label}</div>
-              <div className="space-y-0.5">
-                {items.map((item) => (
-                  <NavLink key={item.href} item={item} color={g.inkColor} onClick={close} mobile />
-                ))}
-              </div>
-            </div>
-          );
-        })}
-        <div className="mt-3 border-t border-line pt-3">
-          <div className="px-3 pb-1 pt-0.5 text-[0.73rem] font-bold tracking-[0.14em] text-ink-3">시스템</div>
+
+        <div className="mt-4 border-t border-line pt-3">
+          <div className="px-3 pb-1 pt-0.5 text-[0.73rem] font-bold tracking-[0.14em] text-ink-3">도움말 · 설정</div>
           <div className="space-y-0.5">
             {NAV_UTILITY.map((item) => <NavLink key={item.href} item={item} color="var(--nav-sys-ink)" onClick={close} mobile />)}
             <Link href="/ax/survey" onClick={close} className="pressable flex items-center gap-2.5 rounded-lg px-3 py-2 text-[0.9rem] font-semibold text-ink-2 hover:bg-surface-2">
@@ -559,6 +577,12 @@ function MoreSheet() {
               <ChevronRight size={13} className="text-ink-3" />
             </Link>
           </div>
+        </div>
+
+        <ConnectionStatus className="mt-4" />
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button onClick={() => setConfirmReset(true)} className={btn}><RotateCcw size={18} /> 데모 초기화</button>
+          <button onClick={() => { logout(); router.push("/login"); }} className={btn}><LogOut size={18} /> 로그아웃</button>
         </div>
       </Sheet>
       <CompanyPickerModal open={pick} onClose={() => setPick(false)} />

@@ -105,9 +105,9 @@ export function AiReadyBadge({ onClick, label = "AI READY" }: { onClick?: () => 
 }
 
 /* ---------- Card & KPI ---------- */
-export function Card({ children, className, hover, onClick, id }: { children: ReactNode; className?: string; hover?: boolean; onClick?: () => void; id?: string }) {
+export function Card({ children, className, hover, onClick, id, "data-testid": testId }: { children: ReactNode; className?: string; hover?: boolean; onClick?: () => void; id?: string; "data-testid"?: string }) {
   return (
-    <div id={id} onClick={onClick} className={cx("card", hover && "card-hover", onClick && "cursor-pointer", className)}>
+    <div id={id} data-testid={testId} onClick={onClick} className={cx("card", hover && "card-hover", onClick && "cursor-pointer", className)}>
       {children}
     </div>
   );
