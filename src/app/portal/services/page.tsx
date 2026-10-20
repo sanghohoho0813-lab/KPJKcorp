@@ -1,6 +1,7 @@
 "use client";
 
 import { Icon3D } from "@/components/domain/portal/Icon3D";
+import Link from "next/link";
 import { CancelRequestButton, OnBehalfNote, useOnBehalf } from "@/components/domain/portal/CancelRequest";
 import { useMemo, useState } from "react";
 import { Check, ChevronRight, MessageSquarePlus, Receipt, Sparkles, ThumbsUp } from "lucide-react";
@@ -10,7 +11,7 @@ import { KPJK_SERVICES, OPP_STATUS, SERVICE_BY_KEY, type ServiceDef } from "@/li
 import { KPJK_CONSULTING } from "@/lib/company-options";
 import { NextGrowth, useGrowth } from "@/components/domain/portal/GrowthBoard";
 import { daysBetween, fmtDate, fmtRelative, fmtWon } from "@/lib/format";
-import { Badge, Button, Card, EmptyState, PageHeader, SectionTitle, Textarea, cx } from "@/components/ui/ui";
+import { Badge, Button, Card, PageHeader, SectionTitle, Textarea, cx } from "@/components/ui/ui";
 import type { Quote } from "@/lib/types";
 import { Modal } from "@/components/ui/overlay";
 
@@ -62,7 +63,7 @@ export default function PortalServicesPage() {
   return (
     <div className="space-y-5">
       <PageHeader id="tut-p-services" icon={<Icon3D name="together" size="2.4rem" />} title="함께 검토해볼 수 있는 것"
-        desc={`담당 컨설턴트가 ${c.name}에 맞춰 골라 드린 항목과 KPJK 컨설팅 분야입니다. 상담을 요청하시면 확인 후 연락드립니다.`} />
+        desc="담당 컨설턴트가 골라 드린 제안과 KPJK 컨설팅 분야입니다. 상담을 요청하시면 연락드립니다." />
 
       {/* 받은 제안 — 회신을 기다리는 건이 가장 위. 고객이 눌러야 다음이 진행된다. */}
       {myQuotes.length > 0 && (
@@ -107,9 +108,10 @@ export default function PortalServicesPage() {
                 )}
 
                 {waiting ? (
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <Button variant="accent" icon={<Check size={15} />} onClick={() => { setReply({ q, decision: "accepted" }); setReplyNote(""); }}>이대로 진행할게요</Button>
-                    <Button variant="outline" onClick={() => { setReply({ q, decision: "declined" }); setReplyNote(""); }}>조금 더 생각해볼게요</Button>
+                  // 휴대폰: 두 버튼을 같은 너비로 쌓아 누를 곳이 분명하게
+                  <div className="mt-4 flex flex-wrap gap-2 max-sm:flex-col">
+                    <Button variant="accent" className="max-sm:w-full" icon={<Check size={15} />} onClick={() => { setReply({ q, decision: "accepted" }); setReplyNote(""); }}>이대로 진행할게요</Button>
+                    <Button variant="outline" className="max-sm:w-full" onClick={() => { setReply({ q, decision: "declined" }); setReplyNote(""); }}>조금 더 생각해볼게요</Button>
                   </div>
                 ) : q.status === "declined" ? (
                   <div className="mt-3 rounded-xl bg-surface-2 px-4 py-2.5 text-[0.85rem] text-ink-2">보류로 회신하셨습니다{q.clientNote ? ` — “${q.clientNote}”` : ""}. 담당 컨설턴트가 확인 후 연락드립니다.</div>
@@ -191,7 +193,13 @@ export default function PortalServicesPage() {
           </div>
         </div>
       ) : (
-        <EmptyState icon={<Icon3D name="together" size="3rem" />} title="아직 담당 컨설턴트가 올린 제안이 없습니다." desc={`궁금한 분야가 있으면 아래에서 상담을 요청하시거나 ${consultant?.name ?? "담당 컨설턴트"} ${consultant?.title ?? ""}에게 문의해 주세요.`} />
+        // 비어 있을 때는 짧게 — 바로 아래 컨설팅 분야에서 고를 수 있다
+        <div className="flex items-center gap-3 rounded-2xl border border-dashed border-line-2 px-4 py-3.5" data-testid="proposals-empty">
+          <Icon3D name="together" size="2.2rem" muted />
+          <p className="min-w-0 flex-1 text-[0.86rem] leading-relaxed text-ink-2">
+            <b className="text-ink">아직 올라온 제안이 없습니다.</b> 궁금한 분야는 아래에서 바로 상담을 요청하시거나 {consultant ? `${consultant.name} ${consultant.title ?? ""}`.trim() : "담당 컨설턴트"}에게 <Link href="/portal/inquiries" className="font-semibold text-accent hover:underline">문의</Link>해 주세요.
+          </p>
+        </div>
       )}
 
       {/* 기업정보·진행 이력으로 고른 검토 과제 — 근거를 함께 */}

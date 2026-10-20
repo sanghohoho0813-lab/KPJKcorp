@@ -11,6 +11,8 @@
 // 12) 경과 보고 미확인 → 확인 연락 업무(규칙) → 대표가 보면 업무 자동 완료
 // 13) 휴대폰 화면 정리: 프로젝트 단계 칩(첫 화면에 프로젝트) · 승인 막대 접기 · 회사 정보 접기 · 막 등록한 고객의 빈 화면
 // 14) 휴대폰 더보기 = 메뉴판(맨 위 그림 칸 · 숫자 · 누르면 이동) · 대시보드 첫 화면에 숫자 칸(실증 안내는 한 줄)
+// 15) 휴대폰 3차 정리: 내부 머리글 압축(설명 두 줄 · AI 짧은 이름 · 주 버튼 먼저) · 숫자 칸 한 줄 · 작은 터치 영역 없음 ·
+//     알림 종 펼침이 화면 안(고객 · 내부) · 고객 알림 날짜 묶음 · 우리 회사 끝낸 항목 · 회사 정보 접기
 // 실행: npm run build && npm start (데모 모드) → node tools/acceptance/daily.mjs
 import fs from 'fs';
 import { execFileSync } from 'child_process';
@@ -662,6 +664,80 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
   await menu.locator('[data-menu-tile="/ax/schedule"]').click(); await page.waitForURL(/\/ax\/schedule/); await sleep(500);
   ok('14 더보기: 메뉴를 누르면 그 화면으로 · 시트 닫힘', /\/ax\/schedule/.test(page.url()) && (await page.getByTestId('more-menu').count()) === 0);
   ok('14 페이지 오류 없음 · 넘침 없음', page.errs.length === 0 && (await overflow(page)) <= 0, page.errs.slice(0, 2).join(' | '));
+}
+
+// ---------- 휴대폰 3차 정리 (컨설턴트 휴대폰 → 고객 휴대폰) ----------
+{
+  // 44px 미만으로 보이는 눌리는 것(글 속 링크 · 눌리는 범위를 넓힌 것은 뺀다)
+  const tiny = (page) => page.evaluate(() => [...document.querySelectorAll('main button, main a, main [role=tab], main select')].filter((e) => {
+    const b = e.getBoundingClientRect(); if (!b.width || !b.height) return false;
+    if (e.tagName === 'A' && getComputedStyle(e).display === 'inline') return false;
+    const a = getComputedStyle(e, '::after'); return !(a.content !== 'none' && a.position === 'absolute') && b.height < 36;
+  }).map((e) => (e.getAttribute('aria-label') || e.innerText || e.tagName).replace(/\s+/g, ' ').slice(0, 16)));
+  const bellBox = (page) => page.evaluate(() => { const el = document.querySelector('[data-testid=bell-panel]'); if (!el) return null; const b = el.getBoundingClientRect(); const t = el.querySelector('a .font-bold, a .font-medium'); return { l: b.left, r: b.right, vw: innerWidth, color: t ? getComputedStyle(t).color : '' }; });
+
+  const page = await session('mobile');
+  await go(page, '/ax/tasks');
+  const ph = page.locator('main .page-header').first();
+  const phBox = await ph.boundingBox();
+  ok('15 업무함 머리글: 휴대폰에서 낮게(≤ 180px)', !!phBox && phBox.height <= 180, `${Math.round(phBox?.height ?? 0)}px`);
+  ok('15 머리글 설명은 두 줄까지', await ph.locator('.ph-desc').evaluate((e) => getComputedStyle(e).webkitLineClamp === '2'));
+  ok('15 AI 버튼은 짧은 이름', await ph.locator('.ax-insight-short').isVisible() && !(await ph.locator('.ax-insight-long').isVisible()));
+  const order = await ph.locator('.ph-actions').evaluate((w) => { const xs = [...w.querySelectorAll('button, a')].filter((e) => e.getBoundingClientRect().width > 0 && !e.classList.contains('seg-btn')); const acc = xs.find((e) => e.classList.contains('bg-accent')); return acc ? Math.min(...xs.map((e) => e.getBoundingClientRect().left)) === acc.getBoundingClientRect().left : true; });
+  ok('15 주 버튼이 맨 앞', order);
+  const kpis = await page.locator('main .kpi-strip .kpi').evaluateAll((xs) => xs.map((e) => Math.round(e.getBoundingClientRect().top)));
+  ok('15 업무함 숫자 칸은 한 줄(4칸)', kpis.length === 4 && new Set(kpis).size === 1, kpis.join(','));
+  const small = [];
+  for (const u of ['/ax/tasks', '/ax/documents', '/ax/consultations', '/ax/clients/co_a', '/ax/growth']) { await go(page, u); small.push(...(await tiny(page)).map((x) => `${u}:${x}`)); }
+  ok('15 내부 주요 화면에 작은 터치 영역 없음', small.length === 0, small.slice(0, 4).join(' | '));
+  await page.getByRole('button', { name: '알림', exact: true }).first().click(); await sleep(400);
+  const ib = await bellBox(page);
+  ok('15 내부 알림 종: 펼침이 화면 안', !!ib && ib.l >= 0 && ib.r <= ib.vw, JSON.stringify(ib));
+  ok('15 내부 휴대폰 오류 없음 · 넘침 없음', page.errs.length === 0 && (await overflow(page)) <= 0, page.errs.slice(0, 2).join(' | '));
+}
+{
+  const ctx = await browser.newContext({ viewport: { width: 360, height: 780 }, isMobile: true, hasTouch: true });
+  await ctx.addInitScript(() => { try { localStorage.setItem('kpjk-test', '1'); } catch {} });
+  const page = await ctx.newPage();
+  page.errs = [];
+  page.on('pageerror', (e) => page.errs.push(String(e)));
+  await page.route('**/*', (r) => (r.request().url().startsWith(B) ? r.continue() : r.abort()));
+  await page.goto(B + '/login', { waitUntil: 'networkidle' });
+  await page.getByLabel('아이디 (이메일)').fill('ceo@a-precision.demo');
+  await page.locator('input[type=password]').first().fill('client2026!');
+  await page.getByRole('button', { name: '로그인' }).click();
+  await page.waitForURL(/\/portal/); await sleep(1200);
+  await page.getByRole('button', { name: /건너뛰기/ }).first().click({ timeout: 800 }).catch(() => {});
+  await page.getByLabel(/튜토리얼 닫기|이용 안내 닫기/).click({ timeout: 800 }).catch(() => {});
+  await go(page, '/portal');
+  await page.getByRole('button', { name: '알림', exact: true }).first().click(); await sleep(400);
+  const cb = await page.evaluate(() => { const el = document.querySelector('[data-testid=bell-panel]'); if (!el) return null; const b = el.getBoundingClientRect(); const t = el.querySelector('a .font-bold, a .font-medium'); return { l: b.left, r: b.right, vw: innerWidth, color: t ? getComputedStyle(t).color : '' }; });
+  ok('15 고객 알림 종(360px): 펼침이 화면 안', !!cb && cb.l >= 0 && cb.r <= cb.vw, JSON.stringify(cb));
+  ok('15 고객 알림 종: 제목 글자가 보이는 색(흰색 아님)', !!cb && cb.color !== '' && cb.color !== 'rgb(255, 255, 255)', cb?.color);
+  ok('15 고객 알림 종: 날짜 묶음 제목', (await page.locator('[data-bell-group]').count()) >= 1);
+  await page.getByTestId('bell-all').click(); await page.waitForURL(/\/portal\/notifications/); await sleep(600);
+  const labels = await page.locator('[data-notif-group]').evaluateAll((xs) => xs.map((e) => e.getAttribute('data-notif-group')));
+  const rank = { today: 0, yesterday: 1, week: 2, older: 3 };
+  ok('15 고객 알림: 날짜 묶음(오늘 · 어제 · 이번 주 · 이전 순)', labels.length >= 1 && labels.every((k, i) => i === 0 || rank[labels[i - 1]] < rank[k]), labels.join(','));
+  const unreadBefore = await page.locator('[data-unread]').count();
+  ok('15 고객 알림: 안 읽은 알림 표시', unreadBefore >= 1 && /읽지 않은 알림 \d+건/.test(await page.locator('main .page-header').innerText()));
+  await page.getByRole('button', { name: '모두 읽음' }).click(); await sleep(400);
+  ok('15 고객 알림: 모두 읽음 → 표시 사라짐', (await page.locator('[data-unread]').count()) === 0 && (await page.getByRole('button', { name: '모두 읽음' }).count()) === 0);
+  await go(page, '/portal/company');
+  const doneShown = () => page.locator('[data-testid=growth-quests] [data-done="1"]').count();
+  ok('15 우리 회사: 끝낸 항목은 접혀 있음', (await page.getByTestId('quest-done-toggle').isVisible()) && (await doneShown()) === 0);
+  await page.getByTestId('quest-done-toggle').click(); await sleep(300);
+  ok('15 우리 회사: 누르면 끝낸 항목이 보임', (await doneShown()) >= 1);
+  const facts = page.getByTestId('company-facts');
+  const visibleRows = () => facts.locator('dl > div').evaluateAll((xs) => xs.filter((e) => e.getBoundingClientRect().height > 0).length);
+  const before = await visibleRows();
+  ok('15 우리 회사: 회사 정보는 앞쪽 6칸만', before === 6, `${before}칸`);
+  await page.getByTestId('facts-more').click(); await sleep(300);
+  ok('15 우리 회사: 나머지 칸 펼침', (await visibleRows()) > before && (await page.getByTestId('facts-more').count()) === 0);
+  await go(page, '/portal/services');
+  ok('15 함께 검토: 화면 오류 없음', (await page.locator('main h1').innerText()).includes('함께 검토'));
+  ok('15 고객 휴대폰(360px) 오류 없음 · 넘침 없음', page.errs.length === 0 && (await overflow(page)) <= 0, page.errs.slice(0, 2).join(' | '));
+  await ctx.close();
 }
 
 await browser.close();

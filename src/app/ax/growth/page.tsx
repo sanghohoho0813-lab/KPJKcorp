@@ -70,7 +70,7 @@ export default function GrowthPage() {
                   <div className="flex items-start gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <Link href={`/ax/clients/${c.id}`} className="truncate text-[1.08rem] font-bold hover:underline">{c.name}</Link>
+                        <Link href={`/ax/clients/${c.id}`} className="-my-2 truncate py-2 text-[1.08rem] font-bold hover:underline">{c.name}</Link>
                         {c.sample && <Badge tone="info">샘플</Badge>}
                       </div>
                       <div className="mt-0.5 truncate text-[0.82rem] text-ink-3">{[c.industry || c.bizCategory, c.region || c.address, c.employees ? `${c.employees}명` : undefined].filter(Boolean).join(" · ")}</div>

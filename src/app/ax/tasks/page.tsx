@@ -92,7 +92,7 @@ function TasksInner() {
             action={may("task.create") ? <Button variant="accent" icon={<Plus size={16} />} onClick={() => setOpen(true)}>업무 등록</Button> : undefined} />
         </Card>
       ) : <>
-      <div className="kpi-row mb-5 mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="kpi-row kpi-strip mb-5 mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
         <KpiCard label="오늘 처리" value={today.length} sub={overdue.length ? `기한 초과 ${overdue.length} 포함` : "기한 내"} accentValue={today.length > 0} />
         <KpiCard label="기한 초과" value={overdue.length} sub="먼저 처리" tone={overdue.length ? "error" : undefined} />
         <KpiCard label="미완료 전체" value={openTasks.length} sub={`자동 생성 ${openTasks.filter((t) => t.source === "auto").length}건`} />

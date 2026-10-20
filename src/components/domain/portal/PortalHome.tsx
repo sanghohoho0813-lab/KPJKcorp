@@ -259,7 +259,7 @@ export function RecentUpdates({ companyId }: { companyId: string }) {
           ))}
         </div>
       )}
-      {resultCount > 0 && <Link href="/portal/results" className="mt-2 flex items-center justify-between rounded-xl bg-surface-2 px-4 py-2.5 text-[0.88rem] font-semibold"><span className="flex items-center gap-2"><FileCheck2 size={16} className="text-success" /> 완료자료 {resultCount}건</span><ArrowRight size={14} /></Link>}
+      {resultCount > 0 && <Link href="/portal/results" className="mt-2 flex min-h-11 items-center justify-between rounded-xl bg-surface-2 px-4 text-[0.88rem] font-semibold"><span className="flex items-center gap-2"><FileCheck2 size={16} className="text-success" /> 완료자료 {resultCount}건</span><ArrowRight size={14} /></Link>}
     </section>
   );
 }

@@ -56,7 +56,7 @@ export default function PortalInquiriesPage() {
 
   return (
     <div>
-      <PageHeader icon={<Icon3D name="idea" size="2.4rem" />} title="문의하기" desc={`담당 컨설턴트 ${consultant?.name ?? ""} ${consultant?.title ?? ""}에게 직접 물어보세요. 답이 오면 알림으로 알려 드립니다.`} actions={<Button variant="accent" icon={<Plus size={16} />} onClick={() => setOpen(true)}>새 문의</Button>} />
+      <PageHeader icon={<Icon3D name="idea" size="2.4rem" />} title="문의하기" desc={`${consultant ? `${consultant.name} ${consultant.title ?? ""}`.trim() : "담당 컨설턴트"}에게 직접 물어보세요. 답이 오면 알림을 드립니다.`} actions={<Button variant="accent" icon={<Plus size={16} />} onClick={() => setOpen(true)}>새 문의</Button>} />
       <div className="grid gap-5 lg:grid-cols-[340px_1fr]">
         <Card className="overflow-hidden">
           {list.length === 0 ? <EmptyState icon={<Icon3D name="idea" size="3rem" />} title="아직 문의가 없습니다" action={<Button variant="outline" onClick={() => setOpen(true)}>첫 문의 남기기</Button>} /> : (

@@ -43,7 +43,7 @@ function Inner() {
 
   return (
     <div className="space-y-5">
-      <PageHeader icon={<Icon3D name="flow" size="2.4rem" />} title="프로젝트 진행현황" desc={`${c.name} ${p.name}${p.type && !p.name.includes(p.type) ? ` (${p.type})` : ""} 프로젝트의 현재 위치를 한눈에 확인합니다.`} badge={<Badge tone="accent">현재 단계: {CUSTOMER_STEPS[step].label}</Badge>} actions={projects.length > 1 ? <SegmentedControl size="sm" value={p.id} onChange={setSel} options={projects.map((x) => ({ key: x.id, label: x.name }))} /> : undefined} />
+      <PageHeader icon={<Icon3D name="flow" size="2.4rem" />} title="프로젝트 진행현황" desc={projects.length > 1 ? "프로젝트를 골라 지금 어디까지 왔는지 확인합니다." : `${p.name}${p.type && !p.name.includes(p.type) ? ` (${p.type})` : ""} — 지금 어디까지 왔는지 확인합니다.`} badge={<Badge tone="accent">현재 단계: {CUSTOMER_STEPS[step].label}</Badge>} actions={projects.length > 1 ? <SegmentedControl size="sm" value={p.id} onChange={setSel} options={projects.map((x) => ({ key: x.id, label: x.name }))} /> : undefined} />
 
       {/* SIGNATURE 04 — Client Journey Timeline */}
       <Card className="p-5 md:p-8" id="tut-p-timeline">

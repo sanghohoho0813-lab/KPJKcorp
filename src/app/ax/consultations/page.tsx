@@ -56,7 +56,7 @@ function ConsultList({ consultations, onNew, onEdit }: { consultations: Consulta
                   <div className="flex items-start gap-2 px-4 py-3 md:px-5">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <Link href={`/ax/clients/${cs.companyId}`} className="font-bold hover:text-accent">{nameOf(cs.companyId)}</Link>
+                        <Link href={`/ax/clients/${cs.companyId}`} className="tap font-bold hover:text-accent">{nameOf(cs.companyId)}</Link>
                         <Badge tone="info">{cs.type}</Badge>
                         <span className="text-[0.8rem] text-ink-3">{cs.channel} · {fmtDateTime(cs.date)} · {userOf(cs.consultantId)}</span>
                         {f.all > 0 && <span className={cx("text-[0.78rem] font-semibold", f.done === f.all ? "text-success" : "text-ink-2")}>후속 업무 {f.done}/{f.all} 완료</span>}
@@ -167,7 +167,7 @@ function ConsultationsInner() {
             {contracts.map((ct) => (
               <div key={ct.id} className="card p-4" onClick={() => may("contract.manage") && setEditContract(ct.id)} role={may("contract.manage") ? "button" : undefined}>
                 <div className="flex items-center gap-2">
-                  <Link href={`/ax/clients/${ct.companyId}`} onClick={(e) => e.stopPropagation()} className="truncate font-bold hover:text-accent">{st.companies.find((c) => c.id === ct.companyId)?.name}</Link>
+                  <Link href={`/ax/clients/${ct.companyId}`} onClick={(e) => e.stopPropagation()} className="-my-2 truncate py-2 font-bold hover:text-accent">{st.companies.find((c) => c.id === ct.companyId)?.name}</Link>
                   <Badge tone={ct.status === "signed" ? "success" : ct.status === "sent" ? "warning" : "neutral"}>{ct.status === "signed" ? "서명 완료" : ct.status === "sent" ? "서명 대기" : "초안"}</Badge>
                 </div>
                 <div className="mt-1 text-[0.88rem] font-semibold">{ct.title}</div>

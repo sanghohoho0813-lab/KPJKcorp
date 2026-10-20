@@ -254,6 +254,11 @@ h1, h2, h3, h4 { letter-spacing: -0.01em; line-height: 1.25; }
 
 /* Safe area */
 .pb-safe { padding-bottom: max(0.5rem, env(safe-area-inset-bottom)); }
+/* 휴대폰 터치 영역 — 글자 크기는 그대로 두고 눌리는 영역만 위아래로 넓힌다(목록 안 기업 이름 링크 · 눌러서 복사하는 값) */
+@media (max-width: 1023.98px) {
+  .tap { position: relative; }
+  .tap::after { content: ""; position: absolute; inset: -0.6rem -0.25rem; }
+}
 /* 휴대폰 내부 화면: 아래 탭 위에 '대표 승인 대기' 막대가 떠 있으면 그만큼 아래 여백을 더 둔다 — 마지막 내용이 가리지 않게 */
 @media (max-width: 1023.98px) { html.qa-bar main { padding-bottom: calc(var(--bottomnav-h) + 6rem); } }
 
@@ -512,6 +517,30 @@ html[data-motion="reduce"] .coach-glow { animation: none; }
 .ax-ui .kpi-row { gap: 1px; background: var(--ax-line); border: 1px solid var(--ax-line); border-radius: var(--radius-card); overflow: hidden; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05); }
 .ax-ui .kpi-row > .card, .ax-ui .kpi-row > a.card, .ax-ui .kpi-row > div > .card { border: 0; border-radius: 0; box-shadow: none; }
 .ax-ui .kpi-row > .card-hover:hover, .ax-ui .kpi-row .card-hover:hover { box-shadow: none; background: var(--ax-head); }
+/* 휴대폰 머리글 — 화면마다 150~300px 이던 것을 줄인다: 설명 두 줄까지, AI 버튼은 'AI', 버튼은 한 줄(주 동작이 먼저) */
+@media (max-width: 767px) {
+  .ax-ui .page-header { gap: 0.6rem; padding-bottom: 0.75rem; margin-bottom: 0.9rem; }
+  .ax-ui .page-header h1 { font-size: 1.25rem; }
+  .ax-ui .ph-desc { margin-top: 0.2rem; font-size: 0.8rem; line-height: 1.45; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+  .ax-ui .page-header .ax-insight { min-height: 1.9rem; padding: 0.2rem 0.55rem; font-size: 0.74rem; }
+  .ax-ui .page-header .ax-insight-long { display: none; }
+  .ax-ui .page-header .ax-insight-short { display: inline; }
+  .ax-ui .ph-actions { flex-wrap: nowrap; overflow-x: auto; margin-inline: -1rem; padding: 0.1rem 1rem; scrollbar-width: none; }
+  .ax-ui .ph-actions::-webkit-scrollbar { display: none; }
+  /* 화면마다 버튼을 한 번 더 감싸 넘기기도 한다 — 감싼 상자는 풀어서 버튼들이 한 줄에 서게(선택 칸 seg 는 그대로) */
+  .ax-ui .ph-actions > div:not(.seg), .ax-ui .ph-actions > span { display: contents; }
+  .ax-ui .ph-actions > *, .ax-ui .ph-actions > div:not(.seg) > * { flex-shrink: 0; }
+  .ax-ui .ph-actions :is(button, a):not(.seg-btn) { height: 2.5rem; min-height: 2.5rem; padding-inline: 0.85rem; font-size: 0.85rem; }
+  .ax-ui .ph-actions :is(button, a).bg-accent { order: -1; }
+  /* 목록 화면 숫자 칸 — 2×2 카드(250px) 대신 네 칸 한 줄 띠 */
+  .ax-ui .kpi-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .ax-ui .kpi-strip .kpi { padding: 0.55rem 0.35rem; gap: 0.15rem; justify-content: center; text-align: center; }
+  .ax-ui .kpi-strip .kpi > div:first-child { justify-content: center; }
+  .ax-ui .kpi-strip .kpi > div:first-child > span:first-child { font-size: 0.7rem; line-height: 1.25; }
+  .ax-ui .kpi-strip .kpi > div:first-child > span:last-child:not(:first-child) { display: none; }
+  .ax-ui .kpi-strip .kpi-value { font-size: 1.3rem; }
+  .ax-ui .kpi-strip .kpi .mt-2 { display: none; }
+}
 /* 표 — 줄 간격은 조금 촘촘하게, 글자는 한 단계 작게(ERP 표 밀도) */
 .ax-ui .tbl td { padding: 0.68rem 0.9rem; font-size: 0.92rem; }
 .ax-ui .tbl th { padding: 0.62rem 0.9rem; }

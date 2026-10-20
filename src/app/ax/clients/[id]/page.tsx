@@ -203,7 +203,7 @@ export default function ClientCardPage() {
                   </span>
                 )}
               </div>
-              <button type="button" onClick={() => setMoreInfo((v) => !v)} aria-expanded={moreInfo} className="pressable mt-2 inline-flex items-center gap-1 rounded-lg py-1 text-[0.85rem] font-semibold text-ink-2 sm:hidden">
+              <button type="button" onClick={() => setMoreInfo((v) => !v)} aria-expanded={moreInfo} className="pressable mt-1 inline-flex min-h-10 items-center gap-1 rounded-lg text-[0.85rem] font-semibold text-ink-2 sm:hidden">
                 {moreInfo ? "접기" : "연락처 · 번호 · 주소 보기"} <ChevronDown size={15} className={cx("transition-transform", moreInfo && "rotate-180")} />
               </button>
             </div>

@@ -55,12 +55,12 @@ export function CompanySnapshot({ company: c, board, showFactsLink = true, colla
 
   return (
     <section className="card overflow-hidden" data-testid="company-snapshot">
-      {/* 휴대폰: 제목 한 줄 + 꼬리표는 옆으로 넘기는 한 줄 / PC: 한 줄에 모두 */}
+      {/* 휴대폰: 제목 한 줄 + 꼬리표 줄(좁으면 다음 줄로 — 잘리지 않게) / PC: 한 줄에 모두 */}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-2.5 border-b border-line px-4 py-3.5 md:px-6 md:py-4">
         {showIcon && <Icon3D name="company" size="1.9rem" />}
         <h2 className="text-[1.1rem] font-extrabold md:text-[1.15rem]">우리 회사 한눈에</h2>
         {c.sample && <span className="rounded-full bg-warning-bg px-2.5 py-0.5 text-[0.72rem] font-bold text-warning" data-testid="sample-figures">샘플 회사 · 예시 수치</span>}
-        <div className="hide-scrollbar flex w-full gap-1.5 overflow-x-auto md:ml-auto md:w-auto">
+        <div className="flex w-full flex-wrap gap-1.5 md:ml-auto md:w-auto">
           {contractDay !== undefined && contractDay > 0 && <span className="shrink-0 whitespace-nowrap rounded-full bg-surface-2 px-2.5 py-1 text-[0.75rem] font-bold text-ink-2" data-testid="contract-day" title={`계약 시작 ${formatYmd(c.contractStartedAt!).replaceAll("-", ".")}`}>KPJK 계약 <span className="tnum">{contractDay.toLocaleString("ko-KR")}</span>일차</span>}
           <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-surface-2 px-2.5 py-1 text-[0.75rem] font-bold text-ink-2" data-testid="growth-level">
             <TrendingUp size={14} className="text-accent-strong" /> 성장 {level.level}/5단계 · {level.name}
@@ -228,7 +228,10 @@ export function GrowthQuests({ company: c, board, limit }: { company: Company; b
   const [all, setAll] = useState(false);
   // 할 일(열린 것) 먼저, 잠긴 것, 완료는 뒤로
   const ordered = [...quests.filter((q) => !q.done && !q.locked), ...quests.filter((q) => !q.done && q.locked), ...quests.filter((q) => q.done)];
-  const shown = limit && !all ? ordered.slice(0, limit) : ordered;
+  const doneCount = quests.filter((q) => q.done).length;
+  // 전체 목록(우리 회사)에서는 끝낸 항목을 접어 두고 남은 일만 먼저 — 다 끝냈으면 모두 보인다
+  const foldDone = !limit && doneCount > 0 && doneCount < ordered.length;
+  const shown = limit && !all ? ordered.slice(0, limit) : foldDone && !all ? ordered.filter((q) => !q.done) : ordered;
   return (
     <section className="card p-5 md:p-6" data-testid="growth-quests">
       <div className="flex items-center gap-4">
@@ -254,6 +257,12 @@ export function GrowthQuests({ company: c, board, limit }: { company: Company; b
       {limit && ordered.length > limit && (
         <button type="button" onClick={() => setAll((v) => !v)} className="pressable mt-2 min-h-9 text-[0.85rem] font-semibold text-accent">
           {all ? "접기" : `${ordered.length - limit}개 더 보기`}
+        </button>
+      )}
+      {foldDone && (
+        <button type="button" onClick={() => setAll((v) => !v)} aria-expanded={all} data-testid="quest-done-toggle"
+          className="pressable mt-2 inline-flex min-h-10 items-center gap-1.5 rounded-xl px-1 text-[0.86rem] font-semibold text-ink-2 hover:text-ink">
+          <Check size={15} className="text-success" />{all ? "끝낸 항목 접기" : `끝낸 항목 ${doneCount}개 보기`}
         </button>
       )}
     </section>
@@ -306,6 +315,10 @@ export function CompanyFacts({ company: c }: { company: Company }) {
     try { await navigator.clipboard.writeText(text); setCopied(key); setTimeout(() => setCopied((k) => (k === key ? null : k)), 1500); } catch { /* 권한 없음 */ }
   };
   const docs = (["bizReg", "corpReg"] as const).filter((k) => docCheckedAt(c, k));
+  // 휴대폰: 신청서에 자주 쓰는 앞쪽 칸만 먼저 — 나머지는 한 번 눌러 펼친다(PC는 모두)
+  const [more, setMore] = useState(false);
+  const FIRST = 6;
+  const folded = rows.length > FIRST + 1 && !more;
   return (
     <section className="card p-5 md:p-6" data-testid="company-facts">
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -313,11 +326,11 @@ export function CompanyFacts({ company: c }: { company: Company }) {
         <span className="text-[0.78rem] text-ink-3">값을 누르면 복사됩니다 — 신청서에 그대로 붙여 넣으세요</span>
       </div>
       <dl className="grid gap-x-6 sm:grid-cols-2">
-        {rows.map((r) => (
-          <div key={r.key} className={cx("flex min-w-0 items-start gap-3 border-b border-line py-2.5", r.wide && "sm:col-span-2")}>
+        {rows.map((r, i) => (
+          <div key={r.key} className={cx("flex min-w-0 items-start gap-3 border-b border-line py-2.5", r.wide && "sm:col-span-2", folded && i >= FIRST && "max-sm:hidden")}>
             <dt className="w-28 shrink-0 pt-0.5 text-[0.8rem] font-semibold text-ink-3">{r.label}</dt>
             <dd className="min-w-0 flex-1">
-              <button type="button" onClick={() => copy(r.value, r.key)} className="pressable group inline-flex max-w-full items-start gap-1.5 text-left text-[0.92rem] font-semibold text-ink" aria-label={`${r.label} 복사`}>
+              <button type="button" onClick={() => copy(r.value, r.key)} className="tap pressable group inline-flex max-w-full items-start gap-1.5 text-left text-[0.92rem] font-semibold text-ink" aria-label={`${r.label} 복사`}>
                 <span className="break-all">{r.value}</span>
                 {copied === r.key ? <Check size={14} className="mt-1 shrink-0 text-success" /> : <ClipboardCopy size={13} className="mt-1 shrink-0 text-ink-3 opacity-60 group-hover:opacity-100" />}
               </button>
@@ -325,11 +338,17 @@ export function CompanyFacts({ company: c }: { company: Company }) {
             </dd>
           </div>
         ))}
-        <div className="flex min-w-0 items-start gap-3 border-b border-line py-2.5">
+        <div className={cx("flex min-w-0 items-start gap-3 border-b border-line py-2.5", folded && "max-sm:hidden")}>
           <dt className="w-28 shrink-0 pt-0.5 text-[0.8rem] font-semibold text-ink-3">담당 컨설턴트</dt>
           <dd className="text-[0.92rem] font-semibold">{consultant ? `${consultant.name} ${consultant.title}` : "배정 전"}</dd>
         </div>
       </dl>
+      {folded && (
+        <button type="button" onClick={() => setMore(true)} data-testid="facts-more"
+          className="pressable mt-1 inline-flex min-h-10 w-full items-center justify-center gap-1 rounded-xl text-[0.86rem] font-semibold text-ink-2 hover:bg-surface-2 sm:hidden">
+          나머지 {rows.length - FIRST + 1}개 칸 보기 <ChevronDown size={15} />
+        </button>
+      )}
       <div className="mt-3 flex flex-wrap items-center gap-2 text-[0.8rem]" data-testid="facts-docs">
         <FileCheck2 size={15} className="text-ink-3" />
         {docs.length

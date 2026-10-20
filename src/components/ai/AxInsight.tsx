@@ -28,7 +28,8 @@ export function AxInsightButton({ topic, className, compact }: { topic: InsightT
         )}
       >
         <Sparkles size={14} />
-        <span className={cx(compact && "hidden sm:inline")}>AI · 자동화 적용</span>
+        <span className={cx("ax-insight-long", compact && "hidden sm:inline")}>AI · 자동화 적용</span>
+        <span className="ax-insight-short hidden">AI</span>
       </button>
       <AxInsightModal topic={topic} open={open} onClose={() => setOpen(false)} />
     </>

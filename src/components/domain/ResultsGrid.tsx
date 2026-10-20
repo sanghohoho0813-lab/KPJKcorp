@@ -45,7 +45,7 @@ export function ResultsGrid() {
               </div>
               <div className="mt-0.5 text-[0.75rem] text-ink-3">{fmtDateTime(r.sharedAt)} · {fmtSize(r.size)} · {st.users.find((u) => u.id === r.sharedBy)?.name} · 고객 열람 {viewed(r.name)}회</div>
               {mayWithdraw && (
-                <button onClick={() => { setTarget(r); setReason(""); }} className="pressable mt-2 inline-flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-[0.78rem] font-semibold text-ink-2 hover:bg-surface-2 hover:text-error">
+                <button onClick={() => { setTarget(r); setReason(""); }} className="pressable mt-2 inline-flex min-h-9 items-center gap-1 rounded-lg border border-line px-3 text-[0.8rem] font-semibold text-ink-2 hover:bg-surface-2 hover:text-error">
                   <RotateCcw size={13} /> 회수
                 </button>
               )}

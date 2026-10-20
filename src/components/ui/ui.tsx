@@ -157,13 +157,13 @@ export function PageHeader({ title, desc, actions, badge, id, icon }: { title: R
         <h1 className="text-[1.75rem] font-bold md:text-[2rem]">{title}</h1>
         {badge}
       </div>
-      {desc && <p className="mt-1 text-[0.95rem] text-ink-2">{desc}</p>}
+      {desc && <p className="ph-desc mt-1 text-[0.95rem] text-ink-2">{desc}</p>}
     </div>
   );
   return (
     <div id={id} className="page-header mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
       {icon ? <div className="flex min-w-0 items-start gap-3"><span className="mt-0.5 shrink-0">{icon}</span>{head}</div> : head}
-      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+      {actions && <div className="ph-actions flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
   );
 }
