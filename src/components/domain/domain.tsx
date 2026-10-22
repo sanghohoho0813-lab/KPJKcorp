@@ -7,6 +7,7 @@ import type { Activity, DocStatus, InternalStage, Schedule, TaskStatus, Priority
 import { DOC_STATUS, INQUIRY_STATUS, PRIORITY, SCHEDULE_TYPE, TASK_STATUS, stageLabel, stageProgress } from "@/lib/stages";
 import type { BriefItem } from "@/lib/brief";
 import { fmtDateTime, fmtRelative, fmtTime, relativeDay, fmtDate } from "@/lib/format";
+import { groupByDate } from "@/lib/day-groups";
 import { Badge, MoreButton, cx, type Tone } from "@/components/ui/ui";
 import { useStore } from "@/lib/store";
 import { BriefActionBar } from "./BriefActions";
@@ -247,29 +248,40 @@ const ACT_ICON: Record<Activity["type"], ReactNode> = {
   demo_reset: <RotateCcw size={14} />,
 };
 
-export function ActivityFeed({ items, limit, showCompany }: { items: Activity[]; limit?: number; showCompany?: boolean }) {
+export function ActivityFeed({ items, limit, showCompany, byDate }: { items: Activity[]; limit?: number; showCompany?: boolean; /** 날짜별 묶음(오늘 · 어제 · 10월 18일) — 몇 주치가 쌓이는 기록용. 줄에는 시각만 */ byDate?: boolean }) {
   const users = useStore((s) => s.users);
   const companies = useStore((s) => s.companies);
-  const list = (limit ? items.slice(0, limit) : items).sort((a, b) => b.at.localeCompare(a.at));
+  // 정렬한 다음에 자른다 — 거꾸로 하면 "최근 12건"이 최근이 아닐 수 있다. 받은 배열은 건드리지 않는다
+  const sorted = [...items].sort((a, b) => b.at.localeCompare(a.at));
+  const list = limit ? sorted.slice(0, limit) : sorted;
   if (!list.length) return <div className="py-8 text-center text-[0.9rem] text-ink-3">아직 기록된 활동이 없습니다.</div>;
+  const row = (a: Activity) => {
+    const actor = a.actorRole === "system" ? "시스템" : users.find((u) => u.id === a.actorId)?.name ?? a.actorId;
+    const isClient = a.actorRole === "client";
+    return (
+      <li key={a.id} className="relative pb-4 last:pb-0">
+        <span className={cx("absolute -left-[29px] top-0.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-surface", isClient ? "bg-soft text-accent" : a.actorRole === "system" ? "bg-surface-2 text-ink-3" : "bg-info-bg text-info")}>{ACT_ICON[a.type]}</span>
+        <div className="text-[0.9rem] font-semibold">{a.text}</div>
+        <div className="mt-0.5 flex flex-wrap gap-x-2 text-[0.78rem] text-ink-3">
+          <span>{actor}{isClient ? " (고객)" : ""}</span>
+          {showCompany && a.companyId && <span>· {companies.find((c) => c.id === a.companyId)?.name}</span>}
+          <span>· {byDate ? <time dateTime={a.at} title={fmtRelative(a.at)}>{fmtTime(a.at)}</time> : fmtRelative(a.at)}</span>
+        </div>
+      </li>
+    );
+  };
+  if (!byDate) return <ol className="relative space-y-0 border-l border-line pl-5">{list.map(row)}</ol>;
   return (
-    <ol className="relative space-y-0 border-l border-line pl-5">
-      {list.map((a) => {
-        const actor = a.actorRole === "system" ? "시스템" : users.find((u) => u.id === a.actorId)?.name ?? a.actorId;
-        const isClient = a.actorRole === "client";
-        return (
-          <li key={a.id} className="relative pb-4 last:pb-0">
-            <span className={cx("absolute -left-[29px] top-0.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-surface", isClient ? "bg-soft text-accent" : a.actorRole === "system" ? "bg-surface-2 text-ink-3" : "bg-info-bg text-info")}>{ACT_ICON[a.type]}</span>
-            <div className="text-[0.9rem] font-semibold">{a.text}</div>
-            <div className="mt-0.5 flex flex-wrap gap-x-2 text-[0.78rem] text-ink-3">
-              <span>{actor}{isClient ? " (고객)" : ""}</span>
-              {showCompany && a.companyId && <span>· {companies.find((c) => c.id === a.companyId)?.name}</span>}
-              <span>· {fmtRelative(a.at)}</span>
-            </div>
-          </li>
-        );
-      })}
-    </ol>
+    <div className="space-y-4" data-testid="activity-by-date">
+      {groupByDate(list, (a) => a.at).map((g) => (
+        <section key={g.key} data-activity-day={g.key}>
+          <h3 className="z-[1] -mx-1 md:sticky md:top-[var(--header-h,4rem)] mb-2 flex items-baseline gap-2 bg-surface/95 px-1 py-1 text-[0.8rem] font-bold text-ink-2 backdrop-blur">
+            {g.label}<span className="font-normal text-ink-3">{g.items.length}건</span>
+          </h3>
+          <ol className="relative space-y-0 border-l border-line pl-5">{g.items.map(row)}</ol>
+        </section>
+      ))}
+    </div>
   );
 }
 

@@ -19,6 +19,12 @@ export function AutoRulesPanel() {
   const manage = can(st.session?.role, "rules.manage");
   const enabled = (k: string) => ruleOn(st.settings.autoRules, k);
   const madeCount = (k: string) => st.tasks.filter((t) => t.ruleKey?.startsWith(k + ":")).length;
+  // 규칙이 실제로 일하고 있는가 — 켜진 수 · 만든 업무 · 그중 끝낸 것(지어낸 숫자 없이 업무 기록을 센다)
+  const ruleKeys = AUTO_RULES.map((r) => r.key);
+  const ruleTasks = st.tasks.filter((t) => t.ruleKey && ruleKeys.some((k) => t.ruleKey!.startsWith(k + ":")));
+  const onCount = AUTO_RULES.filter((r) => enabled(r.key)).length;
+  const doneCount = ruleTasks.filter((t) => t.status === "done").length;
+  const openCount = ruleTasks.filter((t) => t.status === "todo" || t.status === "doing").length;
 
   return (
     <div>
@@ -26,6 +32,11 @@ export function AutoRulesPanel() {
         사건이 아니라 <b className="text-ink-2">시간이 흘러서</b> 생기는 일들입니다. 앱을 열 때와 10분마다 확인해 아직 없는 업무만 만듭니다.
         같은 대상에 같은 규칙으로 두 번 만들지 않습니다.
       </p>
+      <div className="mb-3 grid grid-cols-3 gap-px overflow-hidden rounded-xl border border-line bg-line text-center" data-testid="rules-summary">
+        <div className="bg-surface px-2 py-2"><div className="text-[0.72rem] font-semibold text-ink-3">켜진 규칙</div><div className="tnum text-[1.1rem] font-bold">{onCount}<span className="text-[0.8rem] font-semibold text-ink-3"> / {AUTO_RULES.length}</span></div></div>
+        <div className="bg-surface px-2 py-2"><div className="text-[0.72rem] font-semibold text-ink-3">규칙이 만든 업무</div><div className="tnum text-[1.1rem] font-bold">{ruleTasks.length}<span className="text-[0.8rem] font-semibold text-ink-3">건</span></div></div>
+        <div className="bg-surface px-2 py-2"><div className="text-[0.72rem] font-semibold text-ink-3">끝냄 · 남음</div><div className="tnum text-[1.1rem] font-bold">{doneCount}<span className="text-[0.8rem] font-semibold text-ink-3"> · {openCount}</span></div></div>
+      </div>
       <div className="divide-y divide-line rounded-xl border border-line">
         {AUTO_RULES.map((r) => {
           const on = enabled(r.key);

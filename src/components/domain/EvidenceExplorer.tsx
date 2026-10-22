@@ -117,7 +117,7 @@ export function EvidenceExplorer() {
           <div className="py-10 text-center text-[0.9rem] text-ink-3">{st.activities.length ? "조건에 맞는 기록이 없습니다." : "아직 기록된 활동이 없습니다."}</div>
         ) : (
           <>
-            <ActivityFeed items={list.slice(0, shown)} showCompany />
+            <ActivityFeed items={list.slice(0, shown)} showCompany byDate />
             {list.length > shown && (
               <div className="mt-4 flex justify-center">
                 <Button variant="outline" onClick={() => setShown((n) => n + PAGE)}>더 보기 ({shown} / {list.length})</Button>

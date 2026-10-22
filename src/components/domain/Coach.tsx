@@ -123,7 +123,8 @@ function NudgeBar({ href, tone, title, body, cta }: { href: string; tone: "warni
       )}
     >
       <Ruler size={16} className="shrink-0" />
-      <span className="min-w-0 flex-1"><b>{title}</b><span className="ml-1 font-normal">{body}</span></span>
+      {/* 휴대폰: 제목과 버튼만 한 줄 — 설명까지 다섯 줄로 늘어나 숫자 칸을 밀어냈다 */}
+      <span className="min-w-0 flex-1"><b>{title}</b><span className="ml-1 font-normal max-md:hidden">{body}</span></span>
       <span className="flex shrink-0 items-center gap-1 font-bold">{cta} <ArrowRight size={14} /></span>
     </Link>
   );
@@ -191,24 +192,29 @@ export function CoachCard() {
 
   if (!s.active) {
     return (
-      <Card className="coach-box coach-glow anim-rise overflow-hidden px-5 py-4" data-testid="coach-start">
-        {/* 휴대폰은 한 줄(그림 · 제목 · 시작) — 대시보드 첫 화면에 숫자 칸이 보이도록. 설명과 '왜'는 PC 에서 */}
+      <Card className="coach-box coach-glow anim-rise overflow-hidden px-5 py-4 md:py-3.5" data-testid="coach-start">
+        {/* 한 줄(그림 · 제목 · 시작) — 대시보드 첫 화면에 숫자 칸과 운영 현황이 보이도록.
+            PC 는 제목 아래 짧은 설명 한 줄 + '왜' 는 시작 버튼 옆 작은 버튼(펼치면 아래) */}
         <div className="flex items-center gap-3 md:gap-4">
-          <div className="flex min-w-0 flex-1 items-center gap-3 md:items-start">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
             <span className="hover-pop flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-ink"><Compass size={20} /></span>
             <div className="min-w-0">
-              <h2 className="text-[1rem] font-bold leading-snug md:text-[1.1rem]">AX 실증 14일을 시작할까요?</h2>
-              <p className="mt-1 text-[0.88rem] leading-relaxed text-ink-2 max-md:hidden">
-                하루 1~3개 미션으로 실제 업무를 시스템 안에서 처리합니다. 별도 입력 없이, 그 행동이 그대로 실증 기록이 됩니다.
+              <h2 className="text-[1rem] font-bold leading-snug md:text-[1.05rem]">AX 실증 14일을 시작할까요?</h2>
+              <p className="mt-0.5 truncate text-[0.85rem] text-ink-2 max-md:hidden">
+                하루 1~3개 미션 — 실제 업무를 시스템 안에서 처리하면 그대로 실증 기록이 됩니다.
               </p>
             </div>
           </div>
+          <button type="button" onClick={() => setWhy((v) => !v)} aria-expanded={why}
+            className="pressable inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[0.85rem] font-semibold text-ink-2 hover:bg-surface-2 hover:text-ink max-md:hidden">
+            <TrendingUp size={15} className="text-accent" /> 왜 핵심인가요? <ChevronDown size={15} className={cx("transition-transform", why && "rotate-180")} />
+          </button>
           <Button variant="accent" icon={<Play size={16} />} className="shrink-0" aria-label="실증 시작" onClick={() => { start(); toast("AX 실증 14일을 시작했습니다. 오늘의 미션부터 확인하세요."); }}>
             <span className="md:hidden">시작</span><span className="max-md:hidden">실증 시작</span>
           </Button>
         </div>
-        <div className="max-md:hidden"><WhyToggle open={why} onToggle={() => setWhy((v) => !v)} /></div>
-        <div className="-mx-5 -mb-4 mt-3 empty:hidden"><BaselineNudge /></div>
+        {why && <div className="anim-fade mt-3 border-t border-line pt-3 max-md:hidden" data-testid="coach-why"><WhyEvidence /></div>}
+        <div className="-mx-5 -mb-4 mt-3 empty:hidden md:-mb-3.5"><BaselineNudge /></div>
       </Card>
     );
   }

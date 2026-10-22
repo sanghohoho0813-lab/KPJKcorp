@@ -508,7 +508,7 @@ export default function ClientCardPage() {
       {tab === "history" && (
         <Card className="p-5">
           <SectionTitle action={<Badge tone="info"><Sparkles size={12} /> Evidence Log</Badge>}>전체 이력 ({activities.length})</SectionTitle>
-          <ActivityFeed items={activities} />
+          <ActivityFeed items={activities} byDate />
         </Card>
       )}
 

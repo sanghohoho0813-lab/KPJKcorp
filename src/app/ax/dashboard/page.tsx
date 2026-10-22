@@ -97,7 +97,7 @@ export default function DashboardPage() {
 
       <FirstRunOrCoach />
 
-      {/* 첫 화면 숫자는 "지금 처리할 것"만 — 누르면 그 일로 바로 간다. 상태 숫자(운영 현황)는 아래에 둔다 */}
+      {/* 첫 화면 숫자는 "지금 처리할 것" — 누르면 그 일로 바로 간다. 바로 아래 한 줄이 운영 현황(계약 별지 모듈1의 6개 상태) */}
       <div id="tut-kpi" className="kpi-row grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
         {isAdmin
           ? <KpiCard label="내 승인 대기" value={pendingApprovals.length} sub={pendingApprovals.length ? "지금 확인 필요" : "대기 없음"} href="/ax/opportunities?tab=approvals" tone={pendingApprovals.length ? "error" : undefined} icon={<Icon3D name="ax-approval" size="2.25rem" />} />
@@ -106,6 +106,9 @@ export default function DashboardPage() {
         <KpiCard label="자료 검토 대기" value={docWaiting} sub={counts.docs ? `기한 이슈 ${counts.docs}건` : "기한 이슈 없음"} href="/ax/documents" tone={counts.docs ? "error" : undefined} icon={<Icon3D name="ax-review" size="2.25rem" />} />
         <KpiCard id="kpi-contact" label="연락 필요" value={contactDue} sub={contactDue ? `${cycle}일 넘게 연락 없음` : "공백 없음"} href="/ax/clients?filter=contact" tone={contactDue ? "error" : undefined} icon={<Icon3D name="ax-call" size="2.25rem" />} />
       </div>
+
+      {/* 운영 현황 — 맨 아래(약 2,000px)에 있어 못 보던 것을 첫 화면으로. PC 에서는 낮은 한 줄 */}
+      {hasCompanies && <OpsStrip />}
 
       <div className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
         <div className="space-y-6">
@@ -148,10 +151,9 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* 운영 현황 — 상태 숫자(계약 별지의 6개 상태)와 대표자용 요약. 매일 바뀌는 할 일 아래에 둔다 */}
+      {/* 대표자용 요약 — 매일 바뀌는 할 일 아래. 복사해서 단톡방에 붙인다 */}
       {hasCompanies && (
         <div className="space-y-6" id="dash-status">
-          <OpsStrip />
           <CeoSummaryCard />
         </div>
       )}

@@ -1,5 +1,5 @@
 // 날짜 묶음 — 오늘 · 어제 · 이번 주 · 이전(이 기기 달력 기준), 받은 순서 유지.
-import { dayGroupOf, groupByDay } from "../../src/lib/day-groups";
+import { dayGroupOf, groupByDate, groupByDay } from "../../src/lib/day-groups";
 
 let fail = 0;
 const ok = (c: boolean, m: string) => { console.log((c ? "OK  " : "FAIL") + " " + m); if (!c) fail++; };
@@ -12,5 +12,7 @@ const xs = [at(0), at(0, 8), at(-1), at(-3), at(-10), at(-20)].map((t, i) => ({ 
 const g = groupByDay(xs, (x) => x.t, now);
 ok(g.map((x) => `${x.label}${x.items.length}`).join() === "오늘2,어제1,이번 주1,이전2", "묶음 · 개수 · 순서 유지");
 ok(groupByDay([], (x: { t: string }) => x.t, now).length === 0, "빈 목록");
+const gd = groupByDate([at(0, 15), at(0, 8), at(-1, 22), at(-4), at(-4, 7)].map((t) => ({ t })), (x) => x.t, now);
+ok(gd.map((x) => `${x.label}:${x.items.length}`).join("|") === "오늘 · 10월 20일:2|어제 · 10월 19일:1|10월 16일 (금):2", "날짜 하나씩 묶음 · 오늘/어제/요일 이름");
 console.log(fail ? `\n${fail} FAIL` : "\nALL OK");
 process.exit(fail ? 1 : 0);

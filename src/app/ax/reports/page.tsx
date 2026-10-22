@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { BarChart3, Printer } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { AxInsightButton } from "@/components/ai/AxInsight";
-import { daysBetween } from "@/lib/format";
+import { daysBetween, fmtDate } from "@/lib/format";
 import { INTERNAL_STAGES } from "@/lib/stages";
 import { Badge, Card, DemoBadge, PageHeader, SectionTitle, Tabs, cx } from "@/components/ui/ui";
 import { EvidenceExplorer } from "@/components/domain/EvidenceExplorer";
@@ -32,6 +32,11 @@ function ReportsInner() {
   const [tab, setTab] = useState<ReportTab>(initialTab && REPORT_TABS.includes(initialTab) ? initialTab : "sprint");
   const sprint = useSprint();
   const now = new Date().toISOString();
+  // 대시보드 기준선 알림과 같은 기준 — 조사를 냈거나, 예전 방식으로 숫자를 넣어 두었으면 "완료"
+  const survey = (st.settings.baselineSurveys ?? []).find((x) => x.phase === "before" && !x.draft);
+  const legacyBase = !!st.settings.baseline && Object.values(st.settings.baseline).some((v) => typeof v === "number");
+  const baseDone = survey ? { at: survey.recordedAt, by: survey.respondentName } : legacyBase ? { at: st.settings.baseline?.recordedAt, by: undefined } : undefined;
+  const baseDraft = (st.settings.baselineSurveys ?? []).find((x) => x.phase === "before" && x.draft);
 
   const m = useMemo(() => {
     const done = st.docRequests.filter((d) => d.submittedAt && d.requestedAt);
@@ -100,7 +105,7 @@ function ReportsInner() {
       title: "운영 사용량",
       desc: "시스템이 실제로 쓰이고 있는가 — 사용량이 없으면 그 뒤의 어떤 숫자도 의미가 없다.",
       items: [
-        { name: "기록된 Event", point: "Activity append-only 로그", value: `${m.events}건` },
+        { name: "쌓인 기록", point: "Activity append-only 로그", value: `${m.events}건` },
         { name: "기록 보유 기간", point: "최초 ~ 최신 Event 간격", value: m.logSpanDays ? `${m.logSpanDays}일` : "-" },
         { name: "Portal 이용 기업", point: "고객 행동(로그인·제출·문의)이 있는 기업 수", value: `${m.portalCompanies} / ${st.companies.length}개사` },
         { name: "자동 생성 업무", point: "Task.source = auto", value: `${m.autoTasks}건 (완료 ${m.autoTasksDone})` },
@@ -154,8 +159,9 @@ function ReportsInner() {
 
   return (
     <div>
-      <PageHeader title="리포트 · 실증" desc="KPI 측정지점과 Evidence Log입니다. 실제 Baseline이 없는 숫자는 개선율로 표시하지 않습니다." badge={<><DemoBadge /><AxInsightButton topic="reports" /></>} actions={<><Link href="/print/evidence" className="pressable lift inline-flex h-11 items-center gap-2 rounded-[var(--radius-btn)] bg-accent px-4 text-[0.9rem] font-semibold text-accent-ink"><Printer size={16} /> 실증 리포트 인쇄 · PDF</Link></>} />
-      <Tabs tabs={[{ key: "kpi", label: "KPI 측정지점" }, { key: "ops", label: "운영 현황" }, { key: "evidence", label: "Evidence Log", count: st.activities.length }]} value={tab} onChange={setTab} />
+      <PageHeader title="리포트 · 실증" desc="실증 진행 · 측정 지점 · 실증 기록입니다. 도입 전 기준선이 없는 숫자는 개선율로 표시하지 않습니다." badge={<><DemoBadge /><AxInsightButton topic="reports" /></>} actions={<><Link href="/print/evidence" className="pressable lift inline-flex h-11 items-center gap-2 rounded-[var(--radius-btn)] bg-accent px-4 text-[0.9rem] font-semibold text-accent-ink"><Printer size={16} /> 실증 리포트 인쇄 · PDF</Link></>} />
+      {/* 처음 여는 탭(실증 진행)이 목록에 없어 다른 탭을 누르면 돌아올 수 없던 것 — 맨 앞에 둔다 */}
+      <Tabs tabs={[{ key: "sprint", label: "실증 진행" }, { key: "kpi", label: "측정 지점" }, { key: "ops", label: "운영 현황" }, { key: "evidence", label: "실증 기록", count: st.activities.length }]} value={tab} onChange={setTab} />
       <div className="mt-5">
         {tab === "sprint" && (
           <div className="space-y-5">
@@ -166,7 +172,7 @@ function ReportsInner() {
                   <h2 className="text-[1.05rem] font-bold">{sprint.active ? `AX 실증 ${sprint.day}일차` : "실증 모드 시작 전"}</h2>
                   <p className="mt-0.5 text-[0.85rem] text-ink-2">
                     {sprint.active
-                      ? `미션 ${sprint.doneCount} / ${sprint.missions.length} 완료 · 이 기간에 기록된 Event만 집계합니다.`
+                      ? `미션 ${sprint.doneCount} / ${sprint.missions.length} 완료 · 이 기간에 남은 기록만 집계합니다.`
                       : "AX 코치에서 실증을 시작하면 이 화면이 기간 기준으로 집계됩니다. 지금은 전체 기간 기준입니다."}
                   </p>
                 </div>
@@ -178,7 +184,7 @@ function ReportsInner() {
             <RecallCompareCard />
 
             <Card className="p-5">
-              <SectionTitle action={<span className="tnum text-[0.85rem] text-ink-3">평균 {sprint.score} / 100</span>}>Evidence Coverage</SectionTitle>
+              <SectionTitle action={<span className="tnum text-[0.85rem] text-ink-3">평균 {sprint.score} / 100</span>}>영역별 기록 현황</SectionTitle>
               <p className="-mt-1 mb-4 text-[0.85rem] text-ink-2">
                 6개 영역이 각각 얼마나 채워졌는지입니다. 목표치는 14일 실증 기준 최소 건수이며, 성과나 개선율이 아닙니다.
               </p>
@@ -218,13 +224,20 @@ function ReportsInner() {
         )}
         {tab === "kpi" && (
           <div className="space-y-5">
-            <div className="rounded-xl border border-warning/30 bg-warning-bg px-4 py-3 text-[0.88rem] text-warning">
-              <b>BASELINE STATUS: REQUIRED / UNKNOWN</b> — 도입 전 값(Before)이 아직 없습니다. 운영 시작 후 4주간 수집하며, 그 전까지는 개선율을 만들지 않고 <b>현재 표본 수</b>만 표시합니다.
-            </div>
+            {/* 기준선 상태는 실제 조사 기록으로 — 조사를 마쳤는데 "미시작"으로 보이면 안 된다 */}
+            {baseDone ? (
+              <div className="rounded-xl border border-success/30 bg-success-bg px-4 py-3 text-[0.88rem] text-success">
+                <b>도입 전 기준선 조사 완료</b>{baseDone.at ? ` (${fmtDate(baseDone.at)}${baseDone.by ? ` · ${baseDone.by}` : ""})` : ""} — 비교는 리포트 첫 탭 &lsquo;실증 진행&rsquo;의 도입 전후 비교에서 봅니다. 아래 숫자는 지금까지 쌓인 <b>표본 수</b>입니다.
+              </div>
+            ) : (
+              <div className="rounded-xl border border-warning/30 bg-warning-bg px-4 py-3 text-[0.88rem] text-warning">
+                <b>도입 전 기준선이 {baseDraft ? "작성 중입니다" : "아직 없습니다"}.</b> 그 전까지는 개선율을 만들지 않고 <b>현재 표본 수</b>만 표시합니다.
+              </div>
+            )}
             <div className="grid gap-3 sm:grid-cols-3">
-              <div className="card p-4"><div className="text-[0.75rem] font-bold text-ink-3">기록된 Event</div><div className="tnum text-[1.5rem] font-bold">{m.events}</div></div>
+              <div className="card p-4"><div className="text-[0.75rem] font-bold text-ink-3">쌓인 기록</div><div className="tnum text-[1.5rem] font-bold">{m.events}</div></div>
               <div className="card p-4"><div className="text-[0.75rem] font-bold text-ink-3">기록 보유 기간</div><div className="tnum text-[1.5rem] font-bold">{m.logSpanDays}일</div></div>
-              <div className="card p-4"><div className="text-[0.75rem] font-bold text-ink-3">Baseline 수집</div><div className="text-[1.1rem] font-bold text-warning">미시작</div></div>
+              <div className="card p-4"><div className="text-[0.75rem] font-bold text-ink-3">도입 전 기준선</div><div className={cx("text-[1.1rem] font-bold", baseDone ? "text-success" : "text-warning")}>{baseDone ? "조사 완료" : baseDraft ? "작성 중" : "미시작"}</div></div>
             </div>
 
             {axes.filter((g) => g.key !== "revenue" || may("finance.view")).map((g) => (
@@ -250,11 +263,11 @@ function ReportsInner() {
               <SectionTitle>이 리포트를 외부에 설명할 때</SectionTitle>
               <ol className="list-decimal space-y-1.5 pl-5 text-[0.88rem] text-ink-2">
                 <li><b className="text-ink">무엇이 바뀌었나</b> — 기억·카톡·개별파일 → 고객이 직접 참여하는 하나의 기록 체계</li>
-                <li><b className="text-ink">근거는 무엇인가</b> — 위 지표는 전부 Event Log에서 계산되며 수기 입력이 없습니다</li>
-                <li><b className="text-ink">아직 없는 것은 무엇인가</b> — 도입 전 Baseline. 그래서 개선율을 제시하지 않습니다</li>
+                <li><b className="text-ink">근거는 무엇인가</b> — 위 지표는 전부 실증 기록(Event Log)에서 계산되며 수기 입력이 없습니다</li>
+                <li><b className="text-ink">아직 없는 것은 무엇인가</b> — 도입 전 기준선. 그래서 개선율을 제시하지 않습니다</li>
                 <li><b className="text-ink">언제 말할 수 있나</b> — 운영 4주 후 Before/After 비교가 가능해집니다</li>
               </ol>
-              <p className="mt-3 text-[0.8rem] text-ink-3">Evidence Pack 구조: Baseline → Trigger → Recommendation → Human Approval → Action → Result → KPI Delta → Provenance.</p>
+              <p className="mt-3 text-[0.8rem] text-ink-3">기록 구조: 기준선 → 계기 → 추천 → 사람 승인 → 실행 → 결과 → 지표 변화 → 출처.</p>
             </Card>
           </div>
         )}
@@ -285,7 +298,7 @@ function ReportsInner() {
         )}
         {tab === "evidence" && (
           <Card className="p-5">
-            <div className="mb-4 hidden text-[0.85rem] text-ink-2 md:block">Evidence Pack 구조: Baseline → Trigger → Recommendation → Human Approval → Action → Result → KPI Delta → Provenance → User/Time Log.</div>
+            <div className="mb-4 hidden text-[0.85rem] text-ink-2 md:block">기록 구조: 기준선 → 계기 → 추천 → 사람 승인 → 실행 → 결과 → 지표 변화 → 출처 → 누가 · 언제.</div>
             <EvidenceExplorer />
           </Card>
         )}

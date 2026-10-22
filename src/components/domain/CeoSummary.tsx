@@ -98,13 +98,14 @@ export function OpsStrip() {
     { label: "후속업무", n: follow, href: "/ax/tasks" },
   ];
   return (
-    <Card className="p-4" id="ops-strip">
-      <div className="mb-2.5 flex items-center justify-between gap-2">
+    <Card className="p-4 md:flex md:items-center md:gap-4" id="ops-strip">
+      {/* PC: 이름은 왼쪽, 여섯 칸은 한 줄 — 첫 화면에서 숫자 칸 바로 아래에 낮게 */}
+      <div className="mb-2.5 flex items-center justify-between gap-2 md:mb-0 md:w-28 md:shrink-0 md:flex-col md:items-start md:justify-center md:gap-1.5">
         <span className="text-[0.95rem] font-bold">운영 현황</span>
         <Badge>{assigneeId ? "내 담당 기준" : "회사 전체"}</Badge>
       </div>
       {/* 한 장의 요약판 — 칸 사이는 1px 선(격자 틈을 선 색으로 칠한다) */}
-      <div className="grid grid-cols-3 gap-px overflow-hidden rounded-[10px] border border-line bg-line md:grid-cols-6">
+      <div className="grid grid-cols-3 gap-px overflow-hidden rounded-[10px] border border-line bg-line md:flex-1 md:grid-cols-6">
         {items.map((it) => (
           <Link key={it.label} href={it.href} className="pressable min-w-0 bg-surface px-3 py-2.5 hover:bg-surface-2">
             {/* 폰에서는 세 칸이라 이름이 잘린다 — 자르지 않고 두 줄로. 숫자 줄은 칸마다 같은 높이에 맞춘다 */}

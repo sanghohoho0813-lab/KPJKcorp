@@ -13,6 +13,8 @@
 // 14) 휴대폰 더보기 = 메뉴판(맨 위 그림 칸 · 숫자 · 누르면 이동) · 대시보드 첫 화면에 숫자 칸(실증 안내는 한 줄)
 // 15) 휴대폰 3차 정리: 내부 머리글 압축(설명 두 줄 · AI 짧은 이름 · 주 버튼 먼저) · 숫자 칸 한 줄 · 작은 터치 영역 없음 ·
 //     알림 종 펼침이 화면 안(고객 · 내부) · 고객 알림 날짜 묶음 · 우리 회사 끝낸 항목 · 회사 정보 접기
+// 16) PC 정리(계약 4단계 문구 — 대시보드 · 업무규칙 · 리포트 · 실증 기록): 첫 화면에 운영 현황 6개 상태 · 실증 안내 한 줄 ·
+//     리포트 첫 탭으로 돌아오기 · 기준선 상태는 실제 조사 기록대로 · 업무함 → 자동 규칙 · 실증 기록 날짜 묶음
 // 실행: npm run build && npm start (데모 모드) → node tools/acceptance/daily.mjs
 import fs from 'fs';
 import { execFileSync } from 'child_process';
@@ -557,8 +559,9 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
   const page = await session('pc', ['ceo@kpjk.co.kr', 'kpjk2026!']);
   const dlg = () => page.locator('[role=dialog]:visible').last();
   const storeKey = await page.evaluate(() => Object.keys(localStorage).find((k) => { try { return !!JSON.parse(localStorage.getItem(k) ?? 'null')?.state; } catch { return false; } }));
+  // 앱의 로그아웃 동작으로 나간다 — 저장된 값만 지우면 화면에 남은 세션이 다시 저장되어(부하가 클 때) 로그인 화면이 안 뜬다
   const relogin = async (id, pwd, to) => {
-    await page.evaluate((key) => { const s = JSON.parse(localStorage.getItem(key)); s.state.session = null; localStorage.setItem(key, JSON.stringify(s)); }, storeKey);
+    await page.evaluate(() => window.__kpjkState().logout());
     await page.goto(B + '/login', { waitUntil: 'networkidle' });
     await page.getByLabel('아이디 (이메일)').fill(id);
     await page.locator('input[type=password]').first().fill(pwd);
@@ -654,8 +657,9 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
   await go(page, '/ax/dashboard');
   await page.getByRole('button', { name: /건너뛰기/ }).first().click({ timeout: 800 }).catch(() => {});
   const coach = page.getByTestId('coach-start');
-  ok('14 대시보드: 실증 안내는 제목 · 시작만(설명 · 왜는 PC)', await coach.getByRole('button', { name: '실증 시작' }).isVisible() && !(await coach.getByText('하루 1~3개 미션').isVisible()) && !(await coach.getByText('왜 이게 이 시스템의 핵심인가요?').isVisible()), `높이 ${Math.round((await coach.boundingBox())?.height ?? 0)}px`);
-  ok('14 대시보드: 첫 화면에 숫자 칸', (await page.locator('#tut-kpi').boundingBox())?.y < 700);
+  ok('14 대시보드: 실증 안내는 제목 · 시작만(설명 · 왜는 PC)', await coach.getByRole('button', { name: '실증 시작' }).isVisible() && !(await coach.getByText('하루 1~3개 미션').isVisible()) && !(await coach.getByText('왜 핵심인가요?').isVisible()), `높이 ${Math.round((await coach.boundingBox())?.height ?? 0)}px`);
+  const kpiY = (await page.locator('#tut-kpi').boundingBox())?.y ?? -1;
+  ok('14 대시보드: 첫 화면에 숫자 칸(화면 위로 지나가 있지 않게)', kpiY >= 0 && kpiY < 700, `${Math.round(kpiY)}px`);
   await page.getByRole('button', { name: '더보기' }).click(); await sleep(500);
   const menu = page.getByTestId('more-menu');
   const box = await menu.boundingBox();
@@ -737,6 +741,80 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
   await go(page, '/portal/services');
   ok('15 함께 검토: 화면 오류 없음', (await page.locator('main h1').innerText()).includes('함께 검토'));
   ok('15 고객 휴대폰(360px) 오류 없음 · 넘침 없음', page.errs.length === 0 && (await overflow(page)) <= 0, page.errs.slice(0, 2).join(' | '));
+  await ctx.close();
+}
+
+// ---------- PC 정리 (대표 PC — 대시보드 · 업무규칙 · 리포트 · 실증 기록) ----------
+{
+  const page = await session('pc', ['ceo@kpjk.co.kr', 'kpjk2026!']);
+  await go(page, '/ax/dashboard');
+  await page.getByRole('button', { name: /건너뛰기/ }).first().click({ timeout: 800 }).catch(() => {});
+  const ops = await page.locator('#ops-strip').boundingBox();
+  const kpi = await page.locator('#tut-kpi').boundingBox();
+  ok('16 대시보드: 운영 현황 6개 상태가 첫 화면(900px)에 · 숫자 칸 바로 아래', !!ops && !!kpi && ops.y + ops.height <= 900 && ops.y > kpi.y, `운영 현황 ${Math.round(ops?.y ?? 0)}~${Math.round((ops?.y ?? 0) + (ops?.height ?? 0))}px`);
+  ok('16 대시보드: 운영 현황은 한 줄(6칸 같은 높이)', new Set(await page.locator('#ops-strip a').evaluateAll((xs) => xs.map((e) => Math.round(e.getBoundingClientRect().top)))).size === 1);
+  const coach = page.getByTestId('coach-start');
+  const ch = (await coach.boundingBox())?.height ?? 999;
+  ok('16 대시보드: 실증 안내는 낮게(기준선 줄 포함 ≤ 150px)', ch <= 150, `${Math.round(ch)}px`);
+  await coach.getByRole('button', { name: /왜 핵심인가요/ }).click(); await sleep(300);
+  ok('16 대시보드: 왜 핵심인가요 → 펼침', await page.getByTestId('coach-why').isVisible());
+
+  await go(page, '/ax/reports');
+  const tabNames = await page.getByRole('tab').allInnerTexts();
+  ok('16 리포트: 탭 4개(실증 진행 · 측정 지점 · 운영 현황 · 실증 기록)', ['실증 진행', '측정 지점', '운영 현황', '실증 기록'].every((t) => tabNames.some((x) => x.includes(t))), tabNames.join(','));
+  await page.getByRole('tab', { name: /^측정 지점/ }).click(); await sleep(300);
+  ok('16 리포트 측정 지점: 기준선 조사 전이면 "미시작"', await page.getByText('도입 전 기준선이 아직 없습니다').first().isVisible() && await page.locator('main').getByText('미시작', { exact: true }).isVisible());
+  await page.getByRole('tab', { name: /^실증 진행/ }).click(); await sleep(300);
+  ok('16 리포트: 다른 탭에서 첫 탭(실증 진행)으로 돌아옴', await page.getByText('영역별 기록 현황').isVisible());
+  // 기준선 조사를 마친 상태 — 저장된 상태에 조사 한 건을 넣고 다시 연다
+  const storeKey = await page.evaluate(() => Object.keys(localStorage).find((k) => { try { return !!JSON.parse(localStorage.getItem(k) ?? 'null')?.state; } catch { return false; } }));
+  await page.evaluate(() => window.__kpjkState().logout());
+  await page.evaluate((key) => { const s = JSON.parse(localStorage.getItem(key)); s.state.settings.baselineSurveys = [{ id: 'bs_t', surveyVersion: 't', phase: 'before', respondentUserId: 'u_admin', respondentName: '시험', recordedAt: new Date().toISOString(), answers: {}, metrics: { docLeadDays: 5 }, source: 'ceo_recall' }]; localStorage.setItem(key, JSON.stringify(s)); }, storeKey);
+  await page.goto(B + '/login', { waitUntil: 'networkidle' });
+  await page.getByLabel('아이디 (이메일)').fill('ceo@kpjk.co.kr'); await page.locator('input[type=password]').first().fill('kpjk2026!');
+  await page.getByRole('button', { name: '로그인' }).click(); await page.waitForURL('**/ax/**'); await sleep(1000);
+  await go(page, '/ax/reports?tab=kpi');
+  ok('16 리포트 측정 지점: 조사를 마쳤으면 "조사 완료"(고정 문구 아님)', await page.getByText('도입 전 기준선 조사 완료').isVisible() && await page.locator('main').getByText('조사 완료', { exact: true }).isVisible() && !(await page.locator('main').getByText('미시작', { exact: true }).isVisible()));
+
+  await go(page, '/ax/tasks');
+  await page.locator('main .page-header').getByRole('link', { name: '자동 규칙' }).click();
+  await page.waitForURL(/\/ax\/settings/); await sleep(900);
+  const rules = await page.locator('#rules').boundingBox();
+  ok('16 업무함 → 자동 규칙: 설정의 자동 업무 규칙으로 바로', /\/ax\/settings#rules/.test(page.url()) && !!rules && rules.y < 450, `${Math.round(rules?.y ?? -1)}px`);
+  const rsTxt = (await page.getByTestId('rules-summary').innerText()).replace(/\s+/g, ' ');
+  const stR = await dump(page);
+  const ruleN = stR.tasks.filter((t) => t.ruleKey && /^(contract_renewal|aftercare_review|result_unread|quote_expiring|doc_overdue_followup|no_contact|progress_report|report_unseen):/.test(t.ruleKey)).length;
+  ok('16 자동 규칙 요약: 켜진 규칙 · 규칙이 만든 업무 수가 기록과 같음', rsTxt.includes(`규칙이 만든 업무 ${ruleN}건`) && /켜진 규칙 \d+ \/ \d+/.test(rsTxt), rsTxt);
+
+  await go(page, '/ax/reports?tab=evidence');
+  const days = await page.locator('[data-activity-day]').evaluateAll((xs) => xs.map((e) => e.getAttribute('data-activity-day')));
+  const firstLabel = await page.locator('[data-activity-day] h3').first().innerText();
+  ok('16 실증 기록: 날짜별 묶음(최신 날짜부터) · 첫 묶음은 오늘', days.length >= 2 && days.every((d, i) => i === 0 || days[i - 1] > d) && firstLabel.startsWith('오늘'), `${days.slice(0, 3).join(',')} / ${firstLabel.split('\n')[0]}`);
+  ok('16 PC 페이지 오류 없음 · 넘침 없음', page.errs.length === 0 && (await overflow(page)) <= 0, page.errs.slice(0, 2).join(' | '));
+}
+
+// ---------- 첫 로그인 안내(튜토리얼) — 휴대폰에서 화면이 끝까지 내려가지 않게 ----------
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await ctx.addInitScript(() => { try { localStorage.setItem('kpjk-test', '1'); } catch {} });
+  const page = await ctx.newPage();
+  page.errs = [];
+  page.on('pageerror', (e) => page.errs.push(String(e)));
+  await page.route('**/*', (r) => (r.request().url().startsWith(B) ? r.continue() : r.abort()));
+  await page.goto(B + '/login', { waitUntil: 'networkidle' });
+  await page.getByLabel('아이디 (이메일)').fill('park@kpjk.co.kr');
+  await page.locator('input[type=password]').first().fill('kpjk2026!');
+  await page.getByRole('button', { name: '로그인' }).click();
+  await page.waitForURL('**/ax/**');
+  const tut = page.getByRole('dialog', { name: '튜토리얼' });
+  await tut.waitFor({ timeout: 8000 });
+  await sleep(1500);
+  ok('16 첫 안내: 맨 위 숫자 칸부터(화면이 끝까지 내려가지 않음)', (await tut.getByText('지금 처리할 숫자').isVisible()) && (await page.evaluate(() => scrollY)) < 700, `scrollY ${await page.evaluate(() => scrollY)}`);
+  await tut.getByRole('button', { name: '다음' }).click(); await sleep(1500);
+  const deep = await page.evaluate(() => scrollY);
+  await tut.getByRole('button', { name: '건너뛰기' }).click(); await sleep(1200);
+  ok('16 첫 안내: 닫으면 화면 맨 위로', (await page.evaluate(() => scrollY)) === 0, `브리핑 단계 ${deep}px → ${await page.evaluate(() => scrollY)}px`);
+  ok('16 첫 안내: 오류 없음', page.errs.length === 0, page.errs.slice(0, 2).join(' | '));
   await ctx.close();
 }
 

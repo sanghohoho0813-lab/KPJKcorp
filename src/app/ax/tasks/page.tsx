@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { CheckSquare, Pencil, Plus, Search } from "lucide-react";
+import { CheckSquare, Pencil, Plus, Repeat, Search } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { AxInsightButton } from "@/components/ai/AxInsight";
 import { daysLate, fmtDate } from "@/lib/format";
@@ -75,7 +75,11 @@ function TasksInner() {
         title="업무함"
         badge={<AxInsightButton topic="tasks" />}
         desc="내가 처리할 업무와 고객 문의를 한 곳에서 봅니다. 고객이 자료를 제출하거나 문의를 남기면 여기에 자동으로 생깁니다."
-        actions={tab === "task" ? <Button variant="accent" icon={<Plus size={16} />} onClick={() => setOpen(true)}>업무 등록</Button> : undefined}
+        actions={tab === "task" ? <>
+          {/* 규칙이 만든 업무('규칙' 배지)가 어디서 오는지 — 대표는 바로 켜고 끄고 기준일을 바꾼다 */}
+          {may("rules.manage") && <LinkButton variant="outline" href="/ax/settings#rules" icon={<Repeat size={15} />}>자동 규칙</LinkButton>}
+          <Button variant="accent" icon={<Plus size={16} />} onClick={() => setOpen(true)}>업무 등록</Button>
+        </> : undefined}
       />
       <Tabs
         tabs={[

@@ -16,8 +16,9 @@ interface Step {
 }
 
 const AX_STEPS: Step[] = [
-  { route: "/ax/dashboard", target: "tut-brief", title: "오늘의 업무 브리핑", body: "시스템을 열면 가장 먼저 '오늘 먼저 확인할 것'이 우선순위로 정리됩니다. '왜?'로 근거를 보고, 바로 아래 버튼으로 안내 초안 작성·업무 등록·단계 변경까지 이 화면에서 끝낼 수 있습니다." },
-  { route: "/ax/dashboard", target: "tut-kpi", title: "핵심 지표", body: "진행 프로젝트, 자료 검토 대기, 미처리 문의, 지연 프로젝트를 한눈에 봅니다. 카드를 누르면 해당 목록으로 이동합니다." },
+  // 화면 위에서 아래 순서로 — 첫 단계가 맨 아래(휴대폰 약 2,000px)를 가리키면 시작부터 화면이 끝까지 내려간다
+  { route: "/ax/dashboard", target: "tut-kpi", title: "지금 처리할 숫자", body: "승인 대기(대표) 또는 오늘 할 업무, 미답변 문의, 자료 검토 대기, 연락 필요를 먼저 봅니다. 바로 아래 한 줄은 운영 현황 6개 상태입니다. 숫자를 누르면 그 목록으로 이동합니다." },
+  { route: "/ax/dashboard", target: "tut-brief", title: "오늘의 업무 브리핑", body: "'오늘 먼저 확인할 것'이 우선순위로 정리됩니다. '왜?'로 근거를 보고, 바로 아래 버튼으로 안내 초안 작성·업무 등록·단계 변경까지 이 화면에서 끝낼 수 있습니다." },
   { route: "/ax/clients", target: "tut-nav-clients", title: "기업고객 카드", body: "기업고객 하나를 열면 상담·계약·프로젝트·자료·일정·문의·결과자료·이력이 한 화면에서 연결됩니다." },
   { route: "/ax/documents", target: "tut-nav-documents", title: "자료 · 누락 관리", body: "고객이 Portal에서 제출한 자료가 여기에 도착합니다. 검토 완료 또는 보완 요청을 하면 고객 Portal 상태가 자동으로 바뀝니다." },
   { route: "/ax/opportunities", target: "tut-nav-approvals", title: "승인 · 매출기회", body: "할인·제안처럼 대표 확인이 필요한 건과, 고객이 관심을 표시한 추가서비스가 여기 모입니다. 승인하면 담당자 업무가 자동으로 생성됩니다." },
@@ -129,6 +130,8 @@ function TutorialRun({ which }: { which: "ax" | "portal" }) {
     if (which === "ax") setSettings({ tutorialDoneAx: true });
     else setSettings({ tutorialDonePortal: true });
     close();
+    // 안내가 내려 둔 자리에 두지 않는다 — 닫으면 화면 맨 위(첫 화면)부터
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }, [which, setSettings, close]);
   return <StepView key={`${which}-${idx}`} step={step} idx={idx} total={steps.length} isMobile={isMobile} onPrev={() => setIdx((i) => Math.max(0, i - 1))} onNext={() => setIdx((i) => Math.min(steps.length - 1, i + 1))} onFinish={finish} />;
 }

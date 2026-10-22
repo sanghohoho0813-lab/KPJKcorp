@@ -25,3 +25,24 @@ export function groupByDay<T>(items: T[], at: (x: T) => string, now = new Date()
   }
   return out;
 }
+
+const WEEK = ["일", "월", "화", "수", "목", "금", "토"];
+const ymdOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+/** 날짜 하나로 묶기(기록처럼 몇 주치가 쌓이는 목록) — "오늘 · 10월 22일", "어제 · 10월 21일", "10월 18일 (토)" */
+export function groupByDate<T>(items: T[], at: (x: T) => string, now = new Date()): { key: string; label: string; items: T[] }[] {
+  const today = ymdOf(now);
+  const y = new Date(now); y.setDate(y.getDate() - 1);
+  const yesterday = ymdOf(y);
+  const out: { key: string; label: string; items: T[] }[] = [];
+  for (const x of items) {
+    const d = new Date(at(x));
+    const key = ymdOf(d);
+    const md = `${d.getMonth() + 1}월 ${d.getDate()}일`;
+    const label = key === today ? `오늘 · ${md}` : key === yesterday ? `어제 · ${md}` : `${md} (${WEEK[d.getDay()]})`;
+    const last = out[out.length - 1];
+    if (last && last.key === key) last.items.push(x);
+    else out.push({ key, label, items: [x] });
+  }
+  return out;
+}
