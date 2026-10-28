@@ -23,6 +23,9 @@ ok("고객: 견적 회신(기존 행) O", writable("quotes", {}, false, client))
 ok("고객: 담당자 알림 보내기 O", writable("notifications", { audience: "internal" }, true, client));
 ok("고객: 고객용 알림 만들기 X (서버 트리거)", !writable("notifications", { audience: "client" }, true, client));
 ok("고객: 내 알림 읽음 O", writable("notifications", { audience: "client" }, false, client));
+ok("고객: 스스로 준비하기 기록 만들기 · 고치기 O (회사 확인은 서버 정책)", writable("selfRuns", {}, true, client) && writable("selfRuns", {}, false, client));
+ok("고객: 학습 자료 X", !writable("learnContents", {}, true, client) && !writable("learnContents", {}, false, client));
+ok("담당자: 학습 자료 · 실행 기록 보냄(대표만 · 근거 확인만은 서버 정책)", writable("learnContents", {}, true, staff) && writable("selfRuns", {}, false, staff));
 ok("고객: 내 이름 기록 O", writable("activities", { actorId: ME }, true, client));
 ok("고객: system 기록 X", !writable("activities", { actorId: "system" }, true, client));
 ok("고객: 서류함·수금·일기 X", ["companyVaults", "companyFiles", "journal", "payments"].every((k) => !writable(k as never, {}, true, client)));

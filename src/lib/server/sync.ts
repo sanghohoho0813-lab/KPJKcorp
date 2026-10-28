@@ -25,8 +25,8 @@ import * as M from "./rows";
 
 /** 부모 먼저. 프로젝트를 기업보다 먼저 보내면 외래키에 걸린다. */
 const ORDER = [
-  "companies", "projects", "programs", "leads",
-  "consultations", "contracts", "docRequests", "schedules", "notices", "tasks",
+  "companies", "projects", "programs", "leads", "learnContents",
+  "consultations", "contracts", "docRequests", "schedules", "notices", "tasks", "selfRuns",
   "companyVaults", "companyFiles", "journal", "payments",
   "inquiries", "results", "opportunities",
   "quotes", "approvals",
@@ -62,6 +62,9 @@ const SPEC: Record<Key, Spec> = {
   journal:       { table: "journal_entries",   toRow: M.journalToRow as Spec["toRow"],      fromRow: M.journalFromRow,      deletable: true,  order: { column: "created_at", ascending: false } },
   payments:      { table: "payments",          toRow: M.paymentToRow as Spec["toRow"],      fromRow: M.paymentFromRow,      deletable: true,  order: { column: "created_at", ascending: true } },
   notices:       { table: "notices",           toRow: M.noticeToRow as Spec["toRow"],       fromRow: M.noticeFromRow,       deletable: true,  order: { column: "published_at", ascending: false } },
+  // 스스로 준비하기 — 지우지 않는다(학습 자료는 비공개로, 실행 기록은 상태로 남긴다)
+  learnContents: { table: "learn_contents",    toRow: M.learnToRow as Spec["toRow"],        fromRow: M.learnFromRow,        deletable: false, order: { column: "updated_at", ascending: false } },
+  selfRuns:      { table: "self_runs",         toRow: M.selfRunToRow as Spec["toRow"],      fromRow: M.selfRunFromRow,      deletable: false, order: { column: "updated_at", ascending: false } },
   tasks:         { table: "tasks",             toRow: M.taskToRow as Spec["toRow"],         fromRow: M.taskFromRow,         deletable: true,  order: { column: "due_date", ascending: true } },
   inquiries:     { table: "inquiries",         toRow: M.inquiryToRow as Spec["toRow"],      fromRow: M.inquiryFromRow,      deletable: true,  order: { column: "created_at", ascending: false } },
   results:       { table: "results",           toRow: M.resultToRow as Spec["toRow"],       fromRow: M.resultFromRow,       deletable: true,  order: { column: "shared_at", ascending: false } },
@@ -93,6 +96,8 @@ export interface LoadResult {
   offline?: boolean;
   data?: Partial<StoreState>;
   settings?: ServerSettings;
+  /** 서버에 아직 없는 새 표(최신 setup.sql 을 다시 실행하면 생긴다) */
+  missing?: string[];
   /**
    * 받은 내용을 화면에 실제로 넣었을 때 부른다 — 그때서야 "이 판을 받았다"고 기억한다.
    * 읽는 사이 내가 뭔가 바꿔 받은 것을 버리는 경우에는 부르지 않는다(기억하면 다음 번에 다시 받지 않아 남의 변경을 놓친다).
@@ -112,6 +117,14 @@ export interface LoadResult {
  */
 /** 고객 계정은 이 표들을 고객용 보기로 읽는다 (내부 칸이 빠진 것) — setup.sql 의 client_* 보기 */
 const CLIENT_VIEW: Partial<Record<string, string>> = { companies: "client_companies", projects: "client_projects", opportunities: "client_opportunities" };
+
+/**
+ * 나중에 생긴 표 — 대표님 서버에 최신 setup.sql 을 아직 돌리지 않았으면 없다.
+ * 없다고 로그인 전체를 막지 않는다: 빈 목록으로 읽고, 무엇이 없는지 알려 준다(저장하려 할 때 안내).
+ */
+const OPTIONAL_TABLES = new Set(["learn_contents", "self_runs"]);
+export const isMissingTable = (e: { code?: string; message?: string } | null | undefined) =>
+  !!e && (e.code === "42P01" || e.code === "PGRST205" || /does not exist|Could not find the table/i.test(e.message ?? ""));
 
 const PAGE = 1000;
 type Rows = { data: Record<string, unknown>[] | null; error: { code?: string; message?: string } | null };
@@ -164,9 +177,14 @@ export async function loadAll(opts: { client?: boolean; userId?: string; increme
     const q = sb.from(t).select("*");
     return (order ? q.order(order.column, { ascending: order.ascending }) : q).order("id", { ascending: true });
   };
-  const read = async (table: string, order?: { column: string; ascending: boolean }) => {
+  const missing: string[] = [];
+  const read = async (table: string, order?: { column: string; ascending: boolean }): Promise<Rows> => {
     const view = client ? CLIENT_VIEW[table] : undefined;
-    if (!view) return readPaged(query(table, order));
+    if (!view) {
+      const r = await readPaged(query(table, order));
+      if (r.error && OPTIONAL_TABLES.has(table) && isMissingTable(r.error)) { missing.push(table); return { data: [], error: null }; }
+      return r;
+    }
     const r = await readPaged(query(view, order));
     // 아직 새 setup.sql 을 돌리지 않은 서버 — 보기가 없으면 예전처럼 표에서 읽는다
     if (r.error && (r.error.code === "42P01" || r.error.code === "PGRST205" || /does not exist|Could not find the table/i.test(r.error.message ?? ""))) return readPaged(query(table, order));
@@ -250,6 +268,7 @@ export async function loadAll(opts: { client?: boolean; userId?: string; increme
     const st = settings.data as Record<string, unknown> | null;
     return {
       ok: true,
+      missing,
       commit: () => { if (cache && heavyCache === cache) for (const [t, e] of staged) cache.fp.set(t, e); },
       data: data as Partial<StoreState>,
       settings: {
@@ -310,7 +329,8 @@ export function writable(key: Key, row: Record<string, unknown>, isNew: boolean,
     case "quotes":        return !isNew;                       // 수락·보류 회신만
     case "notifications": return isNew ? row.audience === "internal" : row.audience === "client"; // 담당자 알림 보내기 · 내 알림 읽음
     case "surveys":       return isNew;
-    default:              return false;                        // 업무·프로젝트 등 내부 자료
+    case "selfRuns":      return true;                         // 스스로 준비하기 — 자기 회사 것만(서버 정책이 회사를 확인한다)
+    default:              return false;                        // 업무·프로젝트·학습 자료 등 내부 자료
   }
 }
 

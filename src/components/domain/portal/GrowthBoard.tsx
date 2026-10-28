@@ -3,7 +3,7 @@
 import { CancelRequestButton, OnBehalfNote, useOnBehalf } from "./CancelRequest";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ArrowRight, CalendarDays, Check, CheckCircle2, FileCheck2, FolderUp, MessageSquarePlus, Receipt, Sparkles, ThumbsUp, TrendingUp } from "lucide-react";
+import { ArrowRight, CalendarDays, Check, CheckCircle2, FileCheck2, FolderUp, Footprints, MessageSquarePlus, Receipt, Sparkles, ThumbsUp, TrendingUp } from "lucide-react";
 import { useStore, useCurrentUser } from "@/lib/store";
 import { growthBoard, type GrowthItem, type NowAction } from "@/lib/growth";
 import { ENTITY_TYPES, yearsSince, EMPLOYEE_BANDS } from "@/lib/company-options";
@@ -19,8 +19,8 @@ import { Icon3D } from "./Icon3D";
 /** 고객 홈의 성장과제 판에 필요한 것을 한 번에 계산한다 */
 export function useGrowth(c: Company | undefined) {
   const st = useStore();
-  return useMemo(() => (c ? growthBoard({ company: c, projects: st.projects, opportunities: st.opportunities, docRequests: st.docRequests, quotes: st.quotes, results: st.results, schedules: st.schedules, now: new Date() }) : null),
-    [c, st.projects, st.opportunities, st.docRequests, st.quotes, st.results, st.schedules]);
+  return useMemo(() => (c ? growthBoard({ company: c, projects: st.projects, opportunities: st.opportunities, docRequests: st.docRequests, quotes: st.quotes, results: st.results, schedules: st.schedules, now: new Date(), selfRuns: st.selfRuns, programs: st.programs }) : null),
+    [c, st.projects, st.opportunities, st.docRequests, st.quotes, st.results, st.schedules, st.selfRuns, st.programs]);
 }
 
 /* ------------------------------ 우리 회사 현재 상태 ------------------------------ */
@@ -68,12 +68,12 @@ export function CompanyStatusCard({ company: c, board, greeting, footer }: { com
 /* ------------------------------ 지금 해야 할 일 ------------------------------ */
 
 const ACTION_ICON: Record<NowAction["kind"], React.ReactNode> = {
-  doc: <FolderUp size={19} />, quote: <Receipt size={19} />, proposal: <Sparkles size={19} />, schedule: <CalendarDays size={19} />, result: <FileCheck2 size={19} />,
+  doc: <FolderUp size={19} />, quote: <Receipt size={19} />, proposal: <Sparkles size={19} />, schedule: <CalendarDays size={19} />, result: <FileCheck2 size={19} />, self: <Footprints size={19} />,
 };
 /** 줄 오른쪽 버튼 말 — 누르면 무엇을 하는지 (배달 앱의 "다시 주문"·"주문 추적"처럼 한 단어) */
-const ACTION_CTA: Record<NowAction["kind"], string> = { doc: "올리기", quote: "회신", proposal: "보기", schedule: "일정", result: "보기" };
+const ACTION_CTA: Record<NowAction["kind"], string> = { doc: "올리기", quote: "회신", proposal: "보기", schedule: "일정", result: "보기", self: "이어서" };
 const ACTION_TONE: Record<NowAction["kind"], string> = {
-  doc: "bg-[#fff1e6] text-[#c25a12]", quote: "bg-[#e8f0ff] text-[#2f5bd3]", proposal: "bg-[#f3ecff] text-[#6b3fd1]", schedule: "bg-[#eef3fb] text-[#3b5b8c]", result: "bg-[#e9f7f7] text-[#13807f]",
+  doc: "bg-[#fff1e6] text-[#c25a12]", quote: "bg-[#e8f0ff] text-[#2f5bd3]", proposal: "bg-[#f3ecff] text-[#6b3fd1]", schedule: "bg-[#eef3fb] text-[#3b5b8c]", result: "bg-[#e9f7f7] text-[#13807f]", self: "bg-[#eaf6ee] text-[#2f7d4f]",
 };
 
 export function NowActions({ actions, companyId }: { actions: NowAction[]; companyId: string }) {

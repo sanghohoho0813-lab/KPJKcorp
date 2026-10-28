@@ -124,6 +124,16 @@ const full = {
     role: "admin" as const, answers: {}, freeText: "f", submittedAt: "x", durationSec: 1,
   },
   user: { id: "u1", name: "n", role: "admin" as const, title: "t", email: "E@X.COM", phone: "p", companyId: "co_1", active: true },
+  learn: {
+    id: "lc_1", category: "c", title: "t", audience: "a", videoUrl: "https://youtu.be/dQw4w9WgXcQ", minutes: 5, summary: "s", body: ["b"],
+    prepItems: ["p"], links: [{ label: "l", url: "https://x.kr" }], programTags: ["정책자금"], forAllPrograms: true, growthAreas: ["인사노무"],
+    published: true, createdAt: "x", updatedAt: "x", updatedBy: "00000000-0000-0000-0000-000000000001",
+  },
+  selfRun: {
+    id: "sr_1", companyId: "co_1", kind: "program" as const, targetKey: "bz_1", targetTitle: "t", status: "preparing" as const, checks: { notice: "x" },
+    note: "n", evidence: [], helpRef: "op_1", startedAt: "x", statusAt: "x", createdBy: "00000000-0000-0000-0000-000000000001",
+    updatedBy: "00000000-0000-0000-0000-000000000001", createdAt: "x", updatedAt: "x",
+  },
 };
 
 const CASES: [string, string, Record<string, unknown>][] = [
@@ -148,6 +158,8 @@ const CASES: [string, string, Record<string, unknown>][] = [
   ["activities",        "activity",    M.activityToRow(full.activity)],
   ["notifications",     "notification",M.notificationToRow(full.notification)],
   ["surveys",           "survey",      M.surveyToRow(full.survey)],
+  ["learn_contents",    "learn",       M.learnToRow(full.learn)],
+  ["self_runs",         "selfRun",     M.selfRunToRow(full.selfRun)],
 ];
 
 let fail = 0;

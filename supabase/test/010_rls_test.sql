@@ -492,6 +492,89 @@ select chk('대표: 자동 완료 기록(system)을 남긴다',
        affected($$insert into public.activities(id, type, company_id, actor_id, actor_role, message) values ('ac_ru1','task_completed','co_a',null,'system','업무 완료(대표가 경과 보고 확인)')$$), 1::bigint);
 reset role; reset request.jwt.claim.sub;
 
+-- =========================== 스스로 준비하기 — 학습 자료 · 고객 실행 기록 (2026-10-28) ==========
+-- 학습 자료: 공개는 누구나, 비공개는 내부만, 쓰기는 대표만. 실행 기록: 고객은 자기 회사 것만, 담당자는 읽고 근거 확인만.
+-- 고객이 신청 · 선정 · 완료를 기록하면 서버가 담당자 알림 · 확인 업무(한 번)를 만든다.
+insert into public.learn_contents(id, category, title, summary, published) values
+  ('lc_pub', '공고문 읽기', '공개 자료', '요약', true),
+  ('lc_hid', '공고문 읽기', '비공개 자료', '요약', false);
+set role anon;
+select chk('비회원: 공개 학습 자료만 본다',          visible($$select * from public.learn_contents$$), 1::bigint);
+select chk('비회원: 학습 자료를 못 만든다',          denied($$insert into public.learn_contents(id, title) values ('x','x')$$), true);
+select chk('비회원: 고객 실행 기록을 못 본다',       visible($$select * from public.self_runs$$), 0::bigint);
+select chk('비회원: 고객 실행 기록을 못 만든다',     denied($$insert into public.self_runs(id, company_id, kind, target_key, target_title, status, created_by) values ('sr_anon','co_a','learn','lc_pub','lc_pub','learned','00000000-0000-0000-0000-00000000f001')$$), true);
+reset role;
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000f001';
+select chk('고객A: 공개 학습 자료만 본다',          visible($$select * from public.learn_contents$$), 1::bigint);
+select chk('고객A: 학습 자료를 못 고친다',           affected($$update public.learn_contents set title='x' where id='lc_pub'$$), 0::bigint);
+select chk('고객A: 자기 회사 직접 준비 기록을 만든다', affected($$insert into public.self_runs(id, company_id, kind, target_key, target_title, status, created_by) values ('sr_a1','co_a','program','bz_t1','bz_t1','preparing','00000000-0000-0000-0000-00000000f001')$$), 1::bigint);
+select chk('고객A: 같은 공고 두 번째 기록은 DB 가 막는다(중복 없음)', dup_blocked($$insert into public.self_runs(id, company_id, kind, target_key, target_title, status, created_by) values ('sr_a1b','co_a','program','bz_t1','bz_t1','preparing','00000000-0000-0000-0000-00000000f001')$$), true);
+select chk('고객A: 다른 회사 이름으로는 못 만든다',  denied($$insert into public.self_runs(id, company_id, kind, target_key, target_title, status, created_by) values ('sr_x','co_b','program','bz_t1','bz_t1','preparing','00000000-0000-0000-0000-00000000f001')$$), true);
+select chk('고객A: 다른 사람 이름으로는 못 만든다',  denied($$insert into public.self_runs(id, company_id, kind, target_key, target_title, status, created_by) values ('sr_y','co_a','program','bz_t9','bz_t9','preparing','00000000-0000-0000-0000-00000000c001')$$), true);
+select chk('고객A: 종류에 없는 상태는 못 넣는다',     denied($$insert into public.self_runs(id, company_id, kind, target_key, target_title, status, created_by) values ('sr_z','co_a','program','bz_t8','bz_t8','done','00000000-0000-0000-0000-00000000f001')$$), true);
+select chk('고객A: 처음부터 담당자 확인을 붙일 수 없다', denied($$insert into public.self_runs(id, company_id, kind, target_key, target_title, status, created_by, evidence) values ('sr_w','co_a','program','bz_t7','bz_t7','preparing','00000000-0000-0000-0000-00000000f001', '[{"id":"e1","kind":"number","label":"접수번호","value":"2026-001","confirmedAt":"2026-10-28T00:00:00Z"}]')$$), true);
+select chk('고객A: 신청 완료로 바꾼다',              affected($$update public.self_runs set status='applied', status_at=now() where id='sr_a1'$$), 1::bigint);
+reset role; reset request.jwt.claim.sub;
+select chk('서버: 신청 완료 → 담당자 알림',         (select count(*) from public.notifications where audience='internal' and company_id='co_a' and title='고객이 지원사업을 직접 신청했습니다'), 1::bigint);
+select chk('서버: 신청 완료만으로는 업무를 만들지 않는다', (select count(*) from public.tasks where rule_key like 'self_run:sr_a1:%'), 0::bigint);
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000f001';
+select chk('고객A: 접수번호 근거를 남긴다',          affected($$update public.self_runs set evidence='[{"id":"e1","kind":"number","label":"접수번호","value":"2026-001"}]' where id='sr_a1'$$), 1::bigint);
+select chk('고객A: 스스로 담당자 확인을 붙일 수 없다', affected($$update public.self_runs set evidence='[{"id":"e1","kind":"number","label":"접수번호","value":"2026-001","confirmedAt":"2026-10-28T00:00:00Z"}]' where id='sr_a1'$$), -1::bigint);
+select chk('고객A: 선정을 기록한다',                affected($$update public.self_runs set status='selected', status_at=now() where id='sr_a1'$$), 1::bigint);
+reset role; reset request.jwt.claim.sub;
+select chk('서버: 선정 → 확인 업무 한 건',          (select count(*) from public.tasks where rule_key='self_run:sr_a1:selected'), 1::bigint);
+select chk('서버: 선정 업무 담당은 그 회사 담당 컨설턴트', (select assignee_id from public.tasks where rule_key='self_run:sr_a1:selected'), '00000000-0000-0000-0000-00000000c001'::uuid);
+select chk('서버: 선정 업무 생성도 기록으로',       (select count(*) from public.activities where type='task_created' and company_id='co_a' and message like '자동 업무 생성:%선정%'), 1::bigint);
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000f001';
+select chk('고객A: 결과 대기로 되돌린다',          affected($$update public.self_runs set status='waiting', status_at=now() where id='sr_a1'$$), 1::bigint);
+select chk('고객A: 다시 선정으로',                  affected($$update public.self_runs set status='selected', status_at=now() where id='sr_a1'$$), 1::bigint);
+select chk('고객A: 자기 실행 활동을 남긴다',         affected($$insert into public.activities(id, type, company_id, actor_id, actor_role, message, meta) values ('ac_sr1','self_status','co_a','00000000-0000-0000-0000-00000000f001','client','시험 공고: 결과 대기 → 선정 (고객 입력)','{"runId":"sr_a1","to":"selected"}')$$), 1::bigint);
+select chk('고객A: 자기 실행 활동을 다시 본다(고객 화면 기록)', visible($$select 1 from public.activities where id='ac_sr1'$$), 1::bigint);
+reset role; reset request.jwt.claim.sub;
+select chk('서버: 되돌렸다 다시 선정해도 확인 업무는 하나', (select count(*) from public.tasks where rule_key='self_run:sr_a1:selected'), 1::bigint);
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000f002';
+select chk('고객B: A사 실행 기록이 안 보인다',     visible($$select * from public.self_runs where company_id='co_a'$$), 0::bigint);
+select chk('고객B: A사 실행 기록을 못 바꾼다',       affected($$update public.self_runs set status='stopped' where id='sr_a1'$$), 0::bigint);
+select chk('고객B: A사 실행 활동이 안 보인다',       visible($$select 1 from public.activities where company_id='co_a' and type like 'self_%'$$), 0::bigint);
+reset role; reset request.jwt.claim.sub;
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000c001';
+select chk('컨설턴트: 고객 실행 기록을 본다',       visible($$select * from public.self_runs where id='sr_a1'$$), 1::bigint);
+select chk('컨설턴트: 고객이 고른 상태는 못 바꾼다',  affected($$update public.self_runs set status='stopped' where id='sr_a1'$$), -1::bigint);
+select chk('컨설턴트: 고객 대신 실행 기록을 만들지 못한다', denied($$insert into public.self_runs(id, company_id, kind, target_key, target_title, status, created_by) values ('sr_c1','co_a','growth','인사노무','인사노무','exploring','00000000-0000-0000-0000-00000000c001')$$), true);
+select chk('컨설턴트: 고객 근거를 확인한다',          affected($$update public.self_runs set evidence='[{"id":"e1","kind":"number","label":"접수번호","value":"2026-001","confirmedAt":"2026-10-28T00:00:00Z","confirmedBy":"00000000-0000-0000-0000-00000000c001"}]' where id='sr_a1'$$), 1::bigint);
+select chk('컨설턴트: 비공개 학습 자료도 본다',       visible($$select * from public.learn_contents$$), 2::bigint);
+select chk('컨설턴트: 학습 자료는 못 고친다(대표만)', affected($$update public.learn_contents set title='x' where id='lc_pub'$$), 0::bigint);
+reset role; reset request.jwt.claim.sub;
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000f001';
+select chk('고객A: 담당자가 확인한 근거는 못 지운다', affected($$update public.self_runs set evidence='[]' where id='sr_a1'$$), -1::bigint);
+select chk('고객A: 기록 대상은 못 바꾼다',            affected($$update public.self_runs set target_key='bz_other' where id='sr_a1'$$), -1::bigint);
+select chk('고객A: 성장과제 직접 알아보기 시작',       affected($$insert into public.self_runs(id, company_id, kind, target_key, target_title, status, created_by) values ('sr_g1','co_a','growth','기업부설연구소','기업부설연구소','exploring','00000000-0000-0000-0000-00000000f001')$$), 1::bigint);
+select chk('고객A: 성장과제 완료 기록',               affected($$update public.self_runs set status='done', status_at=now() where id='sr_g1'$$), 1::bigint);
+reset role; reset request.jwt.claim.sub;
+select chk('서버: 성장과제 완료 → 확인 · 기업정보 반영 업무', (select count(*) from public.tasks where rule_key='self_run:sr_g1:done'), 1::bigint);
+select chk('서버: 성장과제 완료 → 담당자 알림',       (select count(*) from public.notifications where audience='internal' and company_id='co_a' and title='고객이 성장과제를 직접 완료했습니다'), 1::bigint);
+update public.app_settings set consultant_scope = 'own' where id = 1;
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000c002';
+select chk('컨설턴트(내 담당만): 다른 회사 실행 기록은 안 보인다', visible($$select * from public.self_runs where company_id='co_a'$$), 0::bigint);
+reset role; reset request.jwt.claim.sub;
+update public.app_settings set consultant_scope = 'all' where id = 1;
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000a001';
+select chk('대표: 학습 자료를 만든다',               affected($$insert into public.learn_contents(id, category, title) values ('lc_new','새 분류','새 자료')$$), 1::bigint);
+select chk('대표: 비공개 자료를 공개로',              affected($$update public.learn_contents set published=true where id='lc_hid'$$), 1::bigint);
+select chk('대표: YouTube 가 아닌 영상 주소는 DB 가 거절', denied($$update public.learn_contents set video_url='https://evil.example/v' where id='lc_new'$$), true);
+reset role; reset request.jwt.claim.sub;
+set role anon;
+select chk('비회원: 대표가 공개하면 바로 보인다',     visible($$select * from public.learn_contents$$), 2::bigint);
+reset role;
+
 -- =========================== 결과 ===========================================
 select n, case when pass then '통과' else '실패' end as 결과, label as 검증, detail as 비고
 from _r order by n;

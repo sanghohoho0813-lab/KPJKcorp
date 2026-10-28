@@ -8,7 +8,7 @@ import type { Activity, ActivityType } from "./types";
  * 기록 자체는 고치지 않는다 — 보는 범위만 바꾼다.
  */
 
-export type EvidenceGroup = "company" | "sales" | "project" | "docs" | "work" | "comms" | "account" | "data";
+export type EvidenceGroup = "company" | "sales" | "project" | "docs" | "work" | "comms" | "self" | "account" | "data";
 
 export const EVIDENCE_GROUPS: { key: EvidenceGroup; label: string }[] = [
   { key: "docs", label: "요청자료" },
@@ -16,6 +16,7 @@ export const EVIDENCE_GROUPS: { key: EvidenceGroup; label: string }[] = [
   { key: "project", label: "프로젝트·결과물" },
   { key: "work", label: "업무·일정·규칙" },
   { key: "comms", label: "문의·공지·의견" },
+  { key: "self", label: "스스로 준비하기" },
   { key: "company", label: "기업고객" },
   { key: "account", label: "로그인·권한" },
   { key: "data", label: "데이터·설정" },
@@ -42,6 +43,7 @@ export const GROUP_OF: Record<ActivityType, EvidenceGroup> = {
   user_created: "account", user_updated: "account", user_deactivated: "account", password_reset: "account",
   evidence_exported: "data", backup_exported: "data", backup_imported: "data", data_exported: "data", live_mode_changed: "data",
   org_updated: "data", demo_reset: "data", samples_removed: "data", samples_restored: "data", baseline_survey_saved: "data",
+  self_started: "self", self_status: "self", self_evidence: "self", self_confirmed: "self", self_help: "self", learn_saved: "self",
 };
 
 export type Period = "all" | "today" | "7" | "30" | "custom";

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { type ReactNode, useState } from "react";
-import { AlertTriangle, FileCheck2, NotebookPen, Wallet, Megaphone, Archive, ArrowRight, Building2, KeyRound, Pencil, ShieldAlert, Trash2, UserPlus, CalendarDays, CheckCircle2, ChevronDown, FileUp, MessageSquare, Clock, FileText, RefreshCw, Sparkles, Upload, UserCheck, Search, Briefcase, Bell, LogIn, Download, RotateCcw, TrendingUp, ShieldCheck, ClipboardList, UserMinus, Repeat, Receipt, Ruler, XCircle } from "lucide-react";
+import { AlertTriangle, FileCheck2, NotebookPen, Wallet, Megaphone, Archive, ArrowRight, Building2, KeyRound, Pencil, ShieldAlert, Trash2, UserPlus, CalendarDays, CheckCircle2, ChevronDown, FileUp, MessageSquare, Clock, FileText, RefreshCw, Sparkles, Upload, UserCheck, Search, Briefcase, Bell, LogIn, Download, RotateCcw, TrendingUp, ShieldCheck, ClipboardList, UserMinus, Repeat, Receipt, Ruler, XCircle, Footprints, BookOpen } from "lucide-react";
 import type { Activity, DocStatus, InternalStage, Schedule, TaskStatus, Priority, InquiryStatus } from "@/lib/types";
 import { DOC_STATUS, INQUIRY_STATUS, PRIORITY, SCHEDULE_TYPE, TASK_STATUS, stageLabel, stageProgress } from "@/lib/stages";
 import type { BriefItem } from "@/lib/brief";
@@ -162,6 +162,12 @@ export function BriefList({ items, limit, compact, emptyText }: { items: BriefIt
 
 /* ---------- Activity feed (Evidence) ---------- */
 const ACT_ICON: Record<Activity["type"], ReactNode> = {
+  self_started: <Footprints size={14} />,
+  self_status: <Footprints size={14} />,
+  self_evidence: <FileCheck2 size={14} />,
+  self_confirmed: <ShieldCheck size={14} />,
+  self_help: <MessageSquare size={14} />,
+  learn_saved: <BookOpen size={14} />,
   notice_published: <Megaphone size={14} />,
   notice_read: <Megaphone size={14} />,
   notice_updated: <Megaphone size={14} />,

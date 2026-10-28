@@ -456,14 +456,12 @@ export interface SupportProgram {
   createdBy?: string;
 }
 
-/* ---------- 성장 학습 자료 (스스로 준비하기) ---------- */
-
-/** 학습 분류 — 운영자가 이름을 바꾸거나 더한다 */
-export interface LearnCategory { key: string; label: string }
+/* ---------- 성장 학습 자료 · 자기주도 실행 (스스로 준비하기) ---------- */
 
 /** 학습 자료 — 운영자(대표)가 등록 · 공개한다. 영상은 YouTube 주소가 있을 때만, 없으면 글 안내 + 공식 사이트 */
 export interface LearnContent {
   id: string;
+  /** 분류 이름 — 이름이 곧 분류다(운영자가 새 이름을 적으면 새 분류) */
   category: string;
   title: string;
   /** 추천 대상 (예: 처음 정책자금을 알아보는 기업) */
@@ -479,14 +477,67 @@ export interface LearnContent {
   prepItems: string[];
   /** 관련 공식 사이트 — https 만 */
   links: { label: string; url: string }[];
-  /** 관련 지원사업: 공고 이름 · 분야 · 지원내용에 이 낱말이 있으면 연결 */
+  /** 관련 지원사업: 공고 이름 · 분야 · 지원내용 · 꼬리표에 이 낱말이 있으면 연결 */
   programTags: string[];
+  /** 어느 공고에나 붙는 공통 자료(공고 찾기 · 공고문 읽기 · 서류) */
+  forAllPrograms?: boolean;
   /** 관련 성장과제(KPJK 분야 이름) */
   growthAreas: string[];
   published: boolean;
   createdAt: string;
   updatedAt: string;
   updatedBy?: string;
+}
+
+/** 무엇을 직접 하고 있는가 — 지원사업 직접 준비 · 성장과제 직접 실행 · 학습 완료 */
+export type SelfRunKind = "program" | "growth" | "learn";
+/** 지원사업: 준비 중 → 신청 완료 → 결과 대기 → 선정 / 미선정 · 중단 */
+export type ProgramRunStatus = "preparing" | "applied" | "waiting" | "selected" | "not_selected" | "stopped";
+/** 성장과제: 알아보는 중 · 검토 완료 · 준비 중 · 직접 신청 · 완료 · 진행 안 함 */
+export type GrowthRunStatus = "exploring" | "reviewed" | "preparing" | "applied" | "done" | "skipped";
+export type SelfRunStatus = ProgramRunStatus | GrowthRunStatus | "learned";
+
+/** 고객이 남긴 근거 — 접수번호(글) 또는 접수확인서 · 선정통보서(파일). 담당자가 확인하면 confirmedBy 가 붙는다 */
+export interface SelfRunEvidence {
+  id: string;
+  kind: "number" | "file";
+  /** 무엇인가 (예: 접수번호 · 접수확인서 · 선정통보서) */
+  label: string;
+  value?: string;
+  fileName?: string;
+  size?: number;
+  /** 서버 보관함(documents 버킷) 경로 — 회사 폴더 아래 */
+  storagePath?: string;
+  at: string;
+  by: string;
+  confirmedBy?: string;
+  confirmedAt?: string;
+}
+
+/**
+ * 자기주도 실행 기록 — 기업 · 종류 · 대상마다 한 건(중복 없음). 상태가 바뀔 때마다 활동 기록이 하나씩 남는다.
+ * 고객이 직접 입력한 값이다. 담당자가 근거 자료를 확인하면 그 근거에 확인 표시가 붙는다(입력과 확인을 구분).
+ */
+export interface SelfRun {
+  id: string;
+  companyId: string;
+  kind: SelfRunKind;
+  /** 지원사업 id · 성장과제 분야 이름 · 학습 자료 id */
+  targetKey: string;
+  targetTitle: string;
+  status: SelfRunStatus;
+  /** 체크리스트 — 항목 키 → 체크한 시각 */
+  checks: Record<string, string>;
+  note?: string;
+  evidence: SelfRunEvidence[];
+  /** 직접 하다가 전문가 도움을 요청한 매출기회 id */
+  helpRef?: string;
+  startedAt: string;
+  statusAt: string;
+  createdBy: string;
+  updatedBy?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type LeadStatus = "new" | "contacted" | "converted" | "dropped";
@@ -794,7 +845,14 @@ export type ActivityType =
   | "journal_written"
   | "payment_added"
   | "payment_received"
-  | "payment_removed";
+  | "payment_removed"
+  // 스스로 준비하기 — 고객의 직접 실행(시작 · 상태 · 근거 · 도움 요청)과 담당자 확인 · 학습 자료 관리
+  | "self_started"
+  | "self_status"
+  | "self_evidence"
+  | "self_confirmed"
+  | "self_help"
+  | "learn_saved";
 
 export interface Activity {
   id: string;

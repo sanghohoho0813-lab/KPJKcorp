@@ -7,15 +7,18 @@
  *   진행 중 과제  ← 진행 중 프로젝트
  *   검토 중 과제  ← 고객이 요청했거나 담당자가 제안한 매출기회
  *   다음 검토 과제 ← 아래 규칙(기업정보·진행이력·상담 때 고른 관심 분야)로 고른 것 — 근거를 한 줄로 함께 보인다
+ *   직접 진행 중  ← 고객이 "직접 알아볼게요"로 시작한 실행 기록(SelfRun) — 완료하면 완료한 과제로 올라가고
+ *                   이어지는 과제 규칙(FOLLOW_UP)이 그대로 다음 과제를 고른다. 검토 완료 · 진행 안 함은 다시 권하지 않는다.
  *
  * 규칙은 "검토해 볼 만한 항목"까지만 말한다. 될지 안 될지, 얼마가 나오는지 판단하지 않는다.
  * 정책자금 같은 자금 판단은 하지 않는다(KPJK 컨설팅 분야만 다룬다).
  */
-import type { Company, DocumentRequest, Opportunity, Project, Quote, ResultFile, Schedule } from "./types";
+import type { Company, DocumentRequest, Opportunity, Project, Quote, ResultFile, Schedule, SelfRun, SupportProgram } from "./types";
 import { KPJK_SERVICES, OPP_STATUS, type ServiceDef } from "./services";
 import { CUSTOMER_STEPS, stageProgress, stageToCustomerStep } from "./stages";
 import { yearsSince } from "./company-options";
 import { isPolicyRequest } from "./policy-docs";
+import { checkProgress, guideOf, isOpen, nextStep, statusLabel } from "./self-run";
 
 export interface GrowthCtx {
   company: Company;
@@ -26,9 +29,13 @@ export interface GrowthCtx {
   results: ResultFile[];
   schedules: Schedule[];
   now: Date;
+  /** 고객의 자기주도 실행 기록 — 없으면 예전과 똑같이 동작한다 */
+  selfRuns?: SelfRun[];
+  /** 직접 준비 중인 지원사업의 마감일을 다음 행동에 붙이려고 */
+  programs?: SupportProgram[];
 }
 
-export type GrowthState = "done" | "active" | "review" | "proposed" | "suggested";
+export type GrowthState = "done" | "active" | "review" | "proposed" | "suggested" | "self";
 
 export interface GrowthItem {
   area: string;                // KPJK 컨설팅 분야 이름 (가지급금 …)
@@ -46,11 +53,13 @@ export interface GrowthItem {
   statusLabel?: string;
   doneAt?: string;
   resultCount?: number;
+  /** 고객이 직접 진행한(하는) 기록 */
+  selfRun?: SelfRun;
 }
 
 export interface NowAction {
   key: string;
-  kind: "doc" | "quote" | "proposal" | "schedule" | "result";
+  kind: "doc" | "quote" | "proposal" | "schedule" | "result" | "self";
   title: string;
   sub?: string;
   href: string;
@@ -101,8 +110,6 @@ export function growthBoard(ctx: GrowthCtx) {
     (done ? completed : active).push(item);
     taken.add(area);
   }
-  completed.sort((a, b) => (b.doneAt ?? "").localeCompare(a.doneAt ?? ""));
-
   // 검토 중(고객이 요청함) · 담당자 제안 — 매출기회 기준. 같은 분야는 하나로 합친다(요청이 제안보다 앞)
   const review: GrowthItem[] = [];
   const proposed: GrowthItem[] = [];
@@ -120,6 +127,24 @@ export function growthBoard(ctx: GrowthCtx) {
     taken.add(area);
   }
 
+  // 고객이 직접 진행한(하는) 성장과제 — 담당자 프로젝트 · 요청이 있는 분야는 그쪽이 먼저(이미 taken)
+  const self: GrowthItem[] = [];
+  const selfClosed: GrowthItem[] = [];
+  const growthRuns = (ctx.selfRuns ?? []).filter((r) => r.companyId === c.id && r.kind === "growth").sort((a, b) => b.statusAt.localeCompare(a.statusAt));
+  const adopted = new Set<string>(); // 판에 올린 직접 실행 — 같은 분야를 담당자가 진행 중이면 그쪽이 보인다
+  for (const r of growthRuns) {
+    const area = r.targetKey;
+    if (taken.has(area)) continue;
+    adopted.add(r.id);
+    const { done, total } = checkProgress(r);
+    const base: GrowthItem = { area, state: "self", service: svcOf(area), selfRun: r, basis: "직접 진행", statusLabel: statusLabel("growth", r.status), progress: total ? Math.round((done / total) * 100) : undefined };
+    if (r.status === "done") completed.push({ ...base, state: "done", statusLabel: guideOf(area).doneLabel ?? "완료", doneAt: r.statusAt });
+    else if (isOpen(r)) self.push(base);
+    else selfClosed.push(base); // 검토 완료 · 진행 안 함 — 다시 권하지 않는다
+    taken.add(area);
+  }
+  completed.sort((a, b) => (b.doneAt ?? "").localeCompare(a.doneAt ?? ""));
+
   // 다음 검토 과제 — 규칙. 근거가 분명한 것만, 최대 3개
   const suggested: GrowthItem[] = [];
   const add = (area: string, reason: string, basis: string) => {
@@ -127,7 +152,7 @@ export function growthBoard(ctx: GrowthCtx) {
     suggested.push({ area, state: "suggested", service: svcOf(area), reason, basis, statusLabel: "검토해 볼 과제" });
   };
   // 1) 진행·완료한 과제에 이어지는 것
-  for (const it of [...completed, ...active]) for (const f of FOLLOW_UP[it.area] ?? []) add(f.next, f.why, `진행이력: ${it.area}${it.state === "done" ? " 완료" : " 진행 중"}`);
+  for (const it of [...completed, ...active]) for (const f of FOLLOW_UP[it.area] ?? []) add(f.next, f.why, `진행이력: ${it.area}${it.state === "done" ? (it.selfRun ? " 직접 완료" : " 완료") : " 진행 중"}`);
   // 2) 상담 때 관심 분야로 고른 것
   for (const k of c.interests ?? []) { const a = INTEREST_TO_AREA[k]; if (a) add(a, "상담 때 관심 분야로 말씀하신 항목입니다.", "상담 관심 분야"); }
   // 3) 기업정보
@@ -152,8 +177,15 @@ export function growthBoard(ctx: GrowthCtx) {
   if (policy.length >= 2) actions.push({ key: "doc_policy", kind: "doc", title: `정책자금 서류 ${policy.length}개 올리기`, sub: policy.some((d) => d.status === "revision") ? "보완 요청이 있습니다" : "공고 전에 미리 모아 둡니다", href: "/portal/documents#policy-docs", urgent: policy.some((d) => d.status === "revision" || d.dueDate < nowIso) });
   for (const q of ctx.quotes.filter((x) => x.companyId === c.id && x.status === "sent")) actions.push({ key: `q_${q.id}`, kind: "quote", title: `${q.title} — 회신하기`, sub: "이대로 진행 / 조금 더 생각", href: "/portal/services" });
   for (const p of proposed.slice(0, 2)) actions.push({ key: `pr_${p.area}`, kind: "proposal", title: `담당자 제안: ${p.area} — 검토하기`, sub: p.reason?.slice(0, 40), href: "/portal/services" });
+  // 직접 진행 중인 것 — 지원사업 준비 · 성장과제 실행의 다음 한 걸음(최대 3개, 급한 것 먼저)
+  const selfNext = (ctx.selfRuns ?? [])
+    .filter((r) => r.companyId === c.id && (r.kind === "program" || (r.kind === "growth" && adopted.has(r.id))))
+    .map((r) => ({ r, n: nextStep(r, r.kind === "program" ? ctx.programs?.find((p) => p.id === r.targetKey) : undefined, now) }))
+    .filter((x): x is { r: SelfRun; n: NonNullable<ReturnType<typeof nextStep>> } => !!x.n)
+    .sort((a, b) => Number(!!b.n.urgent) - Number(!!a.n.urgent) || b.r.statusAt.localeCompare(a.r.statusAt));
+  for (const { r, n } of selfNext.slice(0, 3)) actions.push({ key: `self_${r.id}`, kind: "self", title: n.title, sub: n.sub, href: n.href, urgent: n.urgent });
   const nextMeet = ctx.schedules.filter((s) => s.companyId === c.id && s.visibleToClient && s.start >= nowIso && s.start <= now7).sort((a, b) => a.start.localeCompare(b.start))[0];
   if (nextMeet) actions.push({ key: `s_${nextMeet.id}`, kind: "schedule", title: `${nextMeet.title} 예정`, sub: new Date(nextMeet.start).toLocaleString("ko-KR", { month: "numeric", day: "numeric", weekday: "short", hour: "numeric", minute: "2-digit" }), href: "/portal/schedule" });
 
-  return { completed, active, review, proposed, suggested: suggested.slice(0, 3), actions };
+  return { completed, active, review, proposed, suggested: suggested.slice(0, 3), actions, self, selfClosed };
 }

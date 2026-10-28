@@ -45,6 +45,11 @@ import type {
   SurveyResponse,
   Task,
   TaskStatus,
+  LearnContent,
+  SelfRun,
+  SelfRunEvidence,
+  SelfRunKind,
+  SelfRunStatus,
 } from "./types";
 import { nowIso, uid, addDays, iso, daysBetween, fmtDate } from "./format";
 import { followKey, type FollowKind } from "./consult-followups";
@@ -56,8 +61,10 @@ import { RULE_BY_KEY, ruleDays, ruleOn } from "./rules";
 import { emptyVault, slotLabel, slotsOf } from "./vault";
 import { PAYMENT_KIND_LABEL, WORK_STATUS, workStatusOf } from "./work-status";
 import { JOURNAL_TYPE } from "./journal";
-import { OPP_STATUS, SERVICE_BY_KEY } from "./services";
+import { KPJK_SERVICES, OPP_STATUS, SERVICE_BY_KEY } from "./services";
 import { can, ROLE_LABEL, type Permission } from "./permissions";
+import { canSet, checkProgress, findRun, followUpOf, selfRunId, statusLabel as selfStatusLabel } from "./self-run";
+import { DEFAULT_LEARN_CATEGORIES, STARTER_LEARN, cleanLearnInput } from "./learn";
 import { isUnreadFor } from "./notifications";
 import { toLegacyBaseline } from "./baseline-survey";
 import { serverConfigured, setDemoForced, supa } from "./server/client";
@@ -96,6 +103,8 @@ export interface StoreState extends SeedData {
   serverMode: boolean;
   /** 서버 저장이 실패했을 때 사용자에게 보일 마지막 사유 */
   syncError?: string;
+  /** 서버에 아직 없는 새 표 — 최신 setup.sql 을 다시 실행하기 전. 그 기능은 저장 대신 안내를 띄운다 */
+  serverMissing?: string[];
   /** 서버에 아직 저장되지 않은 줄 수 (보관했다가 다시 보낸다) */
   unsaved?: number;
   /** 이 화면(탭)에서 서버 내용을 마지막으로 받아 넣은 시각 — 새로고침 직후 "아직 오는 중"과 "정말 비어 있음"을 가른다(저장하지 않음) */
@@ -247,6 +256,26 @@ export interface StoreState extends SeedData {
   shareProgram: (programId: string, companyIds: string[], byUserId: string) => number;
   /** 고객: 이 공고 담당 컨설턴트에게 물어보기 → 매출기회·상담 연락 업무·담당자 알림 */
   askProgram: (programId: string, companyId: string, byUserId: string, note?: string) => boolean;
+  // ---- 스스로 준비하기: 학습 자료(대표) · 자기주도 실행(고객) ----
+  /** 학습 자료 새로 만들기 · 고치기. 링크는 https, 영상은 YouTube 주소만 받는다 */
+  saveLearn: (input: Partial<LearnContent> & { id?: string }, byUserId: string) => { ok: true; id: string } | { ok: false; problems: string[] };
+  setLearnPublished: (id: string, published: boolean, byUserId: string) => void;
+  /** KPJK 기본 안내 7개를 비공개로 더한다(이미 있는 것은 건너뜀) — 검토 후 공개 */
+  importStarterLearn: (byUserId: string) => number;
+  /** 분류 이름 바꾸기 — 그 분류의 자료 전부 */
+  renameLearnCategory: (from: string, to: string, byUserId: string) => number;
+  /** 고객: 직접 준비 · 알아보기 · 학습 완료 시작. 같은 대상이면 있는 기록을 돌려준다(중복 없음) */
+  startSelfRun: (data: { companyId: string; kind: SelfRunKind; targetKey: string; targetTitle: string }) => string | null;
+  /** 고객: 상태 바꾸기 — 바뀔 때만 기록. 신청 · 선정 · 완료는 담당자에게 알림(선정 · 완료는 확인 업무) */
+  setSelfStatus: (runId: string, to: SelfRunStatus, note?: string) => boolean;
+  toggleSelfCheck: (runId: string, key: string, on: boolean) => void;
+  /** 고객: 접수번호 · 접수확인서 같은 근거 — 담당자 확인 전까지는 고객 첨부로 보인다 */
+  addSelfEvidence: (runId: string, ev: Omit<SelfRunEvidence, "id" | "at" | "by" | "confirmedBy" | "confirmedAt">) => string | null;
+  removeSelfEvidence: (runId: string, evidenceId: string) => void;
+  /** 담당자: 고객 근거 확인 */
+  confirmSelfEvidence: (runId: string, evidenceId: string, byUserId: string) => void;
+  /** 고객: 직접 하다가 전문가 도움 요청 — 과제 · 공고 정보와 지금 진행 상태를 그대로 담아 기존 상담 요청으로 */
+  requestSelfHelp: (runId: string, note: string) => boolean;
   /** 가망고객 남기기 (데모 모드. 서버 모드는 화면이 서버에 바로 넣고 서버가 후속을 만든다) */
   submitLeadLocal: (lead: Lead) => void;
   updateLeadStatus: (id: string, status: LeadStatus, byUserId: string) => void;
@@ -354,6 +383,18 @@ function deny(
   return true;
 }
 
+/**
+ * 서버에 아직 없는 새 표에 쓰려 하면 — 저장이 거절되기 전에 막고 무엇을 해야 하는지 알린다(true = 막음).
+ * 최신 setup.sql 을 다시 실행하면 표가 생기고 다음 불러오기부터 그대로 쓰인다.
+ */
+function tableMissing(st: StoreState, table: string): boolean {
+  if (!st.serverMode || !st.serverMissing?.includes(table)) return false;
+  st.toast(st.session?.role === "admin"
+    ? "서버에 이 기능의 표가 아직 없습니다. Supabase 에서 최신 setup.sql 을 한 번 다시 실행해 주세요 (설정 › 데이터 › 서버 › 연결 점검)."
+    : "이 기능은 서버 설정 업데이트 뒤에 저장됩니다. 담당 컨설턴트에게 알려 주세요.", "error");
+  return true;
+}
+
 function makeNotification(n: Omit<Notification, "id" | "at" | "read">): Notification {
   return { ...n, id: uid("nt"), at: nowIso(), read: false };
 }
@@ -361,7 +402,7 @@ function makeNotification(n: Omit<Notification, "id" | "at" | "read">): Notifica
 /** 백업에 반드시 있어야 하는 목록 (처음부터 있던 것) */
 const BACKUP_KEYS: (keyof SeedData)[] = ["users", "companies", "consultations", "contracts", "projects", "docRequests", "schedules", "tasks", "inquiries", "results", "opportunities", "quotes", "approvals", "surveys", "activities", "notifications"];
 /** 나중에 생긴 목록 — 옛 백업에는 없을 수 있다 */
-const BACKUP_OPTIONAL_KEYS: (keyof SeedData)[] = ["notices", "companyVaults", "companyFiles", "journal", "payments"];
+const BACKUP_OPTIONAL_KEYS: (keyof SeedData)[] = ["notices", "companyVaults", "companyFiles", "journal", "payments", "learnContents", "selfRuns"];
 
 /** 서버 모드로 들어가거나 로그아웃할 때의 빈 상태. 남의 데이터가 화면에 남아 있으면 안 된다. */
 const EMPTY_DATA: SeedData = {
@@ -369,6 +410,7 @@ const EMPTY_DATA: SeedData = {
   schedules: [], tasks: [], inquiries: [], results: [], opportunities: [], quotes: [],
   approvals: [], surveys: [], notices: [], activities: [], notifications: [],
   companyVaults: [], companyFiles: [], journal: [], payments: [], programs: [], leads: [],
+  learnContents: [], selfRuns: [],
 };
 
 /**
@@ -384,6 +426,7 @@ function applyServer(
   user: User,
   data: Partial<StoreState>,
   server: ServerSettings | undefined,
+  missing: string[] = [],
 ) {
   const cur = get().settings;
   // 대표가 보기 전환 중이었다면(같은 계정) 새로고침 뒤에도 그 화면을 유지한다
@@ -397,6 +440,7 @@ function applyServer(
     ...data,
     serverMode: true,
     syncError: undefined,
+    serverMissing: missing,
     authLost: false,
     serverLoadedAt: Date.now(),
     session: {
@@ -2017,6 +2061,197 @@ export const useStore = create<StoreState>()(
         return true;
       },
 
+      saveLearn: (input, byUserId) => {
+        const st = get();
+        if (deny(st, "learn.manage", `학습 자료 저장 (${input.title ?? input.id ?? ""})`, set)) return { ok: false, problems: ["학습 자료는 대표 계정에서만 고칠 수 있습니다."] };
+        if (tableMissing(st, "learn_contents")) return { ok: false, problems: ["서버에 학습 자료 표가 아직 없습니다 — 최신 setup.sql 을 다시 실행해 주세요."] };
+        const { value, problems } = cleanLearnInput(input);
+        if (problems.length) return { ok: false, problems };
+        const now = nowIso();
+        const cur = input.id ? st.learnContents.find((x) => x.id === input.id) : undefined;
+        let next: LearnContent;
+        if (cur) {
+          next = { ...cur, ...value, id: cur.id, title: (value.title ?? cur.title).trim(), createdAt: cur.createdAt, updatedAt: now, updatedBy: byUserId };
+        } else {
+          if (!value.title?.trim()) return { ok: false, problems: ["제목을 적어 주세요."] };
+          next = {
+            id: uid("lc"), category: value.category || DEFAULT_LEARN_CATEGORIES[0], title: value.title.trim(), audience: value.audience?.trim() || undefined,
+            videoUrl: value.videoUrl, minutes: value.minutes, summary: value.summary?.trim() ?? "", body: value.body ?? [], prepItems: value.prepItems ?? [],
+            links: value.links ?? [], programTags: value.programTags ?? [], forAllPrograms: value.forAllPrograms, growthAreas: value.growthAreas ?? [],
+            published: !!value.published, createdAt: now, updatedAt: now, updatedBy: byUserId,
+          };
+        }
+        set({
+          learnContents: cur ? st.learnContents.map((x) => (x.id === cur.id ? next : x)) : [next, ...st.learnContents],
+          activities: [makeActivity({ type: "learn_saved", actorId: byUserId, actorRole: st.session?.role ?? "admin", text: `학습 자료 ${cur ? "수정" : "등록"}: ${next.title}${next.published ? " (공개)" : " (비공개)"}`, meta: { learnId: next.id } }), ...st.activities],
+        });
+        return { ok: true, id: next.id };
+      },
+      setLearnPublished: (id, published, byUserId) => {
+        const st = get();
+        const cur = st.learnContents.find((x) => x.id === id);
+        if (!cur || cur.published === published) return;
+        if (deny(st, "learn.manage", `학습 자료 ${published ? "공개" : "비공개"} (${cur.title})`, set) || tableMissing(st, "learn_contents")) return;
+        set({
+          learnContents: st.learnContents.map((x) => (x.id === id ? { ...x, published, updatedAt: nowIso(), updatedBy: byUserId } : x)),
+          activities: [makeActivity({ type: "learn_saved", actorId: byUserId, actorRole: st.session?.role ?? "admin", text: `학습 자료 ${published ? "공개" : "비공개"}: ${cur.title}`, meta: { learnId: id } }), ...st.activities],
+        });
+      },
+      importStarterLearn: (byUserId) => {
+        const st = get();
+        if (deny(st, "learn.manage", "기본 안내 불러오기", set) || tableMissing(st, "learn_contents")) return 0;
+        const have = new Set(st.learnContents.map((x) => x.id));
+        const now = nowIso();
+        const add: LearnContent[] = STARTER_LEARN.filter((x) => !have.has(x.id)).map((x) => ({ ...x, published: false, createdAt: now, updatedAt: now, updatedBy: byUserId }));
+        if (!add.length) return 0;
+        set({
+          learnContents: [...add, ...st.learnContents],
+          activities: [makeActivity({ type: "learn_saved", actorId: byUserId, actorRole: st.session?.role ?? "admin", text: `기본 안내 ${add.length}개 불러오기 (비공개 — 검토 후 공개)` }), ...st.activities],
+        });
+        return add.length;
+      },
+      renameLearnCategory: (from, to, byUserId) => {
+        const st = get();
+        const name = to.trim();
+        if (!name || name === from) return 0;
+        if (deny(st, "learn.manage", `학습 분류 이름 바꾸기 (${from})`, set) || tableMissing(st, "learn_contents")) return 0;
+        const now = nowIso();
+        const hit = st.learnContents.filter((x) => x.category === from);
+        if (!hit.length) return 0;
+        set({
+          learnContents: st.learnContents.map((x) => (x.category === from ? { ...x, category: name, updatedAt: now, updatedBy: byUserId } : x)),
+          activities: [makeActivity({ type: "learn_saved", actorId: byUserId, actorRole: st.session?.role ?? "admin", text: `학습 분류 이름 바꿈: ${from} → ${name} (${hit.length}개)` }), ...st.activities],
+        });
+        return hit.length;
+      },
+      startSelfRun: ({ companyId, kind, targetKey, targetTitle }) => {
+        const st = get();
+        const s = st.session;
+        if (deny(st, "self.run", `스스로 준비하기 (${targetTitle})`, set)) return null;
+        // 고객 본인 회사만 — 담당자 미리보기로는 "고객이 했다"는 기록을 만들지 않는다
+        if (!s || s.role !== "client" || s.portalPreviewCompanyId || s.companyId !== companyId) return null;
+        const existing = findRun(st.selfRuns, companyId, kind, targetKey);
+        if (!existing && tableMissing(st, "self_runs")) return null;
+        if (existing) return existing.id;
+        const now = nowIso();
+        const status: SelfRunStatus = kind === "program" ? "preparing" : kind === "growth" ? "exploring" : "learned";
+        const run: SelfRun = { id: selfRunId(companyId, kind, targetKey), companyId, kind, targetKey, targetTitle: targetTitle.slice(0, 200), status, checks: {}, evidence: [], startedAt: now, statusAt: now, createdBy: s.userId, createdAt: now, updatedAt: now };
+        const text = kind === "learn" ? `학습 완료(고객 입력): ${run.targetTitle}` : kind === "program" ? `지원사업 직접 준비 시작: ${run.targetTitle}` : `성장과제 직접 알아보기 시작: ${targetKey}`;
+        set({
+          selfRuns: [run, ...st.selfRuns],
+          activities: [makeActivity({ type: "self_started", companyId, actorId: s.userId, actorRole: "client", text, meta: { runId: run.id, kind, target: targetKey.slice(0, 120), to: status } }), ...st.activities],
+        });
+        return run.id;
+      },
+      setSelfStatus: (runId, to, note) => {
+        const st = get();
+        const s = st.session;
+        const r = st.selfRuns.find((x) => x.id === runId);
+        if (!r) return false;
+        if (deny(st, "self.run", `스스로 준비하기 상태 (${r.targetTitle})`, set)) return false;
+        if (!s || s.role !== "client" || s.portalPreviewCompanyId || s.companyId !== r.companyId) return false;
+        if (!canSet(r.kind, to) || r.status === to || tableMissing(st, "self_runs")) return false;
+        const now = nowIso();
+        const from = r.status;
+        const next: SelfRun = { ...r, status: to, statusAt: now, updatedAt: now, updatedBy: s.userId, ...(note !== undefined ? { note: note.trim() || undefined } : {}) };
+        const company = st.companies.find((c) => c.id === r.companyId);
+        const what = r.kind === "program" ? `지원사업 '${r.targetTitle}'` : r.targetKey;
+        const acts: Activity[] = [makeActivity({ type: "self_status", companyId: r.companyId, actorId: s.userId, actorRole: "client", text: `${what}: ${selfStatusLabel(r.kind, from)} → ${selfStatusLabel(r.kind, to)} (고객 입력)`, meta: { runId, kind: r.kind, target: r.targetKey.slice(0, 120), from, to } })];
+        const notifs: Notification[] = [];
+        const tasks: Task[] = [];
+        // 담당자 알림 · 확인 업무 — 서버 모드에서는 서버(트리거 kpjk_after_self_run)가 만든다. 고객은 업무를 직접 만들 수 없다
+        const fu = followUpOf(r, to, company?.name ?? "고객");
+        if (fu && !st.serverMode) {
+          notifs.push(makeNotification({ audience: "internal", companyId: r.companyId, title: fu.notify.title, body: fu.notify.body, href: `/ax/clients/${r.companyId}?tab=portal` }));
+          if (fu.task && !st.tasks.some((t) => t.ruleKey === fu.task!.ruleKey)) {
+            tasks.push({ id: uid("tk"), companyId: r.companyId, title: fu.task.title.slice(0, 160), type: "후속연락", dueDate: iso(addDays(new Date(), fu.task.dueDays, 18)), assigneeId: company?.consultantId ?? "u_admin", status: "todo", priority: "normal", createdAt: now, source: "auto", ruleKey: fu.task.ruleKey, memo: "고객이 '스스로 준비하기'에서 기록한 내용입니다. 근거 자료를 확인해 주세요." });
+            acts.push(makeActivity({ type: "task_created", companyId: r.companyId, actorId: "system", actorRole: "system", text: `자동 업무 생성: ${fu.task.title}`.slice(0, 200) }));
+          }
+        }
+        set({
+          selfRuns: st.selfRuns.map((x) => (x.id === runId ? next : x)),
+          tasks: tasks.length ? [...tasks, ...st.tasks] : st.tasks,
+          notifications: notifs.length ? [...notifs, ...st.notifications] : st.notifications,
+          activities: [...acts, ...st.activities],
+        });
+        return true;
+      },
+      toggleSelfCheck: (runId, key, on) => {
+        const st = get();
+        const s = st.session;
+        const r = st.selfRuns.find((x) => x.id === runId);
+        if (!r || !s || s.role !== "client" || s.portalPreviewCompanyId || s.companyId !== r.companyId) return;
+        if (!!r.checks[key] === on) return;
+        const checks = { ...r.checks };
+        if (on) checks[key] = nowIso(); else delete checks[key];
+        set({ selfRuns: st.selfRuns.map((x) => (x.id === runId ? { ...x, checks, updatedAt: nowIso(), updatedBy: s.userId } : x)) });
+      },
+      addSelfEvidence: (runId, ev) => {
+        const st = get();
+        const s = st.session;
+        const r = st.selfRuns.find((x) => x.id === runId);
+        if (!r) return null;
+        if (deny(st, "self.run", `근거 남기기 (${r.targetTitle})`, set)) return null;
+        if (!s || s.role !== "client" || s.portalPreviewCompanyId || s.companyId !== r.companyId) return null;
+        const value = ev.value?.trim().slice(0, 120);
+        if (ev.kind === "number" && !value) return null;
+        const item: SelfRunEvidence = { id: uid("ev"), kind: ev.kind, label: ev.label.trim().slice(0, 40) || "근거", value: value || undefined, fileName: ev.fileName?.slice(0, 200), size: ev.size, storagePath: ev.storagePath, at: nowIso(), by: s.userId };
+        set({
+          selfRuns: st.selfRuns.map((x) => (x.id === runId ? { ...x, evidence: [...x.evidence, item], updatedAt: item.at, updatedBy: s.userId } : x)),
+          activities: [makeActivity({ type: "self_evidence", companyId: r.companyId, actorId: s.userId, actorRole: "client", text: `근거 남김(확인 전): ${item.label}${item.fileName ? ` · ${item.fileName}` : ""} — ${r.kind === "program" ? r.targetTitle : r.targetKey}`, meta: { runId, evidenceId: item.id } }), ...st.activities],
+        });
+        return item.id;
+      },
+      removeSelfEvidence: (runId, evidenceId) => {
+        const st = get();
+        const s = st.session;
+        const r = st.selfRuns.find((x) => x.id === runId);
+        if (!r || !s || s.role !== "client" || s.portalPreviewCompanyId || s.companyId !== r.companyId) return;
+        // 담당자가 확인한 근거는 고객이 지우지 못한다(확인 기록이 어긋난다)
+        if (!r.evidence.some((e) => e.id === evidenceId && !e.confirmedAt)) return;
+        set({ selfRuns: st.selfRuns.map((x) => (x.id === runId ? { ...x, evidence: x.evidence.filter((e) => e.id !== evidenceId), updatedAt: nowIso(), updatedBy: s.userId } : x)) });
+      },
+      confirmSelfEvidence: (runId, evidenceId, byUserId) => {
+        const st = get();
+        const r = st.selfRuns.find((x) => x.id === runId);
+        const e = r?.evidence.find((x) => x.id === evidenceId);
+        if (!r || !e || e.confirmedAt) return;
+        if (deny(st, "self.confirm", `고객 근거 확인 (${r.targetTitle})`, set)) return;
+        const now = nowIso();
+        set({
+          selfRuns: st.selfRuns.map((x) => (x.id === runId ? { ...x, evidence: x.evidence.map((y) => (y.id === evidenceId ? { ...y, confirmedBy: byUserId, confirmedAt: now } : y)), updatedAt: now, updatedBy: byUserId } : x)),
+          activities: [makeActivity({ type: "self_confirmed", companyId: r.companyId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `고객 근거 확인: ${e.label} — ${r.kind === "program" ? r.targetTitle : r.targetKey}`, meta: { runId, evidenceId } }), ...st.activities],
+        });
+      },
+      requestSelfHelp: (runId, note) => {
+        const st = get();
+        const s = st.session;
+        const r = st.selfRuns.find((x) => x.id === runId);
+        if (!r || !s || s.role !== "client" || s.portalPreviewCompanyId || s.companyId !== r.companyId) return false;
+        if (r.helpRef && st.opportunities.some((o) => o.id === r.helpRef && o.status !== "dropped")) return true;
+        const { done, total } = checkProgress(r);
+        const ctx = `[스스로 준비하기에서 요청] 지금 상태: ${selfStatusLabel(r.kind, r.status)}${total ? ` · 준비 ${done}/${total}` : ""}`;
+        const text = [ctx, note.trim()].filter(Boolean).join("\n");
+        let oppId: string | undefined;
+        if (r.kind === "program") {
+          if (!get().askProgram(r.targetKey, r.companyId, s.userId, text)) return false;
+          const p = get().programs.find((x) => x.id === r.targetKey);
+          const name = `지원사업: ${p?.title ?? r.targetTitle}`.slice(0, 120);
+          oppId = get().opportunities.find((o) => o.companyId === r.companyId && o.serviceKey === "support_program" && o.serviceName === name && o.status !== "dropped")?.id;
+        } else if (r.kind === "growth") {
+          const svc = KPJK_SERVICES.find((x) => x.name === r.targetKey);
+          if (!svc) return false;
+          get().raiseOpportunity({ companyId: r.companyId, serviceKey: svc.key, note: text, reason: `고객이 직접 진행하다 도움을 요청했습니다 (${selfStatusLabel(r.kind, r.status)})`, source: "portal_request" }, s.userId, "client");
+          oppId = get().opportunities.find((o) => o.companyId === r.companyId && o.serviceKey === svc.key && o.status !== "dropped")?.id;
+        }
+        if (!oppId) return false;
+        const after = get();
+        set({
+          selfRuns: after.selfRuns.map((x) => (x.id === runId ? { ...x, helpRef: oppId, updatedAt: nowIso(), updatedBy: s.userId } : x)),
+          activities: [makeActivity({ type: "self_help", companyId: r.companyId, actorId: s.userId, actorRole: "client", text: `직접 진행 중 전문가 도움 요청: ${r.kind === "program" ? r.targetTitle : r.targetKey}`, meta: { runId, opportunityId: oppId } }), ...after.activities],
+        });
+        return true;
+      },
       submitLeadLocal: (lead) => {
         const st = get();
         const owner = st.users.find((u) => u.id === lead.refUserId && u.role !== "client") ?? st.users.find((u) => u.role === "admin");
@@ -2511,7 +2746,7 @@ export const useStore = create<StoreState>()(
         resetLoadCache();
         const loaded = await loadAll({ client: r.user.role === "client", userId: r.user.id });
         if (!loaded.ok || !loaded.data) return { ok: false, reason: loaded.reason, offline: loaded.offline };
-        applyServer(set, get, r.user, loaded.data, loaded.settings);
+        applyServer(set, get, r.user, loaded.data, loaded.settings, loaded.missing);
         loaded.commit?.();
         // 데모와 같은 기록을 서버에도 남긴다 — 고객 Portal 접속 횟수·실증 기록이 서버 모드에서 0으로 보이면 안 된다.
         // (새로고침으로 다시 붙을 때는 남기지 않는다 — 로그인한 것이 아니다)
@@ -2559,7 +2794,7 @@ export const useStore = create<StoreState>()(
         }
         // 미리보기 중이던 고객 화면은 유지한다
         const preview = get().session?.userId === me.user.id ? get().session?.portalPreviewCompanyId : undefined;
-        applyServer(set, get, me.user, loaded.data, loaded.settings);
+        applyServer(set, get, me.user, loaded.data, loaded.settings, loaded.missing);
         loaded.commit?.();
         if (preview) set({ session: { ...get().session!, portalPreviewCompanyId: preview } });
         return true;
@@ -2610,6 +2845,7 @@ export const useStore = create<StoreState>()(
           ...loaded.data,
           live: arrived.length ? [...arrived, ...(cur.live ?? [])].slice(0, 4) : cur.live,
           syncError: undefined,
+          serverMissing: loaded.missing ?? [],
           serverLoadedAt: Date.now(),
           // 역할이 바뀌었으면 따라간다. 미리보기·로그인 시각은 그대로 둔다
           // 보기 전환 중인 대표는 보고 있는 역할을 유지한다(실제 역할이 대표가 아니게 되면 풀린다)
@@ -2758,6 +2994,7 @@ export const useStore = create<StoreState>()(
           companyFiles: st.companyFiles.filter(keepC),
           journal: st.journal.filter(keepC),
           payments: st.payments.filter(keepC),
+          selfRuns: st.selfRuns.filter(keepC),
         };
         const after = next.projects.length + next.consultations.length + next.contracts.length + next.docRequests.length + next.schedules.length + next.tasks.length + next.inquiries.length + next.results.length + next.opportunities.length + next.quotes.length + next.approvals.length + next.activities.length + next.notifications.length;
         const counts = { companies: ids.size, projects: pids.size, records: before - after };
@@ -2814,6 +3051,7 @@ export const useStore = create<StoreState>()(
           companyFiles: [...st.companyFiles, ...seed.companyFiles.filter(inC)],
           journal: [...st.journal, ...seed.journal.filter(inC)],
           payments: [...st.payments, ...seed.payments.filter(inC)],
+          selfRuns: [...st.selfRuns, ...seed.selfRuns.filter(inC)],
           activities: [
             makeActivity({ type: "samples_restored", actorId: byUserId, actorRole: "admin", text: `샘플 데이터 다시 보기 — 기업 ${companies.length} · 프로젝트 ${projects.length}` }),
             ...st.activities,

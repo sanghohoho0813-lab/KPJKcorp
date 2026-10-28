@@ -1,6 +1,6 @@
 // 성장과제 판(lib/growth) — 규칙이 근거 있는 것만 고르는지, 상태가 기존 데이터에서 맞게 읽히는지
 import { growthBoard } from "../../src/lib/growth";
-import type { Company, Opportunity, Project } from "../../src/lib/types";
+import type { Company, Opportunity, Project, SelfRun } from "../../src/lib/types";
 
 let fail = 0;
 const ok = (c: boolean, m: string) => { console.log((c ? "OK  " : "FAIL") + " " + m); if (!c) fail++; };
@@ -53,5 +53,26 @@ b = growthBoard({
 ok(b.actions.length === 3 && b.actions[0].title.includes("주주명부") && !!b.actions[0].urgent, "기한 지난 자료가 먼저 · 빨강");
 ok(b.actions.some((a) => a.title.includes("정관 보완")), "보완 요청은 '보완해서 다시 올리기'");
 ok(b.actions.some((a) => a.kind === "quote"), "회신 기다리는 견적");
+
+// 5) 고객의 자기주도 실행 기록(SelfRun) → 성장과제 판 갱신 · 다음 과제 · 다음 행동
+const sr = (x: Partial<SelfRun>): SelfRun => ({ id: "sr_" + Math.random().toString(36).slice(2, 7), companyId: "co_t", kind: "growth", targetKey: "기업부설연구소", targetTitle: "기업부설연구소", status: "exploring", checks: {}, evidence: [], startedAt: now.toISOString(), statusAt: now.toISOString(), createdBy: "c1", createdAt: now.toISOString(), updatedAt: now.toISOString(), ...x });
+const lab = co({ industry: "제조업", entityType: "corporation", establishedAt: "2021-01-01" });
+const before = growthBoard({ ...base, company: lab });
+ok(JSON.stringify(growthBoard({ ...base, company: lab, selfRuns: [] })) === JSON.stringify(before), "실행 기록이 없으면 판은 예전과 똑같다");
+ok(before.suggested.some((x) => x.area === "기업부설연구소"), "(전제) 제조업 → 연구소가 다음 검토 과제");
+b = growthBoard({ ...base, company: lab, selfRuns: [sr({ status: "exploring", checks: { req: now.toISOString() } })] });
+ok(b.self.length === 1 && b.self[0].area === "기업부설연구소" && b.self[0].progress === 20 && !b.suggested.some((x) => x.area === "기업부설연구소"), "직접 알아보는 중 → '직접 진행 중'으로 옮겨지고 추천에서 빠진다 (1/5 = 20%)");
+ok(b.actions.some((a) => a.kind === "self" && a.title.includes("기업부설연구소") && a.href.startsWith("/portal/self/growth/")), "지금 해야 할 일에 직접 진행의 다음 한 걸음");
+b = growthBoard({ ...base, company: lab, selfRuns: [sr({ status: "done" })] });
+ok(b.completed.some((x) => x.area === "기업부설연구소" && x.basis === "직접 진행" && x.statusLabel === "신고 완료"), "직접 완료 → 완료한 과제(근거: 직접 진행 · 신고 완료)");
+ok(b.suggested.some((x) => x.area === "특허자본" && x.basis === "진행이력: 기업부설연구소 직접 완료"), "직접 완료 → 이어지는 과제 규칙이 특허자본을 다음 과제로");
+b = growthBoard({ ...base, company: lab, selfRuns: [sr({ status: "skipped" })] });
+ok(!b.suggested.some((x) => x.area === "기업부설연구소") && b.selfClosed.length === 1 && !b.actions.some((a) => a.kind === "self"), "진행 안 함 → 다시 권하지 않고 다음 행동도 없다");
+b = growthBoard({ ...base, company: lab, projects: [pj({ type: "기업부설연구소", stage: "in_progress" })], selfRuns: [sr({ status: "exploring" })] });
+ok(b.active.length === 1 && b.self.length === 0 && !b.actions.some((a) => a.kind === "self"), "담당자가 같은 분야를 진행 중이면 그쪽이 먼저(직접 실행은 판에 겹치지 않음)");
+b = growthBoard({ ...base, company: lab, selfRuns: [sr({ companyId: "co_other", status: "done" })] });
+ok(!b.completed.length && JSON.stringify(b.suggested) === JSON.stringify(before.suggested), "다른 회사 실행 기록은 섞이지 않는다");
+b = growthBoard({ ...base, company: lab, programs: [{ id: "bz_1", title: "스마트공장", agency: "a", category: "기술", regions: [], tags: [], source: "bizinfo", notified: [], fetchedAt: "x", applyEnd: "2026-10-04" }], selfRuns: [sr({ kind: "program", targetKey: "bz_1", targetTitle: "스마트공장", status: "preparing" })] });
+ok(b.actions[0]?.kind === "self" && b.actions[0].sub === "마감 D-3" && b.actions[0].urgent === true, "직접 준비 중인 공고 → 마감 D-3 급한 일로 맨 앞");
 console.log(fail ? `\nFAIL ${fail}` : "\n전부 통과");
 process.exit(fail ? 1 : 0);

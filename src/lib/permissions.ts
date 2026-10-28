@@ -52,6 +52,9 @@ export type Permission =
   | "contract.manage"
   | "result.withdraw"
   | "rules.manage"
+  | "learn.manage"
+  | "self.run"
+  | "self.confirm"
   | "data.manage"
   | "notice.write"
   | "vault.write"
@@ -100,6 +103,12 @@ const POLICY: Record<Permission, Role[]> = {
   "contract.manage": ["admin"],
   "result.withdraw": ["admin", "consultant", "staff"],
   "rules.manage": ["admin"],
+  /** 학습 자료 등록 · 수정 · 공개 — 대표만 */
+  "learn.manage": ["admin"],
+  /** 스스로 준비하기 기록 — 고객 본인만(담당자가 고객 대신 "고객이 했다"는 기록을 만들지 않는다) */
+  "self.run": ["client"],
+  /** 고객이 올린 접수확인서 · 선정통보서 확인 */
+  "self.confirm": ["admin", "consultant", "staff"],
   // 운영 모드 전환·백업·복원·데모 초기화. 데이터 전체를 바꾸는 일이라 대표만
   "data.manage": ["admin"],
   // 공지는 여러 고객에게 한 번에 나간다 — 내부 계정만 쓴다
@@ -158,6 +167,9 @@ export const PERMISSION_ROWS: { label: string; perms: Permission[] }[] = [
   { label: "계약 직접 등록 · 수정", perms: ["contract.manage"] },
   { label: "결과자료 회수", perms: ["result.withdraw"] },
   { label: "자동 업무 규칙 설정", perms: ["rules.manage"] },
+  { label: "학습 자료 등록 · 공개", perms: ["learn.manage"] },
+  { label: "스스로 준비하기 기록 (직접 준비 · 결과)", perms: ["self.run"] },
+  { label: "고객 직접 실행 근거 확인", perms: ["self.confirm"] },
   { label: "운영 모드 · 백업 · 복원", perms: ["data.manage"] },
   { label: "사용자 계정 관리", perms: ["user.manage"] },
 ];

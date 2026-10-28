@@ -26,7 +26,7 @@
 --    - 맨 마지막에 설치 결과 표가 한 줄 나옵니다. 그것으로 성공을 확인하세요.
 --
 --  이 파일이 만드는 것
---    1부. 표 26개          — 기업·프로젝트·상담·계약·자료·일정·공지·업무·문의·견적·기록·서류함·업무 일기·수금·지원사업 공고·가망고객
+--    1부. 표 28개          — 기업·프로젝트·상담·계약·자료·일정·공지·업무·문의·견적·기록·서류함·업무 일기·수금·지원사업 공고·가망고객·학습 자료·스스로 준비하기 기록
 --    2부. 접근 권한        — 누가 무엇을 볼 수 있는지. 데이터베이스가 직접 막습니다
 --    3부. 파일 보관함 3개  — 고객 제출자료 / 결과자료 / 기업 서류함(내부 전용)
 --    4부. 대표 계정 연결
@@ -928,7 +928,9 @@ create policy activities_select on public.activities for select to authenticated
              and type in ('company_created','project_stage_changed','document_requested','document_uploaded',
                           'document_reviewed','document_revision_requested','result_shared','result_downloaded',
                           'inquiry_created','inquiry_answered','contract_signed','quote_sent','quote_responded',
-                          'portal_login','sign_in','survey_submitted')
+                          'portal_login','sign_in','survey_submitted',
+                          -- 스스로 준비하기 — 고객이 직접 한 일과 그 근거 확인
+                          'self_started','self_status','self_evidence','self_confirmed','self_help')
              and (project_id is null
                   or public.kpjk_project_client_visible(activities.project_id))));
 
@@ -1513,6 +1515,178 @@ notify pgrst, 'reload schema';
 
 
 -- =============================================================================
+--  스스로 준비하기 (2026-10-28 추가)
+--  learn_contents : 성장 학습 자료 — 대표가 등록 · 공개한다. 공개한 것은 로그인 없이도 읽는다(/learn).
+--                   영상은 YouTube 주소만 받는다(가짜 재생 화면 없음). 링크는 https 만(앱이 걸러서 보낸다).
+--  self_runs      : 고객의 자기주도 실행 기록 — 지원사업 직접 준비 · 성장과제 직접 실행 · 학습 완료.
+--                   기업 · 종류 · 대상마다 한 줄(중복 없음). 고객은 자기 회사 것만 쓰고 읽는다.
+--                   담당자는 열람 범위 안에서 읽고, 고객이 올린 근거(접수확인서 등)를 확인만 한다.
+--  고객이 신청 · 선정 · 미선정 · 완료를 기록하면 서버가 담당자 알림을, 선정 · 완료는 확인 업무까지 만든다.
+--  기존 표 · 데이터는 건드리지 않는다. 여러 번 실행해도 된다.
+-- =============================================================================
+create table if not exists public.learn_contents (
+  id               text primary key,
+  category         text not null default '',
+  title            text not null,
+  audience         text,
+  video_url        text check (video_url is null or video_url ~ '^https://(www\.|m\.)?(youtube\.com|youtu\.be|youtube-nocookie\.com)/'),
+  minutes          integer check (minutes is null or minutes between 0 and 600),
+  summary          text not null default '',
+  body             jsonb not null default '[]',
+  prep_items       jsonb not null default '[]',
+  links            jsonb not null default '[]',
+  program_tags     jsonb not null default '[]',
+  for_all_programs boolean not null default false,
+  growth_areas     jsonb not null default '[]',
+  published        boolean not null default false,
+  created_at       timestamptz not null default now(),
+  updated_at       timestamptz not null default now(),
+  updated_by       uuid references public.profiles(id) on delete set null
+);
+create index if not exists learn_contents_pub_idx on public.learn_contents(published, updated_at desc);
+
+create table if not exists public.self_runs (
+  id           text primary key,
+  company_id   text not null references public.companies(id) on delete cascade,
+  kind         text not null check (kind in ('program','growth','learn')),
+  target_key   text not null,
+  target_title text not null default '',
+  status       text not null,
+  checks       jsonb not null default '{}',
+  note         text,
+  evidence     jsonb not null default '[]',
+  help_ref     text,
+  started_at   timestamptz not null default now(),
+  status_at    timestamptz not null default now(),
+  created_by   uuid references public.profiles(id) on delete set null,
+  updated_by   uuid references public.profiles(id) on delete set null,
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
+);
+-- 같은 기업 · 종류 · 대상은 한 줄 — 두 기기에서 동시에 눌러도, 다시 눌러도 하나만
+create unique index if not exists self_runs_once_uidx on public.self_runs(company_id, kind, target_key);
+create index if not exists self_runs_company_idx on public.self_runs(company_id, updated_at desc);
+alter table public.self_runs drop constraint if exists self_runs_status_kind;
+alter table public.self_runs add constraint self_runs_status_kind check (
+  (kind = 'program' and status in ('preparing','applied','waiting','selected','not_selected','stopped'))
+  or (kind = 'growth' and status in ('exploring','reviewed','preparing','applied','done','skipped'))
+  or (kind = 'learn' and status = 'learned'));
+
+alter table public.learn_contents enable row level security;
+alter table public.self_runs enable row level security;
+grant select on public.learn_contents to anon, authenticated;
+grant insert, update on public.learn_contents to authenticated;
+grant select, insert, update on public.self_runs to authenticated;
+
+-- 학습 자료: 공개한 것은 누구나(비회원 포함), 비공개는 내부만 본다. 쓰기는 대표만.
+drop policy if exists learn_contents_read_anon on public.learn_contents;
+create policy learn_contents_read_anon on public.learn_contents for select to anon using (published);
+drop policy if exists learn_contents_read on public.learn_contents;
+create policy learn_contents_read on public.learn_contents for select to authenticated
+  using (published or public.kpjk_is_internal());
+drop policy if exists learn_contents_insert on public.learn_contents;
+create policy learn_contents_insert on public.learn_contents for insert to authenticated with check (public.kpjk_is_admin());
+drop policy if exists learn_contents_update on public.learn_contents;
+create policy learn_contents_update on public.learn_contents for update to authenticated
+  using (public.kpjk_is_admin()) with check (public.kpjk_is_admin());
+
+-- 실행 기록: 고객은 자기 회사 것만 만들고 고친다. 담당자는 열람 범위 안에서 읽고 근거 확인만(아래 트리거가 지킨다).
+drop policy if exists self_runs_select on public.self_runs;
+create policy self_runs_select on public.self_runs for select to authenticated using (public.kpjk_can_see_company(company_id));
+drop policy if exists self_runs_client_insert on public.self_runs;
+create policy self_runs_client_insert on public.self_runs for insert to authenticated
+  with check (public.kpjk_is_client() and company_id = public.kpjk_my_company() and created_by = auth.uid());
+drop policy if exists self_runs_client_update on public.self_runs;
+create policy self_runs_client_update on public.self_runs for update to authenticated
+  using (public.kpjk_is_client() and company_id = public.kpjk_my_company())
+  with check (public.kpjk_is_client() and company_id = public.kpjk_my_company());
+drop policy if exists self_runs_internal_update on public.self_runs;
+create policy self_runs_internal_update on public.self_runs for update to authenticated
+  using (public.kpjk_is_internal() and public.kpjk_can_see_company(company_id))
+  with check (public.kpjk_is_internal() and public.kpjk_can_see_company(company_id));
+
+-- 기록 지키기 — 대상(기업 · 종류 · 대상)은 바뀌지 않는다. "담당자 확인"은 담당자만 남기고 지운다.
+-- 담당자는 고객이 고른 상태 · 체크 · 메모를 바꾸지 못한다(고객이 한 일을 담당자가 대신 만들지 않는다).
+create or replace function public.kpjk_self_runs_guard() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if tg_op = 'INSERT' then
+    if exists (select 1 from jsonb_array_elements(coalesce(new.evidence, '[]'::jsonb)) e where e ? 'confirmedAt') then
+      raise exception '담당자 확인은 담당자만 남길 수 있습니다' using errcode = '42501';
+    end if;
+    return new;
+  end if;
+  if new.company_id <> old.company_id or new.kind <> old.kind or new.target_key <> old.target_key
+     or new.started_at <> old.started_at or new.created_by is distinct from old.created_by or new.created_at <> old.created_at then
+    raise exception '실행 기록의 대상은 바꿀 수 없습니다' using errcode = '42501';
+  end if;
+  if public.kpjk_is_client() then
+    if exists (select 1 from jsonb_array_elements(new.evidence) e where e ? 'confirmedAt' and not (old.evidence @> jsonb_build_array(e)))
+       or exists (select 1 from jsonb_array_elements(old.evidence) e where e ? 'confirmedAt' and not (new.evidence @> jsonb_build_array(e))) then
+      raise exception '담당자 확인은 담당자만 남기거나 지울 수 있습니다' using errcode = '42501';
+    end if;
+  elsif public.kpjk_is_internal() then
+    if new.status <> old.status or new.checks <> old.checks or new.note is distinct from old.note or new.help_ref is distinct from old.help_ref
+       or new.status_at <> old.status_at or new.target_title <> old.target_title or jsonb_array_length(new.evidence) <> jsonb_array_length(old.evidence) then
+      raise exception '고객이 남긴 기록은 담당자가 바꿀 수 없습니다(근거 확인만 가능)' using errcode = '42501';
+    end if;
+  end if;
+  return new;
+end $$;
+drop trigger if exists kpjk_self_runs_guard on public.self_runs;
+create trigger kpjk_self_runs_guard before insert or update on public.self_runs
+  for each row execute function public.kpjk_self_runs_guard();
+drop trigger if exists touch_learn_contents on public.learn_contents;
+create trigger touch_learn_contents before update on public.learn_contents for each row execute function public.touch_updated_at();
+drop trigger if exists touch_self_runs on public.self_runs;
+create trigger touch_self_runs before update on public.self_runs for each row execute function public.touch_updated_at();
+
+-- 고객이 상태를 바꾸면 → 담당자 알림 · (선정 · 완료) 확인 업무. 앱의 lib/self-run.ts followUpOf 와 같은 규칙.
+-- 같은 근거로 업무를 두 번 만들지 않는다(rule_key 고유).
+create or replace function public.kpjk_after_self_run() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare v_company text; v_owner uuid; v_what text; v_title text; v_body text; v_task text; v_key text; v_days int;
+begin
+  if tg_op = 'UPDATE' and new.status = old.status then return new; end if;
+  if not public.kpjk_is_client() then return new; end if;
+  select name, consultant_id into v_company, v_owner from public.companies where id = new.company_id;
+  v_company := coalesce(v_company, '고객');
+  if v_owner is null then select id into v_owner from public.profiles where role = 'admin' and active order by created_at limit 1; end if;
+  v_what := case when new.kind = 'program' then '''' || new.target_title || '''' else new.target_key end;
+  if new.kind = 'program' and new.status = 'applied' then
+    v_title := '고객이 지원사업을 직접 신청했습니다'; v_body := v_company || ' — ' || v_what || ' 신청 완료(고객 입력)';
+  elsif new.kind = 'program' and new.status = 'selected' then
+    v_title := '고객이 지원사업 선정을 기록했습니다'; v_body := v_company || ' — ' || v_what || ' 선정(고객 입력). 근거 자료를 확인해 주세요.';
+    v_task := v_company || ' ' || v_what || ' 선정 — 근거 확인 · 후속 절차 안내'; v_key := 'self_run:' || new.id || ':selected'; v_days := 2;
+  elsif new.kind = 'program' and new.status = 'not_selected' then
+    v_title := '고객이 지원사업 미선정을 기록했습니다'; v_body := v_company || ' — ' || v_what || ' 미선정(고객 입력)';
+  elsif new.kind = 'growth' and new.status = 'applied' then
+    v_title := '고객이 성장과제를 직접 신청했습니다'; v_body := v_company || ' — ' || v_what || ' 직접 신청(고객 입력)';
+  elsif new.kind = 'growth' and new.status = 'done' then
+    v_title := '고객이 성장과제를 직접 완료했습니다'; v_body := v_company || ' — ' || v_what || ' 완료(고객 입력). 기업정보 반영이 필요한지 확인해 주세요.';
+    v_task := v_company || ' ' || v_what || ' 직접 완료 — 확인 · 기업정보 반영'; v_key := 'self_run:' || new.id || ':done'; v_days := 3;
+  else
+    return new;
+  end if;
+  insert into public.notifications (id, audience, company_id, title, body, at, read, href)
+  values (public.kpjk_new_id('nt'), 'internal', new.company_id, v_title, v_body, now(), false, '/ax/clients/' || new.company_id || '?tab=portal');
+  if v_key is not null and not exists (select 1 from public.tasks where rule_key = v_key) then
+    insert into public.tasks (id, company_id, title, type, due_date, assignee_id, status, priority, created_at, source, memo, rule_key)
+    values (public.kpjk_new_id('tk'), new.company_id, left(v_task, 160), '후속연락', public.kpjk_due(v_days), v_owner, 'todo', 'normal', now(), 'auto',
+            '고객이 ''스스로 준비하기''에서 기록한 내용입니다. 근거 자료를 확인해 주세요.', v_key);
+    insert into public.activities (id, type, company_id, actor_id, actor_role, at, message)
+    values (public.kpjk_new_id('ac'), 'task_created', new.company_id, null, 'system', now(), left('자동 업무 생성: ' || v_task, 200));
+  end if;
+  return new;
+end $$;
+drop trigger if exists kpjk_self_run_after on public.self_runs;
+create trigger kpjk_self_run_after after insert or update of status on public.self_runs
+  for each row execute function public.kpjk_after_self_run();
+
+notify pgrst, 'reload schema';
+
+
+-- =============================================================================
 --  고객용 보기 — 고객은 기업·프로젝트·제안을 이 보기로만 읽는다
 --  보기는 만든 사람 권한으로 돌므로 행 조건(자기 회사·공개 프로젝트)을 여기서 직접 건다.
 --  내부 칸(메모·유입 경로·주주 구성·직접 만든 칸·서류 판독 기록·진행 상태 메모·담당자 진행 메모)은 아예 없다.
@@ -1577,7 +1751,7 @@ end $$;
 -- =============================================================================
 --  설치 결과 — 아래 한 줄로 확인하세요
 -- =============================================================================
---  표 26 · 권한정책 61 · 파일보관함 3 · 실시간 12 가 나오면 설치는 끝난 것입니다.
+--  표 28 · 권한정책 69 · 파일보관함 3 · 실시간 12 가 나오면 설치는 끝난 것입니다.
 --  "다음 할 일" 칸에 적힌 대로 하시면 됩니다.
 
 select

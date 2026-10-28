@@ -1,4 +1,5 @@
-import type { Activity, Approval, Company, Consultation, Contract, DocumentRequest, Inquiry, Notification, Opportunity, Project, Quote, ResultFile, Schedule, SurveyResponse, Task, User, Notice, CompanyVault, CompanyFile, JournalEntry, Payment, SupportProgram, Lead } from "../types";
+import type { Activity, Approval, Company, Consultation, Contract, DocumentRequest, Inquiry, Notification, Opportunity, Project, Quote, ResultFile, Schedule, SurveyResponse, Task, User, Notice, CompanyVault, CompanyFile, JournalEntry, Payment, SupportProgram, Lead, LearnContent, SelfRun } from "../types";
+import { STARTER_LEARN } from "../learn";
 import { addDays, iso } from "../format";
 
 /**
@@ -7,7 +8,7 @@ import { addDays, iso } from "../format";
  * 실데이터 연결 시 이 파일만 교체한다 (UI 재작성 없음).
  */
 /** 샘플 내용의 판 — 샘플을 고치면 올린다. 데모 브라우저에 저장된 예전 샘플이 다음 접속 때 새 샘플로 바뀐다. */
-export const SEED_REV = "2026-10-06c";
+export const SEED_REV = "2026-10-28a";
 
 export interface SeedData {
   users: User[];
@@ -34,6 +35,10 @@ export interface SeedData {
   /** 지원사업 공고 — 데모에도 지어낸 공고는 넣지 않는다(빈 목록에서 시작) */
   programs: SupportProgram[];
   leads: Lead[];
+  /** 성장 학습 자료 — 데모에서는 KPJK 기본 안내 7개를 공개 상태로(영상 없음) */
+  learnContents: LearnContent[];
+  /** 고객의 자기주도 실행 기록 — 데모도 빈 목록에서 시작(고객이 직접 만든다) */
+  selfRuns: SelfRun[];
 }
 
 export function buildSeed(now = new Date()): SeedData {
@@ -589,5 +594,6 @@ export function buildSeed(now = new Date()): SeedData {
     if (p.id === "pj_a2") { p.workStatus = "done"; }
   }
 
-  return { users, companies, consultations, contracts, projects, docRequests, schedules, tasks, inquiries, results, opportunities, quotes, approvals, surveys, notices, companyVaults, companyFiles, journal, payments, activities: allActivities, notifications: allNotifications, programs: [], leads: [] };
+  const learnContents: LearnContent[] = STARTER_LEARN.map((x) => ({ ...x, published: true, createdAt: d(-3, 9), updatedAt: d(-3, 9), updatedBy: "u_admin" }));
+  return { users, companies, consultations, contracts, projects, docRequests, schedules, tasks, inquiries, results, opportunities, quotes, approvals, surveys, notices, companyVaults, companyFiles, journal, payments, activities: allActivities, notifications: allNotifications, programs: [], leads: [], learnContents, selfRuns: [] };
 }

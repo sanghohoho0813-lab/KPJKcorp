@@ -2,7 +2,7 @@ import type {
   CompanyVault, CompanyFile, JournalEntry, Payment,
   Activity, Approval, Company, Consultation, Contract, DocumentFile, DocumentRequest,
   Inquiry, Message, Notice, Notification, Opportunity, Project, Quote, ResultFile, Schedule,
-  SurveyResponse, Task, User, SupportProgram, Lead,
+  SurveyResponse, Task, User, SupportProgram, Lead, LearnContent, SelfRun, SelfRunEvidence, SelfRunKind, SelfRunStatus,
 } from "../types";
 import { isRealYmd } from "../format";
 
@@ -668,4 +668,64 @@ export const leadToRow = (x: Partial<Lead> & { id?: string }): Row => ({
   ...(x.refUserId !== undefined && { ref_user: personId(x.refUserId) }),
   ...(x.companyId !== undefined && { company_id: x.companyId || null }),
   ...(x.createdAt !== undefined && { created_at: x.createdAt }),
+});
+
+/* ------------------------------ 학습 자료 · 자기주도 실행 ------------------------------ */
+
+const strList = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
+
+export const learnFromRow = (r: Row): LearnContent => ({
+  id: s(r.id), category: s(r.category), title: s(r.title), audience: u(r.audience as string | null) ?? undefined,
+  videoUrl: u(r.video_url as string | null) ?? undefined, minutes: r.minutes === null || r.minutes === undefined ? undefined : num(r.minutes),
+  summary: s(r.summary), body: strList(r.body), prepItems: strList(r.prep_items),
+  links: Array.isArray(r.links) ? (r.links as { label?: unknown; url?: unknown }[]).filter((l) => typeof l?.label === "string" && typeof l?.url === "string").map((l) => ({ label: String(l.label), url: String(l.url) })) : [],
+  programTags: strList(r.program_tags), forAllPrograms: bool(r.for_all_programs) || undefined, growthAreas: strList(r.growth_areas),
+  published: bool(r.published), createdAt: s(r.created_at), updatedAt: s(r.updated_at), updatedBy: u(r.updated_by as string | null) ?? undefined,
+});
+
+export const learnToRow = (x: Partial<LearnContent> & { id?: string }): Row => ({
+  ...(x.id !== undefined && { id: x.id }),
+  ...(x.category !== undefined && { category: x.category }),
+  ...(x.title !== undefined && { title: x.title }),
+  ...("audience" in x && { audience: n(x.audience) }),
+  ...("videoUrl" in x && { video_url: n(x.videoUrl) }),
+  ...("minutes" in x && { minutes: n(x.minutes) }),
+  ...(x.summary !== undefined && { summary: x.summary }),
+  ...(x.body !== undefined && { body: x.body }),
+  ...(x.prepItems !== undefined && { prep_items: x.prepItems }),
+  ...(x.links !== undefined && { links: x.links }),
+  ...(x.programTags !== undefined && { program_tags: x.programTags }),
+  ...("forAllPrograms" in x && { for_all_programs: !!x.forAllPrograms }),
+  ...(x.growthAreas !== undefined && { growth_areas: x.growthAreas }),
+  ...(x.published !== undefined && { published: x.published }),
+  ...(x.createdAt !== undefined && { created_at: x.createdAt }),
+  ...(x.updatedBy !== undefined && { updated_by: personId(x.updatedBy) }),
+});
+
+export const selfRunFromRow = (r: Row): SelfRun => ({
+  id: s(r.id), companyId: s(r.company_id), kind: s(r.kind) as SelfRunKind, targetKey: s(r.target_key), targetTitle: s(r.target_title),
+  status: s(r.status) as SelfRunStatus,
+  checks: r.checks && typeof r.checks === "object" && !Array.isArray(r.checks) ? Object.fromEntries(Object.entries(r.checks as Record<string, unknown>).filter(([, v]) => typeof v === "string")) as Record<string, string> : {},
+  note: u(r.note as string | null) ?? undefined,
+  evidence: Array.isArray(r.evidence) ? (r.evidence as SelfRunEvidence[]).filter((e) => e && typeof e.id === "string") : [],
+  helpRef: u(r.help_ref as string | null) ?? undefined,
+  startedAt: s(r.started_at), statusAt: s(r.status_at), createdBy: s(r.created_by), updatedBy: u(r.updated_by as string | null) ?? undefined,
+  createdAt: s(r.created_at), updatedAt: s(r.updated_at),
+});
+
+export const selfRunToRow = (x: Partial<SelfRun> & { id?: string }): Row => ({
+  ...(x.id !== undefined && { id: x.id }),
+  ...(x.companyId !== undefined && { company_id: ref(x.companyId) }),
+  ...(x.kind !== undefined && { kind: x.kind }),
+  ...(x.targetKey !== undefined && { target_key: x.targetKey }),
+  ...(x.targetTitle !== undefined && { target_title: x.targetTitle }),
+  ...(x.status !== undefined && { status: x.status }),
+  ...(x.checks !== undefined && { checks: x.checks }),
+  ...("note" in x && { note: n(x.note) }),
+  ...(x.evidence !== undefined && { evidence: x.evidence }),
+  ...("helpRef" in x && { help_ref: ref(x.helpRef) }),
+  ...(x.startedAt !== undefined && { started_at: x.startedAt }),
+  ...(x.statusAt !== undefined && { status_at: x.statusAt }),
+  ...(x.createdBy !== undefined && { created_by: personId(x.createdBy) }),
+  ...(x.updatedBy !== undefined && { updated_by: personId(x.updatedBy) }),
 });

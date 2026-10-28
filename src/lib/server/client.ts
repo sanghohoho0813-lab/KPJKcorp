@@ -81,6 +81,8 @@ export function explain(e: { code?: string; message?: string; details?: string }
   if (code === "PGRST116") return "대상을 찾을 수 없습니다. 다른 사람이 먼저 바꿨을 수 있습니다.";
   // 새 기능의 칸이 서버에 아직 없다 — 업데이트된 supabase/setup.sql 을 아직 다시 실행하지 않은 경우
   if (code === "PGRST204" || /Could not find the '.+' column/i.test(e.message ?? "")) return "서버에 새 기능의 칸이 아직 없습니다. 대표 계정으로 Supabase 에서 최신 setup.sql 을 한 번 다시 실행해 주세요.";
+  // 새 기능의 표가 서버에 아직 없다 — 같은 이유(setup.sql 다시 실행 전)
+  if (code === "PGRST205" || code === "42P01" || /Could not find the table/i.test(e.message ?? "")) return "서버에 새 기능의 표가 아직 없습니다. 대표 계정으로 Supabase 에서 최신 setup.sql 을 한 번 다시 실행해 주세요.";
   if (e.message?.includes("Failed to fetch")) return "서버에 연결하지 못했습니다. 인터넷 연결을 확인해 주세요.";
   return e.message ?? "서버 오류";
 }

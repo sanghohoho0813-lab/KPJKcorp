@@ -7,26 +7,33 @@
  * 아래 기본 안내 7개는 KPJK 가 쓴 일반 안내다. 금리 · 한도 · 기간 같은 숫자는 넣지 않았다(해마다 공고로 바뀐다).
  * 대상 · 서류 · 요건은 늘 "해당 공고문 · 기관 안내가 기준"이라고 적는다. 운영자가 고치고 공개 여부를 정한다.
  */
-import type { LearnCategory, LearnContent, SupportProgram } from "./types";
+import type { LearnContent, SupportProgram } from "./types";
 import { LINK_BY_KEY, safeHttpsUrl, youtubeId } from "./official-links";
 
-/** 처음 분류 — 운영자가 이름을 바꾸거나 더할 수 있다(설정 learnCategories) */
-export const DEFAULT_LEARN_CATEGORIES: LearnCategory[] = [
-  { key: "policy_fund", label: "정책자금 · 정책보증의 기본 이해" },
-  { key: "find_programs", label: "정부지원사업 공고 찾는 방법" },
-  { key: "read_notice", label: "신청 자격과 공고문 읽는 방법" },
-  { key: "prep_docs", label: "신청 전 준비서류 · 체크리스트" },
-  { key: "bizplan", label: "사업계획서 작성의 기본" },
-  { key: "finance", label: "기업 재무관리 · 자금흐름의 기본" },
-  { key: "cert_rnd", label: "기업인증 · 연구개발 준비의 기초" },
+/** 처음 분류 — 운영자가 자료의 분류 이름을 바꾸거나 새 이름을 적으면 그대로 분류가 된다 */
+export const DEFAULT_LEARN_CATEGORIES = [
+  "정책자금 · 정책보증의 기본 이해",
+  "정부지원사업 공고 찾는 방법",
+  "신청 자격과 공고문 읽는 방법",
+  "신청 전 준비서류 · 체크리스트",
+  "사업계획서 작성의 기본",
+  "기업 재무관리 · 자금흐름의 기본",
+  "기업인증 · 연구개발 준비의 기초",
 ];
+const [C_FUND, C_FIND, C_READ, C_DOCS, C_PLAN, C_FIN, C_CERT] = DEFAULT_LEARN_CATEGORIES;
+
+/** 분류 목록 — 처음 분류 순서대로, 그 뒤에 운영자가 새로 만든 분류(가나다순) */
+export function learnCategories(all: Pick<LearnContent, "category">[]): string[] {
+  const extra = [...new Set(all.map((x) => x.category.trim()).filter((c) => c && !DEFAULT_LEARN_CATEGORIES.includes(c)))].sort((a, b) => a.localeCompare(b, "ko"));
+  return [...DEFAULT_LEARN_CATEGORIES, ...extra];
+}
 
 const link = (k: string) => ({ label: LINK_BY_KEY[k].label, url: LINK_BY_KEY[k].url });
 
 /** 기본 안내(시작용) — 데모에서는 공개, 서버에서는 운영자가 '기본 안내 불러오기'로 비공개 추가 후 검토해 공개 */
 export const STARTER_LEARN: Omit<LearnContent, "createdAt" | "updatedAt" | "updatedBy" | "published">[] = [
   {
-    id: "lc_policy_basics", category: "policy_fund", title: "정책자금과 정책보증, 무엇이 다른가요",
+    id: "lc_policy_basics", category: C_FUND, title: "정책자금과 정책보증, 무엇이 다른가요",
     audience: "자금이 필요한 중소기업 대표 · 처음 정책자금을 알아보는 기업", minutes: 6,
     summary: "정책자금은 공공기관이 정책 목적에 맞는 기업에 빌려주는 돈(대부분 융자)이고, 정책보증은 보증기관이 보증서를 내어 은행 대출을 받도록 돕는 제도입니다. 둘 다 갚아야 하는 돈이라는 점에서 갚지 않는 보조금(출연금)과 다릅니다.",
     body: [
@@ -40,7 +47,7 @@ export const STARTER_LEARN: Omit<LearnContent, "createdAt" | "updatedAt" | "upda
     programTags: ["정책자금", "융자", "보증", "자금", "금융"], growthAreas: [],
   },
   {
-    id: "lc_find_programs", category: "find_programs", title: "지원사업 공고, 어디서 어떻게 찾나요",
+    id: "lc_find_programs", category: C_FIND, title: "지원사업 공고, 어디서 어떻게 찾나요",
     audience: "지원사업을 처음 찾아보는 기업", minutes: 5,
     summary: "중앙부처 · 지자체 지원사업은 기업마당에 모여 있고, 창업 지원사업은 K-Startup 에서 따로 찾습니다. 지역 사업은 해당 지자체 · 지역 기관 공지도 함께 봅니다.",
     body: [
@@ -51,10 +58,10 @@ export const STARTER_LEARN: Omit<LearnContent, "createdAt" | "updatedAt" | "upda
     ],
     prepItems: ["관심 분야 키워드 2~3개 정하기", "우리 회사 지역 · 업종 · 설립일 확인", "관심 공고 마감일 적어 두기"],
     links: [link("bizinfo"), link("kstartup")],
-    programTags: [], growthAreas: [],
+    programTags: [], forAllPrograms: true, growthAreas: [],
   },
   {
-    id: "lc_read_notice", category: "read_notice", title: "공고문은 이 순서로 읽습니다",
+    id: "lc_read_notice", category: C_READ, title: "공고문은 이 순서로 읽습니다",
     audience: "신청을 고민하는 모든 기업", minutes: 7,
     summary: "공고문은 ① 지원대상 ② 제외대상(신청 제한) ③ 지원내용 ④ 신청기간 · 방법 ⑤ 제출서류 ⑥ 평가 방법 · 일정 ⑦ 문의처 순서로 보면 빠릅니다. 제외대상부터 확인하면 헛수고를 줄일 수 있습니다.",
     body: [
@@ -66,10 +73,10 @@ export const STARTER_LEARN: Omit<LearnContent, "createdAt" | "updatedAt" | "upda
     ],
     prepItems: ["공고문 원문(PDF · HWP) 내려받기", "지원대상 · 제외대상 표시해 두기", "신청기간 · 마감 시각 확인", "궁금한 점을 문의처에 묻기"],
     links: [link("bizinfo")],
-    programTags: [], growthAreas: [],
+    programTags: [], forAllPrograms: true, growthAreas: [],
   },
   {
-    id: "lc_prep_docs", category: "prep_docs", title: "신청 전에 미리 챙겨 두면 좋은 서류",
+    id: "lc_prep_docs", category: C_DOCS, title: "신청 전에 미리 챙겨 두면 좋은 서류",
     audience: "공고 신청을 앞둔 기업", minutes: 6,
     summary: "공고마다 서류는 다르지만 사업자등록증명 · 납세증명서 · 재무제표 · 법인 등기사항증명서(법인) · 4대보험 가입자 명부가 자주 요구됩니다. 실제 필요한 서류와 발급일 기준은 해당 공고문이 기준입니다.",
     body: [
@@ -81,10 +88,10 @@ export const STARTER_LEARN: Omit<LearnContent, "createdAt" | "updatedAt" | "upda
     ],
     prepItems: ["공고문 제출서류 목록 옮겨 적기", "서류별 발급처 확인", "발급일 기준 확인 후 발급", "파일 이름을 서류명으로 정리"],
     links: [link("hometax"), link("gov24"), link("iros")],
-    programTags: [], growthAreas: [],
+    programTags: [], forAllPrograms: true, growthAreas: [],
   },
   {
-    id: "lc_bizplan", category: "bizplan", title: "사업계획서, 평가표부터 보고 씁니다",
+    id: "lc_bizplan", category: C_PLAN, title: "사업계획서, 평가표부터 보고 씁니다",
     audience: "사업계획서를 직접 써 보려는 기업", minutes: 8,
     summary: "사업계획서는 평가하는 사람이 점수를 매기는 문서입니다. 공고문의 평가 항목과 배점을 먼저 보고, 항목마다 근거가 있는 문장과 숫자로 답하는 방식으로 씁니다.",
     body: [
@@ -98,7 +105,7 @@ export const STARTER_LEARN: Omit<LearnContent, "createdAt" | "updatedAt" | "upda
     programTags: ["사업화", "기술개발", "R&D", "창업", "바우처"], growthAreas: [],
   },
   {
-    id: "lc_finance_basics", category: "finance", title: "이익과 현금은 다릅니다 — 자금흐름 기본",
+    id: "lc_finance_basics", category: C_FIN, title: "이익과 현금은 다릅니다 — 자금흐름 기본",
     audience: "재무제표를 처음 정리해 보는 대표", minutes: 7,
     summary: "장부상 이익이 나도 현금이 모자랄 수 있습니다. 매출이 입금되는 시점과 비용이 나가는 시점이 다르기 때문입니다. 월별로 들어오고 나가는 돈을 표로 적어 두면 자금이 부족해지는 달을 미리 볼 수 있습니다.",
     body: [
@@ -112,7 +119,7 @@ export const STARTER_LEARN: Omit<LearnContent, "createdAt" | "updatedAt" | "upda
     programTags: ["자금", "금융"], growthAreas: ["가지급금", "가수금", "재무세무", "이익잉여금"],
   },
   {
-    id: "lc_cert_rnd", category: "cert_rnd", title: "기업인증 · 연구소, 무엇부터 확인하나요",
+    id: "lc_cert_rnd", category: C_CERT, title: "기업인증 · 연구소, 무엇부터 확인하나요",
     audience: "기술 · 연구개발을 하는 기업", minutes: 7,
     summary: "벤처기업확인 · 이노비즈 · 기업부설연구소(연구개발전담부서)는 각각 담당 기관과 요건이 다릅니다. 이 화면은 요건을 판정하지 않습니다 — 기관 안내와 관련 법령이 기준이며, 아래 순서로 우리 회사 상황을 먼저 정리합니다.",
     body: [
@@ -140,7 +147,7 @@ export function learnForProgram(all: LearnContent[], p: Pick<SupportProgram, "ti
   const hay = norm(`${p.title} ${p.category} ${p.summary ?? ""} ${p.tags.join(" ")}`);
   const vis = visibleLearn(all);
   const tagged = vis.filter((x) => x.programTags.some((t) => t && hay.includes(norm(t))));
-  const common = vis.filter((x) => x.programTags.length === 0 && ["read_notice", "prep_docs", "find_programs"].includes(x.category));
+  const common = vis.filter((x) => x.forAllPrograms);
   const out: LearnContent[] = [];
   for (const x of [...tagged, ...common]) if (!out.some((y) => y.id === x.id)) out.push(x);
   return out.slice(0, 4);
@@ -166,5 +173,6 @@ export function cleanLearnInput(x: Partial<LearnContent>): { value: Partial<Lear
   }
   if (x.minutes !== undefined && (!Number.isFinite(x.minutes) || x.minutes < 0 || x.minutes > 600)) { problems.push("학습 시간은 0~600분으로 적어 주세요."); value.minutes = undefined; }
   for (const k of ["prepItems", "programTags", "growthAreas", "body"] as const) if (x[k]) value[k] = x[k]!.map((s) => s.trim()).filter(Boolean);
+  if (x.category !== undefined) { value.category = x.category.trim(); if (!value.category) problems.push("분류를 고르거나 새 분류 이름을 적어 주세요."); }
   return { value, problems };
 }
