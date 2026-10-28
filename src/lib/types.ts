@@ -456,6 +456,39 @@ export interface SupportProgram {
   createdBy?: string;
 }
 
+/* ---------- 성장 학습 자료 (스스로 준비하기) ---------- */
+
+/** 학습 분류 — 운영자가 이름을 바꾸거나 더한다 */
+export interface LearnCategory { key: string; label: string }
+
+/** 학습 자료 — 운영자(대표)가 등록 · 공개한다. 영상은 YouTube 주소가 있을 때만, 없으면 글 안내 + 공식 사이트 */
+export interface LearnContent {
+  id: string;
+  category: string;
+  title: string;
+  /** 추천 대상 (예: 처음 정책자금을 알아보는 기업) */
+  audience?: string;
+  videoUrl?: string;
+  /** 예상 학습 시간(분) */
+  minutes?: number;
+  /** 핵심 설명 */
+  summary: string;
+  /** 본문 — 한 줄씩 */
+  body: string[];
+  /** 학습 후 준비할 항목 */
+  prepItems: string[];
+  /** 관련 공식 사이트 — https 만 */
+  links: { label: string; url: string }[];
+  /** 관련 지원사업: 공고 이름 · 분야 · 지원내용에 이 낱말이 있으면 연결 */
+  programTags: string[];
+  /** 관련 성장과제(KPJK 분야 이름) */
+  growthAreas: string[];
+  published: boolean;
+  createdAt: string;
+  updatedAt: string;
+  updatedBy?: string;
+}
+
 export type LeadStatus = "new" | "contacted" | "converted" | "dropped";
 
 /** 가망고객 — 로그인 없이 지원사업 매칭 화면에서 상담을 남긴 사람 */
