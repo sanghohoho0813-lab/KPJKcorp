@@ -211,15 +211,48 @@ PX, PY, PWD = 80, 150, 300          # 고객 휴대폰
 BX, BY, BWD = 420, 150, 1040        # 담당자 PC
 SVX, SVW = 1500, 340                # 서버 처리 기록
 PVH = round(BWD * 900 / 1440)
+# 눈 따라가기 — 휴대폰 · 서버 기록 · PC 중 한 곳이 바뀐 뒤 다른 곳이 바뀌기까지 시간을 두고, 흐름점이 다음 화면으로 시선을 데려간다.
+# 클립 안의 동작(누르기 · 입력 · 화면 이동)은 실제 속도 그대로. 기다리는 시간만 늘리고, 나레이션은 문장 사이 쉼(pauses.json)으로 맞춘다.
+HOLD = 1.4                                   # 결과 화면(자동 생성 업무 · 보완 필요)을 그대로 보여 주는 시간
+def ev0(name, k, frm): return REC["clips"][name]["events"][k] - frm
 A = clip("a-submit", 0.6, 5.6, a1)
-Bc = clip("b-task", 0.9, 6.8, at("검토업무를 자동으로") + .2 - (REC["clips"]["b-task"]["events"]["task"] - 0.9))
-Cc = clip("c-revision", 1.0, 5.9, a4 - .5)
-Dc = clip("d-status", 0.5, 4.7, max(Cc["ev"]["revision"] + .25, a5))
-Ec = clip("e-resubmit", 0.45, 3.7, max(a6, Dc["ev"]["shown"] + .6))
-Fc = clip("f-done", 1.9, 7.3, Ec["ev"]["submit"] + .15)
+sub = A["ev"]["submit"]
+r1 = sub + .9; r2 = r1 + .8; r3 = r2 + .8; r45 = r3 + .7     # 서버: 제출 기록 → 트리거 → 업무 생성 → 고객 알림 · 단계(같은 트리거 결과라 한 번에)
+Bc = clip("b-task", 0.9, 6.8, r45 + .8 - ev0("b-task", "nav", 0.9))   # PC 는 서버 기록이 다 오른 뒤 움직인다
+Cc = clip("c-revision", 1.0, 5.9, Bc["ev"]["task"] + HOLD)
+r6 = Cc["ev"]["revision"] + .65
+Dc = clip("d-status", 0.5, 4.7, r6 + .95)                     # 흐름점이 휴대폰에 닿을 때 고객이 앱을 연다
+r7 = Dc["t0"]
+Ec = clip("e-resubmit", 0.45, 3.7, Dc["ev"]["shown"] + HOLD)
+r8 = Ec["ev"]["submit"] + .8
+Fc = clip("f-done", 2.5, 7.3, r8 + .7)
+r9 = Fc["ev"]["done"] + .8
 order = [A["ev"]["submit"], Bc["ev"]["task"], Cc["ev"]["revision"], Dc["ev"]["shown"], Ec["ev"]["submit"], Fc["ev"]["done"], Fc["ev"]["history"]]
-if order != sorted(order) or Fc["ev"]["history"] > a7: raise SystemExit(f"녹화 사건 순서 · 시각 확인: {order} / a7 {a7}")
-srv_t = [A["ev"]["submit"] + .15, a2 + .3, a2 + 1.1, a2 + 1.8, a2 + 2.5, Cc["ev"]["revision"] + .2, Dc["ev"]["shown"], Ec["ev"]["submit"] + .3, Fc["ev"]["done"] + .2]
+if order != sorted(order): raise SystemExit(f"녹화 사건 순서 확인: {order}")
+# 나레이션 ↔ 화면 — (쉼을 넣을 자막 첫머리, 맞출 문구, 그 문구가 나와야 할 시각). 문구가 화면보다 이르면 그 자막 앞에 쉼을 더하고,
+# 늦으면 앞서 넣은 쉼을 줄인다. 맞지 않으면 새 쉼 값을 적어 두고 멈춘다 → pauses.json 에 옮기고 align_voice.py 부터 다시
+SYNC = [("서버는 제출된 자료를", "서버는 제출된 자료를", r1 - .3),
+        ("담당자가 처리해야 할", "검토업무를 자동으로", Bc["ev"]["task"] - .8),
+        ("담당자가 자료를 검토하고", "보완을 요청하면", Cc["ev"]["revision"] - .9),
+        ("고객 화면에도", "필요한 상태가 반영", Dc["ev"]["shown"] - .5),
+        ("고객이 다시 자료를", "담당자가 검토를", Fc["ev"]["done"] - 1.4),
+        ("그 결과가 업무기록과", "그 결과가 업무기록과", Fc["ev"]["done"] + .4),
+        ("이는 단순히 알림을", "이는 단순히 알림을", Fc["ev"]["history"] + 1.3)]
+PF = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pauses.json")
+CUR = json.load(open(PF, encoding="utf-8")) if os.path.exists(PF) else {}
+NEW, moved, late = dict(CUR), 0.0, []
+for key, ph, want in SYNC:
+    d = want - (at(ph, a1) + moved)
+    nv = round(max(0.0, CUR.get(key, 0.0) + d), 2); moved += nv - CUR.get(key, 0.0)
+    if nv > 0: NEW[key] = nv
+    else: NEW.pop(key, None)
+    if d + CUR.get(key, 0.0) < -.8: late.append(f"{ph} {-(d + CUR.get(key, 0.0)):.1f}초 늦음")
+if late: print("나레이션이 화면보다 늦은 곳:", late)
+if any(abs(NEW.get(k, 0) - CUR.get(k, 0)) > .05 for k in set(NEW) | set(CUR)):
+    json.dump(NEW, open(f"{W}/pauses_new.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    raise SystemExit(f"쉼 조정 필요 → {W}/pauses_new.json 을 tools/video/appeal/pauses.json 으로 옮기고 align_voice.py 부터 다시: {NEW}")
+if Fc["ev"]["history"] + 1.3 > a7: raise SystemExit(f"이력 화면을 볼 시간이 짧음: {Fc['ev']['history']} / a7 {a7}")
+srv_t = [r1, r2, r3, r45, r45, r6, r7, r8, r9]
 ROLE = {"고객": "c", "서버": "s", "담당자": "a"}
 task_title, _, task_owner, task_type = SRV["TASK"]
 lines = [("고객", "자료 제출 — <b>document_files</b> +1", "고객 계정으로 실행"),
@@ -231,16 +264,20 @@ lines = [("고객", "자료 제출 — <b>document_files</b> +1", "고객 계정
          ("고객", f"고객이 읽는 상태 · <b>보완 요청</b>", esc(SRV["CLIENT"][3])),
          ("고객", "재제출 → 검토 업무 다시 생성", f"자동 생성 누적 {esc(SRV['RETASK'][0])}건"),
          ("담당자", "검토 완료 → 기록 · 진행상태", "요청 상태 완료 1건")]
-srv_rows = "".join(f'<div class="srow" data-in="{srv_t[i]:.2f}" data-out="{a7 + .3:.2f}" data-a="up" data-dim="{(srv_t[i + 1] if i + 1 < len(srv_t) else a7):.2f}">'
+srv_rows = "".join(f'<div class="srow" data-in="{srv_t[i]:.2f}" data-out="{a7 + .3:.2f}" data-a="up" data-dim="{next((x for x in srv_t[i + 1:] if x > srv_t[i] + .01), a7):.2f}">'
                    f'<span class="role {ROLE[r]}">{r}</span><div><div class="m">{m}</div><div class="d">{d}</div></div></div>' for i, (r, m, d) in enumerate(lines))
 srv = box("srv", f'<div class="hd"><b>서버 처리 — 실제 실행 결과</b><span>로컬 시험 DB · 운영과 같은 setup.sql · 가상 데이터</span></div><div class="rows">{srv_rows}</div><div class="ft">같은 규칙을 서버 DB 에서 실제로 실행한 결과입니다. 왼쪽 녹화(데모 환경)와 데이터는 별개입니다.</div>',
           s3 + .4, a7 + .3, f"left:{SVX}px;top:{BY}px;width:{SVW}px;height:{PVH + 34}px", "card")
 # 흐름 표시 — 실제 사건 시각에만 움직인다
 yb = BY + PVH + 34 + 22
-flows = [(f"M{PX + PWD/2 + 12:.0f} {PY + 672} L{PX + PWD/2 + 12:.0f} {yb} L{SVX + 60} {yb} L{SVX + 60} {BY + PVH + 34}", A["ev"]["submit"] + .05, A["ev"]["submit"] + 1.0),
-         (f"M{SVX - 2} {BY + 210} L{BX + BWD + 6} {BY + 210}", Bc["ev"]["task"] - .6, Bc["ev"]["task"] - .1),
-         (f"M{BX + BWD + 6} {BY + 470} L{SVX - 2} {BY + 470}", Cc["ev"]["revision"] + .05, Cc["ev"]["revision"] + .5),
-         (f"M{SVX + 60} {BY + PVH + 34} L{SVX + 60} {yb} L{PX + PWD/2 + 12:.0f} {yb} L{PX + PWD/2 + 12:.0f} {PY + 672}", Dc["ev"]["shown"] - 1.0, Dc["ev"]["shown"] - .1)]
+P2S = f"M{PX + PWD/2 + 12:.0f} {PY + 672} L{PX + PWD/2 + 12:.0f} {yb} L{SVX + 60} {yb} L{SVX + 60} {BY + PVH + 34}"   # 휴대폰 → 서버
+S2P = f"M{SVX + 60} {BY + PVH + 34} L{SVX + 60} {yb} L{PX + PWD/2 + 12:.0f} {yb} L{PX + PWD/2 + 12:.0f} {PY + 672}"   # 서버 → 휴대폰
+flows = [(P2S, sub + .1, r1 - .05),
+         (f"M{SVX - 2} {BY + 210} L{BX + BWD + 6} {BY + 210}", r45 + .3, Bc["ev"]["nav"] - .1),
+         (f"M{BX + BWD + 6} {BY + 470} L{SVX - 2} {BY + 470}", Cc["ev"]["revision"] + .05, r6 - .05),
+         (S2P, r6 + .2, Dc["t0"] - .05),
+         (P2S, Ec["ev"]["submit"] + .1, r8 - .05),
+         (f"M{SVX - 2} {BY + 330} L{BX + BWD + 6} {BY + 330}", r8 + .2, Fc["t0"] - .05)]
 flow_svg = '<svg class="wire" width="1920" height="1080" viewBox="0 0 1920 1080">' + "".join(
     f'<path id="fl{i}" d="{d_}" class="soft" data-draw="{a_:.2f},{b_:.2f}" data-fade="{b_ + .6:.2f}"/>' for i, (d_, a_, b_) in enumerate(flows)) + "</svg>"
 flow_dots = "".join(f'<div class="fdot" data-move="fl{i},{a_:.2f},{b_:.2f}"></div>' for i, (d_, a_, b_) in enumerate(flows))
