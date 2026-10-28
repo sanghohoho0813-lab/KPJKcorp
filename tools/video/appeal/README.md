@@ -13,6 +13,9 @@
 | `build.py` | 장면표 → `comp.html`. 장면 시각은 대본 문구로 찾고(`at`), 코드는 저장소 파일에서 줄 번호로 읽는다 |
 | `comp.tpl.html` | 1920×1080 틀 — `render(t)` 하나로 프레임 결정(CSS 애니메이션 없음), 자막 · 장 표시 · 예시 데이터 표기 |
 | `render.mjs` | 시험 프레임(`frames`) · 전체 렌더(`video`, 30fps H.264 + AAC) |
+| `record-loop.mjs` | ① 장면용 **실제 화면 녹화** — 데모 모드 앱을 사람 속도로 조작하며 Chrome 화면 프레임(CDP screencast)을 받는다. 고객 제출 → 담당자 업무함 → 보완 요청 → 고객 보완 필요 → 재제출 → 검토 완료 · 이력 6클립. 덧그리는 것은 누른 자리 원 · PC 마우스 화살표뿐 |
+| `server-loop.sql` · `server-loop.sh` | ① 장면 오른쪽 **서버 처리 기록**의 근거 — 로컬 Postgres 에 운영과 같은 `setup.sql` 을 올리고 고객 · 담당자 계정으로 실제 실행(파일 제출 → 트리거가 검토 업무 · 고객 알림 · 자동 기록 · 단계 변경 → 보완 요청 → 고객이 읽는 상태 → 재제출 → 검토 완료). 결과가 기대와 다르면 `build.py` 가 멈춘다 |
+| `compare.mjs` | 전후 비교 영상 — 수정한 구간만 왼쪽 수정 전 · 오른쪽 수정 후 |
 
 ## 화면에 넣은 사실과 근거
 
@@ -28,6 +31,16 @@
 회사 · 사람 · 자료는 데모 샘플이며 화면 장면마다 오른쪽 위에 "예시 데이터" 표기가 붙습니다.
 성과 · 개선율 같은 숫자는 넣지 않았습니다(대본이 말한 시험 항목 수만).
 
+## 2026-10-28 수정 (심사 설득력 보강 — 3개 구간만)
+
+| 구간 | 바꾼 것 |
+|---|---|
+| ① 01:02 – 01:30 | 정지 화면 · 코드 → **실제 화면 녹화**(데모 환경) 6클립 + **서버 트리거 실제 실행 결과**(로컬 시험 DB). 클립은 실제 속도 그대로, 클립 사이 대기만 편집. 사건 순서(제출 → 업무 → 보완 요청 → 고객 화면 → 재제출 → 완료)가 어긋나면 `build.py` 가 멈춘다 |
+| ② 02:03 – 02:12 | 구현 위치 카드 3장 → 일반 CRM 기능과 KPJK 통합 처리구조 비교(다른 CRM 에 없다고 단정하지 않음) |
+| ③ 02:36 – 03:00 | 「기존 신청기술 기반 추가 고도화 \| 2026년 10월」 표기 · '신규' → '고도화' · 확장 도식에 "핵심 구조 그대로 유지" |
+
+나레이션 · 자막 · 길이(4:47)는 그대로입니다. 나머지 구간은 수정 전과 화소 단위로 같습니다(16개 시각 비교).
+
 ## 다시 만들기
 
 ```bash
@@ -38,6 +51,8 @@ W=$W /usr/bin/python3 tools/video/appeal/synth.py "+15%" ko-KR-InJoonNeural && W
 OUT=$W/cap node tools/video/appeal/capture.mjs
 # 3) 글꼴: $W/fonts/ 에 PretendardVariable.ttf · ngc-{latin,korean}-{400,700}.woff2 (npm pretendard · @fontsource/nanum-gothic-coding)
 # 4) 시험 로그: $W/logs/daily.log · rls.log (daily.mjs · run-rls.sh 출력)
+OUT=$W/rec node tools/video/appeal/record-loop.mjs                      # ① 실제 화면 녹화
+bash tools/video/appeal/server-loop.sh > $W/logs/server-loop.txt          # ① 서버 실제 실행 (로컬 Postgres)
 python3 tools/video/appeal/build.py $W
 node tools/video/appeal/render.mjs frames $W/comp.html $W/test 5,30,70,120   # 확인
 node tools/video/appeal/render.mjs video  $W/comp.html $W/voice.wav $W/out.mp4

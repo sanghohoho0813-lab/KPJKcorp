@@ -168,28 +168,95 @@ scene(t_ev, T + .3, *parts)
 s3 = S(3); T = nxt(3)
 a1 = at("고객이 휴대폰으로"); a1b = at("자료를 제출합니다"); a2 = at("서버는 제출된 자료를"); a3 = at("검토업무를 자동으로")
 a4 = at("담당자가 자료를 검토하고"); a5 = at("고객 화면에도"); a6 = at("고객이 다시 자료를"); a7 = at("이는 단순히 알림을")
-PX, PY, PWD = 100, 120, 320       # 휴대폰
-BX, BY, BWD = 470, 150, 1020      # PC
-SX_, SW_ = 1530, 310              # 단계 목록
+# ① 실제 화면 녹화(데모 환경) + 서버 처리 실제 실행(로컬 시험 DB). 클립은 실제 속도 그대로, 앞뒤 대기만 잘라 이어 놓는다.
+REC = json.load(open(f"{W}/rec/meta.json"))
+SRV = {}
+for ln_ in open(f"{W}/logs/server-loop.txt", encoding="utf-8"):
+    k, *v = ln_.strip().split("|")
+    if k: SRV[k] = v
+need = {"STEP1": ["client", "1"], "TASK": None, "NOTI": None, "ACT": None, "STAGE": ["doc_received"], "STEP3": ["consultant", "1"], "CLIENT": None, "RETASK": ["2"], "DONE": ["1"]}
+for k, v in need.items():
+    if k not in SRV or (v and SRV[k] != v): raise SystemExit(f"서버 실행 결과가 기대와 다름: {k} {SRV.get(k)}")
+def clip(name, frm, to, t0):
+    """녹화 클립 한 토막 — frm~to(클립 시각)을 영상 t0 부터 실제 속도로. 반환: (시작, 끝, 사건 → 영상 시각)"""
+    c = REC["clips"][name]; f0, f1 = round(frm * REC["fps"]), round(min(to, c["dur"]) * REC["fps"])
+    ev = {k: round(t0 + (v - frm), 2) for k, v in c["events"].items()}
+    return {"name": name, "frames": c["frames"][f0:f1], "t0": t0, "t1": t0 + (f1 - f0) / REC["fps"], "ev": ev, "c": c, "frm": frm}
+def zoom_to(c, key, w, vh, z, a, b):
+    """녹화 화면을 key 상자 쪽으로 천천히 확대 — 화면 밖이 보이지 않게 이동량을 묶는다"""
+    r = c["c"]["boxes"].get(key)
+    if not r: raise SystemExit(f"녹화 위치 없음 {c['name']}:{key}")
+    s0 = w / c["c"]["w"]; ih = c["c"]["h"] * s0
+    cx, cy = (r["x"] + r["w"] / 2) * s0, (r["y"] + r["h"] / 2) * s0
+    tx = min(0, max(w - w * z, w / 2 - cx * z)); ty = min(0, max(vh - ih * z, vh / 2 - cy * z))
+    return (round(a, 2), round(b, 2), 1.0, 0, 0, z, round(tx), round(ty))
+def seq_view(c, w, kb=None, focus=()):
+    s0 = w / c["c"]["w"]; h = round(c["c"]["h"] * s0)
+    k = f'data-kb="{",".join(str(x) for x in kb)}"' if kb else ""
+    fx = ""
+    for key, a, b in focus:
+        r = c["c"]["boxes"].get(key)
+        if not r: raise SystemExit(f"녹화 위치 없음 {c['name']}:{key}")
+        fx += f'<div class="focus" style="left:{r["x"]*s0-6:.0f}px;top:{r["y"]*s0-6:.0f}px;width:{r["w"]*s0+12:.0f}px;height:{r["h"]*s0+12:.0f}px" data-glow="{a:.2f},{b:.2f}"></div>'
+    d = json.dumps({"dir": f"rec/{c['name']}", "frames": c["frames"], "t0": round(c["t0"], 3), "fps": REC["fps"]})
+    return h, f'<div class="kbw" style="width:{w}px;height:{h}px" {k}><img data-seq=\'{d}\' src="rec/{c["name"]}/{c["frames"][0]}" style="width:{w}px;height:{h}px">{fx}</div>'
+def rec_phone(c, x, y, w, tin, tout, kb=None, focus=()):
+    h, inner = seq_view(c, w, kb, focus)
+    return box("phone", f'<div class="notch"></div><div class="view" style="width:{w}px;height:{h}px">{inner}</div>', tin, tout, f"left:{x}px;top:{y}px", "swap")
+def rec_browser(c, x, y, w, tin, tout, url, kb=None, focus=()):
+    h, inner = seq_view(c, w, kb, focus)
+    return box("browser", f'<div class="bar"><i></i><i></i><i></i><b>{esc(url)}</b></div><div class="view" style="width:{w}px;height:{h}px">{inner}</div>', tin, tout, f"left:{x}px;top:{y}px;width:{w}px", "swap")
+
+PX, PY, PWD = 80, 150, 300          # 고객 휴대폰
+BX, BY, BWD = 420, 150, 1040        # 담당자 PC
+SVX, SVW = 1500, 340                # 서버 처리 기록
+PVH = round(BWD * 900 / 1440)
+A = clip("a-submit", 0.6, 5.6, a1)
+Bc = clip("b-task", 0.9, 6.8, at("검토업무를 자동으로") + .2 - (REC["clips"]["b-task"]["events"]["task"] - 0.9))
+Cc = clip("c-revision", 1.0, 5.9, a4 - .5)
+Dc = clip("d-status", 0.5, 4.7, max(Cc["ev"]["revision"] + .25, a5))
+Ec = clip("e-resubmit", 0.45, 3.7, max(a6, Dc["ev"]["shown"] + .6))
+Fc = clip("f-done", 1.9, 7.3, Ec["ev"]["submit"] + .15)
+order = [A["ev"]["submit"], Bc["ev"]["task"], Cc["ev"]["revision"], Dc["ev"]["shown"], Ec["ev"]["submit"], Fc["ev"]["done"], Fc["ev"]["history"]]
+if order != sorted(order) or Fc["ev"]["history"] > a7: raise SystemExit(f"녹화 사건 순서 · 시각 확인: {order} / a7 {a7}")
+srv_t = [A["ev"]["submit"] + .15, a2 + .3, a2 + 1.1, a2 + 1.8, a2 + 2.5, Cc["ev"]["revision"] + .2, Dc["ev"]["shown"], Ec["ev"]["submit"] + .3, Fc["ev"]["done"] + .2]
+ROLE = {"고객": "c", "서버": "s", "담당자": "a"}
+task_title, _, task_owner, task_type = SRV["TASK"]
+lines = [("고객", "자료 제출 — <b>document_files</b> +1", "고객 계정으로 실행"),
+         ("서버", "트리거 <b>kpjk_after_client_file()</b>", "제출을 기업 · 요청항목과 연결"),
+         ("서버", f"업무 생성 · <b>{esc(task_title)}</b>", f"자동(auto) · 담당 {esc(task_owner)} · {esc(task_type)}"),
+         ("서버", f"고객 알림 · {esc(SRV['NOTI'][0])}", "고객 화면 알림"),
+         ("서버", "프로젝트 단계 → 자료접수", f"자동 기록({esc(SRV['ACT'][1])}) · {esc(SRV['ACT'][0])}"),
+         ("담당자", "보완 요청 — 요청 상태 변경 1건", "담당자 계정으로 실행"),
+         ("고객", f"고객이 읽는 상태 · <b>보완 요청</b>", esc(SRV["CLIENT"][3])),
+         ("고객", "재제출 → 검토 업무 다시 생성", f"자동 생성 누적 {esc(SRV['RETASK'][0])}건"),
+         ("담당자", "검토 완료 → 기록 · 진행상태", "요청 상태 완료 1건")]
+srv_rows = "".join(f'<div class="srow" data-in="{srv_t[i]:.2f}" data-out="{a7 + .3:.2f}" data-a="up" data-dim="{(srv_t[i + 1] if i + 1 < len(srv_t) else a7):.2f}">'
+                   f'<span class="role {ROLE[r]}">{r}</span><div><div class="m">{m}</div><div class="d">{d}</div></div></div>' for i, (r, m, d) in enumerate(lines))
+srv = box("srv", f'<div class="hd"><b>서버 처리 — 실제 실행 결과</b><span>로컬 시험 DB · 운영과 같은 setup.sql · 가상 데이터</span></div><div class="rows">{srv_rows}</div><div class="ft">같은 규칙을 서버 DB 에서 실제로 실행한 결과입니다. 왼쪽 녹화(데모 환경)와 데이터는 별개입니다.</div>',
+          s3 + .4, a7 + .3, f"left:{SVX}px;top:{BY}px;width:{SVW}px;height:{PVH + 34}px", "card")
+# 흐름 표시 — 실제 사건 시각에만 움직인다
+yb = BY + PVH + 34 + 22
+flows = [(f"M{PX + PWD/2 + 12:.0f} {PY + 672} L{PX + PWD/2 + 12:.0f} {yb} L{SVX + 60} {yb} L{SVX + 60} {BY + PVH + 34}", A["ev"]["submit"] + .05, A["ev"]["submit"] + 1.0),
+         (f"M{SVX - 2} {BY + 210} L{BX + BWD + 6} {BY + 210}", Bc["ev"]["task"] - .6, Bc["ev"]["task"] - .1),
+         (f"M{BX + BWD + 6} {BY + 470} L{SVX - 2} {BY + 470}", Cc["ev"]["revision"] + .05, Cc["ev"]["revision"] + .5),
+         (f"M{SVX + 60} {BY + PVH + 34} L{SVX + 60} {yb} L{PX + PWD/2 + 12:.0f} {yb} L{PX + PWD/2 + 12:.0f} {PY + 672}", Dc["ev"]["shown"] - 1.0, Dc["ev"]["shown"] - .1)]
+flow_svg = '<svg class="wire" width="1920" height="1080" viewBox="0 0 1920 1080">' + "".join(
+    f'<path id="fl{i}" d="{d_}" class="soft" data-draw="{a_:.2f},{b_:.2f}" data-fade="{b_ + .6:.2f}"/>' for i, (d_, a_, b_) in enumerate(flows)) + "</svg>"
+flow_dots = "".join(f'<div class="fdot" data-move="fl{i},{a_:.2f},{b_:.2f}"></div>' for i, (d_, a_, b_) in enumerate(flows))
+kb_b = zoom_to(Bc, "task", BWD, PVH, 1.45, Bc["ev"]["task"] - .2, Bc["ev"]["task"] + .9)
+kb_c = zoom_to(Cc, "dialog", BWD, PVH, 1.3, Cc["ev"]["open"] + .1, Cc["ev"]["open"] + 1.0)
+kb_f = zoom_to(Fc, "list", BWD, PVH, 1.3, Fc["ev"]["history"] + .2, Fc["ev"]["history"] + 1.2)
 scene(s3, a7 + .3,
-    phone("ph-docs-request", PX, PY, PWD, s3 + .2, a1b + .2, focus=[("row", a1, a1b + .2)]),
-    phone("ph-upload", PX, PY, PWD, a1b, a1b + 2.0, focus=[("dialog", a1b + .2, a1b + 1.8)]),
-    phone("ph-docs-sent", PX, PY, PWD, a1b + 1.8, a5 + .2, focus=[("row", a1b + 2.0, a2 + 1.0)]),
-    phone("ph-docs-revision", PX, PY, PWD, a5, a6 + .2, focus=[("row", a5 + .3, a6)]),
-    phone("ph-project", PX, PY, PWD, a6, a7 + .3),
-    browser("pc-docreq", BX, BY, BWD, s3 + .2, a2 + .2, url="kpj-kcorp.vercel.app/ax/clients — 담당자가 보낸 자료 요청", kb=(s3, a2, 1.0, 0, 0, 1.05, -20, -10)),
-    code("supabase/setup.sql", "서버 트리거 — 고객 제출 → 검토 업무", src("supabase/setup.sql", [(1017, 1019), (1022, 1023), (1028, 1032)], maxc=92),
-         BX, BY + 20, BWD, a2, a3 + .3, hls=[(1017, a2 + .3, a3), (1029, a2 + 2.0, a3 + .3), (1030, a2 + 2.6, a3 + .3)], fs=18),
-    browser("pc-tasks-auto", BX, BY, BWD, a3, a4 + .2, url="kpj-kcorp.vercel.app/ax/tasks — 담당자 업무함", focus=[("task", a3 + .4, a4)],
-            kb=(a3, a4, 1.0, 0, 0, 1.08, -40, -60)),
-    browser("pc-review", BX, BY, BWD, a4, a6 + .2, url="kpj-kcorp.vercel.app/ax/clients — 자료 검토", focus=[("btn", a4 + .8, a5 + .5)], kb=(a4, a6, 1.0, 0, 0, 1.05, -10, -10)),
-    browser("pc-history", BX, BY, BWD, a6, a7 + .3, url="kpj-kcorp.vercel.app/ax/clients — 기업 이력", kb=(a6, a7, 1.15, -60, -180, 1.25, -90, -260)),
-    step(1, "고객이 휴대폰으로 자료 제출", a1, a7 + .3, SX_, 170, SW_, dim=a2),
-    step(2, "서버가 기업 · 요청항목과 연결", a2, a7 + .3, SX_, 290, SW_, dim=a3),
-    step(3, "담당자 검토 업무 자동 생성", a3, a7 + .3, SX_, 410, SW_, dim=a4),
-    step(4, "담당자 검토 · 보완 요청", a4, a7 + .3, SX_, 530, SW_, dim=a5),
-    step(5, "고객 화면에 보완 필요 반영", a5, a7 + .3, SX_, 650, SW_, dim=a6),
-    step(6, "업무기록 · 진행상태 반영", a6, a7 + .3, SX_, 770, SW_),
+    box("rec abs", '<i></i>실제 화면 녹화 · 고객 휴대폰', s3 + .3, a7 + .3, f"left:{PX}px;top:104px", "fade"),
+    box("rec abs", '<i></i>실제 화면 녹화 · 담당자 PC <span>데모 환경 · 예시 데이터 · 장면 사이 대기 구간만 편집</span>', s3 + .3, a7 + .3, f"left:{BX}px;top:104px", "fade"),
+    rec_phone(A, PX, PY, PWD, s3 + .2, Dc["t0"] + .1, focus=[("row", s3 + .8, A["ev"]["open"])]),
+    rec_phone(Dc, PX, PY, PWD, Dc["t0"], Ec["t0"] + .1, focus=[("row", Dc["ev"]["shown"] + .2, Ec["t0"])]),
+    rec_phone(Ec, PX, PY, PWD, Ec["t0"], a7 + .3),
+    rec_browser(Bc, BX, BY, BWD, s3 + .2, Cc["t0"] + .1, "kpj-kcorp.vercel.app/ax/tasks — 담당자 업무함", kb=kb_b, focus=[("task", Bc["ev"]["task"] + .9, Cc["t0"])]),
+    rec_browser(Cc, BX, BY, BWD, Cc["t0"], Fc["t0"] + .1, "kpj-kcorp.vercel.app/ax/clients — 자료 검토", kb=kb_c, focus=[("btn", Cc["ev"]["typed"], Cc["ev"]["revision"] + .3)]),
+    rec_browser(Fc, BX, BY, BWD, Fc["t0"], a7 + .3, "kpj-kcorp.vercel.app/ax/clients — 기업 이력", kb=kb_f),
+    srv, flow_svg, flow_dots,
 )
 # 순환 도식
 L = [("고객 행동", "자료 제출 · 재제출", 960, 250), ("내부 업무 발생", "검토 업무 자동 생성", 1440, 470), ("처리 결과", "검토 · 보완 요청 · 완료", 960, 690), ("고객 화면 반영", "보완 필요 · 진행 단계", 480, 470)]
@@ -243,13 +310,25 @@ scene(d2, d3 + .3,
     code("supabase/setup.sql", "같은 근거의 업무는 한 번만", src("supabase/setup.sql", [(361, 361), (1644, 1645), (1673, 1674)], maxc=76), 1020, 280, 780, e2 - .4, d3 + .3,
          hls=[(361, e2 + .3, d3 + .3), (1673, e2 + 1.0, d3 + .3)], fs=17),
 )
+# ② 일반 CRM 대비 — 개별 기능의 유무가 아니라 컨설팅 업무에 맞춘 통합 처리구조 (기존 나레이션 구간 그대로)
 f1 = at("상태변환 규칙"); f2 = at("실제 프로그램과 데이터베이스에", d3)
+CRM = ["고객정보 관리", "일정 관리", "업무(할 일) 관리", "영업 단계 관리"]
+KP = [("기업별 복합 업무상태 관리", "내부 11단계 · 자료 · 실행 기록을 기업 단위로", "stages.ts"),
+      ("상태변화에 따른 후속행동 생성", "규칙 · 서버 트리거가 다음 업무를 만든다", "setup.sql 트리거"),
+      ("내부 담당자와 고객의 역할별 출력", "담당자 업무 / 고객 진행 4단계 · 할 일 — 기업별 권한", "RLS 정책"),
+      ("고객 실행결과의 재반영 → 다음 행동", "실행 이력 → 다음 검토과제 · 담당자 확인", "growth.ts · self-run.ts")]
+tk = [f1 - .2 + i * .55 for i in range(4)]
+crm_rows = "".join(f'<li data-in="{d3 + .9 + i * .18:.2f}" data-out="{T + .3:.2f}" data-a="up">{esc(x)}</li>' for i, x in enumerate(CRM))
+kp_rows = "".join(f'<div class="kp" data-in="{tk[i]:.2f}" data-out="{T + .3:.2f}" data-a="left"><span class="n">{i + 1}</span><div class="tx"><b>{esc(t)}</b><span>{esc(d)}</span></div><code>{esc(c)}</code></div>' for i, (t, d, c) in enumerate(KP))
 scene(d3, T + .3,
-    box("abs", f'<span class="h3" style="color:var(--ink2)">{strike("화면 디자인만 다른 것", at("아니라", d3))}</span>', d3 + .1, T + .3, "left:120px;top:200px", "up"),
-    box("glass hl abs", '<div class="small">상태변환 규칙</div><div class="h3" style="margin-top:14px">내부 11단계 →<br>고객 4단계</div><div class="small" style="margin-top:22px;font-family:\'NGC-L\',\'NGC-K\',monospace">stages.ts</div>', f1, T + .3, "left:120px;top:330px;width:520px;height:330px;padding:40px", "card"),
-    box("glass hl abs", '<div class="small">데이터 접근통제</div><div class="h3" style="margin-top:14px">기업별 권한 정책<br>(RLS)</div><div class="small" style="margin-top:22px;font-family:\'NGC-L\',\'NGC-K\',monospace">setup.sql · kpjk_can_see_company</div>', f1 + .6, T + .3, "left:700px;top:330px;width:520px;height:330px;padding:40px", "card"),
-    box("glass hl abs", '<div class="small">중복 방지</div><div class="h3" style="margin-top:14px">고유 색인 ·<br>규칙 키</div><div class="small" style="margin-top:22px;font-family:\'NGC-L\',\'NGC-K\',monospace">tasks_rule_key_uidx</div>', f1 + 1.2, T + .3, "left:1280px;top:330px;width:520px;height:330px;padding:40px", "card"),
-    txt("p abs", "실제 프로그램과 **데이터베이스**에 구현", f2, T + .3, "left:0;right:0;text-align:center;top:720px"),
+    box("abs", f'<span class="h3" style="color:var(--ink2);font-size:34px">{strike("화면 디자인만 다른 것", at("아니라", d3))}</span>', d3 + .1, T + .3, "left:120px;top:130px", "up"),
+    txt("h3 abs", "일반 CRM 과의 차이 — 컨설팅 업무에 특화된 **통합 처리구조**", d3 + .4, T + .3, "left:120px;top:196px;font-size:38px"),
+    box("glass abs cmp", f'<div class="small" style="letter-spacing:.12em">일반적인 CRM 기능</div><ul>{crm_rows}</ul><div class="small" style="margin-top:18px;font-size:17px">기능별로 관리 · 제품마다 구성은 다릅니다</div>',
+        d3 + .7, T + .3, "left:120px;top:290px;width:520px;height:500px;padding:36px 40px", "card"),
+    box("glass hl abs cmp2", f'<div class="small" style="letter-spacing:.12em;color:var(--hi)">KPJK — 하나의 처리 흐름으로 연결</div>{kp_rows}',
+        f1 - .5, T + .3, "left:680px;top:290px;width:1120px;height:500px;padding:30px 36px", "card"),
+    txt("small abs", "다른 CRM 에 없는 기능이라는 뜻이 아니라, 기업 컨설팅 업무에 맞춰 네 가지를 하나의 처리 흐름으로 묶어 프로그램과 **데이터베이스**에 구현했다는 점이 차이입니다",
+        f2, T + .3, "left:120px;right:120px;top:812px;font-size:19px;text-align:center"),
 )
 
 # =====================================================================
@@ -271,8 +350,11 @@ scene(g1, g2 + .3,
     box("glass abs", '<div class="small" style="letter-spacing:.12em">이미 구현된 기능</div><div class="h3" style="margin-top:16px;font-size:34px">다음 검토과제 제시</div><div class="h3" style="margin-top:8px;font-size:34px">지원사업 공고 매칭</div><div class="small" style="margin-top:24px;line-height:1.5">매칭은 검토 후보 —<br>자격 · 선정을 판단하지 않음</div>', g1 + 1.0, g2 + .3, f"left:{slot(2) - 20}px;top:250px;width:440px;padding:40px", "card"),
 )
 h1_, h2_, h3_ = at("무료 학습자료"), at("직접 지원사업을 준비"), at("실행 결과를 기록할")
-NEWT = lambda t, tin, tout, x: tag("신규", t, tin, tout, f"left:{x - 40}px;top:104px", new=True).replace('class="n">신규', 'class="n" style="width:auto;padding:0 10px;border-radius:12px;font-size:17px">신규')
+NEWT = lambda t, tin, tout, x: tag("고도화", t, tin, tout, f"left:{x - 40}px;top:104px", new=True).replace('class="n">고도화', 'class="n" style="width:auto;padding:0 10px;border-radius:12px;font-size:17px">고도화')
+# ③ 신규 고도화 기능의 시점 — 최초 신청 당시부터 있었던 것처럼 보이지 않게, 화면마다 같은 표기
+DATE_BADGE = lambda tin, tout: box("abs", '<span class="badge-date"><i>●</i>기존 신청기술 기반 추가 고도화 <i>|</i> 2026년 10월</span>', tin, tout, "left:0;right:0;text-align:center;top:30px", "fade")
 scene(g2, g3 + .3,
+    DATE_BADGE(g2 + .3, g3 + .3),
     phone("ph-learn", slot(0), PYY, PW5, h1_ - .3, g3 + .3, a="card"),
     phone("ph-prog-checks", slot(1), PYY, PW5, h2_ - .3, g3 + .3, focus=[("checks", h2_ + .3, h3_)], a="card"),
     phone("ph-prog-applied", slot(2), PYY, PW5, h3_ - .3, g3 + .3, focus=[("ev", h3_ + .4, g3 + .3)], a="card"),
@@ -280,6 +362,7 @@ scene(g2, g3 + .3,
 )
 k1, k2 = at("완료한 성장과제는"), at("다음 검토과제로 이어집니다")
 scene(g3, g4 + .3,
+    DATE_BADGE(g3 - .2, g4 + .3),
     phone("ph-prog-official", slot(0), PYY, PW5, g3 + .1, g4 + .3, focus=[("title", g3 + .5, k1)]),
     phone("ph-prog-next", slot(1), PYY, PW5, at("직접 준비할 수 있고") , g4 + .3, focus=[("next", at("직접 준비할 수 있고") + .4, k1 + .5)], a="card"),
     phone("ph-growth-done", slot(2), PYY, PW5, k1 - .2, g4 + .3, focus=[("follow", k2 - .3, g4 + .3)], a="card"),
@@ -290,7 +373,10 @@ L5 = [("업무 이벤트", "", 300, 400), ("기업별 상태 갱신", "", 720, 4
 x1 = at("고객의 자기주도 실행"); parts = [txt("eyebrow abs", "Extension", g4 + .1, T + .3, "left:120px;top:190px"),
                                     txt("h3 abs", "출원한 상태 기반 후속행동 구조를 → 고객의 **자기주도 실행**까지", g4 + .2, T + .3, "left:120px;top:236px")]
 for i, (t, s_, cx, cy) in enumerate(L5): parts.append(node(t, s_, cx, cy, 340, 110, g4 + .2 + i * .25, T + .3))
+parts.append(txt("small abs", "기존 신청기술 — 핵심 구조 그대로 유지", g4 + .4, T + .3, "left:130px;top:302px;letter-spacing:.04em"))
 parts.append(node("고객의 직접 실행", "학습 · 직접 준비 · 신청 · 결과 기록", 1140, 680, 520, 150, x1 - .4, T + .3, cls="new", a="card"))
+parts.append(box("abs", '<span class="badge-date"><i>●</i>추가 고도화 <i>|</i> 2026년 10월 · 활용 범위 확장</span>', x1 + .2, T + .3, "left:880px;top:770px", "up"))
+parts.append(DATE_BADGE(g4 - .2, T + .3))
 parts.append(node("이력 · 다음 과제 반영", "", 520, 680, 420, 110, x1 + .8, T + .3, cls="on", a="card"))
 parts.append(wire([(f"M{300+170} 400 L{720-170} 400", g4 + .3, g4 + .8, "soft"), (f"M{720+170} 400 L{1140-170} 400", g4 + .5, g4 + 1.0, "soft"), (f"M{1140+170} 400 L{1560-170} 400", g4 + .7, g4 + 1.2, "soft"),
                    ("M1560 455 C 1560 600, 1460 680, 1400 680", x1 - .6, x1 + .2, ""), ("M880 680 L730 680", x1 + .4, x1 + 1.0, ""), ("M520 625 C 520 520, 300 520, 300 455", x1 + 1.0, x1 + 1.8, "")]))

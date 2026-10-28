@@ -103,6 +103,36 @@
   #sub span { max-width:1500px; padding:12px 30px; border-radius:18px; background:rgba(12,15,19,.84); border:1px solid rgba(255,255,255,.10);
               font-size:40px; font-weight:700; letter-spacing:-.01em; line-height:1.42; text-align:center; white-space:pre-line; }
   #sub b { color:var(--hi); font-weight:800; }
+  /* 실제 화면 녹화 · 서버 처리 기록 */
+  .rec { display:flex; align-items:center; gap:10px; font-size:19px; font-weight:700; white-space:nowrap; }
+  .rec i { width:11px; height:11px; border-radius:50%; background:#e5534b; box-shadow:0 0 0 4px rgba(229,83,75,.22); display:block; }
+  .rec span { font-size:16px; font-weight:600; color:var(--ink3); margin-left:8px; }
+  .srv { position:absolute; border-radius:18px; overflow:hidden; background:#0b0e12; border:1px solid rgba(255,255,255,.12); box-shadow:0 40px 90px -30px rgba(0,0,0,.85); }
+  .srv .hd { padding:14px 18px 12px; background:#151a20; border-bottom:1px solid rgba(255,255,255,.08); }
+  .srv .hd b { display:block; font-size:19px; font-weight:800; color:var(--hi); }
+  .srv .hd span { display:block; margin-top:5px; font-size:14px; font-weight:600; color:var(--ink3); }
+  .srv .rows { padding:10px 14px; }
+  .srow { display:flex; gap:10px; align-items:flex-start; padding:5px 4px; border-bottom:1px solid rgba(255,255,255,.06); }
+  .srow .role { flex:none; width:52px; text-align:center; padding:4px 0; border-radius:8px; font-size:14px; font-weight:800; margin-top:1px; }
+  .srow .role.c { background:rgba(111,211,154,.16); color:#8fe0b2; }
+  .srow .role.s { background:rgba(212,122,74,.22); color:var(--hi); }
+  .srow .role.a { background:rgba(120,160,230,.18); color:#a9c4f0; }
+  .srow .m { font-size:16px; font-weight:700; line-height:1.35; color:var(--ink); }
+  .srow .m b { font-family:'NGC-L','NGC-K',monospace; font-weight:700; color:#fff; }
+  .srow .d { margin-top:3px; font-size:13.5px; font-weight:600; color:var(--ink3); line-height:1.35; }
+  .srv .ft { position:absolute; left:18px; right:18px; bottom:14px; font-size:13px; font-weight:600; color:var(--ink3); line-height:1.45; }
+  .cmp ul { list-style:none; margin-top:22px; }
+  .cmp li { font-size:28px; font-weight:700; color:var(--ink2); padding:14px 0; border-bottom:1px solid rgba(255,255,255,.08); display:flex; align-items:center; gap:14px; }
+  .cmp li:before { content:""; width:10px; height:10px; border-radius:50%; background:rgba(244,241,236,.35); flex:none; }
+  .kp { display:flex; align-items:center; gap:18px; padding:15px 0; border-bottom:1px solid rgba(255,255,255,.08); }
+  .kp .n { flex:none; display:inline-flex; width:42px; height:42px; border-radius:50%; background:var(--acc); color:#fff; font-size:21px; font-weight:800; align-items:center; justify-content:center; }
+  .kp .tx { flex:1; min-width:0; }
+  .kp .tx b { display:block; font-size:28px; font-weight:800; line-height:1.25; }
+  .kp .tx span { display:block; margin-top:4px; font-size:19px; font-weight:600; color:var(--ink3); }
+  .kp code { flex:none; font-family:'NGC-L','NGC-K',monospace; font-size:16px; color:var(--hi); padding:6px 12px; border-radius:10px; background:rgba(212,122,74,.12); border:1px solid rgba(232,184,154,.3); white-space:nowrap; }
+  .badge-date { display:inline-flex; align-items:center; gap:12px; padding:10px 22px; border-radius:999px; background:rgba(111,211,154,.10); border:1px solid rgba(111,211,154,.45); font-size:21px; font-weight:700; white-space:nowrap; color:var(--ink); }
+  .badge-date i { font-style:normal; color:#8fe0b2; font-weight:800; }
+  .fdot { position:absolute; width:18px; height:18px; margin:-9px 0 0 -9px; border-radius:50%; background:var(--hi); box-shadow:0 0 0 6px rgba(212,122,74,.25), 0 0 24px rgba(232,184,154,.8); opacity:0; }
   .guide { position:absolute; outline:2px dashed rgba(255,80,80,.7); display:none; pointer-events:none; }
   body.show-guide .guide { display:block; }
 </style></head>
@@ -132,6 +162,9 @@
   const strikes = [...document.querySelectorAll('[data-strike]')];
   const glows = [...document.querySelectorAll('[data-glow]')];
   const dims = [...document.querySelectorAll('[data-dim]')];
+  const seqs = [...document.querySelectorAll('img[data-seq]')].map((el) => ({ el, d: JSON.parse(el.dataset.seq), cur: '' }));
+  const moves = [...document.querySelectorAll('[data-move]')].map((el) => { const [id, a, b] = el.dataset.move.split(','); const p = document.getElementById(id); return { el, p, L: p.getTotalLength(), a: +a, b: +b }; });
+  const fades = [...document.querySelectorAll('[data-fade]')];
   const subEl = document.querySelector('#sub span'), chapEl = document.getElementById('chap'), noteEl = document.getElementById('note');
   let subIdx = -2, chapIdx = -2;
   function render(t) {
@@ -155,6 +188,13 @@
       el.style.transform = `translate(${lerp(x0, x1, k)}px, ${lerp(y0, y1, k)}px) scale(${lerp(s0, s1, k)})`;
     }
     for (const [p, L] of draws) { const [a, b] = p.dataset.draw.split(',').map(Number); p.style.strokeDashoffset = L * (1 - eio(clamp((t - a) / (b - a)))); }
+    for (const el of fades) el.style.opacity = 1 - eo(clamp((t - +el.dataset.fade) / .6));
+    for (const m of moves) {
+      const k = clamp((t - m.a) / (m.b - m.a));
+      const on = t >= m.a - .05 && t <= m.b + .25;
+      m.el.style.opacity = on ? Math.min(1, (t - m.a + .05) / .1, (m.b + .25 - t) / .25) : 0;
+      const pt = m.p.getPointAtLength(m.L * eio(k)); m.el.style.left = pt.x + 'px'; m.el.style.top = pt.y + 'px';
+    }
     for (const el of strikes) el.querySelector('i').style.width = `calc(${eio(clamp((t - +el.dataset.strike) / .8)) * 100}% + 8px)`;
     for (const el of glows) {
       const [a, b] = el.dataset.glow.split(',').map(Number);
@@ -170,6 +210,16 @@
     if (c !== chapIdx) { chapIdx = c; if (c >= 0) { chapEl.innerHTML = `${CHAPS[c][2]}<b>${esc(CHAPS[c][3])}</b>`; noteEl.textContent = CHAPS[c][4] || ''; } }
     const co = c < 0 ? 0 : Math.min(clamp((t - CHAPS[c][0]) / .6), clamp((CHAPS[c][1] - t) / .5));
     chapEl.style.opacity = co; noteEl.style.opacity = co;
+    // 실제 화면 녹화: 그 시각의 프레임으로 바꾸고, 그림이 다 그려질 때까지 기다린다(프레임이 정확히 맞게)
+    const waits = [];
+    for (const s of seqs) {
+      const { dir, frames, t0, fps } = s.d;
+      if (t < t0 - 1.5 || t > t0 + frames.length / fps + 40) continue;
+      const i = Math.max(0, Math.min(frames.length - 1, Math.floor((t - t0) * fps + 1e-6)));
+      const src = dir + '/' + frames[i];
+      if (s.cur !== src) { s.cur = src; s.el.src = src; waits.push(s.el.decode().catch(() => {})); }
+    }
+    return waits.length ? Promise.all(waits) : undefined;
   }
   window.render = render; window.DUR = DUR;
   render(0);
