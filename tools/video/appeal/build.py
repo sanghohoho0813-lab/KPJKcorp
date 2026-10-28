@@ -168,15 +168,21 @@ scene(t_ev, T + .3, *parts)
 s3 = S(3); T = nxt(3)
 a1 = at("고객이 휴대폰으로"); a1b = at("자료를 제출합니다"); a2 = at("서버는 제출된 자료를"); a3 = at("검토업무를 자동으로")
 a4 = at("담당자가 자료를 검토하고"); a5 = at("고객 화면에도"); a6 = at("고객이 다시 자료를"); a7 = at("이는 단순히 알림을")
-# ① 실제 화면 녹화(데모 환경) + 서버 처리 실제 실행(로컬 시험 DB). 클립은 실제 속도 그대로, 앞뒤 대기만 잘라 이어 놓는다.
-REC = json.load(open(f"{W}/rec/meta.json"))
-SRV = {}
-for ln_ in open(f"{W}/logs/server-loop.txt", encoding="utf-8"):
-    k, *v = ln_.strip().split("|")
-    if k: SRV[k] = v
-need = {"STEP1": ["client", "1"], "TASK": None, "NOTI": None, "ACT": None, "STAGE": ["doc_received"], "STEP3": ["consultant", "1"], "CLIENT": None, "RETASK": ["2"], "DONE": ["1"]}
-for k, v in need.items():
-    if k not in SRV or (v and SRV[k] != v): raise SystemExit(f"서버 실행 결과가 기대와 다름: {k} {SRV.get(k)}")
+if "--cues" in sys.argv:
+    # 운영 서버 연속 녹화용 큐 — 조작하는 사람이 나레이션에 맞춰 누르도록(발표자가 대본에 맞춰 누르듯), 각 조작 묶음 사이의 간격.
+    # 앞 묶음이 실제로 시작된 때부터 잰다 — 조작이 나레이션보다 느렸던 곳은 뒤가 함께 밀리고, 그만큼 나레이션 쉼(pauses.json)이 메운다.
+    # 첫 기준 = 고객이 업로드를 누르는 때(영상에서 "고객이 휴대폰으로" 직후). 서버 반응(다른 화면에 나타나는 것)은 기다리기만 하고 맞추지 않는다
+    CUES = {"G2": at("검토업무를 자동으로") + .2,            # PC: 자동 생성 업무를 가리킨다
+            "G3": at("검토업무를 자동으로") + 1.4,           # PC: 기업 → 요청자료 → 자료 열기
+            "G4": at("보완을 요청하면") - 1.6,               # PC: 사유 입력 → 보완 요청
+            "G5": at("고객이 다시 자료를") - .2,             # 휴대폰: 재제출
+            "G6": at("담당자가 검토를") - .4,                # PC: 검토 완료
+            "G7": at("그 결과가 업무기록과") + .6,           # PC: 이력
+            "END": a7 + .5}
+    prev, chain = a1 + .3, {}
+    for k, t in CUES.items(): chain[k] = round(t - prev, 2); prev = t
+    json.dump(chain, open(f"{W}/cues.json", "w"), indent=1)
+    raise SystemExit(f"큐 → {W}/cues.json")
 def clip(name, frm, to, t0):
     """녹화 클립 한 토막 — frm~to(클립 시각)을 영상 t0 부터 실제 속도로. 반환: (시작, 끝, 사건 → 영상 시각)"""
     c = REC["clips"][name]; f0, f1 = round(frm * REC["fps"]), round(min(to, c["dur"]) * REC["fps"])
@@ -192,14 +198,15 @@ def zoom_to(c, key, w, vh, z, a, b):
     return (round(a, 2), round(b, 2), 1.0, 0, 0, z, round(tx), round(ty))
 def seq_view(c, w, kb=None, focus=()):
     s0 = w / c["c"]["w"]; h = round(c["c"]["h"] * s0)
-    k = f'data-kb="{",".join(str(x) for x in kb)}"' if kb else ""
+    k = f'data-kb="{",".join(str(x) for seg in (kb if isinstance(kb, list) else [kb]) for x in seg)}"' if kb else ""
     fx = ""
     for key, a, b in focus:
         r = c["c"]["boxes"].get(key)
         if not r: raise SystemExit(f"녹화 위치 없음 {c['name']}:{key}")
         fx += f'<div class="focus" style="left:{r["x"]*s0-6:.0f}px;top:{r["y"]*s0-6:.0f}px;width:{r["w"]*s0+12:.0f}px;height:{r["h"]*s0+12:.0f}px" data-glow="{a:.2f},{b:.2f}"></div>'
-    d = json.dumps({"dir": f"rec/{c['name']}", "frames": c["frames"], "t0": round(c["t0"], 3), "fps": REC["fps"]})
-    return h, f'<div class="kbw" style="width:{w}px;height:{h}px" {k}><img data-seq=\'{d}\' src="rec/{c["name"]}/{c["frames"][0]}" style="width:{w}px;height:{h}px">{fx}</div>'
+    dr = c.get("dir") or f"rec/{c['name']}"     # 데모 녹화는 rec/<클립>, 운영 서버 연속 녹화는 rec-server/<화면>
+    d = json.dumps({"dir": dr, "frames": c["frames"], "t0": round(c["t0"], 3), "fps": c.get("fps") or REC["fps"]})
+    return h, f'<div class="kbw" style="width:{w}px;height:{h}px" {k}><img data-seq=\'{d}\' src="{dr}/{c["frames"][0]}" style="width:{w}px;height:{h}px">{fx}</div>'
 def rec_phone(c, x, y, w, tin, tout, kb=None, focus=()):
     h, inner = seq_view(c, w, kb, focus)
     return box("phone", f'<div class="notch"></div><div class="view" style="width:{w}px;height:{h}px">{inner}</div>', tin, tout, f"left:{x}px;top:{y}px", "swap")
@@ -211,90 +218,171 @@ PX, PY, PWD = 80, 150, 300          # 고객 휴대폰
 BX, BY, BWD = 420, 150, 1040        # 담당자 PC
 SVX, SVW = 1500, 340                # 서버 처리 기록
 PVH = round(BWD * 900 / 1440)
-# 눈 따라가기 — 휴대폰 · 서버 기록 · PC 중 한 곳이 바뀐 뒤 다른 곳이 바뀌기까지 시간을 두고, 흐름점이 다음 화면으로 시선을 데려간다.
-# 클립 안의 동작(누르기 · 입력 · 화면 이동)은 실제 속도 그대로. 기다리는 시간만 늘리고, 나레이션은 문장 사이 쉼(pauses.json)으로 맞춘다.
-HOLD = 1.4                                   # 결과 화면(자동 생성 업무 · 보완 필요)을 그대로 보여 주는 시간
-def ev0(name, k, frm): return REC["clips"][name]["events"][k] - frm
-A = clip("a-submit", 0.6, 5.6, a1)
-sub = A["ev"]["submit"]
-r1 = sub + .9; r2 = r1 + .8; r3 = r2 + .8; r45 = r3 + .7     # 서버: 제출 기록 → 트리거 → 업무 생성 → 고객 알림 · 단계(같은 트리거 결과라 한 번에)
-Bc = clip("b-task", 0.9, 6.8, r45 + .8 - ev0("b-task", "nav", 0.9))   # PC 는 서버 기록이 다 오른 뒤 움직인다
-Cc = clip("c-revision", 1.0, 5.9, Bc["ev"]["task"] + HOLD)
-r6 = Cc["ev"]["revision"] + .65
-Dc = clip("d-status", 0.5, 4.7, r6 + .95)                     # 흐름점이 휴대폰에 닿을 때 고객이 앱을 연다
-r7 = Dc["t0"]
-Ec = clip("e-resubmit", 0.45, 3.7, Dc["ev"]["shown"] + HOLD)
-r8 = Ec["ev"]["submit"] + .8
-Fc = clip("f-done", 2.5, 7.3, r8 + .7)
-r9 = Fc["ev"]["done"] + .8
-order = [A["ev"]["submit"], Bc["ev"]["task"], Cc["ev"]["revision"], Dc["ev"]["shown"], Ec["ev"]["submit"], Fc["ev"]["done"], Fc["ev"]["history"]]
-if order != sorted(order): raise SystemExit(f"녹화 사건 순서 확인: {order}")
-# 나레이션 ↔ 화면 — (쉼을 넣을 자막 첫머리, 맞출 문구, 그 문구가 나와야 할 시각). 문구가 화면보다 이르면 그 자막 앞에 쉼을 더하고,
-# 늦으면 앞서 넣은 쉼을 줄인다. 맞지 않으면 새 쉼 값을 적어 두고 멈춘다 → pauses.json 에 옮기고 align_voice.py 부터 다시
-SYNC = [("서버는 제출된 자료를", "서버는 제출된 자료를", r1 - .3),
-        ("담당자가 처리해야 할", "검토업무를 자동으로", Bc["ev"]["task"] - .8),
-        ("담당자가 자료를 검토하고", "보완을 요청하면", Cc["ev"]["revision"] - .9),
-        ("고객 화면에도", "필요한 상태가 반영", Dc["ev"]["shown"] - .5),
-        ("고객이 다시 자료를", "담당자가 검토를", Fc["ev"]["done"] - 1.4),
-        ("그 결과가 업무기록과", "그 결과가 업무기록과", Fc["ev"]["done"] + .4),
-        ("이는 단순히 알림을", "이는 단순히 알림을", Fc["ev"]["history"] + 1.3)]
-PF = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pauses.json")
-CUR = json.load(open(PF, encoding="utf-8")) if os.path.exists(PF) else {}
-NEW, moved, late = dict(CUR), 0.0, []
-for key, ph, want in SYNC:
-    d = want - (at(ph, a1) + moved)
-    nv = round(max(0.0, CUR.get(key, 0.0) + d), 2); moved += nv - CUR.get(key, 0.0)
-    if nv > 0: NEW[key] = nv
-    else: NEW.pop(key, None)
-    if d + CUR.get(key, 0.0) < -.8: late.append(f"{ph} {-(d + CUR.get(key, 0.0)):.1f}초 늦음")
-if late: print("나레이션이 화면보다 늦은 곳:", late)
-if any(abs(NEW.get(k, 0) - CUR.get(k, 0)) > .05 for k in set(NEW) | set(CUR)):
-    json.dump(NEW, open(f"{W}/pauses_new.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1)
-    raise SystemExit(f"쉼 조정 필요 → {W}/pauses_new.json 을 tools/video/appeal/pauses.json 으로 옮기고 align_voice.py 부터 다시: {NEW}")
-if Fc["ev"]["history"] + 1.3 > a7: raise SystemExit(f"이력 화면을 볼 시간이 짧음: {Fc['ev']['history']} / a7 {a7}")
-srv_t = [r1, r2, r3, r45, r45, r6, r7, r8, r9]
+def fit_pauses(SYNC):
+    """나레이션 ↔ 화면 — SYNC: (쉼을 넣을 자막 첫머리, 맞출 문구, 그 문구가 나와야 할 시각). 문구가 화면보다 이르면 그 자막 앞에 쉼을 더하고,
+    늦으면 앞서 넣은 쉼을 줄인다. 맞지 않으면 새 쉼 값을 적어 두고 멈춘다 → pauses.json 에 옮기고 align_voice.py 부터 다시"""
+    PF = os.environ.get("PAUSES") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "pauses.json")
+    CUR = json.load(open(PF, encoding="utf-8")) if os.path.exists(PF) else {}
+    NEW, moved, late = dict(CUR), 0.0, []
+    for key, ph, want in SYNC:
+        d = want - (at(ph, a1) + moved)
+        nv = round(max(0.0, CUR.get(key, 0.0) + d), 2); moved += nv - CUR.get(key, 0.0)
+        if nv > 0: NEW[key] = nv
+        else: NEW.pop(key, None)
+        if d + CUR.get(key, 0.0) < -.8: late.append(f"{ph} {-(d + CUR.get(key, 0.0)):.1f}초 늦음")
+    if late: print("나레이션이 화면보다 늦은 곳:", late)
+    if any(abs(NEW.get(k, 0) - CUR.get(k, 0)) > .05 for k in set(NEW) | set(CUR)):
+        json.dump(NEW, open(f"{W}/pauses_new.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+        raise SystemExit(f"쉼 조정 필요 → {W}/pauses_new.json 을 tools/video/appeal/pauses.json 으로 옮기고 align_voice.py 부터 다시: {NEW}")
+
 ROLE = {"고객": "c", "서버": "s", "담당자": "a"}
-task_title, _, task_owner, task_type = SRV["TASK"]
-lines = [("고객", "자료 제출 — <b>document_files</b> +1", "고객 계정으로 실행"),
-         ("서버", "트리거 <b>kpjk_after_client_file()</b>", "제출을 기업 · 요청항목과 연결"),
-         ("서버", f"업무 생성 · <b>{esc(task_title)}</b>", f"자동(auto) · 담당 {esc(task_owner)} · {esc(task_type)}"),
-         ("서버", f"고객 알림 · {esc(SRV['NOTI'][0])}", "고객 화면 알림"),
-         ("서버", "프로젝트 단계 → 자료접수", f"자동 기록({esc(SRV['ACT'][1])}) · {esc(SRV['ACT'][0])}"),
-         ("담당자", "보완 요청 — 요청 상태 변경 1건", "담당자 계정으로 실행"),
-         ("고객", f"고객이 읽는 상태 · <b>보완 요청</b>", esc(SRV["CLIENT"][3])),
-         ("고객", "재제출 → 검토 업무 다시 생성", f"자동 생성 누적 {esc(SRV['RETASK'][0])}건"),
-         ("담당자", "검토 완료 → 기록 · 진행상태", "요청 상태 완료 1건")]
-srv_rows = "".join(f'<div class="srow" data-in="{srv_t[i]:.2f}" data-out="{a7 + .3:.2f}" data-a="up" data-dim="{next((x for x in srv_t[i + 1:] if x > srv_t[i] + .01), a7):.2f}">'
-                   f'<span class="role {ROLE[r]}">{r}</span><div><div class="m">{m}</div><div class="d">{d}</div></div></div>' for i, (r, m, d) in enumerate(lines))
-srv = box("srv", f'<div class="hd"><b>서버 처리 — 실제 실행 결과</b><span>로컬 시험 DB · 운영과 같은 setup.sql · 가상 데이터</span></div><div class="rows">{srv_rows}</div><div class="ft">같은 규칙을 서버 DB 에서 실제로 실행한 결과입니다. 왼쪽 녹화(데모 환경)와 데이터는 별개입니다.</div>',
-          s3 + .4, a7 + .3, f"left:{SVX}px;top:{BY}px;width:{SVW}px;height:{PVH + 34}px", "card")
-# 흐름 표시 — 실제 사건 시각에만 움직인다
 yb = BY + PVH + 34 + 22
 P2S = f"M{PX + PWD/2 + 12:.0f} {PY + 672} L{PX + PWD/2 + 12:.0f} {yb} L{SVX + 60} {yb} L{SVX + 60} {BY + PVH + 34}"   # 휴대폰 → 서버
 S2P = f"M{SVX + 60} {BY + PVH + 34} L{SVX + 60} {yb} L{PX + PWD/2 + 12:.0f} {yb} L{PX + PWD/2 + 12:.0f} {PY + 672}"   # 서버 → 휴대폰
-flows = [(P2S, sub + .1, r1 - .05),
-         (f"M{SVX - 2} {BY + 210} L{BX + BWD + 6} {BY + 210}", r45 + .3, Bc["ev"]["nav"] - .1),
-         (f"M{BX + BWD + 6} {BY + 470} L{SVX - 2} {BY + 470}", Cc["ev"]["revision"] + .05, r6 - .05),
-         (S2P, r6 + .2, Dc["t0"] - .05),
-         (P2S, Ec["ev"]["submit"] + .1, r8 - .05),
-         (f"M{SVX - 2} {BY + 330} L{BX + BWD + 6} {BY + 330}", r8 + .2, Fc["t0"] - .05)]
-flow_svg = '<svg class="wire" width="1920" height="1080" viewBox="0 0 1920 1080">' + "".join(
-    f'<path id="fl{i}" d="{d_}" class="soft" data-draw="{a_:.2f},{b_:.2f}" data-fade="{b_ + .6:.2f}"/>' for i, (d_, a_, b_) in enumerate(flows)) + "</svg>"
-flow_dots = "".join(f'<div class="fdot" data-move="fl{i},{a_:.2f},{b_:.2f}"></div>' for i, (d_, a_, b_) in enumerate(flows))
-kb_b = zoom_to(Bc, "task", BWD, PVH, 1.45, Bc["ev"]["task"] - .2, Bc["ev"]["task"] + .9)
-kb_c = zoom_to(Cc, "dialog", BWD, PVH, 1.3, Cc["ev"]["open"] + .1, Cc["ev"]["open"] + 1.0)
-kb_f = zoom_to(Fc, "list", BWD, PVH, 1.3, Fc["ev"]["history"] + .2, Fc["ev"]["history"] + 1.2)
-scene(s3, a7 + .3,
-    box("rec abs", '<i></i>실제 화면 녹화 · 고객 휴대폰', s3 + .3, a7 + .3, f"left:{PX}px;top:104px", "fade"),
-    box("rec abs", '<i></i>실제 화면 녹화 · 담당자 PC <span>데모 환경 · 예시 데이터 · 장면 사이 대기 구간만 편집</span>', s3 + .3, a7 + .3, f"left:{BX}px;top:104px", "fade"),
-    rec_phone(A, PX, PY, PWD, s3 + .2, Dc["t0"] + .1, focus=[("row", s3 + .8, A["ev"]["open"])]),
-    rec_phone(Dc, PX, PY, PWD, Dc["t0"], Ec["t0"] + .1, focus=[("row", Dc["ev"]["shown"] + .2, Ec["t0"])]),
-    rec_phone(Ec, PX, PY, PWD, Ec["t0"], a7 + .3),
-    rec_browser(Bc, BX, BY, BWD, s3 + .2, Cc["t0"] + .1, "kpj-kcorp.vercel.app/ax/tasks — 담당자 업무함", kb=kb_b, focus=[("task", Bc["ev"]["task"] + .9, Cc["t0"])]),
-    rec_browser(Cc, BX, BY, BWD, Cc["t0"], Fc["t0"] + .1, "kpj-kcorp.vercel.app/ax/clients — 자료 검토", kb=kb_c, focus=[("btn", Cc["ev"]["typed"], Cc["ev"]["revision"] + .3)]),
-    rec_browser(Fc, BX, BY, BWD, Fc["t0"], a7 + .3, "kpj-kcorp.vercel.app/ax/clients — 기업 이력", kb=kb_f),
-    srv, flow_svg, flow_dots,
-)
+def wires(flows):
+    return ('<svg class="wire" width="1920" height="1080" viewBox="0 0 1920 1080">' + "".join(
+        f'<path id="fl{i}" d="{d_}" class="soft" data-draw="{a_:.2f},{b_:.2f}" data-fade="{b_ + .6:.2f}"/>' for i, (d_, a_, b_) in enumerate(flows)) + "</svg>",
+        "".join(f'<div class="fdot" data-move="fl{i},{a_:.2f},{b_:.2f}"></div>' for i, (d_, a_, b_) in enumerate(flows)))
+def srv_box(rows, head, sub_, foot, tin, tout):
+    """서버 기록 판 — rows: (시각, 역할, 본문, 설명). 새 줄이 오르면 앞 줄은 흐려진다"""
+    ts = [r[0] for r in rows]
+    html_ = "".join(f'<div class="srow" data-in="{t:.2f}" data-out="{tout:.2f}" data-a="up" data-dim="{next((x for x in ts[i + 1:] if x > t + .01), tout - .3):.2f}">'
+                    f'<span class="role {ROLE[r]}">{r}</span><div><div class="m">{m}</div><div class="d">{d}</div></div></div>' for i, (t, r, m, d) in enumerate(rows))
+    return box("srv", f'<div class="hd"><b>{head}</b><span>{sub_}</span></div><div class="rows">{html_}</div><div class="ft">{foot}</div>',
+               tin, tout, f"left:{SVX}px;top:{BY}px;width:{SVW}px;height:{PVH + 34}px", "card")
+SREC = f"{W}/rec-server/meta.json"
+if os.path.exists(SREC):
+    # ① 운영 서버 연속 녹화(record-server.mjs) — 고객 휴대폰 · 담당자 PC 를 서로 다른 로그인으로 동시에, 한 번에 녹화했다.
+    # 두 화면을 같은 시각축 하나로 그대로 재생한다(자르거나 늦추지 않는다). 눈이 따라올 틈은 녹화할 때 둔 멈춤뿐이고, 나레이션은 문장 사이 쉼으로 맞춘다.
+    R = json.load(open(SREC, encoding="utf-8")); E, LAT = R["events"], R["latency"]
+    if R.get("mode") != "server": raise SystemExit("rec-server/meta.json 이 운영 서버 녹화가 아닙니다")
+    off = a1 + .3 - E["ph_open"]                                   # 고객이 업로드를 누르는 때 = "고객이 휴대폰으로" 직후
+    v = lambda k: round(off + E[k], 2)
+    def seqc(nm):
+        sc = R["screens"][nm]
+        return {"name": nm, "dir": f"rec-server/{nm}", "frames": sc["frames"], "t0": off, "fps": R["fps"], "c": {"w": sc["w"], "h": sc["h"], "boxes": R["boxes"][nm]}}
+    PHs, PCs = seqc("phone"), seqc("pc")
+    order = [v(k) for k in ("ph_submit", "pc_task", "pc_revision", "ph_shown", "ph_resubmit", "pc_resub", "pc_done")]
+    if order != sorted(order) or v("pc_history") < v("pc_done") or v("ph_done") < v("pc_done"): raise SystemExit(f"녹화 사건 순서 확인: {order}")
+    end_t = max(v("pc_history") + 1.3, v("ph_done") + .8)
+    fit_pauses([("서버는 제출된 자료를", "서버는 제출된 자료를", v("ph_submit") + .3),
+                ("담당자가 처리해야 할", "검토업무를 자동으로", v("pc_point") - .2),
+                ("담당자가 자료를 검토하고", "보완을 요청하면", v("pc_revision") - 1.4),   # 사유를 적는 동안 "보완을 요청하면"
+                ("고객 화면에도", "필요한 상태가 반영", v("ph_shown") - .4),
+                ("고객이 다시 자료를", "고객이 다시 자료를", v("ph_reopen") - .2),
+                ("그 결과가 업무기록과", "그 결과가 업무기록과", v("pc_done") - .2),
+                ("이는 단순히 알림을", "이는 단순히 알림을", end_t)])
+    if end_t > a7: raise SystemExit(f"마지막 화면을 볼 시간이 짧음: {end_t} / a7 {a7}")
+    # 서버 기록 — 받는 화면이 바뀌는 바로 그 순간에 한 줄씩(그 화면 변화의 설명). 초 = 보낸 화면의 조작 → 받는 화면에 나타나기까지 잰 값
+    auto = next((x for x in R["history"] if x.startswith("자동 생성:")), None)
+    rows = [(v("pc_task"), "서버", "검토 업무 자동 생성 → <b>담당자 PC</b>", f"고객 제출 {LAT['task']}초 뒤 · 새로고침 없음 · 트리거 kpjk_after_client_file()"),
+            (v("ph_shown"), "서버", "보완 요청 → <b>고객 휴대폰</b>", f"{LAT['shown']}초 뒤 보완필요 표시 · 새로고침 없음"),
+            (v("pc_resub"), "서버", "재제출 → <b>담당자 PC</b>", f"{LAT['resub']}초 뒤 반영 · 새로고침 없음"),
+            (v("ph_done"), "서버", "검토 완료 → <b>고객 휴대폰</b>", f"{LAT['done']}초 뒤 확인완료 · 새로고침 없음")]
+    if auto: rows.insert(4, (v("pc_history") + .6, "서버", "이력 · " + esc(auto), "시스템이 남긴 기록(담당자 History 화면)"))
+    rows.sort(key=lambda r: r[0])
+    srv = srv_box(rows, "운영 서버 — 새로고침 없이 반영", f"{esc(R['app'])} · {esc(R['company'])} · {R['recordedAt'][:10]} 녹화",
+                  "두 화면은 서로 다른 로그인으로 같은 운영 서버에 연결돼 있습니다. 한 번에 녹화했고 자르거나 늦추지 않았습니다. 초는 녹화 중 잰 값입니다.",
+                  s3 + .4, a7 + .3)
+    # 흐름 표시 — 보낸 화면 → 서버 → 받는 화면, 실제로 걸린 시간 동안만 움직인다
+    P2C = f"M{SVX - 2} {BY + 210} L{BX + BWD + 6} {BY + 210}"; C2S = f"M{BX + BWD + 6} {BY + 470} L{SVX - 2} {BY + 470}"
+    def hop(a_, b_, first, second):
+        m = a_ + .65 * (b_ - a_); return [(first, a_ + .05, m), (second, m, b_ - .05)]
+    flows = hop(v("ph_submit"), v("pc_task"), P2S, P2C) + hop(v("pc_revision"), v("ph_shown"), C2S, S2P) + \
+            hop(v("ph_resubmit"), v("pc_resub"), P2S, P2C) + hop(v("pc_done"), v("ph_done"), C2S, S2P)
+    flow_svg, flow_dots = wires(flows)
+    # PC 확대 — 자동 생성 업무 → 되돌림 → 보완 요청 창 → 되돌림 → 이력 (한 화면이라 구간을 이어 붙인다)
+    z1 = zoom_to(PCs, "task", BWD, PVH, 1.4, v("pc_task") + .2, v("pc_task") + 1.1)
+    z2 = zoom_to(PCs, "dialog", BWD, PVH, 1.25, v("pc_open") + .1, v("pc_open") + .9)
+    z3 = zoom_to(PCs, "list", BWD, PVH, 1.3, v("pc_history") + .2, v("pc_history") + 1.2)
+    back = lambda z, a_, b_: (round(a_, 2), round(b_, 2), z[5], z[6], z[7], 1.0, 0, 0)
+    kb = [z1, back(z1, v("pc_point") + .4, v("pc_point") + 1.1), z2, back(z2, v("pc_revision") + .3, v("pc_revision") + 1.0), z3]
+    if [k[0] for k in kb] != sorted(k[0] for k in kb): raise SystemExit(f"PC 확대 구간 순서 확인: {[k[0] for k in kb]}")
+    scene(s3, a7 + .3,
+        box("rec abs", '<i></i>실제 화면 녹화 · 고객 휴대폰', s3 + .3, a7 + .3, f"left:{PX}px;top:104px", "fade"),
+        box("rec abs", '<i></i>실제 화면 녹화 · 담당자 PC <span>운영 서버 · 가상 기업 · 두 화면 동시 녹화 · 편집 없음</span>', s3 + .3, a7 + .3, f"left:{BX}px;top:104px", "fade"),
+        rec_phone(PHs, PX, PY, PWD, s3 + .2, a7 + .3, focus=[("row", s3 + .8, v("ph_open")), ("row2", v("ph_shown") + .2, v("ph_reopen"))]),
+        rec_browser(PCs, BX, BY, BWD, s3 + .2, a7 + .3, f"{R['app']} — 담당자 계정 (운영 서버)", kb=kb,
+                    focus=[("task", v("pc_task") + 1.1, v("pc_point") + .4), ("btn", v("pc_typed"), v("pc_revision") + .3)]),
+        srv, flow_svg, flow_dots,
+    )
+else:
+    # ① 실제 화면 녹화(데모 환경) + 서버 처리 실제 실행(로컬 시험 DB). 클립은 실제 속도 그대로, 앞뒤 대기만 잘라 이어 놓는다.
+    REC = json.load(open(f"{W}/rec/meta.json"))
+    SRV = {}
+    for ln_ in open(f"{W}/logs/server-loop.txt", encoding="utf-8"):
+        k, *v = ln_.strip().split("|")
+        if k: SRV[k] = v
+    need = {"STEP1": ["client", "1"], "TASK": None, "NOTI": None, "ACT": None, "STAGE": ["doc_received"], "STEP3": ["consultant", "1"], "CLIENT": None, "RETASK": ["2"], "DONE": ["1"]}
+    for k, v in need.items():
+        if k not in SRV or (v and SRV[k] != v): raise SystemExit(f"서버 실행 결과가 기대와 다름: {k} {SRV.get(k)}")
+    # 눈 따라가기 — 휴대폰 · 서버 기록 · PC 중 한 곳이 바뀐 뒤 다른 곳이 바뀌기까지 시간을 두고, 흐름점이 다음 화면으로 시선을 데려간다.
+    # 클립 안의 동작(누르기 · 입력 · 화면 이동)은 실제 속도 그대로. 기다리는 시간만 늘리고, 나레이션은 문장 사이 쉼(pauses.json)으로 맞춘다.
+    HOLD = 1.4                                   # 결과 화면(자동 생성 업무 · 보완 필요)을 그대로 보여 주는 시간
+    def ev0(name, k, frm): return REC["clips"][name]["events"][k] - frm
+    A = clip("a-submit", 0.6, 5.6, a1)
+    sub = A["ev"]["submit"]
+    r1 = sub + .9; r2 = r1 + .8; r3 = r2 + .8; r45 = r3 + .7     # 서버: 제출 기록 → 트리거 → 업무 생성 → 고객 알림 · 단계(같은 트리거 결과라 한 번에)
+    Bc = clip("b-task", 0.9, 6.8, r45 + .8 - ev0("b-task", "nav", 0.9))   # PC 는 서버 기록이 다 오른 뒤 움직인다
+    Cc = clip("c-revision", 1.0, 5.9, Bc["ev"]["task"] + HOLD)
+    r6 = Cc["ev"]["revision"] + .65
+    Dc = clip("d-status", 0.5, 4.7, r6 + .95)                     # 흐름점이 휴대폰에 닿을 때 고객이 앱을 연다
+    r7 = Dc["t0"]
+    Ec = clip("e-resubmit", 0.45, 3.7, Dc["ev"]["shown"] + HOLD)
+    r8 = Ec["ev"]["submit"] + .8
+    Fc = clip("f-done", 2.5, 7.3, r8 + .7)
+    r9 = Fc["ev"]["done"] + .8
+    order = [A["ev"]["submit"], Bc["ev"]["task"], Cc["ev"]["revision"], Dc["ev"]["shown"], Ec["ev"]["submit"], Fc["ev"]["done"], Fc["ev"]["history"]]
+    if order != sorted(order): raise SystemExit(f"녹화 사건 순서 확인: {order}")
+    SYNC = [("서버는 제출된 자료를", "서버는 제출된 자료를", r1 - .3),
+            ("담당자가 처리해야 할", "검토업무를 자동으로", Bc["ev"]["task"] - .8),
+            ("담당자가 자료를 검토하고", "보완을 요청하면", Cc["ev"]["revision"] - .9),
+            ("고객 화면에도", "필요한 상태가 반영", Dc["ev"]["shown"] - .5),
+            ("고객이 다시 자료를", "담당자가 검토를", Fc["ev"]["done"] - 1.4),
+            ("그 결과가 업무기록과", "그 결과가 업무기록과", Fc["ev"]["done"] + .4),
+            ("이는 단순히 알림을", "이는 단순히 알림을", Fc["ev"]["history"] + 1.3)]
+    fit_pauses(SYNC)
+    if Fc["ev"]["history"] + 1.3 > a7: raise SystemExit(f"이력 화면을 볼 시간이 짧음: {Fc['ev']['history']} / a7 {a7}")
+    srv_t = [r1, r2, r3, r45, r45, r6, r7, r8, r9]
+    task_title, _, task_owner, task_type = SRV["TASK"]
+    lines = [("고객", "자료 제출 — <b>document_files</b> +1", "고객 계정으로 실행"),
+             ("서버", "트리거 <b>kpjk_after_client_file()</b>", "제출을 기업 · 요청항목과 연결"),
+             ("서버", f"업무 생성 · <b>{esc(task_title)}</b>", f"자동(auto) · 담당 {esc(task_owner)} · {esc(task_type)}"),
+             ("서버", f"고객 알림 · {esc(SRV['NOTI'][0])}", "고객 화면 알림"),
+             ("서버", "프로젝트 단계 → 자료접수", f"자동 기록({esc(SRV['ACT'][1])}) · {esc(SRV['ACT'][0])}"),
+             ("담당자", "보완 요청 — 요청 상태 변경 1건", "담당자 계정으로 실행"),
+             ("고객", f"고객이 읽는 상태 · <b>보완 요청</b>", esc(SRV["CLIENT"][3])),
+             ("고객", "재제출 → 검토 업무 다시 생성", f"자동 생성 누적 {esc(SRV['RETASK'][0])}건"),
+             ("담당자", "검토 완료 → 기록 · 진행상태", "요청 상태 완료 1건")]
+    srv_rows = "".join(f'<div class="srow" data-in="{srv_t[i]:.2f}" data-out="{a7 + .3:.2f}" data-a="up" data-dim="{next((x for x in srv_t[i + 1:] if x > srv_t[i] + .01), a7):.2f}">'
+                       f'<span class="role {ROLE[r]}">{r}</span><div><div class="m">{m}</div><div class="d">{d}</div></div></div>' for i, (r, m, d) in enumerate(lines))
+    srv = box("srv", f'<div class="hd"><b>서버 처리 — 실제 실행 결과</b><span>로컬 시험 DB · 운영과 같은 setup.sql · 가상 데이터</span></div><div class="rows">{srv_rows}</div><div class="ft">같은 규칙을 서버 DB 에서 실제로 실행한 결과입니다. 왼쪽 녹화(데모 환경)와 데이터는 별개입니다.</div>',
+              s3 + .4, a7 + .3, f"left:{SVX}px;top:{BY}px;width:{SVW}px;height:{PVH + 34}px", "card")
+    # 흐름 표시 — 실제 사건 시각에만 움직인다
+    flows = [(P2S, sub + .1, r1 - .05),
+             (f"M{SVX - 2} {BY + 210} L{BX + BWD + 6} {BY + 210}", r45 + .3, Bc["ev"]["nav"] - .1),
+             (f"M{BX + BWD + 6} {BY + 470} L{SVX - 2} {BY + 470}", Cc["ev"]["revision"] + .05, r6 - .05),
+             (S2P, r6 + .2, Dc["t0"] - .05),
+             (P2S, Ec["ev"]["submit"] + .1, r8 - .05),
+             (f"M{SVX - 2} {BY + 330} L{BX + BWD + 6} {BY + 330}", r8 + .2, Fc["t0"] - .05)]
+    flow_svg = '<svg class="wire" width="1920" height="1080" viewBox="0 0 1920 1080">' + "".join(
+        f'<path id="fl{i}" d="{d_}" class="soft" data-draw="{a_:.2f},{b_:.2f}" data-fade="{b_ + .6:.2f}"/>' for i, (d_, a_, b_) in enumerate(flows)) + "</svg>"
+    flow_dots = "".join(f'<div class="fdot" data-move="fl{i},{a_:.2f},{b_:.2f}"></div>' for i, (d_, a_, b_) in enumerate(flows))
+    kb_b = zoom_to(Bc, "task", BWD, PVH, 1.45, Bc["ev"]["task"] - .2, Bc["ev"]["task"] + .9)
+    kb_c = zoom_to(Cc, "dialog", BWD, PVH, 1.3, Cc["ev"]["open"] + .1, Cc["ev"]["open"] + 1.0)
+    kb_f = zoom_to(Fc, "list", BWD, PVH, 1.3, Fc["ev"]["history"] + .2, Fc["ev"]["history"] + 1.2)
+    scene(s3, a7 + .3,
+        box("rec abs", '<i></i>실제 화면 녹화 · 고객 휴대폰', s3 + .3, a7 + .3, f"left:{PX}px;top:104px", "fade"),
+        box("rec abs", '<i></i>실제 화면 녹화 · 담당자 PC <span>데모 환경 · 예시 데이터 · 장면 사이 대기 구간만 편집</span>', s3 + .3, a7 + .3, f"left:{BX}px;top:104px", "fade"),
+        rec_phone(A, PX, PY, PWD, s3 + .2, Dc["t0"] + .1, focus=[("row", s3 + .8, A["ev"]["open"])]),
+        rec_phone(Dc, PX, PY, PWD, Dc["t0"], Ec["t0"] + .1, focus=[("row", Dc["ev"]["shown"] + .2, Ec["t0"])]),
+        rec_phone(Ec, PX, PY, PWD, Ec["t0"], a7 + .3),
+        rec_browser(Bc, BX, BY, BWD, s3 + .2, Cc["t0"] + .1, "kpj-kcorp.vercel.app/ax/tasks — 담당자 업무함", kb=kb_b, focus=[("task", Bc["ev"]["task"] + .9, Cc["t0"])]),
+        rec_browser(Cc, BX, BY, BWD, Cc["t0"], Fc["t0"] + .1, "kpj-kcorp.vercel.app/ax/clients — 자료 검토", kb=kb_c, focus=[("btn", Cc["ev"]["typed"], Cc["ev"]["revision"] + .3)]),
+        rec_browser(Fc, BX, BY, BWD, Fc["t0"], a7 + .3, "kpj-kcorp.vercel.app/ax/clients — 기업 이력", kb=kb_f),
+        srv, flow_svg, flow_dots,
+    )
+
 # 순환 도식
 L = [("고객 행동", "자료 제출 · 재제출", 960, 250), ("내부 업무 발생", "검토 업무 자동 생성", 1440, 470), ("처리 결과", "검토 · 보완 요청 · 완료", 960, 690), ("고객 화면 반영", "보완 필요 · 진행 단계", 480, 470)]
 b1, b2, b3 = at("고객의 행동이 내부 업무를"), at("그 처리 결과가 다시"), at("순환형 업무처리 구조")

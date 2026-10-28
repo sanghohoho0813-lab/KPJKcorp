@@ -51,22 +51,25 @@ for g in sorted(gaps, reverse=True)[:6]: print("  안 맞은 곳", g[0], "자:",
 if long_: raise SystemExit("대본과 녹음이 다른 곳이 있습니다 — 위 '안 맞은 곳'을 확인하세요")
 # 문장 사이 쉼 넣기(pauses.json: {"자막 첫머리": 초}) — 말 속도는 그대로, 화면을 눈으로 따라갈 시간만 더한다.
 # 넣는 자리는 앞 문장 끝 ~ 이 문장 첫 글자 사이에서 가장 조용한 10ms (받아쓰기 시각이 조금 어긋나도 말을 자르지 않게)
-PF = os.path.join(HERE, "pauses.json")
+PF = os.environ.get("PAUSES") or os.path.join(HERE, "pauses.json")
 PAUSES = json.load(open(PF, encoding="utf-8")) if os.path.exists(PF) else {}
 wf = wave.open(RAW, "rb"); SR, NCH, SW = wf.getframerate(), wf.getnchannels(), wf.getsampwidth()
 if SW != 2: raise SystemExit("16비트 wav 만 받습니다")
 PCM = wf.readframes(wf.getnframes()); wf.close()
 def quietest(a, b):
-    """a~b 에서 가장 길게 이어진 무음(-50dB 아래)의 한가운데. 받아쓰기 낱말 시각은 0.3~0.5초 어긋나기도 해 넓게 본다"""
-    f = int(SR * .01); lo = 32768 ** 2 * 10 ** (-50 / 10); run, best = None, (0, a)
+    """a~b 에서 가장 길게 이어진 무음(-50dB 아래)의 한가운데. 받아쓰기 낱말 시각은 0.3~0.5초 어긋나기도 해 넓게 본다.
+    쉼표로 이어 읽어 완전한 무음이 없으면, 숨소리 정도(-40dB 아래)로 가장 조용한 10ms — 말소리(-10~-25dB)는 자르지 않는다"""
+    f = int(SR * .01); lo = 32768 ** 2 * 10 ** (-50 / 10); run, best, q = None, (0, a), (None, a)
     for k in range(int(a * SR), int(b * SR) - f, f):
-        x = array.array("h", PCM[k * NCH * 2:(k + f) * NCH * 2])[::2]
-        if sum(v * v for v in x) / len(x) < lo:
+        x = array.array("h", PCM[k * NCH * 2:(k + f) * NCH * 2])[::2]; e = sum(v * v for v in x) / len(x)
+        if q[0] is None or e < q[0]: q = (e, (k + f / 2) / SR)
+        if e < lo:
             run = run if run is not None else k
             if (k + f - run) / SR > best[0]: best = ((k + f - run) / SR, (run + k + f) / 2 / SR)
         else: run = None
-    if best[0] < .06: raise SystemExit(f"{a:.2f}~{b:.2f}초 사이에 무음이 없습니다 — 말을 자르게 됩니다")
-    return best[1]
+    if best[0] >= .06: return best[1]
+    if q[0] is not None and q[0] < 32768 ** 2 * 10 ** (-40 / 10): return q[1]
+    raise SystemExit(f"{a:.2f}~{b:.2f}초 사이에 쉼이 없습니다 — 말을 자르게 됩니다")
 ins, used, pos = [], set(), 0
 for s in secs:
     for c in s["chunks"]:
@@ -81,9 +84,18 @@ for x, p, k0 in ins:
     for k in range(k0, len(S)): t0[k] += p; t1[k] += p
 if ins:
     out, k0 = [], 0
+    F = int(SR * .01)    # 자른 자리 앞뒤 10ms 를 부드럽게 줄였다 키운다(숨소리 위에서 잘라도 딸깍 소리가 나지 않게)
+    def ramp(buf, up):
+        x = array.array("h", buf); n = len(x) // NCH
+        for i in range(n):
+            g = (i + 1) / n if up else 1 - i / n
+            for c in range(NCH): x[i * NCH + c] = int(x[i * NCH + c] * g)
+        return x.tobytes()
     for x, p, _ in sorted(ins):
-        k = int(x * SR) * NCH * 2; out += [PCM[k0:k], bytes(int(p * SR) * NCH * 2)]; k0 = k
-    out.append(PCM[k0:]); PCM = b"".join(out)
+        k = int(x * SR) * NCH * 2; seg = PCM[k0:k]
+        if k0: seg = ramp(seg[:F * NCH * 2], True) + seg[F * NCH * 2:]
+        out += [seg[:-F * NCH * 2] + ramp(seg[-F * NCH * 2:], False), bytes(int(p * SR) * NCH * 2)]; k0 = k
+    tail = PCM[k0:]; out.append(ramp(tail[:F * NCH * 2], True) + tail[F * NCH * 2:]); PCM = b"".join(out)
     RAW = os.path.join(W, "voice_paused.wav")
     with wave.open(RAW, "wb") as wo: wo.setnchannels(NCH); wo.setsampwidth(2); wo.setframerate(SR); wo.writeframes(PCM)
     print(f"쉼 {len(ins)}곳 · 더한 길이 {sum(p for _, p, _ in ins):.2f}초 · 녹음 시각", ", ".join(f"{x:.2f}+{p}" for x, p, _ in sorted(ins)))

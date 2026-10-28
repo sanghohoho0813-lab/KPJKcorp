@@ -183,7 +183,10 @@
       else if (a === 'card') el.style.transform = `translateY(${(1 - p) * 50}px) scale(${lerp(.93, 1, p)})`;
     }
     for (const el of kbs) {
-      const [a, b, s0, x0, y0, s1, x1, y1] = el.dataset.kb.split(',').map(Number);
+      // 8개 값 = 확대 한 구간. 여러 구간이면(연속 녹화: 확대 → 되돌리기 → 확대) 시작 시각이 지난 마지막 구간을 쓴다
+      const v = el.dataset.kb.split(',').map(Number); let g = 0;
+      for (let j = 8; j < v.length; j += 8) if (t >= v[j]) g = j;
+      const [a, b, s0, x0, y0, s1, x1, y1] = v.slice(g, g + 8);
       const k = eio(clamp((t - a) / (b - a)));
       el.style.transform = `translate(${lerp(x0, x1, k)}px, ${lerp(y0, y1, k)}px) scale(${lerp(s0, s1, k)})`;
     }
