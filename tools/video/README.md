@@ -10,6 +10,7 @@
 | `record-tutorial.mjs` | 대표·직원용 튜토리얼 2분 — `out/tutorial/KPJK_AX_튜토리얼_2분.mp4` |
 | `rec.mjs` | 녹화 엔진 — Chrome 화면 프레임을 받아 ffmpeg 로 인코딩, 자막·커서·강조 표시를 화면 위에 그림 |
 | `cards.mjs` | 타이틀·설명·마무리 카드, 휴대폰 목업 |
+| `appeal/` | 벤처기업확인 이의신청 기술검증 영상 (16:9, 실제 화면 · 코드 · 시험 기록) — `appeal/README.md` |
 
 ## 어떻게 녹화하나
 
