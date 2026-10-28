@@ -13,6 +13,7 @@ import { EvidenceExplorer } from "@/components/domain/EvidenceExplorer";
 import { AreaBar, WhyEvidence, useSprint } from "@/components/domain/Coach";
 import { BaselineCard, RecallCompareCard } from "@/components/domain/BaselineCard";
 import { coverageOf } from "@/lib/evidence";
+import { selfMetrics } from "@/lib/self-run";
 import Link from "next/link";
 import { ArrowRight, Compass } from "lucide-react";
 
@@ -99,6 +100,8 @@ function ReportsInner() {
   }, [st, now]);
 
   interface Metric { name: string; point: string; value: string; baseline?: string }
+  const sampleCo = new Set(st.companies.filter((c) => c.sample).map((c) => c.id));
+  const sm = selfMetrics(st.selfRuns, st.activities, (id) => sampleCo.has(id));
   const axes: { key: string; title: string; desc: string; items: Metric[] }[] = [
     {
       key: "usage",
@@ -136,6 +139,18 @@ function ReportsInner() {
         { name: "진행상황 단순문의 비중", point: "Inquiry.category = 진행상황", value: `${m.progressInq} / ${m.inquiries}건`, baseline: "측정 필요" },
         { name: "고객 발신 추가요청", point: "portal_interest · portal_request", value: `${m.oppFromClient}건` },
         { name: "결과자료 열람", point: "result_downloaded", value: `${st.activities.filter((a) => a.type === "result_downloaded").length}회` },
+      ],
+    },
+    {
+      key: "self",
+      title: "자기주도 실행",
+      desc: "고객이 컨설팅 없이 스스로 준비 · 신청 · 실행한 일. 고객이 고른 상태를 그대로 세고, 시연용 샘플 기업은 따로 셉니다.",
+      items: [
+        { name: "학습 완료", point: "SelfRun.kind = learn (고객 직접 표시)", value: `실제 ${sm.real.learned} · 샘플 ${sm.sample.learned}건` },
+        { name: "지원사업 직접 준비 → 신청", point: "SelfRun.kind = program · self_status", value: `실제 ${sm.real.programApplied} / ${sm.real.programStarted}건 · 샘플 ${sm.sample.programApplied} / ${sm.sample.programStarted}건` },
+        { name: "준비 시작 → 신청까지", point: "SelfRun.startedAt → 첫 신청 완료 기록 (중앙값)", value: sm.real.daysToApply === undefined ? "표본 없음" : `${sm.real.daysToApply}일 (표본 ${sm.real.applySamples})`, baseline: "기준선 없음" },
+        { name: "성장과제 직접 완료 · 검토", point: "SelfRun.kind = growth", value: `실제 완료 ${sm.real.growthDone} · 검토 ${sm.real.growthReviewed}건 · 샘플 ${sm.sample.growthDone + sm.sample.growthReviewed}건` },
+        { name: "직접 하다가 전문가 문의", point: "SelfRun.helpRef", value: `실제 ${sm.real.helpRequested} · 샘플 ${sm.sample.helpRequested}건` },
       ],
     },
     {

@@ -18,6 +18,7 @@ import { ReviewDocModal } from "@/components/domain/DocActions";
 import { CompanyDocRequestModal, NewDocRequestModal, NewScheduleModal, NewTaskModal } from "@/components/domain/CreateModals";
 import { ProposalPanel } from "@/components/domain/client/ProposalPanel";
 import { GrowthRequests } from "@/components/domain/client/GrowthRequests";
+import { ClientSelfRuns } from "@/components/domain/self/SelfAdmin";
 import { CompanyModal, ProjectModal, useMay } from "@/components/domain/EntityModals";
 import { UserModal } from "@/components/domain/UserModals";
 import { Confirm } from "@/components/ui/overlay";
@@ -473,6 +474,7 @@ export default function ClientCardPage() {
 
       {tab === "portal" && <PortalStatus company={c} onMakeAccount={may("user.manage") ? () => setNewAccount(true) : undefined} />}
       {tab === "portal" && <div className="mt-4"><GrowthRequests company={c} /></div>}
+      {tab === "portal" && <div className="mt-4"><ClientSelfRuns company={c} /></div>}
       {tab === "portal" && <div className="mt-4"><ProposalPanel company={c} /></div>}
       {tab === "portal" && (
         <div className="mt-4 space-y-3">

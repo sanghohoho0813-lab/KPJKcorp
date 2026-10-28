@@ -12,6 +12,7 @@ import type { Company } from "@/lib/types";
 import { CUSTOMER_STEPS, stageToCustomerStep } from "@/lib/stages";
 import { Icon3D, PORTAL_ICON } from "./Icon3D";
 import { isReport } from "@/lib/progress-report";
+import { isOpen } from "@/lib/self-run";
 import { Avatar, cx } from "@/components/ui/ui";
 import type { useGrowth } from "./GrowthBoard";
 
@@ -264,3 +265,30 @@ export function RecentUpdates({ companyId }: { companyId: string }) {
   );
 }
 
+/* ------------------------------ 스스로 준비하기 (홈 카드) ------------------------------ */
+
+/**
+ * 스스로 준비하기로 가는 길 — 직접 준비 중인 공고 · 실행 중인 과제 · 학습 완료 수.
+ * 아이콘 메뉴(8칸)는 그대로 두고 카드 한 장으로. 직접 하는 일의 다음 한 걸음은 위 '지금 해야 할 일'에 이미 있다.
+ */
+export function SelfPrepCard({ companyId }: { companyId: string }) {
+  const runs = useStore((s) => s.selfRuns);
+  const learn = useStore((s) => s.learnContents);
+  const mine = runs.filter((r) => r.companyId === companyId);
+  const prog = mine.filter((r) => r.kind === "program" && isOpen(r)).length;
+  const growth = mine.filter((r) => r.kind === "growth" && isOpen(r)).length;
+  const learned = mine.filter((r) => r.kind === "learn").length;
+  const open = learn.filter((x) => x.published).length;
+  return (
+    <Link href="/portal/self" className="pressable card card-hover flex items-center gap-3.5 p-4" data-testid="self-card">
+      <Icon3D name="checklist" size="2.6rem" />
+      <span className="min-w-0 flex-1">
+        <span className="flex flex-wrap items-center gap-1.5"><span className="text-[1.02rem] font-bold">스스로 준비하기</span><span className="rounded-full bg-success-bg px-2 py-0.5 text-[0.7rem] font-bold text-success">무료</span></span>
+        <span className="mt-0.5 block text-[0.8rem] leading-snug text-ink-2">
+          {prog + growth > 0 ? `직접 준비 중 ${prog + growth}건 · 학습 완료 ${learned}/${open}` : `공식 안내 · 체크리스트로 지원사업과 성장과제를 직접 준비합니다${open ? ` · 학습 자료 ${open}개` : ""}`}
+        </span>
+      </span>
+      <ArrowRight size={18} className="shrink-0 text-ink-3" />
+    </Link>
+  );
+}

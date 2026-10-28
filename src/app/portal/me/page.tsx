@@ -31,6 +31,7 @@ export default function PortalMePage() {
 
   // 아래 탭에 없는 화면은 여기서 — 앱의 "내 정보" 메뉴처럼 한 줄씩
   const menu = [
+    { href: "/portal/self", label: "스스로 준비하기" },
     { href: "/portal/company", label: "우리 회사 정보" },
     { href: "/portal/schedule", label: "일정 · 공지" },
     { href: "/portal/results", label: "완료자료" },

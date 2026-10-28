@@ -17,8 +17,10 @@ import { Chip } from "@/components/ui/chips";
 import { Modal } from "@/components/ui/overlay";
 import { ProgramCard, MATCH_NOTE } from "@/components/domain/programs/ProgramCard";
 import { MatchStatus } from "@/components/domain/programs/MatchStatus";
+import { LearnAdmin, SelfOverview } from "@/components/domain/self/SelfAdmin";
+import { isOpen } from "@/lib/self-run";
 
-type Tab = "programs" | "companies" | "leads";
+type Tab = "programs" | "companies" | "leads" | "self" | "learn";
 const LEAD_STATUS: Record<LeadStatus, { label: string; tone: "accent" | "info" | "success" | "neutral" }> = {
   new: { label: "새 요청", tone: "accent" }, contacted: { label: "연락함", tone: "info" }, converted: { label: "고객 전환", tone: "success" }, dropped: { label: "종료", tone: "neutral" },
 };
@@ -28,10 +30,10 @@ const DAY_PLUS = 25 * 3600 * 1000;
 /** 공고 목록을 한 번에 그리는 수 — 더 보려면 아래 "더 보기" */
 const PAGE_SIZE = 60;
 
-/** ?tab=leads · ?tab=companies — 알림(새 가망고객)처럼 앱 안에서 넘어와도 그 탭으로. 처음 그릴 땐 주소창이 아직 안 바뀌어 있다 */
+/** ?tab=leads · ?tab=companies · ?tab=self · ?tab=learn — 알림(새 가망고객)처럼 앱 안에서 넘어와도 그 탭으로. 처음 그릴 땐 주소창이 아직 안 바뀌어 있다 */
 function TabFromUrl({ onTab }: { onTab: (t: Tab) => void }) {
   const q = useSearchParams().get("tab");
-  useEffect(() => { if (q === "leads" || q === "companies") onTab(q); }, [q, onTab]);
+  useEffect(() => { if (q === "leads" || q === "companies" || q === "self" || q === "learn") onTab(q); }, [q, onTab]);
   return null;
 }
 
@@ -126,6 +128,7 @@ export default function ProgramsPage() {
     .sort((a, b) => (a.applyEnd ?? "9999").localeCompare(b.applyEnd ?? "9999")), [programs, q, filter, byProgram]);
   const shown = shownAll.slice(0, limit);
   const newLeads = st.leads.filter((l) => l.status === "new").length;
+  const selfOpen = st.selfRuns.filter((r) => r.kind !== "learn" && isOpen(r)).length;
 
   return (
     <div className="space-y-4">
@@ -154,6 +157,8 @@ export default function ProgramsPage() {
         { key: "programs", label: "공고", count: programs.length },
         { key: "companies", label: "고객별", count: companies.length },
         { key: "leads", label: "가망고객", count: newLeads || undefined },
+        { key: "self", label: "고객 직접 진행", count: selfOpen || undefined },
+        { key: "learn", label: "학습 자료", count: st.learnContents.length || undefined },
       ]} />
 
       {tab === "programs" && (
@@ -279,6 +284,9 @@ export default function ProgramsPage() {
             })}
         </div>
       )}
+
+      {tab === "self" && <SelfOverview />}
+      {tab === "learn" && <LearnAdmin />}
 
       {adding && <AddProgram onClose={() => setAdding(false)} />}
     </div>

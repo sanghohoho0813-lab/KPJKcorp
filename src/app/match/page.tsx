@@ -106,6 +106,7 @@ export default function MatchPage() {
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-shell text-[0.65rem] font-black text-white">KPJK</span>
           <div className="min-w-0 flex-1"><div className="text-[0.95rem] font-bold">KPJK 지원사업 찾기</div><div className="text-[0.75rem] text-ink-3">로그인 없이 · 무료</div></div>
+          <Link href="/learn" className="inline-flex min-h-9 items-center rounded-lg px-2 text-[0.8rem] font-semibold text-accent hover:bg-surface-2" data-testid="match-to-learn">무료 학습</Link>
           <Link href="/login" className="inline-flex min-h-9 items-center rounded-lg px-2 text-[0.8rem] font-semibold text-ink-3 hover:bg-surface-2 hover:text-ink">고객 로그인</Link>
         </div>
       </header>

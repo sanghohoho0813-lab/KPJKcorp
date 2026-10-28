@@ -3,7 +3,9 @@
 import { Icon3D } from "@/components/domain/portal/Icon3D";
 import { CancelRequestButton, OnBehalfNote, useOnBehalf } from "@/components/domain/portal/CancelRequest";
 import { useEffect, useMemo, useState } from "react";
-import { MessageSquarePlus } from "lucide-react";
+import { Footprints, MessageSquarePlus } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { findRun, statusLabel } from "@/lib/self-run";
 import { useStore, usePortalCompanyId, useCurrentUser } from "@/lib/store";
 import { profileOfCompany, programsForCompany, type ProgramMatch } from "@/lib/programs";
 import { fetchBizinfo, newestFetch, openOnly } from "@/lib/programs-client";
@@ -17,6 +19,7 @@ import { MatchStatus } from "@/components/domain/programs/MatchStatus";
 /** 고객: 우리 회사 기본 정보에 맞는 지원사업 공고 + 담당 컨설턴트에게 물어보기 */
 export default function PortalPrograms() {
   const st = useStore();
+  const router = useRouter();
   const companyId = usePortalCompanyId();
   const user = useCurrentUser();
   const ask = useStore((s) => s.askProgram);
@@ -41,10 +44,17 @@ export default function PortalPrograms() {
   const urgent = [...sent, ...matches].filter((m) => m.deadline.urgent).length;
   const card = (m: ProgramMatch) => {
     const a = asked(m.program);
+    const run = findRun(st.selfRuns, c.id, "program", m.program.id);
+    // 직접 준비하기(무료) — 카드 안에는 링크를 하나만 둔다(공고문 보기). 여기는 버튼으로 이동한다
+    const self = (
+      <Button size="sm" variant="outline" icon={<Footprints size={14} />} onClick={() => router.push(`/portal/self/program/${encodeURIComponent(m.program.id)}`)} data-self-go={m.program.id}>
+        {run ? `직접 준비 중 · ${statusLabel("program", run.status)}` : "직접 준비하기"}
+      </Button>
+    );
     return (
       <ProgramCard key={m.program.id} m={m} actions={a
-        ? <span className="flex flex-wrap items-center gap-1.5"><Badge tone={OPP_STATUS[a.status].tone}>문의함 · {OPP_STATUS[a.status].clientLabel}</Badge><CancelRequestButton opp={a} /></span>
-        : <Button size="sm" variant="accent" icon={<MessageSquarePlus size={14} />} onClick={() => { setTarget(m.program); setNote(""); }}>담당 컨설턴트에게 물어보기</Button>} />
+        ? <span className="flex flex-wrap items-center gap-1.5">{self}<Badge tone={OPP_STATUS[a.status].tone}>문의함 · {OPP_STATUS[a.status].clientLabel}</Badge><CancelRequestButton opp={a} /></span>
+        : <span className="flex flex-wrap items-center gap-1.5">{self}<Button size="sm" variant="accent" icon={<MessageSquarePlus size={14} />} onClick={() => { setTarget(m.program); setNote(""); }}>담당 컨설턴트에게 물어보기</Button></span>} />
     );
   };
 
@@ -56,6 +66,7 @@ export default function PortalPrograms() {
         <b>검토해 볼 공고 {sent.length + matches.length}건</b>{sent.length > 0 && <span className="font-semibold text-accent">담당자 추천 {sent.length}건</span>}{urgent > 0 && <span className="font-semibold text-error">마감 임박 {urgent}건</span>}
       </div>
       <p className="text-[0.78rem] leading-relaxed text-ink-3">{MATCH_NOTE}</p>
+      <p className="text-[0.82rem] leading-relaxed text-ink-2"><b>직접 준비하기</b>(무료)는 공고 이해 → 관련 교육 → 체크리스트 → 공식 사이트 신청 → 결과 기록 순서로 안내합니다. KPJK 에 맡기지 않아도 됩니다.</p>
       {missing.length > 0 && <Card className="p-3 text-[0.82rem] text-ink-2">회사 정보의 {missing.join("·")} 칸이 비어 있어 결과가 넓게 나올 수 있습니다. 담당 컨설턴트에게 알려 주시면 더 정확해집니다.</Card>}
       {sent.length > 0 && (
         <section className="space-y-2.5" data-testid="programs-sent">

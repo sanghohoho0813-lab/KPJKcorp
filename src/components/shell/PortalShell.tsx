@@ -4,7 +4,7 @@ import { Icon3D, PORTAL_ICON } from "@/components/domain/portal/Icon3D";
 import { type ReactNode, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, Briefcase, CalendarDays, Eye, FileCheck2, FolderUp, HelpCircle, Home, LayoutDashboard, LogOut, MessageSquare, Sparkles, UserRound, ChevronRight, Megaphone, Building2 } from "lucide-react";
+import { Bell, Briefcase, CalendarDays, Eye, FileCheck2, FolderUp, HelpCircle, Home, LayoutDashboard, LogOut, MessageSquare, Sparkles, UserRound, ChevronRight, Megaphone, Building2, Footprints } from "lucide-react";
 import { useStore, useCurrentUser, usePortalCompanyId } from "@/lib/store";
 import { useUi } from "@/lib/ui-store";
 import { useIsMobile, useIsPreviewFrame } from "@/lib/hooks";
@@ -31,6 +31,7 @@ const NAV = [
   { href: "/portal/services", label: "함께 검토", icon: <Sparkles size={20} /> },
   { href: "/portal/programs", label: "지원사업", icon: <Megaphone size={20} /> },
   { href: "/portal/inquiries", label: "문의하기", icon: <MessageSquare size={20} /> },
+  { href: "/portal/self", label: "스스로 준비하기", icon: <Footprints size={20} /> },
   { href: "/portal/company", label: "우리 회사", icon: <Building2 size={20} /> },
   { href: "/portal/notifications", label: "알림", icon: <Bell size={20} /> },
   { href: "/portal/me", label: "내 정보", icon: <UserRound size={20} /> },
@@ -141,10 +142,10 @@ export function PortalShell({ children }: { children: ReactNode }) {
             <span className="hdr-logo flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-shell text-[0.65rem] font-black text-white">KPJK</span>
             <span className="truncate text-[1rem] font-bold"><span className="hidden 2xl:inline">KPJK </span>성장 플랫폼</span>
           </Link>
-          {/* 메뉴가 잘려 보이면 안 된다 — 넓은 화면(xl)에서 8개 전부, 그보다 좁으면 앞의 6개(나머지는 알림·내 정보에서) */}
+          {/* 메뉴가 잘려 보이면 안 된다 — 아주 넓은 화면(2xl)에서 9개, 넓은 화면(xl)에서 8개, 그보다 좁으면 앞의 6개(나머지는 홈 카드·내 정보에서) */}
           <nav className="ml-1 hidden shrink-0 items-center gap-0.5 lg:flex" data-testid="portal-nav">
-            {NAV.slice(0, 8).map((n, i) => (
-              <Link key={n.href} href={n.href} aria-current={isActive(pathname, n.href) ? "page" : undefined} className={cx("pressable lift whitespace-nowrap rounded-full px-3 py-2 text-[0.85rem] font-semibold transition-colors", i >= 6 && "hidden xl:block", isActive(pathname, n.href) ? "bg-soft text-accent" : "text-ink-2 hover:bg-surface-2 hover:text-ink")}>
+            {NAV.slice(0, 9).map((n, i) => (
+              <Link key={n.href} href={n.href} aria-current={isActive(pathname, n.href) ? "page" : undefined} className={cx("pressable lift whitespace-nowrap rounded-full px-3 py-2 text-[0.85rem] font-semibold transition-colors", i >= 6 && i < 8 && "hidden xl:block", i >= 8 && "hidden 2xl:block", isActive(pathname, n.href) ? "bg-soft text-accent" : "text-ink-2 hover:bg-surface-2 hover:text-ink")}>
                 {n.label}
               </Link>
             ))}

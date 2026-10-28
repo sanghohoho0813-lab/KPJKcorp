@@ -2,7 +2,7 @@
 
 import { useStore, usePortalCompanyId, useCurrentUser } from "@/lib/store";
 import { GrowthHistory, NextGrowth, NowActions, useGrowth, useGrowthHistory } from "@/components/domain/portal/GrowthBoard";
-import { PinnedStrip, PortalHero, PortalHub, ProgramsPreview, RecentUpdates } from "@/components/domain/portal/PortalHome";
+import { PinnedStrip, PortalHero, PortalHub, ProgramsPreview, RecentUpdates, SelfPrepCard } from "@/components/domain/portal/PortalHome";
 import { liveNoticesFor } from "@/components/domain/Notices";
 import { CompanySnapshot, GrowthQuests } from "@/components/domain/portal/CompanySnapshot";
 
@@ -42,6 +42,8 @@ export default function PortalHome() {
       </div>
       {/* 맞는 지원사업 — 실제 공고만. 휴대폰은 옆으로 넘기는 카드 */}
       <div className="empty:hidden"><ProgramsPreview company={c} /></div>
+      {/* 스스로 준비하기(무료) — 공고 · 성장과제를 직접 준비하는 길. 상담 요청과 따로 */}
+      <SelfPrepCard companyId={c.id} />
       {/* 우리 회사 한눈에 — 최근 매출·업력·임직원·보유 인증. 휴대폰에서는 매출 막대·인증 목록을 접어 둔다 */}
       <CompanySnapshot company={c} board={board} collapsible />
       {/* 휴대폰: 체크리스트 → 다음 검토 과제 → 이력 / PC: 체크리스트 | 이력, 그 아래 다음 검토 과제 */}

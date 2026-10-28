@@ -112,6 +112,11 @@ export function uploadDocument(companyId: string, requestId: string, fileId: str
   return put(DOC_BUCKET, `${companyId}/${requestId}/${fileId}__${safeName(file.name)}`, file, opts);
 }
 
+/** 스스로 준비하기 근거(접수확인서 · 선정통보서) — 고객 제출 보관함의 회사 폴더 아래. 권한은 같은 정책(회사 단위) */
+export function uploadSelfEvidence(companyId: string, runId: string, fileId: string, file: File, opts?: UploadOptions) {
+  return put(DOC_BUCKET, `${companyId}/self_${runId}/${fileId}__${safeName(file.name)}`, file, opts);
+}
+
 /** 기업 서류함 원본 — 신분증 사본 같은 것이 들어가므로 별도 보관함 */
 export function uploadVault(companyId: string, fileId: string, file: File) {
   return put(VAULT_BUCKET, `${companyId}/${fileId}__${safeName(file.name)}`, file);

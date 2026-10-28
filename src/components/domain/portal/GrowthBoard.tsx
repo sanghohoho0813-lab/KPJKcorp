@@ -6,6 +6,8 @@ import { useMemo, useState } from "react";
 import { ArrowRight, CalendarDays, Check, CheckCircle2, FileCheck2, FolderUp, Footprints, MessageSquarePlus, Receipt, Sparkles, ThumbsUp, TrendingUp } from "lucide-react";
 import { useStore, useCurrentUser } from "@/lib/store";
 import { growthBoard, type GrowthItem, type NowAction } from "@/lib/growth";
+import { runHref } from "@/lib/self-run";
+import { useRouter } from "next/navigation";
 import { ENTITY_TYPES, yearsSince, EMPLOYEE_BANDS } from "@/lib/company-options";
 import { fmtDate, fmtRelative } from "@/lib/format";
 import { OPP_STATUS } from "@/lib/services";
@@ -141,13 +143,14 @@ export function ActiveGrowth({ items }: { items: GrowthItem[] }) {
 /** 다음으로 검토할 성장과제 — 요청한 것(진행 상황) · 담당자 제안 · 기업정보로 고른 것. 누르면 담당자에게 바로 간다 */
 export function NextGrowth({ board, companyId, compact, only, title }: { board: NonNullable<ReturnType<typeof useGrowth>>; companyId: string; compact?: boolean; only?: GrowthItem["state"][]; title?: string }) {
   const st = useStore();
+  const router = useRouter();
   const user = useCurrentUser();
   const raise = useStore((s) => s.raiseOpportunity);
   const toast = useStore((s) => s.toast);
   const [ask, setAsk] = useState<{ it: GrowthItem; kind: "interest" | "request" } | null>(null);
   const [note, setNote] = useState("");
   const { isClient, onBehalf } = useOnBehalf();
-  const items = [...board.review, ...board.proposed, ...board.suggested].filter((x) => !only || only.includes(x.state));
+  const items = [...board.review, ...board.self, ...board.proposed, ...board.suggested].filter((x) => !only || only.includes(x.state));
   if (only && items.length === 0) return null;
   const submit = () => {
     if (!ask?.it.service) return;
@@ -172,14 +175,19 @@ export function NextGrowth({ board, companyId, compact, only, title }: { board: 
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-bold">{it.area}</span>
                 {it.state === "review" && it.opportunity ? <Badge tone={OPP_STATUS[it.opportunity.status].tone}>{OPP_STATUS[it.opportunity.status].clientLabel}</Badge>
+                  : it.state === "self" ? <Badge tone="success">직접 진행 · {it.statusLabel}</Badge>
                   : it.state === "proposed" ? <Badge tone="accent">담당자 제안</Badge> : <Badge>검토해 볼 과제</Badge>}
               </div>
               {it.reason && <div className="mt-1.5 text-[0.85rem] leading-relaxed text-ink-2">{it.reason}</div>}
               {it.basis && <div className="mt-1.5 inline-flex rounded-md bg-surface-2 px-2 py-0.5 text-[0.72rem] font-semibold text-ink-3">근거 · {it.basis}</div>}
-              {it.state === "review" ? (
+              {it.state === "self" && it.selfRun ? (
+                <Link href={runHref(it.selfRun)} className="pressable mt-3 inline-flex min-h-9 items-center gap-1 rounded-lg bg-soft/60 px-3 text-[0.82rem] font-semibold text-accent-strong">이어서 하기{it.progress !== undefined ? ` · 준비 ${it.progress}%` : ""} <ArrowRight size={13} /></Link>
+              ) : it.state === "review" ? (
                 <div className="mt-2 flex flex-wrap items-center gap-x-2 text-[0.8rem] text-ink-3">{fmtRelative(it.opportunity!.createdAt)} 요청 · 담당 컨설턴트가 확인하고 있습니다.<CancelRequestButton opp={it.opportunity!} className="-ml-1" /></div>
               ) : it.service && (
                 <div className="mt-3 flex flex-wrap gap-2">
+                  {/* 직접 알아보기(무료) — 상담으로 넘어가지 않고 스스로 끝까지 갈 수 있는 길 */}
+                  <Button size="sm" variant="outline" icon={<Footprints size={14} className="hidden sm:block" />} onClick={() => router.push(`/portal/self/growth/${encodeURIComponent(it.area)}`)} data-self-go={it.area}>직접 알아보기</Button>
                   <Button size="sm" variant="outline" icon={<ThumbsUp size={14} className="hidden sm:block" />} onClick={() => { setAsk({ it, kind: "interest" }); setNote(""); }}>검토하고 싶어요</Button>
                   <Button size="sm" variant="accent" icon={<MessageSquarePlus size={14} className="hidden sm:block" />} onClick={() => { setAsk({ it, kind: "request" }); setNote(""); }}>상담 요청</Button>
                 </div>
@@ -210,7 +218,9 @@ function historyText(a: { type: string; text: string; meta?: Record<string, unkn
 /** 완료한 성장과제와 이력 — 지금까지 함께 한 것 */
 export function useGrowthHistory(companyId: string) {
   const acts = useStore((s) => s.activities);
-  return useMemo(() => acts.filter((a) => a.companyId === companyId && ["project_stage_changed", "document_reviewed", "result_shared", "contract_signed", "inquiry_answered"].includes(a.type)).sort((a, b) => b.at.localeCompare(a.at)).slice(0, 6), [acts, companyId]);
+  // 대표님이 직접 한 일(스스로 준비하기의 시작 · 결과)도 같은 이력에 — 체크 하나하나 같은 잔일은 빼고
+  return useMemo(() => acts.filter((a) => a.companyId === companyId && (["project_stage_changed", "document_reviewed", "result_shared", "contract_signed", "inquiry_answered", "self_started"].includes(a.type)
+    || (a.type === "self_status" && ["applied", "selected", "not_selected", "done", "reviewed"].includes(String(a.meta?.to))))).sort((a, b) => b.at.localeCompare(a.at)).slice(0, 6), [acts, companyId]);
 }
 export function GrowthHistory({ board, companyId }: { board: NonNullable<ReturnType<typeof useGrowth>>; companyId: string }) {
   const history = useGrowthHistory(companyId);
@@ -221,9 +231,11 @@ export function GrowthHistory({ board, companyId }: { board: NonNullable<ReturnT
       {board.completed.length > 0 && (
         <div className="mb-4 space-y-2">
           {board.completed.map((it) => (
-            <div key={it.project!.id} className="flex items-center gap-3 rounded-xl bg-success-bg/50 px-4 py-2.5" data-growth-done={it.area}>
+            // 담당자와 끝낸 과제(프로젝트)와 대표님이 직접 끝낸 과제(실행 기록)가 함께 온다 — 직접 한 것은 그렇게 표시
+            <div key={`${it.area}-${it.project?.id ?? it.selfRun?.id ?? ""}`} className="flex items-center gap-3 rounded-xl bg-success-bg/50 px-4 py-2.5" data-growth-done={it.area} data-growth-self={it.selfRun ? "1" : undefined}>
               <Check size={16} className="shrink-0 text-success" />
-              <span className="min-w-0 flex-1"><b>{it.area}</b><span className="ml-1.5 text-[0.8rem] text-ink-3">{it.doneAt ? `${fmtDate(it.doneAt, { year: true })} 완료` : "완료"}</span></span>
+              <span className="min-w-0 flex-1"><b>{it.area}</b><span className="ml-1.5 text-[0.8rem] text-ink-3">{it.selfRun ? "직접 " : ""}{it.doneAt ? `${fmtDate(it.doneAt, { year: true })} ${it.statusLabel ?? "완료"}` : it.statusLabel ?? "완료"}</span></span>
+              {it.selfRun && <Link href={runHref(it.selfRun)} className="tap inline-flex items-center gap-1 text-[0.8rem] font-semibold text-accent">기록 <ArrowRight size={13} /></Link>}
               {!!it.resultCount && <Link href="/portal/results" className="tap inline-flex items-center gap-1 text-[0.8rem] font-semibold text-accent">결과자료 {it.resultCount} <ArrowRight size={13} /></Link>}
             </div>
           ))}

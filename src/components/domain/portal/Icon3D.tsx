@@ -27,6 +27,7 @@ export const PORTAL_ICON: Record<string, Icon3DName> = {
   "/portal/services": "together",
   "/portal/programs": "funding",
   "/portal/inquiries": "idea",
+  "/portal/self": "checklist",
   "/portal/company": "company",
   "/portal/notifications": "bell",
   "/portal/me": "profile",
