@@ -13,7 +13,7 @@ import { EvidenceExplorer } from "@/components/domain/EvidenceExplorer";
 import { AreaBar, WhyEvidence, useSprint } from "@/components/domain/Coach";
 import { BaselineCard, RecallCompareCard } from "@/components/domain/BaselineCard";
 import { coverageOf } from "@/lib/evidence";
-import { selfMetrics } from "@/lib/self-run";
+import { isTestCompany, selfMetrics } from "@/lib/self-run";
 import Link from "next/link";
 import { ArrowRight, Compass } from "lucide-react";
 
@@ -100,7 +100,7 @@ function ReportsInner() {
   }, [st, now]);
 
   interface Metric { name: string; point: string; value: string; baseline?: string }
-  const sampleCo = new Set(st.companies.filter((c) => c.sample).map((c) => c.id));
+  const sampleCo = new Set(st.companies.filter(isTestCompany).map((c) => c.id));
   const sm = selfMetrics(st.selfRuns, st.activities, (id) => sampleCo.has(id));
   const axes: { key: string; title: string; desc: string; items: Metric[] }[] = [
     {
@@ -144,7 +144,7 @@ function ReportsInner() {
     {
       key: "self",
       title: "자기주도 실행",
-      desc: "고객이 컨설팅 없이 스스로 준비 · 신청 · 실행한 일. 고객이 고른 상태를 그대로 세고, 시연용 샘플 기업은 따로 셉니다.",
+      desc: "고객이 컨설팅 없이 스스로 준비 · 신청 · 실행한 일. 고객이 고른 상태를 그대로 세고, 샘플 · [가상] 촬영용 기업은 따로 셉니다.",
       items: [
         { name: "학습 완료", point: "SelfRun.kind = learn (고객 직접 표시)", value: `실제 ${sm.real.learned} · 샘플 ${sm.sample.learned}건` },
         { name: "지원사업 직접 준비 → 신청", point: "SelfRun.kind = program · self_status", value: `실제 ${sm.real.programApplied} / ${sm.real.programStarted}건 · 샘플 ${sm.sample.programApplied} / ${sm.sample.programStarted}건` },

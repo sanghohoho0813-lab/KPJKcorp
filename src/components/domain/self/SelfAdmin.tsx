@@ -12,7 +12,7 @@ import { useMemo, useState } from "react";
 import { BookOpen, Download, Eye, EyeOff, Pencil, PlayCircle, Plus, ShieldCheck } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useMay } from "@/components/domain/EntityModals";
-import { checkProgress, isOpen, resultBasis, selfMetrics, statusLabel } from "@/lib/self-run";
+import { checkProgress, isOpen, isTestCompany, resultBasis, selfMetrics, statusLabel } from "@/lib/self-run";
 import { DEFAULT_LEARN_CATEGORIES, STARTER_LEARN, learnCategories } from "@/lib/learn";
 import { OFFICIAL_LINKS, youtubeId } from "@/lib/official-links";
 import { KPJK_CONSULTING_ALL } from "@/lib/company-options";
@@ -94,7 +94,7 @@ export function ClientSelfRuns({ company: c }: { company: Company }) {
 
 export function SelfOverview() {
   const st = useStore();
-  const sampleOf = useMemo(() => new Set(st.companies.filter((c) => c.sample).map((c) => c.id)), [st.companies]);
+  const sampleOf = useMemo(() => new Set(st.companies.filter(isTestCompany).map((c) => c.id)), [st.companies]);
   const m = useMemo(() => selfMetrics(st.selfRuns, st.activities, (id) => sampleOf.has(id)), [st.selfRuns, st.activities, sampleOf]);
   const runs = st.selfRuns.filter((r) => r.kind !== "learn").sort((a, b) => b.statusAt.localeCompare(a.statusAt));
   const rows: [string, (x: typeof m.real) => string][] = [
@@ -109,7 +109,7 @@ export function SelfOverview() {
   return (
     <div className="space-y-4" data-testid="self-overview">
       <Card className="overflow-hidden">
-        <div className="border-b border-line px-5 py-3"><h3 className="font-bold">자기주도 실행 측정</h3><p className="text-[0.78rem] text-ink-3">고객이 남긴 기록을 그대로 센 값입니다. 시연용 샘플 기업과 실제 기업을 나눠 셉니다.</p></div>
+        <div className="border-b border-line px-5 py-3"><h3 className="font-bold">자기주도 실행 측정</h3><p className="text-[0.78rem] text-ink-3">고객이 남긴 기록을 그대로 센 값입니다. 샘플 기업과 이름이 [가상]으로 시작하는 촬영 · 시험용 기업은 따로 셉니다.</p></div>
         <table className="w-full text-[0.86rem]">
           <thead><tr className="bg-surface-2 text-left text-[0.75rem] text-ink-3"><th className="px-5 py-2 font-semibold">항목</th><th className="px-3 py-2 text-right font-semibold">실제 고객</th><th className="px-5 py-2 text-right font-semibold">샘플 · 시험</th></tr></thead>
           <tbody className="divide-y divide-line">
@@ -127,7 +127,7 @@ export function SelfOverview() {
               return (
                 <li key={r.id}>
                   <Link href={`/ax/clients/${r.companyId}?tab=portal`} className="flex flex-wrap items-center gap-2 py-2.5 hover:bg-surface-2/60">
-                    <span className="min-w-0 flex-1"><span className="font-semibold">{co?.name ?? r.companyId}</span>{co?.sample && <span className="ml-1 text-[0.72rem] text-ink-3">(샘플)</span>}<span className="block truncate text-[0.8rem] text-ink-2">{KIND_LABEL[r.kind]} · {r.kind === "program" ? r.targetTitle : r.targetKey}</span></span>
+                    <span className="min-w-0 flex-1"><span className="font-semibold">{co?.name ?? r.companyId}</span>{co?.sample && <span className="ml-1 text-[0.72rem] text-ink-3">(샘플)</span>}{co && !co.sample && isTestCompany(co) && <span className="ml-1 text-[0.72rem] text-ink-3">(시연 · 시험)</span>}<span className="block truncate text-[0.8rem] text-ink-2">{KIND_LABEL[r.kind]} · {r.kind === "program" ? r.targetTitle : r.targetKey}</span></span>
                     <Badge tone={isOpen(r) ? "info" : "neutral"}>{statusLabel(r.kind, r.status)}</Badge>
                     <span className="text-[0.75rem] text-ink-3">{fmtDate(r.statusAt)}</span>
                   </Link>

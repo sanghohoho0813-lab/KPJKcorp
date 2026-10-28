@@ -277,6 +277,12 @@ export interface SelfMetricsSplit {
 type ActLike = { type: string; at: string; companyId?: string; meta?: Record<string, string | number> };
 
 /**
+ * 시연 · 내부 시험용 기업인가 — 데모 샘플 기업, 또는 운영 서버에서 이름을 "[가상]" · "(가상)" 으로 시작하게 만든 촬영용 기업.
+ * 측정에서 실제 고객 실적과 섞지 않으려고 쓴다(이 표시로 지우거나 숨기는 동작은 없다).
+ */
+export const isTestCompany = (c: { name: string; sample?: boolean }) => !!c.sample || /^\s*[[(]\s*가상\s*[\])]/.test(c.name);
+
+/**
  * 성과 측정 — 고객 기록에서 바로 센다. 시연용(샘플) 기업과 실제 기업을 나눠 센다.
  * "기존 방식 대비 시간 변화"는 도입 전 기준선이 없으면 계산하지 않는다(여기서 만들지 않는다).
  */

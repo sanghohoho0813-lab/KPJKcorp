@@ -15,6 +15,9 @@
 //     알림 종 펼침이 화면 안(고객 · 내부) · 고객 알림 날짜 묶음 · 우리 회사 끝낸 항목 · 회사 정보 접기
 // 16) PC 정리(계약 4단계 문구 — 대시보드 · 업무규칙 · 리포트 · 실증 기록): 첫 화면에 운영 현황 6개 상태 · 실증 안내 한 줄 ·
 //     리포트 첫 탭으로 돌아오기 · 기준선 상태는 실제 조사 기록대로 · 업무함 → 자동 규칙 · 실증 기록 날짜 묶음
+// 17) 스스로 준비하기(지시서 TEST 01~10): 실제 공고 사본으로 매칭 → 관련 교육 · 공식 링크 → 직접 준비 저장 · 재접속 복원 →
+//     신청 완료 이력 → 결과 변경 후 다음 행동 · 담당자 확인 업무 → 중복 없음 → 회사 간 분리 → 비회원은 공개 학습만 →
+//     직접 진행 · 전문가 문의 경로 분리 → 새 화면 오류 · 넘침 없음 (회사는 전부 샘플 기업, 공고는 tools/acceptance/fixtures 사본)
 // 실행: npm run build && npm start (데모 모드) → node tools/acceptance/daily.mjs
 import fs from 'fs';
 import { execFileSync } from 'child_process';
@@ -791,6 +794,168 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
   const firstLabel = await page.locator('[data-activity-day] h3').first().innerText();
   ok('16 실증 기록: 날짜별 묶음(최신 날짜부터) · 첫 묶음은 오늘', days.length >= 2 && days.every((d, i) => i === 0 || days[i - 1] > d) && firstLabel.startsWith('오늘'), `${days.slice(0, 3).join(',')} / ${firstLabel.split('\n')[0]}`);
   ok('16 PC 페이지 오류 없음 · 넘침 없음', page.errs.length === 0 && (await overflow(page)) <= 0, page.errs.slice(0, 2).join(' | '));
+}
+
+// ---------- 17) 스스로 준비하기 — 지시서 TEST 01~10 (휴대폰) ----------
+// 공고는 운영 서버 공개 목록에서 받아 둔 실제 기업마당 상시 공고 사본(가짜 공고 아님). 회사 · 계정은 데모 샘플.
+{
+  const fx = JSON.parse(fs.readFileSync(new URL('./fixtures/bizinfo-open.json', import.meta.url), 'utf8'));
+  const OFFICIAL = [...fs.readFileSync(new URL('../../src/lib/official-links.ts', import.meta.url), 'utf8').matchAll(/url: "(https:[^"]+)"/g)].map((m) => m[1]);
+  const fxIds = new Set(fx.items.map((x) => x.id));
+  const P = fx.items[0];
+  const page = await session('mobile', ['ceo@kpjk.co.kr', 'kpjk2026!']);
+  await page.route('**/api/programs**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, items: fx.items, cachedAt: fx.savedAt }) }));
+  const relogin = async (id, pwd, to) => {
+    await page.evaluate(() => window.__kpjkState().logout());
+    await page.goto(B + '/login', { waitUntil: 'networkidle' });
+    await page.getByLabel('아이디 (이메일)').fill(id);
+    await page.locator('input[type=password]').first().fill(pwd);
+    await page.getByRole('button', { name: '로그인' }).click();
+    await page.waitForURL(to); await sleep(1200);
+    await page.getByRole('button', { name: /건너뛰기/ }).first().click({ timeout: 800 }).catch(() => {});
+    await page.getByLabel(/튜토리얼 닫기|이용 안내 닫기/).click({ timeout: 800 }).catch(() => {});
+  };
+  const pages = new Set();
+  const visit = async (path) => { await go(page, path); pages.add(path.replace(/\?.*$/, '')); if ((await overflow(page)) > 0) page.errs.push(`가로 넘침 ${path}`); };
+  await page.evaluate((items) => { const st = window.__kpjkState(); st.upsertPrograms(items, st.session.userId); st.shareProgram(items[0].id, ['co_a'], st.session.userId); st.shareProgram(items[1].id, ['co_a'], st.session.userId); }, fx.items);
+
+  // TEST 01 기업조건 매칭 — 고객 공고 목록(기존 매칭 규칙)에 실제 공고만, 직접 준비 · 전문가 문의 버튼이 따로
+  await relogin('ceo@a-precision.demo', 'client2026!', /\/portal/);
+  let st = await dump(page);
+  const before = { opp: st.opportunities.filter((o) => o.companyId === 'co_a').length, inq: st.inquiries.filter((q) => q.companyId === 'co_a').length };
+  await visit('/portal/programs'); await sleep(600);
+  const goIds = await page.locator('[data-self-go]').evaluateAll((xs) => xs.map((e) => e.getAttribute('data-self-go')));
+  ok('17 TEST01 기업조건 매칭: 고객 공고 목록은 실제 공고만 · 공고마다 직접 준비하기', goIds.length > 0 && goIds.every((id) => fxIds.has(id)) && goIds.includes(P.id), `${goIds.length}건`);
+  ok('17 TEST01 전문가 문의 버튼은 직접 준비와 따로', (await page.getByRole('button', { name: '담당 컨설턴트에게 물어보기' }).count()) === goIds.length);
+  await page.locator(`[data-self-go="${P.id}"]`).click(); await page.waitForURL(/\/portal\/self\/program\//); await sleep(800); pages.add('/portal/self/program');
+  ok('17 TEST01 공고 화면: 매칭은 검토 후보(자격 · 선정 판단 아님) 안내', await page.getByText('신청 자격과 선정 여부를 판단한 것이 아니며').first().isVisible());
+
+  // TEST 02 관련 교육 · 공식 링크
+  const learnIds = await page.getByTestId('self-learn').locator('[data-learn]').evaluateAll((xs) => xs.map((e) => e.getAttribute('data-learn')));
+  const pubIds = new Set(st.learnContents.filter((x) => x.published).map((x) => x.id));
+  ok('17 TEST02 관련 교육: 공개한 학습 자료만 연결', learnIds.length > 0 && learnIds.every((id) => pubIds.has(id)), learnIds.join(','));
+  const ext = await page.locator('main a[target=_blank]').evaluateAll((xs) => xs.map((a) => a.href));
+  const bad = ext.filter((h) => !(h === P.url || OFFICIAL.some((o) => h === o || h === o + '/')));
+  ok('17 TEST02 공식 링크: 공고문 원문 + 확인한 공식 기관 주소만(https)', ext.includes(P.url) && bad.length === 0 && ext.every((h) => h.startsWith('https://')), `${ext.length}개${bad.length ? ' 벗어남 ' + bad.join(' ') : ''}`);
+
+  // TEST 03 직접 준비 상태 저장 · 재접속 복원
+  await page.getByTestId('self-start').click(); await sleep(500);
+  for (const k of ['notice', 'eligibility', 'period']) await page.locator(`[data-check="${k}"]`).check();
+  await sleep(300);
+  await relogin('ceo@a-precision.demo', 'client2026!', /\/portal/);
+  await visit('/portal/self/program/' + encodeURIComponent(P.id));
+  st = await dump(page);
+  const run = st.selfRuns.find((r) => r.companyId === 'co_a' && r.kind === 'program' && r.targetKey === P.id);
+  ok('17 TEST03 다시 로그인해도 준비 상태 그대로(체크 3 · 준비 중)', (await page.locator('[data-check]:checked').count()) === 3 && run?.status === 'preparing' && Object.keys(run.checks).length === 3);
+
+  // TEST 04 신청 완료 기록 → 실행 이력
+  await page.locator('[data-status="applied"]').click(); await sleep(400);
+  await page.getByLabel('접수번호').fill('TEST-0001'); await page.getByRole('button', { name: '번호 저장' }).click(); await sleep(400);
+  st = await dump(page);
+  const act = st.activities.find((a) => a.type === 'self_status' && a.meta?.runId === run.id && a.meta?.to === 'applied');
+  ok('17 TEST04 신청 완료 → 활동 기록(고객 입력 · 누가 · 언제)', !!act && act.actorRole === 'client' && act.actorId === 'c_a' && !!act.at && /고객 입력/.test(act.text));
+  ok('17 TEST04 화면 이력 · 근거는 "확인 전"으로 표시', /신청 완료/.test(await page.getByTestId('self-history').textContent()) && /고객 근거 첨부 · 확인 전/.test(await page.getByTestId('self-evidence').textContent()));
+  ok('17 TEST04 담당자에게 알림(내부)', st.notifications.some((n) => n.audience === 'internal' && n.companyId === 'co_a' && n.href === '/ax/clients/co_a?tab=portal'));
+
+  // TEST 05 결과 변경 → 다음 행동 · 담당자 확인 업무
+  const nextBefore = await page.getByTestId('self-next').innerText();
+  await page.locator('[data-status="selected"]').click(); await sleep(500);
+  const nextAfter = await page.getByTestId('self-next').innerText();
+  st = await dump(page);
+  const fuTask = st.tasks.filter((t) => t.ruleKey === `self_run:${run.id}:selected`);
+  ok('17 TEST05 선정 기록 → 다음 할 일이 바뀜', nextBefore !== nextAfter && /선정/.test(nextAfter), nextAfter.replace(/\s+/g, ' ').slice(0, 80));
+  ok('17 TEST05 선정 → 담당자 확인 업무(담당 컨설턴트)', fuTask.length === 1 && fuTask[0].assigneeId === 'u_park' && fuTask[0].source === 'auto');
+  await visit('/portal/self/growth/' + encodeURIComponent('기업부설연구소'));
+  await page.getByTestId('self-start').click(); await sleep(400);
+  await page.locator('[data-status="done"]').click(); await sleep(600);
+  ok('17 TEST05 성장과제 직접 완료 → 이어지는 과제(특허자본) 제시', /특허자본/.test(await page.getByTestId('self-followups').innerText().catch(() => '')));
+  await visit('/portal/self');
+  ok('17 TEST05 완료한 과제는 다시 권하지 않음', (await page.locator('[data-doable="기업부설연구소"]').count()) === 0);
+
+  // TEST 06 중복 방지
+  st = await dump(page);
+  const dup = await page.evaluate(([pid, title]) => {
+    const s = window.__kpjkState();
+    const id2 = s.startSelfRun({ companyId: 'co_a', kind: 'program', targetKey: pid, targetTitle: title });
+    const same = window.__kpjkState().setSelfStatus(id2, 'selected');
+    window.__kpjkState().setSelfStatus(id2, 'waiting'); window.__kpjkState().setSelfStatus(id2, 'selected');
+    const t = window.__kpjkState();
+    return { id2, same, runs: t.selfRuns.filter((r) => r.companyId === 'co_a' && r.kind === 'program' && r.targetKey === pid).length, tasks: t.tasks.filter((x) => x.ruleKey === `self_run:${id2}:selected`).length };
+  }, [P.id, P.title]);
+  ok('17 TEST06 같은 공고 다시 시작해도 기록 1건 · 같은 상태 다시 고르면 기록 안 함 · 확인 업무 1건', dup.id2 === run.id && dup.same === false && dup.runs === 1 && dup.tasks === 1, JSON.stringify(dup));
+
+  // TEST 07 고객 A ↔ B 분리 (화면 · 저장 동작. 서버 표 권한은 supabase/test RLS 시험에서 따로)
+  await relogin('choi@bntech.demo', 'client2026!', /\/portal/);
+  const bRun = await page.evaluate(() => window.__kpjkState().startSelfRun({ companyId: 'co_b', kind: 'growth', targetKey: '인사노무', targetTitle: '인사노무' }));
+  await relogin('ceo@a-precision.demo', 'client2026!', /\/portal/);
+  await visit('/portal/self/growth/' + encodeURIComponent('인사노무'));
+  const leak = await page.evaluate((bid) => {
+    const s = window.__kpjkState();
+    return { start: s.startSelfRun({ companyId: 'co_b', kind: 'growth', targetKey: '인사노무', targetTitle: '인사노무' }), set: s.setSelfStatus(bid, 'done'), ev: s.addSelfEvidence(bid, { kind: 'number', label: '접수번호', value: 'X' }), help: s.requestSelfHelp(bid, 'x'), status: window.__kpjkState().selfRuns.find((r) => r.id === bid)?.status };
+  }, bRun);
+  ok('17 TEST07 고객 A 화면에 B 기록 안 보임(같은 과제도 시작 전)', !!bRun && (await page.getByTestId('self-start').isVisible()) && !(await page.locator(`[data-self-run="${bRun}"]`).count()));
+  ok('17 TEST07 고객 A 는 B 기록을 만들거나 바꾸지 못함', leak.start === null && leak.set === false && leak.ev === null && leak.help === false && leak.status === 'exploring', JSON.stringify(leak));
+
+  // TEST 09 직접 진행 ↔ 전문가 문의 경로 분리
+  st = await dump(page);
+  ok('17 TEST09 직접 진행만으로는 상담 요청 · 문의가 생기지 않음', st.opportunities.filter((o) => o.companyId === 'co_a').length === before.opp && st.inquiries.filter((q) => q.companyId === 'co_a').length === before.inq);
+  await visit('/portal/self/program/' + encodeURIComponent(P.id));
+  await page.getByTestId('expert-help').getByRole('button', { name: '담당 컨설턴트에게 물어보기' }).click(); await sleep(300);
+  await page.getByRole('dialog').getByRole('button', { name: '보내기' }).click(); await sleep(600);
+  st = await dump(page);
+  const r2 = st.selfRuns.find((r) => r.id === run.id);
+  const opp = st.opportunities.find((o) => o.id === r2.helpRef);
+  ok('17 TEST09 직접 하다 전문가 요청: 진행 상태 · 준비를 담아 요청 · 직접 기록은 그대로', !!opp && r2.status === 'selected' && /스스로 준비하기에서 요청/.test(JSON.stringify(opp)) && (await page.getByTestId('expert-asked').isVisible()));
+  ok('17 TEST09 요청 뒤에도 직접 기록 계속 가능', await page.evaluate((id) => window.__kpjkState().setSelfStatus(id, 'waiting'), run.id));
+  const runsBefore = st.selfRuns.length;
+  await visit('/portal/programs');
+  const other = goIds.find((id) => id !== P.id);
+  if (other) {
+    await page.locator(`[data-self-go="${other}"]`).locator('xpath=..').getByRole('button', { name: '담당 컨설턴트에게 물어보기' }).click(); await sleep(300);
+    await page.getByRole('dialog').getByRole('button', { name: '보내기' }).click(); await sleep(600);
+  }
+  st = await dump(page);
+  ok('17 TEST09 전문가 문의만 해도 직접 진행 기록은 생기지 않음', !!other && st.selfRuns.length === runsBefore && st.opportunities.some((o) => o.companyId === 'co_a' && fx.items.find((x) => x.id === other) && o.serviceName?.includes(fx.items.find((x) => x.id === other).title.slice(0, 20))));
+
+  // 내부: 근거 확인 · 권한 구분 · 측정(샘플 분리)
+  await relogin('park@kpjk.co.kr', 'kpjk2026!', /\/ax\//);
+  await visit('/ax/clients/co_a?tab=portal');
+  const panel = page.getByTestId('client-self-runs');
+  await panel.getByRole('button', { name: '확인' }).first().click(); await sleep(400);
+  st = await dump(page);
+  ok('17 내부: 담당자가 고객 근거 확인 → 확인 기록(누가 · 언제), 상태는 고객 값 그대로', st.selfRuns.find((r) => r.id === run.id)?.evidence.some((e) => e.confirmedBy === 'u_park' && e.confirmedAt) && st.selfRuns.find((r) => r.id === run.id)?.status === 'waiting' && st.activities.some((a) => a.type === 'self_confirmed' && a.actorId === 'u_park'));
+  const parkTry = await page.evaluate((id) => window.__kpjkState().setSelfStatus(id, 'not_selected'), run.id);
+  await visit('/ax/programs?tab=learn');
+  ok('17 내부: 담당자는 고객 상태 · 학습 자료를 바꾸지 못함(대표만 학습 자료)', parkTry === false && (await page.getByTestId('learn-new').count()) === 0);
+  await relogin('ceo@kpjk.co.kr', 'kpjk2026!', /\/ax\//);
+  await visit('/ax/programs?tab=self');
+  const rows = await page.getByTestId('self-overview').locator('tbody tr').evaluateAll((trs) => trs.map((tr) => [...tr.querySelectorAll('td')].map((td) => td.innerText.trim())));
+  const started = rows.find((r) => r[0].startsWith('지원사업 직접 준비 시작'));
+  ok('17 측정: 샘플 기업 기록은 "샘플 · 시험"에만, 실제 고객 칸은 0 · 기준선 없는 시간 변화는 계산 안 함', started?.[1] === '0건' && started?.[2] !== '0건' && rows.some((r) => /기준선이 없어 계산하지 않습니다/.test(r.join(' '))), JSON.stringify(started));
+  await page.evaluate(() => { const s = window.__kpjkState(); s.setLearnPublished('lc_bizplan', false, s.session.userId); });
+
+  // TEST 08 비회원: 공개 학습만 · 아무것도 묻지 않음 · 고객 화면은 로그인 필요
+  await page.evaluate(() => window.__kpjkState().logout());
+  await visit('/learn');
+  st = await dump(page);
+  const pubNow = new Set(st.learnContents.filter((x) => x.published).map((x) => x.id));
+  const anonIds = await page.locator('[data-learn]').evaluateAll((xs) => xs.map((e) => e.getAttribute('data-learn')));
+  ok('17 TEST08 비회원 /learn: 공개 자료만(비공개로 바꾼 자료 안 보임)', anonIds.length === pubNow.size && anonIds.every((id) => pubNow.has(id)) && !anonIds.includes('lc_bizplan'), `${anonIds.length}개`);
+  ok('17 TEST08 비회원 /learn: 입력 칸 없음(개인정보 · 회원가입 요구 없음) · 공고 찾기로 연결', (await page.locator('main input, main textarea, main select').count()) === 0 && (await page.getByTestId('learn-to-match').getAttribute('href')) === '/match');
+  await visit('/learn/lc_bizplan');
+  ok('17 TEST08 비공개 자료 주소로 들어와도 내용 안 보임', (await page.getByText('찾을 수 없는 학습 자료입니다').isVisible()) && !(await page.getByTestId('learn-body').count()));
+  await visit('/learn/lc_prep_docs');
+  const box = page.getByTestId('learn-public-checks').locator('input').first(); await box.check();
+  await page.reload({ waitUntil: 'networkidle' }); await sleep(600);
+  ok('17 TEST08 비회원 체크는 저장되지 않음', !(await page.getByTestId('learn-public-checks').locator('input').first().isChecked()));
+  await page.goto(B + '/portal/self', { waitUntil: 'networkidle' }); await sleep(900);
+  ok('17 TEST08 비회원은 고객 화면(스스로 준비하기)에 못 들어감', /\/login/.test(page.url()), page.url());
+  await visit('/match');
+  ok('17 TEST08 지원사업 찾기(/match) → 무료 학습 연결', (await page.getByTestId('match-to-learn').getAttribute('href')) === '/learn');
+
+  // TEST 10 새 화면 오류 · 넘침 없음 (기존 기능 회귀는 이 파일의 1~16 · run.mjs · 단위 · RLS 시험)
+  ok('17 TEST10 새 화면 페이지 오류 · 가로 넘침 없음', page.errs.length === 0, `${pages.size}개 화면${page.errs.length ? ' · ' + page.errs.slice(0, 2).join(' | ') : ''}`);
+  await page.context().close();
 }
 
 // ---------- 첫 로그인 안내(튜토리얼) — 휴대폰에서 화면이 끝까지 내려가지 않게 ----------

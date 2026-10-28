@@ -1,5 +1,5 @@
 // 스스로 준비하기 — 한 건만(id) · 체크 진행 · 다음 행동 · 담당자 후속 · 입력/확인 구분 · 측정(샘플/실제 구분) · 학습 자료 연결 · 주소 검사
-import { selfRunId, findRun, checkProgress, nextStep, followUpOf, resultBasis, selfMetrics, canSet, statusLabel, guideOf, PROGRAM_CHECKS } from "../../src/lib/self-run";
+import { selfRunId, findRun, checkProgress, nextStep, followUpOf, resultBasis, selfMetrics, canSet, statusLabel, guideOf, PROGRAM_CHECKS, isTestCompany } from "../../src/lib/self-run";
 import { learnForProgram, learnForArea, cleanLearnInput, learnCategories, STARTER_LEARN, DEFAULT_LEARN_CATEGORIES } from "../../src/lib/learn";
 import { safeHttpsUrl, youtubeId, OFFICIAL_LINKS } from "../../src/lib/official-links";
 import type { LearnContent, SelfRun } from "../../src/lib/types";
@@ -63,5 +63,6 @@ ok(c1.problems.length === 4 && c1.value.videoUrl === undefined && c1.value.links
 ok(youtubeId("https://www.youtube.com/watch?v=dQw4w9WgXcQ") === "dQw4w9WgXcQ" && youtubeId("https://youtu.be/dQw4w9WgXcQ?t=3") === "dQw4w9WgXcQ" && youtubeId("https://www.youtube.com/shorts/dQw4w9WgXcQ") === "dQw4w9WgXcQ", "YouTube 주소 3가지");
 ok(youtubeId("https://evil.com/watch?v=dQw4w9WgXcQ") === undefined && youtubeId("http://youtube.com/watch?v=dQw4w9WgXcQ") === undefined && youtubeId("https://youtube.com/watch?v=short") === undefined, "다른 사이트 · http · 잘못된 id 거절");
 ok(safeHttpsUrl("https://user:pw@kosmes.or.kr") === undefined && safeHttpsUrl("data:text/html,x") === undefined && safeHttpsUrl("https://www.kosmes.or.kr") === "https://www.kosmes.or.kr/", "외부 주소 검사");
+ok(isTestCompany({ name: "[가상] 시연기업" }) && isTestCompany({ name: "(가상)한빛정밀" }) && isTestCompany({ name: "에이정밀(주)", sample: true }) && !isTestCompany({ name: "가상현실(주)" }) && !isTestCompany({ name: "주식회사 한빛" }), "시연 · 시험 기업 구분: 샘플 · [가상] · (가상)만");
 console.log(fail ? `\n${fail} FAIL` : "\nALL OK");
 process.exit(fail ? 1 : 0);
