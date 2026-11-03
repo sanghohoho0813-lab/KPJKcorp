@@ -26,13 +26,18 @@ function dateInput(d: Date) {
 
 /* ---------------- 견적 작성 ---------------- */
 
+const PERIODS = ["1개월", "2개월", "3개월", "4개월", "6개월", "12개월"];
+
 /** 작성과 수정(발송 전)이 같은 폼을 쓴다. 발송된 견적은 고객이 이미 본 금액이라 여기로 들어올 수 없다. */
-export function NewQuoteModal(props: { open: boolean; onClose: () => void; companyId?: string; quoteId?: string | null }) {
+/** 새 견적의 처음 값 — 갱신 견적처럼 기존 계약을 옮겨 시작할 때 */
+export type QuotePrefill = Partial<Pick<Quote, "projectId" | "title" | "scope" | "period" | "items">>;
+
+export function NewQuoteModal(props: { open: boolean; onClose: () => void; companyId?: string; quoteId?: string | null; prefill?: QuotePrefill }) {
   if (!props.open) return null;
   return <QuoteFormInner key={props.quoteId ?? "new"} {...props} />;
 }
 
-function QuoteFormInner({ open, onClose, companyId, quoteId }: { open: boolean; onClose: () => void; companyId?: string; quoteId?: string | null }) {
+function QuoteFormInner({ open, onClose, companyId, quoteId, prefill }: { open: boolean; onClose: () => void; companyId?: string; quoteId?: string | null; prefill?: QuotePrefill }) {
   const st = useStore();
   const create = useStore((s) => s.createQuote);
   const update = useStore((s) => s.updateQuote);
@@ -41,12 +46,12 @@ function QuoteFormInner({ open, onClose, companyId, quoteId }: { open: boolean; 
   const editing = st.quotes.find((q) => q.id === quoteId);
 
   const [company, setCompany] = useState(editing?.companyId ?? companyId ?? st.companies[0]?.id ?? "");
-  const [project, setProject] = useState(editing?.projectId ?? "");
+  const [project, setProject] = useState(editing?.projectId ?? prefill?.projectId ?? "");
   const [opp, setOpp] = useState(editing?.opportunityId ?? "");
-  const [title, setTitle] = useState(editing?.title ?? "");
-  const [scope, setScope] = useState(editing?.scope ?? "");
-  const [period, setPeriod] = useState(editing?.period ?? "3개월");
-  const [items, setItems] = useState<QuoteItem[]>(editing?.items.length ? editing.items.map((i) => ({ ...i })) : [{ name: "", amount: 0 }]);
+  const [title, setTitle] = useState(editing?.title ?? prefill?.title ?? "");
+  const [scope, setScope] = useState(editing?.scope ?? prefill?.scope ?? "");
+  const [period, setPeriod] = useState(editing?.period ?? prefill?.period ?? "3개월");
+  const [items, setItems] = useState<QuoteItem[]>(editing?.items.length ? editing.items.map((i) => ({ ...i })) : prefill?.items?.length ? prefill.items.map((i) => ({ ...i })) : [{ name: "", amount: 0 }]);
   const [discount, setDiscount] = useState(String(editing?.discountPct ?? 0));
   const [valid, setValid] = useState(() => dateInput(editing ? new Date(editing.validUntil) : addDays(new Date(), 14)));
 
@@ -130,7 +135,8 @@ function QuoteFormInner({ open, onClose, companyId, quoteId }: { open: boolean; 
         )}
         <Field label="기간">
           <Select value={period} onChange={(e) => setPeriod(e.target.value)}>
-            {["1개월", "2개월", "3개월", "4개월", "6개월", "12개월"].map((x) => <option key={x} value={x}>{x}</option>)}
+            {/* 갱신 견적 · 예전 계약의 "6주" 같은 값도 그대로 보이게 */}
+            {[...(PERIODS.includes(period) ? [] : [period]), ...PERIODS].map((x) => <option key={x} value={x}>{x}</option>)}
           </Select>
         </Field>
         <Field label="유효기간"><Input type="date" value={valid} onChange={(e) => setValid(e.target.value)} /></Field>

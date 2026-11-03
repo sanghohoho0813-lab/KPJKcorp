@@ -122,6 +122,8 @@ function TasksInner() {
                 <>
                   {/* '경과 보고 N일 공백' 규칙 업무 — 그 기업의 보고 창으로 바로. 보내면 업무는 저절로 끝난다 */}
                   {!isDone && t.companyId && t.ruleKey?.startsWith("progress_report:") && may("notice.write") && <LinkButton size="sm" variant="outline" href={`/ax/clients/${t.companyId}?report=1`}>보고 쓰기</LinkButton>}
+                  {/* '계약 만료 D-N 갱신 협의' 규칙 업무 — 그 계약의 갱신 준비 창(함께한 기록 · 다음 1년 · 갱신 견적)으로 바로 */}
+                  {!isDone && t.companyId && t.ruleKey?.startsWith("contract_renewal:") && may("notice.write") && <LinkButton size="sm" variant="outline" href={`/ax/clients/${t.companyId}?renew=${encodeURIComponent(t.ruleKey.slice("contract_renewal:".length))}`}>갱신 준비</LinkButton>}
                   {t.status === "todo" && <Button size="sm" variant="ghost" onClick={() => setStatus(t, "doing")}>시작</Button>}
                   {t.status === "hold" ? <Button size="sm" variant="ghost" onClick={() => setStatus(t, "todo")}>다시 시작</Button>
                     : !isDone && <Button size="sm" variant="ghost" onClick={() => setStatus(t, "hold")}>보류</Button>}

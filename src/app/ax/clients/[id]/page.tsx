@@ -4,7 +4,7 @@ import { CancelDocRequestButton } from "@/components/domain/portal/CancelRequest
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Building2, ClipboardList, EyeOff, Lock, Landmark, CalendarDays, ChevronDown, ChevronRight, Eye, FileCheck2, FileText, ListPlus, Mail, PhoneCall, MapPin, MessageSquare, MessageSquareText, NotebookPen, Phone, Plus, Sparkles, UserRound, Pencil, Archive, ArchiveRestore, UserPlus } from "lucide-react";
+import { ArrowLeft, Building2, ClipboardList, EyeOff, Lock, Landmark, CalendarDays, ChevronDown, ChevronRight, Eye, FileCheck2, FileText, ListPlus, Mail, PhoneCall, MapPin, MessageSquare, MessageSquareText, NotebookPen, Phone, Plus, RefreshCw, Sparkles, UserRound, Pencil, Archive, ArchiveRestore, UserPlus } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { AxInsightButton } from "@/components/ai/AxInsight";
 import { useUi } from "@/lib/ui-store";
@@ -38,6 +38,7 @@ import { ContactLine, LogContactModal, useContactStatus, useMayLogContact } from
 import { EXTRACT_METHOD_LABEL } from "@/lib/docextract";
 import { PolicyDocsModal } from "@/components/domain/client/PolicyDocs";
 import { ProgressReportModal } from "@/components/domain/client/ProgressReport";
+import { RenewalModal } from "@/components/domain/client/Renewal";
 import { Icon3D } from "@/components/domain/portal/Icon3D";
 
 type TabKey = "overview" | "work" | "vault" | "docs" | "contract" | "consult" | "schedule" | "portal" | "journal" | "history";
@@ -73,6 +74,9 @@ export default function ClientCardPage() {
   const [policyDocs, setPolicyDocs] = useState(false);
   const [report, setReport] = useState(false);
   const openReport = useCallback(() => setReport(true), []);
+  // 갱신 준비 — 열 계약(없으면 창이 알아서 고른다). undefined 면 닫힘
+  const [renew, setRenew] = useState<string | null>();
+  const openRenew = useCallback((ct: string) => setRenew(ct), []);
   const [companyDoc, setCompanyDoc] = useState(false);
   const [newTask, setNewTask] = useState(false);
   // 휴대폰에서는 머리글의 번호·연락처 줄을 접어 둔다 — 열자마자 할 일이 보이게
@@ -114,6 +118,7 @@ export default function ClientCardPage() {
     );
   }
   const { projects, active, consultations, contracts, docs, missing, waiting, schedules, upcoming, inquiries, results, activities, opps, consultant } = data;
+  const hasSigned = contracts.some((x) => x.status === "signed");
   const openIq = inquiries.filter((i) => i.status === "open");
 
   // 지금 할 일 — 이 기업에서 처리할 것을 한 목록으로 (마감·만료·연체 경고 + 자료·문의·업무·일정). 급한 것부터.
@@ -255,6 +260,7 @@ export default function ClientCardPage() {
         {may("doc.request") && <QuickAction icon={<Landmark size={16} />} label="정책자금 서류" onClick={() => setPolicyDocs(true)} />}
         {may("schedule.create") && <QuickAction icon={<CalendarDays size={16} />} label="일정 등록" onClick={() => setNewSchedule(true)} />}
         {may("notice.write") && <QuickAction icon={<ClipboardList size={16} />} label="경과 보고" onClick={() => setReport(true)} />}
+        {may("notice.write") && hasSigned && <QuickAction icon={<RefreshCw size={16} />} label="갱신 준비" onClick={() => setRenew(null)} />}
         <QuickAction icon={<MessageSquareText size={16} />} label="업무 일기" onClick={() => setTab("journal")} />
         {c.contactPhone && <a href={`tel:${c.contactPhone.replace(/[^0-9+]/g, "")}`} onClick={() => { if (mayLog) setLogContact(true); }} className="pressable flex shrink-0 items-center gap-1.5 rounded-xl border border-line bg-surface px-3.5 py-2 text-[0.88rem] font-semibold text-ink-2 hover:border-accent hover:text-ink md:hidden"><Phone size={16} className="text-accent" />전화</a>}
       </div>
@@ -383,14 +389,15 @@ export default function ClientCardPage() {
             <div key={ct.id} className="card p-4">
               <div className="flex items-center gap-2"><span className="truncate font-bold">{ct.title}</span><Badge tone={ct.status === "signed" ? "success" : ct.status === "sent" ? "warning" : "neutral"}>{ct.status === "signed" ? "서명 완료" : ct.status === "sent" ? "서명 대기" : "초안"}</Badge></div>
               <div className="mt-1 truncate text-[0.85rem] text-ink-2">{ct.scope}</div>
-              <div className="mt-2 flex flex-wrap gap-x-3 text-[0.78rem] text-ink-3"><span>{ct.period}</span><span>송부 {ct.sentAt ? fmtDate(ct.sentAt) : "-"}</span><span>서명 {ct.signedAt ? fmtDate(ct.signedAt) : "-"}</span></div>
+              <div className="mt-2 flex flex-wrap gap-x-3 text-[0.78rem] text-ink-3"><span>{ct.period}</span><span>송부 {ct.sentAt ? fmtDate(ct.sentAt) : "-"}</span><span>서명 {ct.signedAt ? fmtDate(ct.signedAt) : "-"}</span>{ct.endDate && <span>종료 {fmtDate(ct.endDate)}</span>}</div>
+              {ct.status === "signed" && may("notice.write") && <Button size="sm" variant="outline" className="mt-3" icon={<RefreshCw size={14} />} onClick={() => setRenew(ct.id)}>갱신 준비</Button>}
             </div>
           ))}
           {contracts.length === 0 && <div className="rounded-xl border border-dashed border-line-2 py-8 text-center text-[0.85rem] text-ink-3">계약 기록이 없습니다.</div>}
         </div>
         <Card className="hidden lg:block">
           <table className="tbl">
-            <thead><tr><th>계약명</th><th>프로젝트</th><th>상태</th><th>기간</th><th>송부일</th><th>서명일</th><th>범위</th></tr></thead>
+            <thead><tr><th>계약명</th><th>프로젝트</th><th>상태</th><th>기간</th><th>송부일</th><th>서명일</th><th>종료일</th><th>범위</th><th /></tr></thead>
             <tbody>
               {contracts.map((ct) => (
                 <tr key={ct.id}>
@@ -400,7 +407,9 @@ export default function ClientCardPage() {
                   <td>{ct.period}</td>
                   <td className="tnum">{ct.sentAt ? fmtDate(ct.sentAt) : "-"}</td>
                   <td className="tnum">{ct.signedAt ? fmtDate(ct.signedAt) : "-"}</td>
+                  <td className="tnum">{ct.endDate ? fmtDate(ct.endDate) : <span className="text-ink-3">-</span>}</td>
                   <td className="text-ink-2">{ct.scope}</td>
+                  <td className="text-right">{ct.status === "signed" && may("notice.write") && <Button size="sm" variant="outline" icon={<RefreshCw size={14} />} onClick={() => setRenew(ct.id)}>갱신 준비</Button>}</td>
                 </tr>
               ))}
             </tbody>
@@ -531,7 +540,8 @@ export default function ClientCardPage() {
       <NewScheduleModal open={newSchedule} onClose={() => setNewSchedule(false)} companyId={c.id} projectId={active[0]?.id} />
       <PolicyDocsModal company={c} open={policyDocs} onClose={() => setPolicyDocs(false)} />
       <ProgressReportModal company={c} open={report && may("notice.write")} onClose={() => setReport(false)} />
-      <Suspense fallback={null}><FromUrl onTab={setTab} onReport={openReport} /></Suspense>
+      <RenewalModal company={c} contractId={renew ?? undefined} open={renew !== undefined && may("notice.write")} onClose={() => setRenew(undefined)} />
+      <Suspense fallback={null}><FromUrl onTab={setTab} onReport={openReport} onRenew={openRenew} /></Suspense>
       <CompanyDocRequestModal companyId={c.id} open={companyDoc} onClose={() => setCompanyDoc(false)} />
       <LogContactModal company={c} open={logContact} onClose={() => setLogContact(false)} />
       <NewTaskModal open={newTask} onClose={() => setNewTask(false)} companyId={c.id} projectId={active[0]?.id} />
@@ -584,14 +594,18 @@ export { Stat };
  * 처음 그릴 때 window.location 으로는 못 읽는다 — 그래서 주소가 바뀔 때마다 여기서 다시 맞춘다.
  *  ?tab=vault  현황표 · 지원사업 매칭 '서류 묶음' 등에서
  *  ?report=1   업무함의 '경과 보고' 업무에서 — 보고 창을 한 번만 연다
+ *  ?renew=ct_x  업무함의 '갱신 협의' 업무에서 — 그 계약의 갱신 준비 창을 한 번만 연다
  */
-function FromUrl({ onTab, onReport }: { onTab: (t: TabKey) => void; onReport: () => void }) {
+function FromUrl({ onTab, onReport, onRenew }: { onTab: (t: TabKey) => void; onReport: () => void; onRenew: (contractId: string) => void }) {
   const sp = useSearchParams();
   const tab = sp.get("tab");
   const report = sp.get("report") === "1";
+  const renew = sp.get("renew");
   const opened = useRef(false);
+  const renewed = useRef(false);
   useEffect(() => { if (tab && TAB_KEYS.includes(tab as TabKey)) onTab(tab as TabKey); }, [tab, onTab]);
   useEffect(() => { if (report && !opened.current) { opened.current = true; onReport(); } }, [report, onReport]);
+  useEffect(() => { if (renew && !renewed.current) { renewed.current = true; onRenew(renew); } }, [renew, onRenew]);
   return null;
 }
 

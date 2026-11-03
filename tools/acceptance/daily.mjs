@@ -18,6 +18,9 @@
 // 17) 스스로 준비하기(지시서 TEST 01~10): 실제 공고 사본으로 매칭 → 관련 교육 · 공식 링크 → 직접 준비 저장 · 재접속 복원 →
 //     신청 완료 이력 → 결과 변경 후 다음 행동 · 담당자 확인 업무 → 중복 없음 → 회사 간 분리 → 비회원은 공개 학습만 →
 //     직접 진행 · 전문가 문의 경로 분리 → 새 화면 오류 · 넘침 없음 (회사는 전부 샘플 기업, 공고는 tools/acceptance/fixtures 사본)
+// 18) 갱신 준비: 업무함 '계약 만료 갱신 협의' → 그 계약의 갱신 준비 창 → 함께한 기록(기록에서만 · 금액 없음) · 다음 1년(근거) →
+//     줄 빼기 · 한마디 → 미리 보기 · 카톡용 복사 · A4 인쇄 → 갱신 견적 초안(지금 계약 그대로) → 고객에게 보내기 → 고객 휴대폰 홈 · 공지 /
+//     대표 PC: 계약 탭 '갱신 준비' · 계약 금액은 창에만 · 이 계약 기간 ↔ 첫 계약부터
 // 실행: npm run build && npm start (데모 모드) → node tools/acceptance/daily.mjs
 import fs from 'fs';
 import { execFileSync } from 'child_process';
@@ -955,6 +958,144 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
 
   // TEST 10 새 화면 오류 · 넘침 없음 (기존 기능 회귀는 이 파일의 1~16 · run.mjs · 단위 · RLS 시험)
   ok('17 TEST10 새 화면 페이지 오류 · 가로 넘침 없음', page.errs.length === 0, `${pages.size}개 화면${page.errs.length ? ' · ' + page.errs.slice(0, 2).join(' | ') : ''}`);
+  await page.context().close();
+}
+
+// ---------- 18) 갱신 준비 (컨설턴트 PC → 고객 휴대폰 → 대표 PC) ----------
+{
+  const page = await session('pc');
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin: B });
+  const dlg = () => page.locator('[role=dialog]:visible').last();
+  await go(page, '/ax/tasks');
+  let st = await dump(page);
+  const ct = st.contracts.find((x) => x.id === 'ct_c1');
+  const task = st.tasks.find((t) => t.ruleKey === 'contract_renewal:ct_c1');
+  ok('18 규칙 업무: 계약 만료 D-N 갱신 협의(담당 컨설턴트)', !!task && task.status !== 'done' && task.assigneeId === 'u_park' && /갱신 협의/.test(task.title), task?.title);
+  await page.getByRole('button', { name: '미완료', exact: true }).click(); await sleep(400);
+  const link = page.locator('a[href="/ax/clients/co_c?renew=ct_c1"]:visible').first();
+  ok('18 업무함: 갱신 협의 업무에 갱신 준비', await link.isVisible());
+  await link.click(); await page.waitForURL(/\/ax\/clients\/co_c\?renew=ct_c1/); await sleep(900);
+  const lines = dlg().getByTestId('renewal-lines');
+  const head = await dlg().getByTestId('renewal-head').innerText();
+  ok('18 갱신 준비 → 그 계약 창이 바로 열림 · 종료 D-N', await lines.isVisible() && head.includes(ct.title) && /종료 D-\d+/.test(head), head.replace(/\s+/g, ' '));
+  ok('18 빠른 작업에도 갱신 준비', await page.getByTestId('client-quick-actions').getByRole('button', { name: '갱신 준비' }).isVisible());
+  const won = (n) => [n.toLocaleString('ko-KR'), `${n / 10000}만`, `${n / 1e8}억`];
+  const modalText = await dlg().innerText();
+  ok('18 컨설턴트에게는 계약 금액이 보이지 않음(수금 권한은 대표만)', !won(ct.amount).some((w) => modalText.includes(w)), String(ct.amount));
+  const secs = await lines.locator('[data-renewal-section]').evaluateAll((els) => els.map((e) => e.getAttribute('data-renewal-section')));
+  ok('18 함께 진행한 일 · 자료 · 다음 1년 묶음이 채워짐', secs.includes('work') && secs.includes('docs') && secs.includes('next'), secs.join(','));
+  const counts = await dlg().getByTestId('renewal-counts').innerText();
+  const from = (ct.signedAt ?? '').slice(0, 10);
+  const got = st.docRequests.filter((d) => d.companyId === 'co_c' && d.status !== 'planned' && d.submittedAt && d.submittedAt.slice(0, 10) >= from).length;
+  ok('18 맨 위 숫자: 받은 자료 = 계약 이후 받은 요청자료 수', counts.replace(/\s+/g, ' ').includes(`${got} 받은 자료`), `${counts.replace(/\s+/g, ' ')} / 기록 ${got}`);
+  const nextLines = await lines.locator('[data-renewal-section=next] [data-line]').allInnerTexts();
+  ok('18 다음 1년: 줄마다 근거 · 6줄 이하', nextLines.length > 0 && nextLines.length <= 6 && nextLines.every((t) => t.includes('근거:')), nextLines.map((t) => t.replace(/\s+/g, ' ')).join(' | '));
+  const first = lines.locator('[data-renewal-section=work] [data-line]').first();
+  const offText = (await first.innerText()).trim();
+  await first.locator('input').uncheck();
+  await dlg().getByLabel('담당자 한마디').fill('시험용 한마디 RENEW-OK');
+  await dlg().getByRole('button', { name: '고객 화면 미리 보기' }).click(); await sleep(300);
+  const pv = await dlg().getByTestId('renewal-preview').innerText();
+  ok('18 미리 보기: 제목 · 날수 · 한마디 · 뺀 줄 없음 · 금액 없음', /함께한 기록 · \d{4}\.\d\d\.\d\d ~ \d+\/\d+/.test(pv) && /함께한 \d+일의 기록/.test(pv) && pv.includes('RENEW-OK') && !pv.includes(offText) && !won(ct.amount).some((w) => pv.includes(w)), offText);
+  await dlg().getByRole('button', { name: '카톡용 복사' }).click(); await sleep(300);
+  const clip = await page.evaluate(() => navigator.clipboard.readText());
+  ok('18 카톡용 복사: 제목 · 본문', clip.startsWith('함께한 기록 ·') && clip.includes('RENEW-OK') && clip.includes('■ 다음 1년에 함께 검토할 것'));
+  // A4 인쇄 — 새 탭, 고른 줄 · 한마디 그대로
+  const [pr] = await Promise.all([page.context().waitForEvent('page'), dlg().getByRole('button', { name: '인쇄' }).click()]);
+  pr.errs = []; pr.on('pageerror', (e) => pr.errs.push(String(e)));
+  await pr.waitForLoadState('networkidle'); await sleep(1200);
+  const ptxt = await pr.getByTestId('renewal-print').innerText().catch(() => '');
+  ok('18 인쇄: /print/renewal/계약 · 한마디 · 뺀 줄 없음 · 금액 없음', pr.url().endsWith('/print/renewal/ct_c1') && ptxt.includes('함께한 기록') && ptxt.includes('RENEW-OK') && !ptxt.includes(offText) && !won(ct.amount).some((w) => ptxt.includes(w)) && pr.errs.length === 0, pr.errs.join(' | '));
+  await pr.close();
+  // 갱신 견적 초안 — 지금 계약을 그대로 옮긴다
+  await dlg().getByTestId('renewal-quote').click(); await sleep(500);
+  const q = dlg();
+  const qTitle = await q.getByLabel('견적명').inputValue();
+  const qScope = await q.getByLabel('범위').inputValue();
+  const qAmount = await q.locator('input[inputmode="numeric"], input[type="number"]').first().inputValue().catch(() => '');
+  ok('18 갱신 견적: 견적명 (갱신) · 범위 + 다음 기간 시작일 · 금액 = 지금 계약', qTitle === `${ct.title} (갱신)` && qScope.startsWith(ct.scope) && /기존 계약 갱신 — \d{4}\.\d\d\.\d\d부터/.test(qScope) && Number(qAmount.replace(/[^0-9]/g, '')) * 10000 === ct.amount, `${qTitle} · ${qScope.replace(/\n/g, ' / ')} · ${qAmount}만원`);
+  const s0 = await dump(page);
+  await q.getByRole('button', { name: '저장' }).click(); await sleep(600);
+  st = await dump(page);
+  const nq = st.quotes.filter((x) => !s0.quotes.some((y) => y.id === x.id));
+  ok('18 견적 저장: 작성 중 견적 1건 · 이 기업 · 할인 없음(승인 불필요)', nq.length === 1 && nq[0].companyId === 'co_c' && nq[0].status === 'draft' && nq[0].discountPct === 0 && nq[0].items.reduce((a, i) => a + i.amount, 0) === ct.amount, nq[0]?.title);
+  ok('18 견적 창을 닫으면 갱신 준비 창(고른 내용)으로 돌아옴', await dlg().getByTestId('renewal-preview').isVisible().catch(() => false) || await dlg().getByTestId('renewal-lines').isVisible().catch(() => false));
+  const n0 = await dump(page);
+  await dlg().getByRole('button', { name: '고객에게 보내기' }).click(); await sleep(600);
+  st = await dump(page);
+  const sent = st.notices.filter((n) => !n0.notices.some((x) => x.id === n.id));
+  const r1 = sent[0];
+  ok('18 공지 한 건 · 이 기업 · 홈 고정 · 경과 보고와 구분', sent.length === 1 && r1.companyId === 'co_c' && r1.pinned === true && r1.title.startsWith('함께한 기록 ·') && !r1.title.startsWith('경과 보고'));
+  const internal = [
+    ...st.consultations.filter((x) => x.companyId === 'co_c').map((x) => x.notes.slice(0, 20)),
+    ...st.tasks.filter((x) => x.companyId === 'co_c').map((x) => x.title),
+    ...(st.payments ?? []).filter((x) => x.companyId === 'co_c').map((x) => x.label),
+  ].filter((t) => t && t.length > 5);
+  ok('18 본문: 묶음 · 한마디 · 서명 · 내부 메모 · 업무 · 수금 · 금액 없음', r1.body.includes('■ 함께 진행한 일') && r1.body.includes('■ 담당자 한마디\n시험용 한마디 RENEW-OK') && /\n— 담당 /.test(r1.body) && !internal.some((t) => r1.body.includes(t)) && !won(ct.amount).some((w) => r1.body.includes(w)), internal.find((t) => r1.body.includes(t)) ?? '');
+  const notif = st.notifications.find((n) => n.audience === 'client' && n.companyId === 'co_c' && n.title.includes('함께한 기록'));
+  ok('18 고객 알림 한 건', !!notif);
+  ok('18 PC 오류 없음', page.errs.length === 0, page.errs.slice(0, 2).join(' | '));
+  // 데모 저장본을 고객 휴대폰(다른 브라우저)으로 옮긴다 — 로그인만 비우고
+  const storeKey = await page.evaluate(() => Object.keys(localStorage).find((k) => { try { return !!JSON.parse(localStorage.getItem(k) ?? 'null')?.state; } catch { return false; } }));
+  const saved = await page.evaluate((k) => { const s = JSON.parse(localStorage.getItem(k)); s.state.session = null; return JSON.stringify(s); }, storeKey);
+
+  // 고객 휴대폰 — 같은 브라우저 저장본으로(데모 모드)
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await ctx.addInitScript(() => { try { localStorage.setItem('kpjk-test', '1'); } catch {} });
+  const ph = await ctx.newPage();
+  ph.errs = []; ph.on('pageerror', (e) => ph.errs.push(String(e)));
+  await ph.route('**/*', (r) => (r.request().url().startsWith(B) ? r.continue() : r.abort()));
+  await ph.goto(B + '/login', { waitUntil: 'networkidle' });
+  await ph.evaluate(([k, v]) => localStorage.setItem(k, v), [storeKey, saved]);
+  await ph.reload({ waitUntil: 'networkidle' });
+  await ph.getByLabel('아이디 (이메일)').fill('han@cmfood.demo');
+  await ph.locator('input[type=password]').first().fill('client2026!');
+  await ph.getByRole('button', { name: '로그인' }).click();
+  await ph.waitForURL('**/portal**'); await sleep(1200);
+  await ph.getByRole('button', { name: /건너뛰기/ }).first().click({ timeout: 800 }).catch(() => {});
+  const strip = await ph.getByTestId('pinned-strip').innerText().catch(() => '');
+  ok('18 고객 홈 맨 위: 담당자가 정리한 기록', strip.includes('담당자가 정리한 기록') && strip.includes('함께한 기록 ·'), strip.replace(/\s+/g, ' '));
+  await go(ph, '/portal/schedule'); await sleep(500);
+  const body = await ph.locator('#notices').innerText().catch(() => '');
+  ok('18 고객 공지: 묶음 제목 · 다음 1년 · 한마디', body.includes('함께 진행한 일') && body.includes('다음 1년에 함께 검토할 것') && body.includes('RENEW-OK') && !body.includes('■'));
+  ok('18 고객 휴대폰 가로 넘침 · 오류 없음', (await overflow(ph)) <= 0 && ph.errs.length === 0, `${await overflow(ph)}px ${ph.errs.slice(0, 2).join(' | ')}`);
+  await ctx.close();
+  await page.context().close();
+}
+{
+  const page = await session('pc', ['ceo@kpjk.co.kr', 'kpjk2026!']);
+  const dlg = () => page.locator('[role=dialog]:visible').last();
+  await go(page, '/ax/clients/co_a?tab=contract');
+  const btns = page.locator('table.tbl').getByRole('button', { name: '갱신 준비' });
+  const st = await dump(page);
+  const signed = st.contracts.filter((x) => x.companyId === 'co_a' && x.status === 'signed');
+  ok('18 대표 계약 탭: 서명 계약마다 갱신 준비 · 종료일 칸', (await btns.count()) === signed.length && (await page.locator('table.tbl thead').innerText()).includes('종료일'), `${await btns.count()} / ${signed.length}`);
+  await btns.first().click(); await sleep(600);
+  const head = await dlg().getByTestId('renewal-head').innerText();
+  const ct = signed[0];
+  ok('18 대표에게는 계약 금액(창에만 · 고객용 글에는 안 넣음)', head.includes('계약 ') && head.includes('고객용 글에는 넣지 않음'), head.replace(/\s+/g, ' '));
+  const range = dlg().getByTestId('renewal-range');
+  const before = await dlg().getByTestId('renewal-counts').innerText();
+  ok('18 앞선 계약이 있으면 이 계약 기간 ↔ 첫 계약부터', await range.isVisible());
+  const p1 = await dlg().locator('p').filter({ hasText: /\d+일 · 고객에게/ }).first().innerText();
+  await range.getByRole('button', { name: /첫 계약부터/ }).click(); await sleep(400);
+  const p2 = await dlg().locator('p').filter({ hasText: /\d+일 · 고객에게/ }).first().innerText();
+  const d1 = +(/(\d+)일 ·/.exec(p1)?.[1] ?? 0), d2 = +(/(\d+)일 ·/.exec(p2)?.[1] ?? 0);
+  ok('18 첫 계약부터: 날수가 늘고 그 기간 기록으로 다시 셈', d2 > d1, `${d1}일 → ${d2}일 · ${before.replace(/\s+/g, ' ')} → ${(await dlg().getByTestId('renewal-counts').innerText()).replace(/\s+/g, ' ')}`);
+  ok('18 대표 PC 오류 없음', page.errs.length === 0, page.errs.slice(0, 2).join(' | '));
+  void ct;
+  await page.context().close();
+}
+{
+  // 컨설턴트 휴대폰 — 갱신 준비 창의 아래 단추가 화면 안에 다 들어오는지(잘림 · 가로 넘침 없음)
+  const page = await session('mobile');
+  await go(page, '/ax/clients/co_c?renew=ct_c1'); await sleep(600);
+  const dlg = page.locator('[role=dialog]:visible').last();
+  const boxes = await dlg.getByRole('button').filter({ hasText: /카톡용 복사|고객에게 보내기|인쇄/ }).evaluateAll((els) => els.filter((e) => e.offsetParent).map((e) => { const r = e.getBoundingClientRect(); return { t: e.textContent.trim(), l: Math.round(r.left), r: Math.round(r.right) }; }));
+  ok('18 휴대폰: 아래 단추 잘림 없음(인쇄는 PC 에서) · 가로 넘침 없음', boxes.length === 2 && boxes.every((x) => x.l >= 0 && x.r <= 390) && (await overflow(page)) <= 0, JSON.stringify(boxes));
+  const cells = await dlg.getByTestId('renewal-counts').evaluate((el) => [...el.children].map((c) => Math.round(c.getBoundingClientRect().top)));
+  ok('18 휴대폰: 숫자 칸 한 줄', cells.length > 0 && new Set(cells).size === 1, JSON.stringify(cells));
+  ok('18 휴대폰 오류 없음', page.errs.length === 0, page.errs.slice(0, 2).join(' | '));
   await page.context().close();
 }
 

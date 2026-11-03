@@ -12,13 +12,13 @@ let fail = 0;
 const ok = (c: boolean, m: string) => { console.log(`${c ? "OK  " : "FAIL"} ${m}`); if (!c) fail++; };
 
 // ---- 사례 2: 빈 번호('')는 서버로 보낼 때 null — 빈 글자를 보내면 없는 프로젝트를 가리켜 외래키 위반으로 묶음 전체가 거절됐다
-const act = activityToRow({ id: "ac_t", type: "document_uploaded", companyId: "co_a", projectId: "", actorId: "", actorRole: "client", at: "2026-10-29T00:00:00Z", message: "제출" } as Activity);
+const act = activityToRow({ id: "ac_t", type: "document_uploaded", companyId: "co_a", projectId: "", actorId: "c_a", actorRole: "client", at: "2026-10-29T00:00:00Z", text: "제출" } satisfies Activity);
 ok(act.project_id === null, `활동 기록: projectId '' → project_id ${JSON.stringify(act.project_id)}`);
 ok(docRequestToRow({ id: "dr_t", projectId: "", companyId: "co_a" }).project_id === null, "자료 요청: projectId '' → null");
 ok(taskToRow({ id: "tk_t", projectId: "", companyId: "co_a" }).project_id === null, "업무: projectId '' → null");
 ok(scheduleToRow({ id: "sc_t", projectId: "", companyId: "co_a" }).project_id === null, "일정: projectId '' → null");
 ok(notificationToRow({ id: "nt_t", companyId: "" }).company_id === null, "알림: companyId '' → null");
-ok(activityToRow({ id: "ac_u", type: "x", companyId: "co_a", projectId: "pj_a1", actorRole: "client", at: "2026-10-29T00:00:00Z", message: "m" } as Activity).project_id === "pj_a1", "값이 있으면 그대로(pj_a1)");
+ok(activityToRow({ id: "ac_u", type: "document_uploaded", companyId: "co_a", projectId: "pj_a1", actorId: "c_a", actorRole: "client", at: "2026-10-29T00:00:00Z", text: "m" } satisfies Activity).project_id === "pj_a1", "값이 있으면 그대로(pj_a1)");
 
 // ---- 사례 3: PostgREST 처럼 한 번에 최대 1000줄만 주는 가짜 서버로 2,500줄 · 1,429줄 표를 읽는다
 const MAX_ROWS = 1000;
