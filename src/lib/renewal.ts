@@ -1,10 +1,10 @@
-import type { Activity, Company, Consultation, Contract, DocumentRequest, Inquiry, Notice, Opportunity, Project, Quote, QuoteItem, ResultFile, Schedule, SelfRun, SupportProgram } from "./types";
+import type { Activity, Company, Consultation, Contract, DocumentRequest, Inquiry, Notice, Opportunity, Project, Quote, QuoteItem, ResultFile, Schedule, SelfRun, SupportProgram, Task } from "./types";
 import { CUSTOMER_STEPS, stageToCustomerStep } from "./stages";
 import { growthBoard } from "./growth";
 import { certSuggestions, certView } from "./company-snapshot";
 import { isReport, localDay, md } from "./progress-report";
 import { APPLIED_OR_LATER } from "./self-run";
-import { daysFromTo, todayYmd } from "./vault";
+import { addMonthsYmd, daysFromTo, todayYmd } from "./vault";
 
 /**
  * 갱신 준비 — 계약 기간에 실제로 함께한 일을 기록에서 모으고, 다음 1년에 검토할 것을 근거와 함께 고른다.
@@ -245,3 +245,95 @@ export function renewalQuoteDraft(ct: Contract, quotes: Quote[], start?: string)
 
 /** 다음 기간 시작일 — 종료일 다음 날(종료일이 없으면 오늘) */
 export const renewalStart = (ct: Pick<Contract, "endDate">, today = todayYmd()) => (ct.endDate ? plusDaysYmd(ct.endDate.slice(0, 10), 1) : today);
+
+/* ------------------------------------------------------------------ 갱신 고리 — 종료일 · 갱신 견적 상태 · 업무 마무리 */
+
+const GAENGSIN = /\(갱신\)\s*$/;
+const FROM_SCOPE = /기존 계약 갱신 — (\d{4})\.(\d{2})\.(\d{2})부터/;
+
+/** 갱신 견적 · 갱신 계약의 범위 끝에 적힌 다음 기간 시작일 */
+export function renewalStartFromScope(scope: string | undefined): string | undefined {
+  const m = FROM_SCOPE.exec(scope ?? "");
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : undefined;
+}
+
+/**
+ * 시작일 + 기간 글자 → 종료일. "6개월" · "10주" · "1년" · "2026.03 ~ 2026.12(.31)" 만 읽는다.
+ * 읽지 못하면 undefined — 지어내지 않는다. 6개월(7/1 시작)은 12/31 까지(끝나는 날 포함).
+ */
+export function periodEnd(start: string, period: string | undefined): string | undefined {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start)) return undefined;
+  const p = (period ?? "").replace(/\s+/g, "");
+  // 날짜로 적힌 기간: 2026.03~2026.12 · 2026-03-02~2026-12-31
+  const range = /[~\-–—]\s*(\d{4})[.\-/](\d{1,2})(?:[.\-/](\d{1,2}))?\.?$/.exec((period ?? "").trim());
+  if (range && /\d{4}[.\-/]\d{1,2}/.test((period ?? "").split(/[~–—]/)[0] ?? "")) {
+    const y = Number(range[1]); const mo = Number(range[2]);
+    if (mo < 1 || mo > 12) return undefined;
+    const day = range[3] ? Number(range[3]) : new Date(y, mo, 0).getDate();
+    const end = `${y}-${pad(mo)}-${pad(day)}`;
+    return end >= start ? end : undefined;
+  }
+  const y = /^(\d{1,2})년/.exec(p); const mo = /^(\d{1,3})개월/.exec(p); const w = /^(\d{1,3})주/.exec(p);
+  if (mo || y) {
+    const next = addMonthsYmd(start, mo ? Number(mo[1]) : Number(y![1]) * 12);
+    return next ? plusDaysYmd(next, -1) : undefined;
+  }
+  if (w) return plusDaysYmd(start, Number(w[1]) * 7 - 1);
+  return undefined;
+}
+
+/**
+ * 종료일이 비어 있는 계약에 권할 종료일 — 시작(갱신이면 범위에 적힌 다음 기간 시작일, 아니면 서명일) + 기간.
+ * 권할 뿐이다: 계약 창에서 대표가 눌러야 들어간다.
+ */
+export function suggestedEndDate(ct: Pick<Contract, "period" | "scope" | "signedAt">): { end: string; start: string; basis: "renewal" | "signed" } | undefined {
+  const fromScope = renewalStartFromScope(ct.scope);
+  const start = fromScope ?? (ct.signedAt ? localDay(ct.signedAt) : undefined);
+  if (!start) return undefined;
+  const end = periodEnd(start, ct.period);
+  return end ? { end, start, basis: fromScope ? "renewal" : "signed" } : undefined;
+}
+
+/** 서명됐는데 종료일이 없는 계약 — 만료 전 갱신 협의 업무가 만들어지지 않는다 */
+export const missingEndContracts = (contracts: Contract[]) => contracts.filter((c) => c.status === "signed" && !c.endDate);
+
+/**
+ * 이 계약의 갱신 견적 — 같은 기업 · (계약에 프로젝트가 있으면) 같은 프로젝트 · 제목이 "(갱신)"으로 끝나고 계약 서명 뒤에 만든 것.
+ * 여러 개면 살아 있는 것(보류가 아닌 것) → 최근 것.
+ */
+export function renewalQuoteFor(ct: Contract, quotes: Quote[]): Quote | undefined {
+  const base = ct.title.replace(GAENGSIN, "").trim();
+  const since = ct.signedAt ?? ct.sentAt ?? "";
+  const mine = quotes.filter((q) => q.companyId === ct.companyId && GAENGSIN.test(q.title) && q.createdAt >= since
+    && (q.title.replace(GAENGSIN, "").trim() === base || (!!ct.projectId && q.projectId === ct.projectId)));
+  return mine.sort((a, b) => Number(a.status === "declined") - Number(b.status === "declined") || b.createdAt.localeCompare(a.createdAt))[0];
+}
+
+export type RenewalStage = "none" | "quote_draft" | "quote_sent" | "accepted" | "declined" | "renewed";
+export const RENEWAL_STAGE_LABEL: Record<RenewalStage, string> = {
+  none: "갱신 준비 전", quote_draft: "갱신 견적 작성 중", quote_sent: "갱신 견적 발송 · 회신 대기", accepted: "고객 수락 · 계약 전환 전", declined: "갱신 견적 보류", renewed: "갱신 계약 진행",
+};
+
+/** 계약의 갱신 진행 — 갱신 견적 상태로만 판단한다(견적 없이 구두로 갱신한 것은 알 수 없다) */
+export function renewalStage(ct: Contract, quotes: Quote[]): { stage: RenewalStage; quote?: Quote } {
+  const q = renewalQuoteFor(ct, quotes);
+  if (!q) return { stage: "none" };
+  const stage: RenewalStage = q.status === "converted" ? "renewed" : q.status === "accepted" ? "accepted" : q.status === "sent" ? "quote_sent" : q.status === "declined" ? "declined" : "quote_draft";
+  return { stage, quote: q };
+}
+
+/**
+ * 새 계약이 서명되면 끝낼 '갱신 협의' 업무 — 그 계약이 어떤 계약의 갱신인지 확실할 때만.
+ *  ① 같은 프로젝트의 앞선 계약에 걸린 갱신 협의 업무
+ *  ② 프로젝트가 다르면: 새 계약이 갱신 계약(제목 "(갱신)" · 범위에 다음 기간 시작일)이고 그 기업의 열린 갱신 협의 업무가 하나뿐일 때
+ * 애매하면 아무것도 끝내지 않는다 — 담당자가 직접 끝낸다.
+ */
+export function renewalTasksToClose(signed: Contract, contracts: Contract[], tasks: Pick<Task, "id" | "ruleKey" | "status" | "companyId">[]): string[] {
+  const open = tasks.filter((t) => t.companyId === signed.companyId && t.ruleKey?.startsWith("contract_renewal:") && t.status !== "done");
+  const oldOf = (t: Pick<Task, "ruleKey">) => contracts.find((c) => c.id === t.ruleKey!.slice("contract_renewal:".length));
+  const cands = open.filter((t) => { const old = oldOf(t); return !!old && old.id !== signed.id; });
+  const sameProject = cands.filter((t) => !!signed.projectId && oldOf(t)!.projectId === signed.projectId);
+  if (sameProject.length) return sameProject.map((t) => t.id);
+  const isRenewal = GAENGSIN.test(signed.title) || !!renewalStartFromScope(signed.scope);
+  return isRenewal && cands.length === 1 ? [cands[0].id] : [];
+}

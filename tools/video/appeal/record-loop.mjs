@@ -162,7 +162,7 @@ await record('d-status', async ({ mark, box }) => {
 });
 
 // ---------- E. 고객 휴대폰: 재제출 ----------
-await record('e-resubmit', async ({ mark, box }) => {
+await record('e-resubmit', async ({ mark }) => {
   await sleep(300);
   const rv = p.locator('li, div').filter({ hasText: '법인등기부등본' }).filter({ has: p.getByRole('button', { name: '재제출' }) }).last();
   await tap(rv.getByRole('button', { name: '재제출' })); mark('open'); await sleep(800);

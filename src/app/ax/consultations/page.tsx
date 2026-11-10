@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ChevronDown, ClipboardList, FileSignature, Plus, Receipt, ShieldCheck, Sparkles, Pencil } from "lucide-react";
+import { ChevronDown, ClipboardList, Plus, Receipt, ShieldCheck, Sparkles, Pencil } from "lucide-react";
 import { useStore, quoteNet } from "@/lib/store";
 import { AxInsightButton } from "@/components/ai/AxInsight";
 import { useUi } from "@/lib/ui-store";
@@ -13,6 +13,7 @@ import { SearchBox } from "@/components/domain/domain";
 import { NewConsultationModal } from "@/components/domain/ConsultationModal";
 import { ContractModal, useMay } from "@/components/domain/EntityModals";
 import { NewQuoteModal, QuoteDetailModal, QUOTE_STATUS } from "@/components/domain/QuoteModals";
+import { ContractBoard } from "@/components/domain/ContractBoard";
 import type { Consultation, Quote } from "@/lib/types";
 
 const CS_TYPES: Consultation["type"][] = ["초기상담", "후속상담", "정기미팅", "대표미팅"];
@@ -162,46 +163,7 @@ function ConsultationsInner() {
             <div className="flex items-start gap-2 text-[0.8rem] text-ink-3"><ShieldCheck size={14} className="mt-0.5 shrink-0" /> 할인이 포함된 견적은 대표 승인 전에는 발송 버튼이 열리지 않습니다.</div>
           </div>
         ) : (
-          <>
-          <div className="space-y-2 lg:hidden">
-            {contracts.map((ct) => (
-              <div key={ct.id} className="card p-4" onClick={() => may("contract.manage") && setEditContract(ct.id)} role={may("contract.manage") ? "button" : undefined}>
-                <div className="flex items-center gap-2">
-                  <Link href={`/ax/clients/${ct.companyId}`} onClick={(e) => e.stopPropagation()} className="-my-2 truncate py-2 font-bold hover:text-accent">{st.companies.find((c) => c.id === ct.companyId)?.name}</Link>
-                  <Badge tone={ct.status === "signed" ? "success" : ct.status === "sent" ? "warning" : "neutral"}>{ct.status === "signed" ? "서명 완료" : ct.status === "sent" ? "서명 대기" : "초안"}</Badge>
-                </div>
-                <div className="mt-1 text-[0.88rem] font-semibold">{ct.title}</div>
-                <div className="mt-0.5 truncate text-[0.82rem] text-ink-2">{ct.scope}</div>
-                <div className="mt-2 flex flex-wrap gap-x-3 text-[0.78rem] text-ink-3">
-                  <span>{ct.period}</span>
-                  <span>송부 {ct.sentAt ? fmtDate(ct.sentAt) : "-"}</span>
-                  <span>서명 {ct.signedAt ? fmtDate(ct.signedAt) : "-"}</span>
-                </div>
-
-              </div>
-            ))}
-          </div>
-          <Card className="hidden lg:block">
-            <table className="tbl">
-              <thead><tr><th>기업</th><th>계약명</th><th>프로젝트</th><th>상태</th><th>기간</th><th>종료일</th><th>금액</th><th>서명</th></tr></thead>
-              <tbody>
-                {contracts.map((ct) => (
-                  <tr key={ct.id} className={may("contract.manage") ? "row-clickable" : undefined} onClick={() => may("contract.manage") && setEditContract(ct.id)}>
-                    <td className="font-semibold"><Link href={`/ax/clients/${ct.companyId}`} onClick={(e) => e.stopPropagation()} className="hover:text-accent">{st.companies.find((c) => c.id === ct.companyId)?.name}</Link></td>
-                    <td>{ct.title}</td>
-                    <td><Link href={`/ax/projects/${ct.projectId}`} onClick={(e) => e.stopPropagation()} className="text-ink-2 hover:text-accent">{st.projects.find((p) => p.id === ct.projectId)?.name}</Link></td>
-                    <td><Badge tone={ct.status === "signed" ? "success" : ct.status === "sent" ? "warning" : "neutral"}>{ct.status === "signed" ? "서명 완료" : ct.status === "sent" ? "서명 대기" : "초안"}</Badge></td>
-                    <td>{ct.period}</td>
-                    <td className="tnum">{ct.endDate ? fmtDate(ct.endDate) : <span className="text-ink-3">미입력</span>}</td>
-                    <td className="tnum font-semibold">{ct.amount ? fmtWon(ct.amount) : <span className="font-normal text-ink-3">-</span>}</td>
-                    <td className="tnum">{ct.signedAt ? fmtDate(ct.signedAt) : "-"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <div className="flex items-center gap-2 border-t border-line px-5 py-3 text-[0.8rem] text-ink-3"><FileSignature size={14} /> 전자서명 연동은 향후 확장(NEXT) 항목입니다. 현재는 상태를 수동으로 관리합니다.</div>
-          </Card>
-          </>
+          <ContractBoard contracts={contracts} onEdit={may("contract.manage") ? setEditContract : undefined} />
         )}
       </div>
       <NewConsultationModal open={newConsult} onClose={() => setNewConsult(false)} />

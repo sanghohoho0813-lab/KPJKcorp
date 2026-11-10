@@ -1,6 +1,6 @@
 // 실제 사용 그대로: 대표가 PC에서 기업 3곳 등록(서류 읽기 포함) → 자동 갱신 2번 지나도 그대로 → 휴대폰 로그인에서도 3곳
 // 사용: node realuse.mjs   (setup.sql 직후 대표 계정만 있는 상태에서도 된다)
-import { launch, ctxFor, login, B, ACC, L, ok, sql, body, summary } from './lib.mjs';
+import { launch, ctxFor, login, B, ACC, ok, sql, body, summary } from './lib.mjs';
 const DOC = process.env.BIZREG_PDF || new URL('./files/', import.meta.url).pathname + 'pilot-a1.txt';
 const b = await launch();
 const { p } = await ctxFor(b, 'pc');

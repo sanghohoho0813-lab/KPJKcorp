@@ -27,7 +27,7 @@ ok(regionsIn("충청남도 소재 기업").join() === "충남" && regionsIn("(�
 
 // 2) 매칭
 const factory = { region: "경기", industry: "제조업 금속가공", foundedYear: 2015, employees: 20, entityType: "corporation" as const };
-let m = matchProgram(a, factory, now);
+const m = matchProgram(a, factory, now);
 ok(!!m && m.reasons.some((r) => r === "지역 맞음: 경기") && m.reasons.some((r) => r.startsWith("업종 맞음: 제조")) && m.reasons.includes("마감 4일 남음"), "지역·업종·마감 근거 " + m?.reasons.join("/"));
 ok(matchProgram(a, { ...factory, region: "부산" }, now) === null, "다른 지역 전용 공고는 뺀다");
 ok(matchProgram(a, factory, new Date("2026-10-06T09:00:00")) === null, "마감 지난 공고는 뺀다");

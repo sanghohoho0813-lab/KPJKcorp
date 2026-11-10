@@ -11,6 +11,7 @@ import { Confirm, Modal } from "@/components/ui/overlay";
 import { Button, Field, Input, Select, Textarea } from "@/components/ui/ui";
 import { Chip } from "@/components/ui/chips";
 import { KPJK_CONSULTING, KPJK_CONSULTING_ALL, projectNameOf } from "@/lib/company-options";
+import { dotDay, renewalTasksToClose, suggestedEndDate } from "@/lib/renewal";
 
 function dateTimeInput(iso?: string) {
   const d = iso ? new Date(iso) : new Date();
@@ -456,6 +457,8 @@ function ContractModalInner({ open, contractId, companyId, onClose }: { open: bo
   const [err, setErr] = useState<Record<string, string | undefined>>({});
 
   const projects = st.projects.filter((p) => p.companyId === cid && !p.archived);
+  // 종료일이 비어 있으면 서명일(갱신 계약은 다음 기간 시작일) + 기간으로 권한다 — 누르기 전에는 들어가지 않는다
+  const suggest = endDate ? undefined : suggestedEndDate({ period, scope, signedAt: signedAt ? `${signedAt}T09:00:00` : undefined });
 
   const submit = () => {
     const e: Record<string, string | undefined> = {};
@@ -473,13 +476,17 @@ function ContractModalInner({ open, contractId, companyId, onClose }: { open: bo
       signedAt: signedAt ? new Date(`${signedAt}T09:00:00`).toISOString() : undefined,
       sentAt: editing?.sentAt ?? (status !== "draft" ? new Date().toISOString() : undefined),
     };
+    // 이번 저장으로 서명 완료가 되면: 앞선 계약의 '갱신 협의' 업무가 함께 끝난다 / 종료일이 없으면 다음 갱신 알림이 안 잡힌다
+    const signing = status === "signed" && editing?.status !== "signed";
+    const closing = signing ? renewalTasksToClose({ ...data, id: editing?.id ?? "", source: editing?.source }, st.contracts, st.tasks).length : 0;
+    const tail = `${closing ? ` 갱신 협의 업무 ${closing}건을 완료로 정리했습니다.` : ""}${status === "signed" && !data.endDate ? " 종료일이 없어 만료 전 갱신 알림은 잡히지 않습니다." : ""}`;
     if (editing) {
       update(editing.id, data, me);
-      toast("계약을 수정했습니다.");
+      toast(`계약을 수정했습니다.${tail}`);
     } else {
       const id = create(data, me);
       if (!id) { toast("계약을 등록할 권한이 없습니다.", "error"); return; }
-      toast(`계약을 등록했습니다.${data.endDate ? " 종료 30일 전에 갱신 협의 업무가 자동으로 잡힙니다." : ""}`);
+      toast(`계약을 등록했습니다.${data.endDate ? " 종료 30일 전에 갱신 협의 업무가 자동으로 잡힙니다." : ""}${tail}`);
     }
     onClose();
   };
@@ -520,7 +527,17 @@ function ContractModalInner({ open, contractId, companyId, onClose }: { open: bo
           <Field label="계약명 *" hint={err.title}><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="예: 경영진단 컨설팅 계약" autoFocus /></Field>
         </div>
         <Field label="기간 표기 *" hint={err.period}><Input value={period} onChange={(e) => setPeriod(e.target.value)} placeholder="예: 2026.03 ~ 2026.12" /></Field>
-        <Field label="종료일" hint="입력하면 30일 전에 갱신 협의 업무가 자동으로 잡힙니다"><Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></Field>
+        <div>
+          <Field label="종료일" hint="입력하면 30일 전에 갱신 협의 업무가 자동으로 잡힙니다"><Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></Field>
+          {suggest ? (
+            <button type="button" onClick={() => setEndDate(suggest.end)} data-testid="contract-end-suggest"
+              className="pressable mt-1.5 inline-flex min-h-9 items-center rounded-lg bg-soft px-2.5 text-left text-[0.8rem] font-semibold text-accent">
+              {dotDay(suggest.end)} 넣기 <span className="ml-1.5 font-normal text-ink-2">{suggest.basis === "renewal" ? "다음 기간" : "서명일"} {dotDay(suggest.start)} + {period.trim()}</span>
+            </button>
+          ) : status === "signed" && !endDate ? (
+            <p className="mt-1.5 text-[0.8rem] font-semibold text-warning" data-testid="contract-end-missing">종료일이 없으면 만료 전 갱신 알림이 잡히지 않습니다.</p>
+          ) : null}
+        </div>
         <Field label="계약 금액">
           <div className="flex items-center gap-2">
             <Input inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0" />

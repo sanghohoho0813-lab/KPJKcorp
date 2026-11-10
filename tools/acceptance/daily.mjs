@@ -21,6 +21,9 @@
 // 18) 갱신 준비: 업무함 '계약 만료 갱신 협의' → 그 계약의 갱신 준비 창 → 함께한 기록(기록에서만 · 금액 없음) · 다음 1년(근거) →
 //     줄 빼기 · 한마디 → 미리 보기 · 카톡용 복사 · A4 인쇄 → 갱신 견적 초안(지금 계약 그대로) → 고객에게 보내기 → 고객 휴대폰 홈 · 공지 /
 //     대표 PC: 계약 탭 '갱신 준비' · 계약 금액은 창에만 · 이 계약 기간 ↔ 첫 계약부터
+// 19) 갱신 고리: 계약 현황판(만료 임박 가까운 순 · D-day) → 종료일 없는 서명 계약 경고 → 서명일 + 기간으로 종료일 채우기 →
+//     갱신 견적은 한 번만(다시 누르면 진행 상태) → 발송 → 고객 수락 → 계약 전환 → 현황판 '갱신됨' →
+//     갱신 계약 서명(다음 기간 시작일 + 기간으로 종료일) → 앞선 계약의 '갱신 협의' 업무 자동 완료
 // 실행: npm run build && npm start (데모 모드) → node tools/acceptance/daily.mjs
 import fs from 'fs';
 import { execFileSync } from 'child_process';
@@ -31,7 +34,7 @@ const CHROME = process.env.CHROME_PATH || (fs.existsSync(SANDBOX_CHROME) ? SANDB
 const B = process.env.APP_URL || 'http://localhost:3000';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let okN = 0, failN = 0;
-const ok = (name, cond, info = '') => { console.log(`${name}: ${cond ? 'OK' : 'FAIL'}${info ? ' ' + info : ''}`); cond ? okN++ : failN++; };
+const ok = (name, cond, info = '') => { console.log(`${name}: ${cond ? 'OK' : 'FAIL'}${info ? ' ' + info : ''}`); if (cond) okN++; else failN++; };
 
 // 한글 파일 이름(내려받기·올리기)은 브라우저가 UTF-8 언어 설정일 때만 그대로 나온다 — 아니면 'download'로 바뀐다
 const browser = await pw.chromium.launch({ executablePath: CHROME, env: { ...process.env, LANG: 'C.UTF-8', LC_ALL: 'C.UTF-8' } });
@@ -1096,6 +1099,138 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
   const cells = await dlg.getByTestId('renewal-counts').evaluate((el) => [...el.children].map((c) => Math.round(c.getBoundingClientRect().top)));
   ok('18 휴대폰: 숫자 칸 한 줄', cells.length > 0 && new Set(cells).size === 1, JSON.stringify(cells));
   ok('18 휴대폰 오류 없음', page.errs.length === 0, page.errs.slice(0, 2).join(' | '));
+  await page.context().close();
+}
+
+// ---------- 19) 갱신 고리 (대표 PC → 고객 → 대표 PC) ----------
+{
+  const page = await session('pc', ['ceo@kpjk.co.kr', 'kpjk2026!']);
+  const dlg = () => page.locator('[role=dialog]:visible').last();
+  const toasts = () => page.getByTestId('toasts').innerText().catch(() => '');
+  const relogin = async (id, pwd, to) => {
+    await page.evaluate(() => window.__kpjkState().logout());
+    await page.goto(B + '/login', { waitUntil: 'networkidle' });
+    await page.getByLabel('아이디 (이메일)').fill(id);
+    await page.locator('input[type=password]').first().fill(pwd);
+    await page.getByRole('button', { name: '로그인' }).click();
+    await page.waitForURL(to); await sleep(1200);
+    await page.getByRole('button', { name: /건너뛰기/ }).first().click({ timeout: 800 }).catch(() => {});
+    await page.getByLabel(/튜토리얼 닫기|이용 안내 닫기/).click({ timeout: 800 }).catch(() => {});
+  };
+  // 이 브라우저의 오늘(앱과 같은 기준) · 날짜 계산
+  const today = await page.evaluate(() => { const d = new Date(); const p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; });
+  const utc = (ymd) => Date.UTC(+ymd.slice(0, 4), +ymd.slice(5, 7) - 1, +ymd.slice(8, 10));
+  const ymdOf = (ms) => new Date(ms).toISOString().slice(0, 10);
+  const localDay = (iso) => page.evaluate((v) => { const d = new Date(v); const p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; }, iso);
+  const plus = (ymd, n) => ymdOf(utc(ymd) + n * 864e5);
+  const addMonths = (ymd, m) => { const y = +ymd.slice(0, 4), mo = +ymd.slice(5, 7) - 1 + m, d = +ymd.slice(8, 10); const ty = y + Math.floor(mo / 12), tm = ((mo % 12) + 12) % 12; const last = new Date(Date.UTC(ty, tm + 1, 0)).getUTCDate(); return `${ty}-${String(tm + 1).padStart(2, '0')}-${String(Math.min(d, last)).padStart(2, '0')}`; };
+  const dot = (ymd) => ymd.replace(/-/g, '.');
+  const rowsOf = () => page.locator('table.tbl tbody tr[data-contract]').evaluateAll((els) => els.map((e) => e.getAttribute('data-contract')));
+
+  // A. 계약 현황판 — 만료 임박은 가까운 순, D-day 는 기록대로
+  await go(page, '/ax/consultations?tab=contract');
+  let st = await dump(page);
+  const signed = st.contracts.filter((c) => c.status === 'signed');
+  const leftOf = {};
+  for (const c of signed) if (c.endDate) leftOf[c.id] = Math.round((utc(await localDay(c.endDate)) - utc(today)) / 864e5);
+  const soon = signed.filter((c) => c.endDate && leftOf[c.id] <= 60 && leftOf[c.id] >= -60).sort((a, b) => leftOf[a.id] - leftOf[b.id]).map((c) => c.id);
+  const views = (await page.getByTestId('contract-views').innerText()).replace(/\s+/g, ' ');
+  ok('19 계약 현황판: 전체 · 만료 임박 건수 = 기록', views.includes(`전체 ${st.contracts.length}`) && views.includes(`만료 임박 ${soon.length}`) && !views.includes('종료일 없음'), views);
+  await page.getByTestId('contract-views').getByRole('button', { name: /만료 임박/ }).click(); await sleep(300);
+  ok('19 만료 임박: 종료일 가까운 순(지난 것 먼저)', JSON.stringify(await rowsOf()) === JSON.stringify(soon), `${(await rowsOf()).join(',')} / ${soon.join(',')}`);
+  const c1Row = await page.locator('tr[data-contract="ct_c1"]').innerText();
+  ok('19 D-day 배지 = 종료일까지 남은 날 · 갱신 준비 버튼', c1Row.includes(`D-${leftOf.ct_c1}`) && c1Row.includes('갱신 준비'), c1Row.replace(/\s+/g, ' '));
+  const past = soon.find((id) => leftOf[id] < 0);
+  ok('19 지난 계약은 N일 지남', !past || (await page.locator(`tr[data-contract="${past}"]`).innerText()).includes(`${-leftOf[past]}일 지남`));
+
+  // B. 종료일이 빠진 서명 계약 → 경고 → 서명일 + 기간으로 채우기
+  await page.getByTestId('contract-views').getByRole('button', { name: /전체/ }).click(); await sleep(300);
+  await page.locator('tr[data-contract="ct_b1"]').click(); await sleep(500);
+  await dlg().locator('input[type=date]').first().fill(''); await sleep(200);
+  const b1 = st.contracts.find((c) => c.id === 'ct_b1');
+  const b1Signed = await localDay(b1.signedAt);
+  const b1End = plus(b1Signed, 6 * 7 - 1); // 기간 '6주'
+  const sgText = await dlg().getByTestId('contract-end-suggest').innerText().catch(() => '');
+  ok('19 계약 창: 종료일이 비면 서명일 + 기간으로 권함', sgText.includes(`${dot(b1End)} 넣기`) && sgText.includes(`서명일 ${dot(b1Signed)} + ${b1.period}`), sgText.replace(/\s+/g, ' '));
+  await dlg().getByRole('button', { name: '저장' }).click(); await sleep(500);
+  st = await dump(page);
+  ok('19 종료일 없이 저장: 안내 · 권한 날짜가 저절로 들어가지 않음', !st.contracts.find((c) => c.id === 'ct_b1').endDate && (await toasts()).includes('수정했습니다'));
+  const banner = page.getByTestId('contract-noend-banner');
+  ok('19 현황판 경고: 종료일 없는 서명 계약 1건', (await banner.innerText().catch(() => '')).includes('종료일이 없는 계약 1건'));
+  await banner.click(); await sleep(300);
+  ok('19 종료일 없음 보기: 그 계약만', JSON.stringify(await rowsOf()) === JSON.stringify(['ct_b1']));
+  await page.locator('tr[data-contract="ct_b1"]').click(); await sleep(500);
+  await dlg().getByTestId('contract-end-suggest').click(); await sleep(200);
+  ok('19 권한 날짜를 누르면 종료일 칸에 들어감', (await dlg().locator('input[type=date]').first().inputValue()) === b1End);
+  await dlg().getByRole('button', { name: '저장' }).click(); await sleep(500);
+  st = await dump(page);
+  ok('19 저장 뒤: 종료일 기록 · 경고 사라짐', (await localDay(st.contracts.find((c) => c.id === 'ct_b1').endDate)) === b1End && (await banner.count()) === 0);
+
+  // C. 갱신 고리 — 갱신 견적(한 번만) → 발송 → 고객 수락 → 계약 전환 → 서명 → 갱신 협의 업무 자동 완료
+  const old = st.contracts.find((c) => c.id === 'ct_c1');
+  const oldEnd = await localDay(old.endDate);
+  const s0done = Object.fromEntries(st.tasks.filter((t) => t.status === 'done').map((t) => [t.id, true]));
+  ok('19 시작: 이 계약의 갱신 협의 업무가 열려 있음', st.tasks.some((t) => t.ruleKey === 'contract_renewal:ct_c1' && t.status !== 'done'));
+  await go(page, '/ax/clients/co_c?renew=ct_c1'); await sleep(600);
+  await dlg().getByTestId('renewal-quote').click(); await sleep(500);
+  await dlg().getByRole('button', { name: '저장' }).click(); await sleep(600);
+  const open1 = await dlg().getByTestId('renewal-quote-open').innerText().catch(() => '');
+  ok('19 갱신 견적은 한 번만: 만든 뒤에는 진행 상태(만들기 버튼 없음)', open1.includes('갱신 견적 작성 중') && (await dlg().getByTestId('renewal-quote').count()) === 0, open1);
+  await dlg().getByTestId('renewal-quote-open').getByRole('link').click(); await page.waitForURL(/\/ax\/consultations\?tab=quote/); await sleep(700);
+  st = await dump(page);
+  const q0 = st.quotes.find((q) => q.companyId === 'co_c' && /\(갱신\)$/.test(q.title));
+  await page.locator('div.card', { hasText: q0.title }).first().click(); await sleep(500);
+  await dlg().getByRole('button', { name: '고객에게 발송' }).click(); await sleep(600);
+  st = await dump(page);
+  ok('19 갱신 견적 발송', st.quotes.find((q) => q.id === q0.id).status === 'sent');
+  await go(page, '/ax/consultations?tab=contract');
+  ok('19 현황판: 갱신 견적 발송 · 회신 대기', (await page.locator('tr[data-contract="ct_c1"]').innerText()).includes('갱신 견적 발송 · 회신 대기'));
+  await relogin('han@cmfood.demo', 'client2026!', /\/portal/);
+  await go(page, '/portal/services');
+  await page.getByRole('button', { name: '이대로 진행할게요' }).first().click(); await sleep(400);
+  await dlg().getByRole('button', { name: '회신 보내기' }).click(); await sleep(600);
+  st = await dump(page);
+  ok('19 고객 수락', st.quotes.find((q) => q.id === q0.id).status === 'accepted');
+  await relogin('ceo@kpjk.co.kr', 'kpjk2026!', /\/ax\//);
+  await go(page, '/ax/consultations?tab=quote');
+  await page.locator('div.card', { hasText: q0.title }).first().click(); await sleep(500);
+  await dlg().getByRole('button', { name: '계약으로 전환' }).click(); await sleep(600);
+  st = await dump(page);
+  const nc = st.contracts.find((c) => c.id === st.quotes.find((q) => q.id === q0.id).contractId);
+  ok('19 계약 전환: 갱신 계약(서명 대기 · 같은 프로젝트 · 다음 기간 시작일)', !!nc && nc.status === 'sent' && nc.projectId === old.projectId && nc.title === q0.title && nc.scope.includes(`기존 계약 갱신 — ${dot(plus(oldEnd, 1))}부터`) && !nc.endDate, nc?.scope?.replace(/\n/g, ' / '));
+  ok('19 아직 서명 전: 갱신 협의 업무는 그대로', st.tasks.some((t) => t.ruleKey === 'contract_renewal:ct_c1' && t.status !== 'done'));
+  await go(page, '/ax/consultations?tab=contract');
+  const oldRow = await page.locator('tr[data-contract="ct_c1"]').innerText();
+  ok('19 현황판: 앞선 계약 갱신됨 · 갱신 준비 버튼 없음', oldRow.includes('갱신됨') && oldRow.includes('갱신 계약 진행') && !oldRow.includes('갱신 준비'), oldRow.replace(/\s+/g, ' '));
+  await page.getByTestId('contract-views').getByRole('button', { name: /만료 임박/ }).click(); await sleep(300);
+  ok('19 만료 임박에서 빠짐', !(await rowsOf()).includes('ct_c1'));
+  await page.getByTestId('contract-views').getByRole('button', { name: /전체/ }).click(); await sleep(300);
+  await page.locator(`tr[data-contract="${nc.id}"]`).click(); await sleep(500);
+  await dlg().locator('select').filter({ has: page.locator('option[value="signed"]') }).selectOption('signed'); await sleep(200);
+  await dlg().locator('input[type=date]').nth(1).fill(today); await sleep(300);
+  const nEnd = plus(addMonths(plus(oldEnd, 1), parseInt(nc.period, 10)), -1);
+  const sg2 = await dlg().getByTestId('contract-end-suggest').innerText().catch(() => '');
+  ok('19 갱신 계약 서명: 서명일이 아니라 다음 기간 시작일 + 기간으로 권함', /개월/.test(nc.period) && sg2.includes(`${dot(nEnd)} 넣기`) && sg2.includes(`다음 기간 ${dot(plus(oldEnd, 1))} + ${nc.period}`), sg2.replace(/\s+/g, ' '));
+  await dlg().getByTestId('contract-end-suggest').click(); await sleep(200);
+  await dlg().getByRole('button', { name: '저장' }).click(); await sleep(700);
+  const t2 = await toasts();
+  st = await dump(page);
+  const closed = st.tasks.find((t) => t.ruleKey === 'contract_renewal:ct_c1');
+  const nc2 = st.contracts.find((c) => c.id === nc.id);
+  ok('19 서명 저장: 앞선 계약의 갱신 협의 업무 자동 완료 · 안내', closed.status === 'done' && !!closed.completedAt && t2.includes('갱신 협의 업무 1건을 완료로 정리했습니다'), t2.replace(/\s+/g, ' '));
+  ok('19 갱신 계약: 서명 완료 · 종료일 = 다음 기간 + 기간(다음 갱신 알림이 다시 잡힘)', nc2.status === 'signed' && (await localDay(nc2.endDate)) === nEnd, `${nc2.endDate}`);
+  ok('19 다른 계약의 갱신 협의 업무는 건드리지 않음', st.tasks.filter((t) => t.ruleKey?.startsWith('contract_renewal:') && t.ruleKey !== 'contract_renewal:ct_c1').every((t) => t.status !== 'done' || !!s0done[t.id]));
+  ok('19 페이지 오류 없음', page.errs.length === 0, page.errs.slice(0, 2).join(' | '));
+  await page.context().close();
+}
+{
+  // 휴대폰(대표) — 계약 현황판: 종료일 · D-day · 갱신 준비, 가로 넘침 없음
+  const page = await session('mobile', ['ceo@kpjk.co.kr', 'kpjk2026!']);
+  await go(page, '/ax/consultations?tab=contract');
+  const card = page.locator('[data-contract="ct_c1"]:visible').first();
+  const txt = (await card.innerText().catch(() => '')).replace(/\s+/g, ' ');
+  ok('19 휴대폰 계약 카드: 종료일 · D-day · 갱신 준비', /종료 \d+월 \d+일/.test(txt) && /D-\d+/.test(txt) && txt.includes('갱신 준비'), txt);
+  ok('19 휴대폰 가로 넘침 · 오류 없음', (await overflow(page)) <= 0 && page.errs.length === 0, `${await overflow(page)}px ${page.errs.slice(0, 2).join(' | ')}`);
   await page.context().close();
 }
 

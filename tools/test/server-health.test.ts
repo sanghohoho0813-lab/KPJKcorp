@@ -8,7 +8,7 @@ const fake=(o:{session?:boolean; missing?:string[]; noCol?:boolean; role?:string
   storage:{from:(b)=>({list:async()=>({error:o.noBucket?.includes(b)?{message:"Bucket not found"}:null})})},
 });
 const URL_="https://abcdefgh.supabase.co"; const f200=async()=>({ok:true,status:200});
-const st=(r:any[])=>r.map(i=>i.key+":"+i.status).join(" ");
+const st=(r:{key:string;status:string}[])=>r.map(i=>i.key+":"+i.status).join(" ");
 (async()=>{
   ok(keyRole(jwt("anon"))==="anon" && keyRole(jwt("service_role"))==="service_role" && keyRole("sb_secret_abc")==="service_role" && keyRole("sb_publishable_x")==="anon","keyRole");
   let r=await runServerCheck({client:null}); ok(r.length===1&&r[0].status==="fail"&&!!r[0].fix,"no env");

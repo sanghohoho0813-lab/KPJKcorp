@@ -46,7 +46,8 @@ export function SearchTrigger({ compact }: { compact?: boolean }) {
   return (
     <button
       onClick={open}
-      className="pressable flex h-9 w-[220px] items-center gap-2 rounded-[10px] border border-line-2 bg-surface px-3 text-left text-[0.85rem] text-ink-3 hover:border-accent hover:bg-surface-2 xl:w-[280px]"
+      // min-w-0 + shrink: 머리줄이 좁으면 검색창이 먼저 줄어든다(글자는 말줄임) — 다른 단추를 화면 밖으로 밀지 않는다
+      className="pressable flex h-9 w-[220px] min-w-0 shrink items-center gap-2 rounded-[10px] border border-line-2 bg-surface px-3 text-left text-[0.85rem] text-ink-3 hover:border-accent hover:bg-surface-2 xl:w-[280px]"
       aria-label="검색 열기"
     >
       <Search size={16} className="shrink-0" />

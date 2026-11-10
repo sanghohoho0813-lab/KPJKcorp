@@ -110,7 +110,9 @@ export default function RoadmapPage() {
 
       {/* 2. 현재 작동 근거 */}
       <Card className="p-5">
-        <SectionTitle action={<span className="text-[0.75rem] text-ink-3">{st.serverMode ? "서버 운영 데이터 기준" : "데모 샘플 데이터 기준"} · 이 화면을 연 순간의 숫자</span>}>현재 작동하고 있다는 근거</SectionTitle>
+        {/* 기준 안내는 글이 길어 좁은 휴대폰(360px)에서 제목 옆에 두면 화면을 밀어낸다 — 휴대폰에서는 제목 아래 줄로 */}
+        <SectionTitle className="max-md:mb-1" action={<span className="text-[0.75rem] text-ink-3 max-md:hidden">{st.serverMode ? "서버 운영 데이터 기준" : "데모 샘플 데이터 기준"} · 이 화면을 연 순간의 숫자</span>}>현재 작동하고 있다는 근거</SectionTitle>
+        <p className="mb-3 text-[0.75rem] text-ink-3 md:hidden">{st.serverMode ? "서버 운영 데이터 기준" : "데모 샘플 데이터 기준"} · 이 화면을 연 순간의 숫자</p>
         <div className="grid grid-cols-2 gap-2.5 md:grid-cols-5" data-testid="roadmap-proof">
           {proof.map((p) => (
             <div key={p.label} className="rounded-xl border border-line px-3.5 py-3">

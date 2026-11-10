@@ -1,5 +1,5 @@
 // 지속성 + 보조 Loop: 새로고침·로그아웃·재로그인·다른 브라우저 / 문의·답변·상담요청 / 격리
-import { launch, ctxFor, login, logout, B, ACC, CO1, L, ok, sql, body, toasts, summary, state } from './lib.mjs';
+import { launch, ctxFor, login, logout, B, ACC, L, ok, sql, body, summary, state } from './lib.mjs';
 const b = await launch();
 const TAG = 'P' + Date.now().toString().slice(-5);
 // --- 고객1: 문의 (PC)

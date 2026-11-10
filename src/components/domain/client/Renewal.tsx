@@ -7,9 +7,9 @@ import { can } from "@/lib/permissions";
 import { fmtWon } from "@/lib/format";
 import { todayYmd } from "@/lib/vault";
 import { md } from "@/lib/progress-report";
-import { buildRenewal, dotDay, lastRenewalFor, relationStart, renewalBody, renewalContract, renewalQuoteDraft, renewalStart, renewalTitle, type RenewalSource } from "@/lib/renewal";
+import { buildRenewal, dotDay, lastRenewalFor, relationStart, renewalBody, renewalContract, renewalQuoteDraft, renewalStage, renewalStart, renewalTitle, RENEWAL_STAGE_LABEL, type RenewalSource } from "@/lib/renewal";
 import type { Company } from "@/lib/types";
-import { Badge, Button, SegmentedControl, Select, Textarea, cx } from "@/components/ui/ui";
+import { Badge, Button, LinkButton, SegmentedControl, Select, Textarea, cx } from "@/components/ui/ui";
 import { Modal } from "@/components/ui/overlay";
 import { NoticeBody } from "@/components/domain/Notices";
 import { NewQuoteModal } from "@/components/domain/QuoteModals";
@@ -59,6 +59,9 @@ function Inner({ company: c, initial, onClose }: { company: Company; initial?: s
   const [pinned, setPinned] = useState(true);
   const [quote, setQuote] = useState(false);
   const last = lastRenewalFor(st.notices, c.id);
+  // 이미 만든 갱신 견적이 살아 있으면 또 만들지 않는다(보류된 견적만 있을 때는 새로 만들 수 있다)
+  const renew = contract ? renewalStage(contract, st.quotes) : undefined;
+  const liveQuote = renew && renew.stage !== "none" && renew.stage !== "declined";
 
   const signer = st.users.find((u) => u.id === c.consultantId) ?? st.users.find((u) => u.id === me);
   const signature = signer ? `담당 ${signer.name} ${signer.title}`.trim() : undefined;
@@ -139,11 +142,18 @@ function Inner({ company: c, initial, onClose }: { company: Company; initial?: s
 
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                 <SegmentedControl value={view} onChange={setView} options={[{ key: "pick", label: `내용 고르기 ${picked}` }, { key: "preview", label: "고객 화면 미리 보기" }]} />
-                {can(role, "quote.create") && <Button size="sm" variant="outline" icon={<FileText size={15} />} onClick={() => setQuote(true)} data-testid="renewal-quote">갱신 견적 만들기</Button>}
+                {liveQuote
+                  ? <span data-testid="renewal-quote-open"><LinkButton size="sm" variant="outline" className="gap-1.5" href="/ax/consultations?tab=quote" icon={<FileText size={15} />}>{RENEWAL_STAGE_LABEL[renew!.stage]}</LinkButton></span>
+                  : can(role, "quote.create") && <Button size="sm" variant="outline" icon={<FileText size={15} />} onClick={() => setQuote(true)} data-testid="renewal-quote">{renew?.stage === "declined" ? "갱신 견적 다시 만들기" : "갱신 견적 만들기"}</Button>}
               </div>
 
               {view === "pick" ? (
                 <div className="mt-3 space-y-3" data-testid="renewal-lines">
+                  {record.sections.length === 0 && (
+                    <p className="rounded-xl bg-surface-2 px-4 py-5 text-center text-[0.86rem] text-ink-2" data-testid="renewal-none">
+                      이 기간에 고객에게 보여 줄 기록이 아직 없습니다. 아래 한마디만 적어 보낼 수 있습니다.
+                    </p>
+                  )}
                   {record.sections.map((s) => (
                     <section key={s.key} data-renewal-section={s.key}>
                       <h4 className="mb-1 text-[0.82rem] font-bold text-ink-2">{s.title}</h4>

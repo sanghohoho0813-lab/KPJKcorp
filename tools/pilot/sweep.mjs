@@ -1,5 +1,5 @@
 // 서버 모드 전 화면 — 오해를 부르는 데모 표시가 남았는지 (대표·컨설턴트·고객, PC·모바일)
-import { launch, ctxFor, login, B, ACC, L, ok, sql, summary, state } from './lib.mjs';
+import { launch, ctxFor, login, B, ACC, L, ok, sql, summary } from './lib.mjs';
 const PAT = /DEMO|데모|Demo|샘플|브라우저에만|브라우저 안에서|이 브라우저|시연용|가상|예시 데이터/g;
 const AX = ['/ax/dashboard', '/ax/brief', '/ax/tasks', '/ax/opportunities', '/ax/clients', '/ax/clients?view=board', '/ax/consultations', '/ax/projects', '/ax/documents', '/ax/results', '/ax/inquiries', '/ax/schedule', '/ax/reports', '/ax/baseline', '/ax/coach', '/ax/survey', '/ax/why', '/ax/settings'];
 const PORTAL = ['/portal', '/portal/projects', '/portal/documents', '/portal/results', '/portal/inquiries', '/portal/schedule', '/portal/services', '/portal/notifications', '/portal/me'];

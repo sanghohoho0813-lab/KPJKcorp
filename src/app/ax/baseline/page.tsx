@@ -174,8 +174,9 @@ function BaselineInner({ phase }: { phase: BaselinePhase }) {
       </p>
 
       {/* 이동 바 — 스크롤 중에도 항상 보이게 */}
-      <div className="fixed inset-x-0 bottom-[var(--bottomnav-h)] z-20 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur lg:bottom-0 lg:left-[var(--sidebar-w)]">
-        <div className="mx-auto flex max-w-2xl items-center gap-2">
+      {/* 좁은 휴대폰(360px)에서 단추 셋이 3px 넘쳤다 — 여백을 조금 줄인다 */}
+      <div className="fixed inset-x-0 bottom-[var(--bottomnav-h)] z-20 border-t border-line bg-surface/95 px-3 py-3 backdrop-blur sm:px-4 lg:bottom-0 lg:left-[var(--sidebar-w)]">
+        <div className="mx-auto flex max-w-2xl items-center gap-1.5 sm:gap-2">
           <Button variant="outline" size="sm" icon={<ArrowLeft size={15} />} disabled={step === 0} onClick={() => go(step - 1)}>이전</Button>
           <Button variant="ghost" size="sm" icon={<Save size={15} />} onClick={() => keep()}>임시저장</Button>
           <span className="flex-1" />

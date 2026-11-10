@@ -1,6 +1,6 @@
 // 갱신 준비 — 계약 기간(서명일 ~ 오늘)에 실제로 함께한 일, 고객에게 안 보이는 기록 빼기, 다음 1년 제안(근거 · 6줄),
 // 본문(금액 없음 · 뺀 줄 · 한마디 · 서명) · 제목, 갱신 견적 초안, 다음 기간 시작일. 기업 · 기록은 지어낸 것.
-import { buildRenewal, contractStart, isRenewalNotice, lastRenewalFor, relationStart, renewalBody, renewalContract, renewalNext, renewalQuoteDraft, renewalStart, renewalTitle, RENEWAL_PREFIX } from "../../src/lib/renewal";
+import { buildRenewal, contractStart, isRenewalNotice, lastRenewalFor, missingEndContracts, periodEnd, relationStart, renewalQuoteFor, renewalStage, renewalStartFromScope, renewalTasksToClose, suggestedEndDate, renewalBody, renewalContract, renewalNext, renewalQuoteDraft, renewalStart, renewalTitle, RENEWAL_PREFIX } from "../../src/lib/renewal";
 import { isReport } from "../../src/lib/progress-report";
 import type { Activity, Company, Consultation, Contract, DocumentRequest, Inquiry, Notice, Opportunity, Project, Quote, ResultFile, Schedule, SelfRun } from "../../src/lib/types";
 
@@ -175,6 +175,37 @@ const qm = renewalQuoteDraft({ ...contract, id: "ct_m", source: "manual" }, quot
 ok(qm.items.length === 1 && qm.items[0].name === "경영진단 컨설팅 계약" && qm.items[0].amount === 18_000_000, "직접 등록한 계약: 계약 금액 한 줄");
 ok(renewalQuoteDraft({ ...contract, id: "ct_m", title: "연간 자문 (갱신)" }, []).title === "연간 자문 (갱신)", "이미 갱신 계약이면 '(갱신)'을 두 번 붙이지 않는다");
 ok(renewalStart(contract) === "2027-01-01" && renewalStart({ endDate: "2026-02-28" }) === "2026-03-01" && renewalStart({}, "2026-11-03") === "2026-11-03", "다음 기간 시작: 종료 다음 날(해 · 달 넘김) · 없으면 오늘");
+
+// 7) 갱신 고리 — 종료일 · 갱신 견적 상태 · 갱신 계약 서명 시 끝낼 업무
+ok(periodEnd("2026-07-01", "6개월") === "2026-12-31" && periodEnd("2026-01-31", "1개월") === "2026-02-27" && periodEnd("2026-03-01", "12개월") === "2027-02-28", "N개월: 끝나는 날 포함(7/1 + 6개월 = 12/31) · 말일 넘김");
+ok(periodEnd("2026-09-01", "10주") === "2026-11-09" && periodEnd("2026-09-01", "6 주") === "2026-10-12" && periodEnd("2026-01-01", "1년") === "2026-12-31", "N주 · N년");
+ok(periodEnd("2026-03-02", "2026.03 ~ 2026.12") === "2026-12-31" && periodEnd("2026-03-02", "2026-03-02 ~ 2026-11-15") === "2026-11-15" && periodEnd("2026-03-02", "2026.3 ~ 2027.2") === "2027-02-28", "날짜로 적힌 기간: 끝 달의 말일 · 끝 날짜 그대로");
+ok(periodEnd("2026-07-01", "협의 후 결정") === undefined && periodEnd("2026-07-01", "") === undefined && periodEnd("2026-07-01", "2025.01 ~ 2025.12") === undefined && periodEnd("7월 1일", "6개월") === undefined, "읽지 못하는 기간 · 시작보다 앞선 끝 · 잘못된 시작일은 권하지 않는다");
+ok(renewalStartFromScope("원가 진단\n기존 계약 갱신 — 2027.01.01부터") === "2027-01-01" && renewalStartFromScope("원가 진단") === undefined, "범위에 적힌 다음 기간 시작일");
+const sg1 = suggestedEndDate({ period: "6개월", scope: "원가 진단", signedAt: "2026-07-01T03:00:00Z" });
+ok(sg1?.end === "2026-12-31" && sg1.basis === "signed", "종료일 제안: 서명일 + 기간");
+const sg2 = suggestedEndDate({ period: "6개월", scope: "원가 진단\n기존 계약 갱신 — 2027.01.01부터", signedAt: "2026-12-20T03:00:00Z" });
+ok(sg2?.end === "2027-06-30" && sg2.start === "2027-01-01" && sg2.basis === "renewal", "갱신 계약: 서명일이 아니라 다음 기간 시작일 + 기간");
+ok(suggestedEndDate({ period: "6개월", scope: "", signedAt: undefined }) === undefined && suggestedEndDate({ period: "별도 협의", scope: "", signedAt: "2026-07-01T03:00:00Z" }) === undefined, "서명일이 없거나 기간을 못 읽으면 권하지 않는다");
+ok(missingEndContracts([contract, { ...contract, id: "ct_noend", endDate: undefined }, { ...contract, id: "ct_sent", status: "sent", endDate: undefined }]).map((c) => c.id).join() === "ct_noend", "종료일 없는 서명 계약만(서명 전 계약은 아직 아님)");
+
+const rq = (id: string, status: Quote["status"], extra: Partial<Quote> = {}): Quote => ({ id, companyId: "co_t", projectId: "pj_main", title: "경영진단 컨설팅 계약 (갱신)", scope: "", period: "6개월", items: [{ name: "a", amount: 1 }], discountPct: 0, validUntil: "2026-12-30T14:59:00Z", status, createdBy: "u1", createdAt: "2026-11-03T03:00:00Z", ...extra });
+ok(renewalStage(contract, quotes).stage === "none", "갱신 견적이 없으면 준비 전(전환된 원래 견적은 갱신 견적이 아님)");
+ok(renewalStage(contract, [...quotes, rq("r1", "draft")]).stage === "quote_draft" && renewalStage(contract, [rq("r1", "sent")]).stage === "quote_sent" && renewalStage(contract, [rq("r1", "accepted")]).stage === "accepted" && renewalStage(contract, [rq("r1", "converted")]).stage === "renewed", "갱신 견적 상태 → 작성 중 · 회신 대기 · 수락 · 갱신 계약");
+ok(renewalQuoteFor(contract, [rq("old", "declined", { createdAt: "2026-11-01T00:00:00Z" }), rq("new", "draft", { createdAt: "2026-11-02T00:00:00Z" })])?.id === "new" && renewalStage(contract, [rq("old", "declined")]).stage === "declined", "보류된 견적보다 살아 있는 견적 · 보류뿐이면 보류");
+ok(renewalQuoteFor(contract, [rq("x", "draft", { companyId: "co_x" }), rq("before", "draft", { createdAt: "2026-06-01T00:00:00Z" }), rq("other", "draft", { projectId: "pj_else", title: "다른 일 (갱신)" })]) === undefined, "다른 기업 · 계약 서명 전에 만든 것 · 다른 프로젝트의 다른 계약은 제외");
+ok(renewalQuoteFor({ ...contract, projectId: "" }, [rq("t", "draft", { projectId: undefined })])?.id === "t", "프로젝트 없는 계약은 제목으로 찾는다");
+
+const tk = (id: string, ruleKey: string | undefined, status = "todo", companyId = "co_t") => ({ id, ruleKey, status: status as "todo" | "done", companyId });
+const oldA: Contract = { ...contract, id: "ct_a", projectId: "pj_a" };
+const oldB: Contract = { ...contract, id: "ct_b", projectId: "pj_b" };
+const signedNew: Contract = { ...contract, id: "ct_new", projectId: "pj_a", title: "경영진단 컨설팅 계약 (갱신)", scope: "x\n기존 계약 갱신 — 2027.01.01부터" };
+const tasks = [tk("t_a", "contract_renewal:ct_a"), tk("t_b", "contract_renewal:ct_b"), tk("t_x", "contract_renewal:ct_zz", "todo", "co_x"), tk("t_done", "contract_renewal:ct_a", "done"), tk("t_other", "progress_report:co_t"), tk("t_plain", undefined)];
+ok(renewalTasksToClose(signedNew, [oldA, oldB, signedNew], tasks).join() === "t_a", "같은 프로젝트의 앞선 계약에 걸린 갱신 협의만 끝낸다(다른 계약 · 끝난 업무 · 다른 규칙 · 다른 기업 제외)");
+ok(renewalTasksToClose({ ...signedNew, projectId: "pj_new" }, [oldA, oldB], tasks).length === 0, "프로젝트가 다르고 열린 갱신 협의가 둘이면 애매 — 아무것도 끝내지 않는다");
+ok(renewalTasksToClose({ ...signedNew, projectId: "pj_new" }, [oldA], [tk("t_a", "contract_renewal:ct_a")]).join() === "t_a", "프로젝트가 달라도 갱신 계약이고 열린 갱신 협의가 하나뿐이면 끝낸다");
+ok(renewalTasksToClose({ ...contract, id: "ct_plain", projectId: "pj_new", title: "새 프로젝트 계약", scope: "별건" }, [oldA], [tk("t_a", "contract_renewal:ct_a")]).length === 0, "갱신 표시가 없는 다른 프로젝트 계약은 갱신으로 보지 않는다");
+ok(renewalTasksToClose(oldA, [oldA], [tk("t_a", "contract_renewal:ct_a")]).length === 0, "자기 자신의 갱신 협의는 끝내지 않는다(같은 계약을 고쳐 저장한 경우)");
 
 console.log(fail ? `\n실패 ${fail}` : "\n전부 통과");
 process.exit(fail ? 1 : 0);

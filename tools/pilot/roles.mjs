@@ -1,6 +1,6 @@
 // 역할·권한 분리 · 대표 보기 전환 · 고객 대신 접수 · 요청 취소(고객/공고 알림/자료 요청) — 실서버
 // setup.mjs 다음에 돌린다(대표·컨설턴트·고객 2 · 기업 A/B 가 있는 상태). 값은 시험용(비식별).
-import { launch, ctxFor, login, logout, B, ACC, CO1, ok, sql, body, summary } from './lib.mjs';
+import { launch, ctxFor, login, B, ACC, CO1, ok, sql, body, summary } from './lib.mjs';
 
 const STAFF = { id: 'staff@pilot.test', pw: 'PilotStaff!2026', name: '파일럿 사무직원' };
 const TAG = Date.now().toString(36).slice(-4);

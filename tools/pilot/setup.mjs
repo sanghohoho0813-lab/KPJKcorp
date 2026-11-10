@@ -1,5 +1,5 @@
 // 파일럿 준비: 대표 로그인 → 컨설턴트 계정 → 기업 2곳 → 고객 계정 2개 → 프로젝트 → 자료요청 (전부 앱 화면으로)
-import { launch, ctxFor, login, B, ACC, CO1, CO2, L, ok, sql, body, toasts, summary, closeTut } from './lib.mjs';
+import { launch, ctxFor, login, B, ACC, CO1, CO2, L, ok, sql, body, toasts, summary } from './lib.mjs';
 const b = await launch();
 const { p } = await ctxFor(b, 'pc');
 
@@ -74,8 +74,8 @@ async function createDocReq(pid, name) {
 }
 
 await createUser('consultant', ACC.con);
-const co1 = await createCompany(CO1);
-const co2 = await createCompany(CO2);
+await createCompany(CO1);
+await createCompany(CO2);
 await createUser('client', ACC.c1, CO1);
 await createUser('client', ACC.c2, CO2);
 const pj1 = await createProject(CO1, 'Pilot 벤처확인 준비 (A)');

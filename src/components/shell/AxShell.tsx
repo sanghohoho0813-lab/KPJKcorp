@@ -334,12 +334,14 @@ function Header() {
         {/* 서버가 아니면(데모·이 기기에만 저장) 휴대폰에서도 늘 보이게 — 자세한 것은 메뉴 맨 위 */}
         {!serverMode && <DemoBadge className="shrink-0" compact />}
       </div>
-      <div className="hidden items-center gap-3 lg:flex">
+      {/* PC: 왼쪽 묶음이 남는 폭을 가져가고, 검색창이 그 안에서 줄어든다 — 1024~1100 · 1280 · 1536px 창에서
+          검색창이 고정 폭이라 머리줄이 화면보다 넓어져(42~118px) 로그아웃 단추가 밖으로 밀렸다 */}
+      <div className="hidden min-w-0 flex-1 items-center gap-3 lg:flex">
         <SearchTrigger />
-        <span className="hdr-optional hidden xl:flex"><LiveClock compact /></span>
+        <span className="hdr-optional hidden shrink-0 xl:flex"><LiveClock compact /></span>
         <DemoBadge className="hdr-optional hidden 2xl:inline-flex" />
       </div>
-      <div className="flex-1" />
+      <div className="flex-1 lg:hidden" />
       <div className="hidden items-center gap-1 lg:flex">
         {/* 대표/직원 전환 버튼을 제거했다 — 버튼 하나로 권한이 바뀌면 권한 체계가 성립하지 않는다.
             역할은 로그인한 계정으로만 정해진다. */}

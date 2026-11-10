@@ -395,21 +395,22 @@ export default function ClientCardPage() {
           ))}
           {contracts.length === 0 && <div className="rounded-xl border border-dashed border-line-2 py-8 text-center text-[0.85rem] text-ink-3">계약 기록이 없습니다.</div>}
         </div>
-        <Card className="hidden lg:block">
+        {/* 칸을 줄였다(프로젝트 · 범위는 계약명 아래 줄로) — 1024~1280px 창에서 표가 화면을 밀어냈다. 그래도 좁으면 표만 옆으로 민다 */}
+        <Card className="hidden overflow-x-auto lg:block">
           <table className="tbl">
-            <thead><tr><th>계약명</th><th>프로젝트</th><th>상태</th><th>기간</th><th>송부일</th><th>서명일</th><th>종료일</th><th>범위</th><th /></tr></thead>
+            <thead><tr><th>계약</th><th>상태</th><th>기간</th><th>서명일</th><th>종료일</th><th /></tr></thead>
             <tbody>
               {contracts.map((ct) => (
                 <tr key={ct.id}>
-                  <td className="font-semibold">{ct.title}</td>
-                  <td>{st.projects.find((p) => p.id === ct.projectId)?.name}</td>
-                  <td><Badge tone={ct.status === "signed" ? "success" : ct.status === "sent" ? "warning" : "neutral"}>{ct.status === "signed" ? "서명 완료" : ct.status === "sent" ? "서명 대기" : "초안"}</Badge></td>
-                  <td>{ct.period}</td>
-                  <td className="tnum">{ct.sentAt ? fmtDate(ct.sentAt) : "-"}</td>
-                  <td className="tnum">{ct.signedAt ? fmtDate(ct.signedAt) : "-"}</td>
-                  <td className="tnum">{ct.endDate ? fmtDate(ct.endDate) : <span className="text-ink-3">-</span>}</td>
-                  <td className="text-ink-2">{ct.scope}</td>
-                  <td className="text-right">{ct.status === "signed" && may("notice.write") && <Button size="sm" variant="outline" icon={<RefreshCw size={14} />} onClick={() => setRenew(ct.id)}>갱신 준비</Button>}</td>
+                  <td>
+                    <div className="font-semibold">{ct.title}</div>
+                    <div className="text-[0.82rem] text-ink-2">{[st.projects.find((p) => p.id === ct.projectId)?.name, ct.scope.split("\n")[0]].filter(Boolean).join(" · ")}</div>
+                  </td>
+                  <td className="whitespace-nowrap"><Badge tone={ct.status === "signed" ? "success" : ct.status === "sent" ? "warning" : "neutral"}>{ct.status === "signed" ? "서명 완료" : ct.status === "sent" ? "서명 대기" : "초안"}</Badge></td>
+                  <td className="whitespace-nowrap">{ct.period}</td>
+                  <td className="tnum whitespace-nowrap">{ct.signedAt ? fmtDate(ct.signedAt) : <span className="text-ink-3">{ct.sentAt ? `송부 ${fmtDate(ct.sentAt)}` : "-"}</span>}</td>
+                  <td className="tnum whitespace-nowrap">{ct.endDate ? fmtDate(ct.endDate) : <span className="text-ink-3">-</span>}</td>
+                  <td className="whitespace-nowrap text-right">{ct.status === "signed" && may("notice.write") && <Button size="sm" variant="outline" icon={<RefreshCw size={14} />} onClick={() => setRenew(ct.id)}>갱신 준비</Button>}</td>
                 </tr>
               ))}
             </tbody>

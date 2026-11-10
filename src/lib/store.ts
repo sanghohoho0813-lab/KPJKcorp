@@ -58,6 +58,7 @@ import { REPORT_PREFIX, lastReportFor, localDay, reportSeenAt } from "./progress
 import { guessTaskType } from "./quick-task";
 import { CUSTOMER_STEPS, stageLabel, stageToCustomerStep } from "./stages";
 import { RULE_BY_KEY, ruleDays, ruleOn } from "./rules";
+import { renewalTasksToClose } from "./renewal";
 import { emptyVault, slotLabel, slotsOf } from "./vault";
 import { PAYMENT_KIND_LABEL, WORK_STATUS, workStatusOf } from "./work-status";
 import { JOURNAL_TYPE } from "./journal";
@@ -1124,10 +1125,13 @@ export const useStore = create<StoreState>()(
         if (!company) return null;
         if (deny(st, "contract.manage", `계약 등록 (${data.title})`, set)) return null;
         const ct: Contract = { ...data, id: uid("ct"), source: "manual" };
+        // 이미 서명된 갱신 계약을 바로 등록하면 — 앞선 계약의 '갱신 협의' 업무도 여기서 끝난다
+        const closing = ct.status === "signed" ? renewalTasksToClose(ct, st.contracts, st.tasks) : [];
         set({
           contracts: [ct, ...st.contracts],
           activities: [makeActivity({ type: "contract_created", companyId: ct.companyId, projectId: ct.projectId, actorId: byUserId, actorRole: st.session?.role ?? "consultant", text: `계약 등록: ${ct.title} (${company.name})`, meta: { amount: ct.amount ?? 0, status: ct.status } }), ...st.activities],
         });
+        for (const tid of closing) get().updateTaskStatus(tid, "done", byUserId);
         return ct.id;
       },
 
@@ -1142,6 +1146,8 @@ export const useStore = create<StoreState>()(
         const next = { ...before, ...pk };
         const signedNow = patch.status === "signed" && before.status !== "signed";
         if (signedNow && !next.signedAt) next.signedAt = nowIso();
+        // 갱신 계약이 서명되면 앞선 계약의 '갱신 협의' 규칙 업무는 끝난 일이다 — 어느 계약의 갱신인지 확실할 때만(renewalTasksToClose)
+        const closing = signedNow ? renewalTasksToClose(next, st.contracts, st.tasks) : [];
         set({
           contracts: st.contracts.map((c) => (c.id === id ? next : c)),
           activities: [
@@ -1150,6 +1156,7 @@ export const useStore = create<StoreState>()(
             ...st.activities,
           ],
         });
+        for (const tid of closing) get().updateTaskStatus(tid, "done", byUserId);
       },
 
       // ---------- 결과자료 회수 ----------

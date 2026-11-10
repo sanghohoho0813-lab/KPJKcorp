@@ -6,8 +6,9 @@
 set -u
 DB=kpjk_appeal
 HERE="$(cd "$(dirname "$0")" && pwd)"; ROOT="$(cd "$HERE/../.." && pwd)"
-LOG="${1:-/dev/stdout}"
 TMP="$(mktemp -d)"
+# 로그 파일을 주지 않으면 임시 파일에 쓰고 끝에 화면으로 보여 준다(화면 출력은 다시 읽을 수 없어 마지막 판정에서 멈췄다)
+LOG="${1:-$TMP/server-tests.log}"
 cp "$ROOT/supabase/test/000_supabase_stub.sql" "$ROOT/supabase/setup.sql" "$HERE/server-tests.sql" "$TMP/" && chmod -R a+rX "$TMP"
 run() { if [ "$(id -un)" = postgres ]; then psql "$@"; else su postgres -c "psql $(printf '%q ' "$@")"; fi; }
 run -qtAc "select 1" >/dev/null 2>&1 || { echo "로컬 Postgres 가 꺼져 있습니다 (예: pg_ctlcluster 16 main start)"; exit 1; }
@@ -21,6 +22,8 @@ run -q -d $DB -f "$TMP/000_supabase_stub.sql" 2>&1 | grep -v "already exists" | 
 run -q -v ON_ERROR_STOP=1 -d $DB -f "$TMP/setup.sql" >/dev/null 2>"$TMP/setup.err" || { cat "$TMP/setup.err"; exit 1; }
 run -X -q -d $DB -f "$TMP/server-tests.sql" 2>&1 | grep -v "^$" >> "$LOG"   # 확인 함수(void)가 찍는 빈 줄은 뺀다
 echo "# 끝 $(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M:%S KST')" >> "$LOG"
+[ $# -ge 1 ] || cat "$LOG"
+RC=0
+if grep -q "ERROR" "$LOG"; then grep "ERROR" "$LOG" | head -5; RC=1; elif ! grep -q "^TOTAL|[0-9]*|0$" "$LOG"; then RC=1; fi
 rm -rf "$TMP"
-grep -q "ERROR" "$LOG" && { grep "ERROR" "$LOG" | head -5; exit 1; }
-grep -q "^TOTAL|[0-9]*|0$" "$LOG"
+exit $RC

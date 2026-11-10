@@ -1,6 +1,6 @@
 // Closed Loop (실제 고객 계정): 고객 제출 → 자동 검토업무 → 컨설턴트 검토 → Portal 반영 → 알림 → Evidence
 // 사용: node loop.mjs pc|mobile
-import { launch, ctxFor, login, logout, B, ACC, L, ok, sql, body, toasts, summary, FILES } from './lib.mjs';
+import { launch, ctxFor, login, B, ACC, L, ok, sql, body, toasts, summary, FILES } from './lib.mjs';
 const kind = process.argv[2] || 'pc';
 const CLIENT = kind === 'pc' ? ACC.c1 : ACC.c2;
 const REQ = kind === 'pc' ? '파일럿 제출자료 A-1' : '파일럿 제출자료 B-1';
