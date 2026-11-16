@@ -9,7 +9,7 @@ import type { Transform } from "./model";
  */
 
 export type Cell = string | number | null;
-export interface SheetOut { name: string; hidden?: boolean; rows: Cell[][]; merges: Merge[]; hiddenRows: number[]; widths: number[] }
+export interface SheetOut { name: string; hidden?: boolean; rows: Cell[][]; merges: Merge[]; hiddenRows: number[]; widths: number[]; hiddenCols?: number[] }
 export interface GtColumn { col: number; role: LeafRole; group?: GroupKey }
 export type GtKind = LineKind | "header" | "blank" | "title" | "repeat" | "info";
 export interface GtRow { row: number; kind: GtKind; iid?: string; name?: string; spec?: string; unit?: string; qty?: number; unitPrice?: number; amount?: number; transforms?: Transform[]; sec?: string }

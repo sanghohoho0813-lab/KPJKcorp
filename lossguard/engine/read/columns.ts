@@ -1,6 +1,6 @@
 import type { ColumnAssign, GroupKey, IndustryPack, LeafRole, RawSheet, SheetShape } from "../types";
 import { cellAt } from "../io/xlsx";
-import { lineTol, parseNum } from "../normalize/number";
+import { displaySlack, displayStep, lineTol, parseNum } from "../normalize/number";
 import { compactText } from "../normalize/text";
 import { numberingOfNoCell } from "../normalize/name";
 import type { AliasIndex, HeaderBlock } from "./header";
@@ -72,12 +72,14 @@ interface Triple { q: number; p: number; a: number; rate: number; n: number }
 function tripleRate(sheet: RawSheet, rows: number[], q: number, p: number, a: number, pack: IndustryPack): { rate: number; n: number } {
   let n = 0, ok = 0;
   for (const r of rows) {
-    const vq = parseNum(cellAt(sheet, r, q), true);
-    const vp = parseNum(cellAt(sheet, r, p));
-    const va = parseNum(cellAt(sheet, r, a));
+    const cq = cellAt(sheet, r, q), cp = cellAt(sheet, r, p), ca = cellAt(sheet, r, a);
+    const vq = parseNum(cq, true);
+    const vp = parseNum(cp);
+    const va = parseNum(ca);
     if (vq === undefined || vp === undefined || va === undefined || va === 0 || vq === 0 || vp === 0) continue;
     n++;
-    if (Math.abs(vq * vp - va) <= lineTol(va, pack.params.lineAbsTol, pack.params.lineRelTol) + 1) ok++;
+    const slack = displaySlack(vq, vp, displayStep(cq), displayStep(cp), displayStep(ca));
+    if (Math.abs(vq * vp - va) <= lineTol(va, pack.params.lineAbsTol, pack.params.lineRelTol) + 1 + slack) ok++;
   }
   return { rate: n ? ok / n : 0, n };
 }

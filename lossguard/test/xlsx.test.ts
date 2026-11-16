@@ -2,6 +2,7 @@
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { readXlsx } from "../engine/io/xlsx";
+import { readWorkbook } from "../engine/io/read";
 import { writeXlsx } from "../synth/xlsx-write";
 import { generateCase } from "../synth/index";
 import { analyze } from "../engine/analyze";
@@ -43,22 +44,30 @@ const ok = (c: boolean, m: string) => { console.log((c ? "OK  " : "FAIL") + " " 
   }
   ok(items > 0 && same === items, `합성 문서 왕복 후 항목 값 일치 ${same}/${items}`);
 
-  // LibreOffice 가 다시 저장한 합성 파일(다른 프로그램이 쓴 xlsx) — fixtures 가 있을 때만
+  // 다른 프로그램 · 다른 형식으로 다시 저장한 합성 파일(fixtures/make-fixtures.ts) — xlsx · xls · HTML 표 · CSV(CP949)
+  //  HTML · CSV 는 보이는 값만 담는다(수량이 반올림되어 보일 수 있음) → 수량은 0.5 이내, 계산 검산은 오탐 0건이어야 한다
   const dir = join(__dirname, "fixtures");
   if (existsSync(dir)) {
-    for (const f of readdirSync(dir).filter((x) => x.startsWith("synthetic-lo-") && x.endsWith(".xlsx"))) {
-      const gtPath = join(dir, f.replace(/\.xlsx$/, ".gt.json"));
+    for (const f of readdirSync(dir).filter((x) => /^synthetic-.*\.(xlsx|xls|html|csv)$/.test(x)).sort()) {
+      const gtPath = join(dir, f.replace(/\.[a-z]+$/, ".gt.json"));
       if (!existsSync(gtPath)) continue;
+      const display = /\.(html|csv)$/.test(f);
       const gt = JSON.parse(readFileSync(gtPath, "utf8")) as { sheet: string; items: { row: number; name: string; qty: number; amount: number }[]; columns: { col: number; role: string; group?: string }[] }[];
-      const wb2 = await readXlsx(new Uint8Array(readFileSync(join(dir, f))), f);
+      const wb2 = await readWorkbook(new Uint8Array(readFileSync(join(dir, f))), f);
       const r2 = analyze({ docs: [{ docId: "contract", kind: "contract", workbook: wb2 }], meta: { vat: "excluded" }, pack });
+      const sheets = r2.docs[0].sheets.filter((x) => x.lines.length);
       let n = 0, hit = 0, colN = 0, colHit = 0;
       for (const g of gt) {
-        const sh = r2.docs[0].sheets.find((x) => x.sheet === g.sheet);
-        for (const it of g.items) { n++; const l = sh?.lines.find((x) => x.row === it.row); if (l && l.name === it.name && l.qty === it.qty && Math.abs((l.amount ?? NaN) - it.amount) < 0.5) hit++; }
+        const sh = r2.docs[0].sheets.find((x) => x.sheet === g.sheet) ?? (gt.length === 1 && sheets.length === 1 ? sheets[0] : undefined);
+        for (const it of g.items) {
+          n++;
+          const l = sh?.lines.find((x) => x.row === it.row);
+          if (l && l.name === it.name && l.qty !== undefined && Math.abs(l.qty - it.qty) <= (display ? 0.5 : 0) && Math.abs((l.amount ?? NaN) - it.amount) < 0.5) hit++;
+        }
         for (const gc of g.columns) { colN++; if (sh?.columns.some((x) => x.col === gc.col && x.role === gc.role && (x.group ?? undefined) === (gc.group ?? undefined))) colHit++; }
       }
-      ok(n > 0 && hit === n && colHit === colN, `LibreOffice 저장본 ${f}: 열 ${colHit}/${colN} · 항목 ${hit}/${n}`);
+      ok(n > 0 && hit === n && colHit === colN, `${wb2.format} 형식 ${f}: 열 ${colHit}/${colN} · 항목 ${hit}/${n}`);
+      ok(r2.findings.length === 0, `${f}: 오류 없는 합성 문서에서 탐지 0건(실제 ${r2.findings.length}건${r2.findings.length ? " — " + r2.findings.slice(0, 2).map((x) => x.title).join(" / ") : ""})`);
     }
   }
   process.exit(fail ? 1 : 0);

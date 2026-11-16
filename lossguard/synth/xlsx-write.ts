@@ -1,9 +1,10 @@
 import { deflateRawSync } from "node:zlib";
 import type { SheetOut } from "./render";
+import type { RawWorkbook } from "../engine/types";
 
 /**
- * 합성 문서 → 실제 .xlsx 바이트(Node 전용 시험 도구). 엔진은 이 파일을 쓰지 않는다.
- * 공유 문자열 · 숫자 서식(#,##0) · 병합 · 숨긴 행 · 숨긴 시트 · 열 너비를 쓴다. 수식은 쓰지 않는다(값만).
+ * 표 → 실제 .xlsx 바이트(Node 전용). 합성 문서 만들기와 개인정보를 지운 사본(cli/sanitize.ts)에 쓴다. 엔진은 이 파일을 쓰지 않는다.
+ * 공유 문자열 · 숫자 서식(#,##0) · 병합 · 숨긴 행 · 숨긴 열 · 숨긴 시트 · 열 너비를 쓴다. 수식 · 메모 · 그림 · 파일 속성은 쓰지 않는다(값만).
  */
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
@@ -78,7 +79,9 @@ export function writeXlsx(sheets: SheetOut[]): Uint8Array {
       });
       if (cells.length || hidden.has(r)) rows.push(`<row r="${r + 1}"${hidden.has(r) ? ' hidden="1"' : ""}>${cells.join("")}</row>`);
     });
-    const cols = sh.widths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join("");
+    const hc = new Set(sh.hiddenCols ?? []);
+    const nCols = Math.max(sh.widths.length, ...[...hc].map((c) => c + 1));
+    const cols = Array.from({ length: nCols }, (_, i) => (sh.widths[i] !== undefined || hc.has(i) ? `<col min="${i + 1}" max="${i + 1}"${sh.widths[i] !== undefined ? ` width="${sh.widths[i]}" customWidth="1"` : ""}${hc.has(i) ? ' hidden="1"' : ""}/>` : "")).join("");
     const merges = sh.merges.length ? `<mergeCells count="${sh.merges.length}">${sh.merges.map((m) => `<mergeCell ref="${colName(m.c1)}${m.r1 + 1}:${colName(m.c2)}${m.r2 + 1}"/>`).join("")}</mergeCells>` : "";
     return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetFormatPr defaultRowHeight="15"/>${cols ? `<cols>${cols}</cols>` : ""}<sheetData>${rows.join("")}</sheetData>${merges}</worksheet>`;
   });
@@ -91,4 +94,12 @@ export function writeXlsx(sheets: SheetOut[]): Uint8Array {
   sheetXml.forEach((x, i) => files.push([`xl/worksheets/sheet${i + 1}.xml`, x]));
   files.push(["xl/sharedStrings.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="${shared.length}" uniqueCount="${shared.length}">${shared.map((s) => `<si><t xml:space="preserve">${esc(s)}</t></si>`).join("")}</sst>`]);
   return zip(files);
+}
+
+/** 읽은 표(RawWorkbook) → .xlsx — 값 · 병합 · 숨긴 행/열/시트만(지운 사본용) */
+export function writeRawWorkbook(wb: RawWorkbook): Uint8Array {
+  return writeXlsx(wb.sheets.map((s) => ({
+    name: s.name, hidden: s.hidden, merges: s.merges, hiddenRows: s.hiddenRows, hiddenCols: s.hiddenCols, widths: [],
+    rows: s.rows.map((r) => (r ?? []).map((x) => (x.t === "num" ? x.n ?? null : x.t === "text" ? x.v : null))),
+  })));
 }

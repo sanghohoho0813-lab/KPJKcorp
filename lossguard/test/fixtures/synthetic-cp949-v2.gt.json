@@ -1,0 +1,233 @@
+[
+ {
+  "sheet": "synthetic-cp949-v2",
+  "columns": [
+   {
+    "col": 0,
+    "role": "name"
+   },
+   {
+    "col": 1,
+    "role": "spec"
+   },
+   {
+    "col": 2,
+    "role": "unit"
+   },
+   {
+    "col": 3,
+    "role": "qty"
+   },
+   {
+    "col": 4,
+    "role": "unitPrice",
+    "group": "mat"
+   },
+   {
+    "col": 5,
+    "role": "amount",
+    "group": "mat"
+   },
+   {
+    "col": 6,
+    "role": "unitPrice",
+    "group": "lab"
+   },
+   {
+    "col": 7,
+    "role": "amount",
+    "group": "lab"
+   },
+   {
+    "col": 8,
+    "role": "unitPrice",
+    "group": "exp"
+   },
+   {
+    "col": 9,
+    "role": "amount",
+    "group": "exp"
+   },
+   {
+    "col": 10,
+    "role": "unitPrice",
+    "group": "sum"
+   },
+   {
+    "col": 11,
+    "role": "amount",
+    "group": "sum"
+   }
+  ],
+  "items": [
+   {
+    "row": 5,
+    "name": "현장정리 및 청소",
+    "qty": 1,
+    "amount": 807430
+   },
+   {
+    "row": 6,
+    "name": "바닥 보양",
+    "qty": 559.6,
+    "amount": 2971476
+   },
+   {
+    "row": 7,
+    "name": "가설 칸막이",
+    "qty": 14.1,
+    "amount": 579792
+   },
+   {
+    "row": 8,
+    "name": "폐기물 처리",
+    "qty": 4,
+    "amount": 1975960
+   },
+   {
+    "row": 9,
+    "name": "안전시설",
+    "qty": 1,
+    "amount": 675160
+   },
+   {
+    "row": 12,
+    "name": "기존 천정 철거",
+    "qty": 82.1,
+    "amount": 660905
+   },
+   {
+    "row": 13,
+    "name": "경량벽체 철거",
+    "qty": 125.5,
+    "amount": 1287630
+   },
+   {
+    "row": 14,
+    "name": "기존 설비 철거",
+    "qty": 1,
+    "amount": 1324310
+   },
+   {
+    "row": 17,
+    "name": "석고보드",
+    "qty": 852.2,
+    "amount": 5820526
+   },
+   {
+    "row": 18,
+    "name": "석고보드",
+    "qty": 130,
+    "amount": 984100
+   },
+   {
+    "row": 19,
+    "name": "방수석고보드",
+    "qty": 112,
+    "amount": 1186080
+   },
+   {
+    "row": 20,
+    "name": "합판",
+    "qty": 117.1,
+    "amount": 1521129
+   },
+   {
+    "row": 21,
+    "name": "천정 몰딩",
+    "qty": 146.2,
+    "amount": 761700
+   },
+   {
+    "row": 24,
+    "name": "수성페인트",
+    "qty": 361.4,
+    "amount": 2092506
+   },
+   {
+    "row": 25,
+    "name": "퍼티 및 샌딩",
+    "qty": 530.9,
+    "amount": 2511157
+   },
+   {
+    "row": 26,
+    "name": "방청도장",
+    "qty": 36.3,
+    "amount": 374615
+   },
+   {
+    "row": 29,
+    "name": "포세린 타일",
+    "qty": 183.6,
+    "amount": 10608408
+   },
+   {
+    "row": 30,
+    "name": "포세린 타일",
+    "qty": 67.3,
+    "amount": 3140218
+   },
+   {
+    "row": 31,
+    "name": "벽타일",
+    "qty": 45,
+    "amount": 2118600
+   },
+   {
+    "row": 34,
+    "name": "데코타일",
+    "qty": 48.8,
+    "amount": 1494744
+   },
+   {
+    "row": 35,
+    "name": "강마루",
+    "qty": 224.7,
+    "amount": 9716028
+   },
+   {
+    "row": 36,
+    "name": "걸레받이",
+    "qty": 297.3,
+    "amount": 2078127
+   },
+   {
+    "row": 39,
+    "name": "실크벽지",
+    "qty": 471.8,
+    "amount": 6246632
+   },
+   {
+    "row": 40,
+    "name": "흡음텍스",
+    "qty": 190.6,
+    "amount": 3440330
+   },
+   {
+    "row": 41,
+    "name": "롤스크린",
+    "qty": 10.7,
+    "amount": 368187
+   },
+   {
+    "row": 44,
+    "name": "LED 평판등",
+    "qty": 21,
+    "amount": 2058630
+   },
+   {
+    "row": 45,
+    "name": "스위치",
+    "qty": 11,
+    "amount": 184470
+   },
+   {
+    "row": 46,
+    "name": "전선",
+    "qty": 1307,
+    "amount": 2117340
+   }
+  ]
+ }
+]

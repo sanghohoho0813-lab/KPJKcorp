@@ -1,5 +1,5 @@
 import type { Finding, GroupKey, Line, ParsedDoc, ParsedSheet } from "../types";
-import { lineTol } from "../normalize/number";
+import { displaySlack, displayStep, lineTol } from "../normalize/number";
 import type { DetectCtx } from "./common";
 import { docTag, evidence, findingKey, fmt, severity } from "./common";
 
@@ -59,7 +59,9 @@ function check(
   if (q === undefined || p === undefined || a === undefined || q === 0 || p === 0) return;
   const calc = q * p;
   const diff = a - calc;
-  if (Math.abs(diff) <= lineTol(a, absTol, relTol) + 1) return;
+  // 글자로 적힌 숫자(CSV · HTML 표 · 글자 칸)는 보이는 자릿수까지만 안다 — 반올림 폭만큼 더 허용한다
+  const display = displaySlack(q, p, shownStep(ctx, l, keys[1]), shownStep(ctx, l, keys[2]), shownStep(ctx, l, keys[3]));
+  if (Math.abs(diff) <= lineTol(a, absTol, relTol) + 1 + display) return;
   out.push({
     key: findingKey(["D01", chk, docTag(doc), sh.kind, l.fp]),
     detector: "D01", check: chk, severity: severity(ctx, diff), certainty: "calc",
@@ -70,4 +72,10 @@ function check(
     calc: { expr: "금액 − 수량 × 단가", inputs: { qty: q, unitPrice: p, amount: a } },
     caveat: CAVEAT,
   });
+}
+
+/** 그 줄의 칸이 글자로 적힌 숫자라면 반올림 폭 */
+function shownStep(ctx: DetectCtx, l: Line, key: string | undefined): number {
+  const c = key === undefined ? undefined : l.cols[key];
+  return c === undefined ? 0 : displayStep(ctx.raw.get(l.docId)?.sheets[l.sheetIndex]?.rows[l.row]?.[c]);
 }

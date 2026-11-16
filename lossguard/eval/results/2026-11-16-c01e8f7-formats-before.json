@@ -1,0 +1,484 @@
+{
+ "engine": "0.3.0",
+ "commit": "c01e8f7",
+ "dirty": true,
+ "n": 16,
+ "totals": {
+  "xlsx": {
+   "cols": 116,
+   "colHit": 116,
+   "items": 417,
+   "itemHit": 417,
+   "fp": 0,
+   "docs": 16,
+   "failed": 0,
+   "ms": 202
+  },
+  "xlsx-lo": {
+   "cols": 116,
+   "colHit": 116,
+   "items": 417,
+   "itemHit": 417,
+   "fp": 0,
+   "docs": 16,
+   "failed": 0,
+   "ms": 209
+  },
+  "xls": {
+   "cols": 116,
+   "colHit": 116,
+   "items": 417,
+   "itemHit": 417,
+   "fp": 0,
+   "docs": 16,
+   "failed": 0,
+   "ms": 99
+  },
+  "html": {
+   "cols": 116,
+   "colHit": 102,
+   "items": 417,
+   "itemHit": 359,
+   "fp": 118,
+   "docs": 16,
+   "failed": 0,
+   "ms": 134
+  },
+  "csv": {
+   "cols": 116,
+   "colHit": 112,
+   "items": 417,
+   "itemHit": 315,
+   "fp": 0,
+   "docs": 16,
+   "failed": 0,
+   "ms": 110
+  }
+ },
+ "byTemplate": {
+  "V1|xlsx": {
+   "cols": 12,
+   "colHit": 12,
+   "items": 62,
+   "itemHit": 62,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V1|xlsx-lo": {
+   "cols": 12,
+   "colHit": 12,
+   "items": 62,
+   "itemHit": 62,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V1|xls": {
+   "cols": 12,
+   "colHit": 12,
+   "items": 62,
+   "itemHit": 62,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V1|html": {
+   "cols": 12,
+   "colHit": 12,
+   "items": 62,
+   "itemHit": 62,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V1|csv": {
+   "cols": 12,
+   "colHit": 12,
+   "items": 62,
+   "itemHit": 62,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V2|xlsx": {
+   "cols": 24,
+   "colHit": 24,
+   "items": 48,
+   "itemHit": 48,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V2|xlsx-lo": {
+   "cols": 24,
+   "colHit": 24,
+   "items": 48,
+   "itemHit": 48,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V2|xls": {
+   "cols": 24,
+   "colHit": 24,
+   "items": 48,
+   "itemHit": 48,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V2|html": {
+   "cols": 24,
+   "colHit": 22,
+   "items": 48,
+   "itemHit": 48,
+   "fp": 45,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V2|csv": {
+   "cols": 24,
+   "colHit": 22,
+   "items": 48,
+   "itemHit": 0,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V3|xlsx": {
+   "cols": 12,
+   "colHit": 12,
+   "items": 63,
+   "itemHit": 63,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V3|xlsx-lo": {
+   "cols": 12,
+   "colHit": 12,
+   "items": 63,
+   "itemHit": 63,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V3|xls": {
+   "cols": 12,
+   "colHit": 12,
+   "items": 63,
+   "itemHit": 63,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V3|html": {
+   "cols": 12,
+   "colHit": 12,
+   "items": 63,
+   "itemHit": 63,
+   "fp": 17,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V3|csv": {
+   "cols": 12,
+   "colHit": 12,
+   "items": 63,
+   "itemHit": 63,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V4|xlsx": {
+   "cols": 12,
+   "colHit": 12,
+   "items": 43,
+   "itemHit": 43,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V4|xlsx-lo": {
+   "cols": 12,
+   "colHit": 12,
+   "items": 43,
+   "itemHit": 43,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V4|xls": {
+   "cols": 12,
+   "colHit": 12,
+   "items": 43,
+   "itemHit": 43,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V4|html": {
+   "cols": 12,
+   "colHit": 12,
+   "items": 43,
+   "itemHit": 43,
+   "fp": 5,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V4|csv": {
+   "cols": 12,
+   "colHit": 12,
+   "items": 43,
+   "itemHit": 43,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V5|xlsx": {
+   "cols": 12,
+   "colHit": 12,
+   "items": 44,
+   "itemHit": 44,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V5|xlsx-lo": {
+   "cols": 12,
+   "colHit": 12,
+   "items": 44,
+   "itemHit": 44,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V5|xls": {
+   "cols": 12,
+   "colHit": 12,
+   "items": 44,
+   "itemHit": 44,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V5|html": {
+   "cols": 12,
+   "colHit": 12,
+   "items": 44,
+   "itemHit": 44,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V5|csv": {
+   "cols": 12,
+   "colHit": 12,
+   "items": 44,
+   "itemHit": 44,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V6|xlsx": {
+   "cols": 12,
+   "colHit": 12,
+   "items": 43,
+   "itemHit": 43,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V6|xlsx-lo": {
+   "cols": 12,
+   "colHit": 12,
+   "items": 43,
+   "itemHit": 43,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V6|xls": {
+   "cols": 12,
+   "colHit": 12,
+   "items": 43,
+   "itemHit": 43,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V6|html": {
+   "cols": 12,
+   "colHit": 12,
+   "items": 43,
+   "itemHit": 43,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V6|csv": {
+   "cols": 12,
+   "colHit": 12,
+   "items": 43,
+   "itemHit": 43,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V7|xlsx": {
+   "cols": 20,
+   "colHit": 20,
+   "items": 56,
+   "itemHit": 56,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V7|xlsx-lo": {
+   "cols": 20,
+   "colHit": 20,
+   "items": 56,
+   "itemHit": 56,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V7|xls": {
+   "cols": 20,
+   "colHit": 20,
+   "items": 56,
+   "itemHit": 56,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V7|html": {
+   "cols": 20,
+   "colHit": 20,
+   "items": 56,
+   "itemHit": 56,
+   "fp": 51,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V7|csv": {
+   "cols": 20,
+   "colHit": 18,
+   "items": 56,
+   "itemHit": 2,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V8|xlsx": {
+   "cols": 12,
+   "colHit": 12,
+   "items": 58,
+   "itemHit": 58,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V8|xlsx-lo": {
+   "cols": 12,
+   "colHit": 12,
+   "items": 58,
+   "itemHit": 58,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V8|xls": {
+   "cols": 12,
+   "colHit": 12,
+   "items": 58,
+   "itemHit": 58,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V8|html": {
+   "cols": 12,
+   "colHit": 0,
+   "items": 58,
+   "itemHit": 0,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  },
+  "V8|csv": {
+   "cols": 12,
+   "colHit": 12,
+   "items": 58,
+   "itemHit": 58,
+   "fp": 0,
+   "docs": 2,
+   "failed": 0,
+   "ms": 0
+  }
+ },
+ "misses": [
+  "V2 html: 오류 없는 문서에서 탐지 45건 — 줄 계산(수량 × 단가)이 금액과 다릅니다 / 줄 계산(수량 × 단가)이 금액과 다릅니다",
+  "V2 csv 을지: 열 6 mat.amount → .amount",
+  "V3 html: 오류 없는 문서에서 탐지 17건 — 줄 계산(수량 × 단가)이 금액과 다릅니다 / 줄 계산(수량 × 단가)이 금액과 다릅니다",
+  "V7 csv 내역서(을): 열 7 mat.amount → .amount",
+  "V8 html Sheet1: 열 2 name → 없음",
+  "V8 html Sheet1: 열 3 spec → 없음",
+  "V8 html Sheet1: 열 4 unit → 없음",
+  "V8 html Sheet1: 열 5 qty → 없음",
+  "V8 html Sheet1: 열 6 unitPrice → 없음",
+  "V8 html Sheet1: 열 7 amount → 없음",
+  "V2 html 을지: 열 6 mat.amount → 없음",
+  "V2 html 을지: 열 10 exp.amount → mat.amount",
+  "V2 csv 을지: 열 6 mat.amount → .amount",
+  "V4 html: 오류 없는 문서에서 탐지 5건 — 줄 계산(수량 × 단가)이 금액과 다릅니다 / 줄 계산(수량 × 단가)이 금액과 다릅니다",
+  "V7 html: 오류 없는 문서에서 탐지 51건 — 줄 계산(수량 × 단가)이 금액과 다릅니다 / 줄 계산(수량 × 단가)이 금액과 다릅니다",
+  "V7 csv 내역서(을): 열 7 mat.amount → .amount",
+  "V8 html Sheet1: 열 2 name → 없음",
+  "V8 html Sheet1: 열 3 spec → 없음",
+  "V8 html Sheet1: 열 4 unit → 없음",
+  "V8 html Sheet1: 열 5 qty → 없음",
+  "V8 html Sheet1: 열 6 unitPrice → 없음",
+  "V8 html Sheet1: 열 7 amount → 없음"
+ ]
+}

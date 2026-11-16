@@ -124,10 +124,11 @@ export function findHeader(sheet: RawSheet, idx: AliasIndex, mi: MergeIndex): He
   }
   const labels: string[] = [];
   const keys: string[][] = [];
+  const spread = spreadUpper(sheet, mi, rows, width);
   for (let c = 0; c < width; c++) {
     const parts: string[] = [];
     for (const r of rows) {
-      const t = filledText(sheet, mi, r, c);
+      const t = filledText(sheet, mi, r, c) || spread.get(r * 20000 + c) || "";
       if (t && parts[parts.length - 1] !== t) parts.push(t);
     }
     labels.push(parts.join(">"));
@@ -138,6 +139,29 @@ export function findHeader(sheet: RawSheet, idx: AliasIndex, mi: MergeIndex): He
   for (let c = 0; c < width; c++) { const k = headerKey(filledText(sheet, mi, last, c)); if (k) signature.push(k); }
   for (let c = 0; c < width; c++) { const k = headerKey(rawText(sheet, best, c)); if (k && !signature.includes(k)) signature.push(k); }
   return { rows, labels, keys, width, hits: bestHits, signature };
+}
+
+/**
+ * 병합 없이 적힌 묶음 머리글(CSV · HTML 내려받기, "선택 영역의 가운데로" 맞춤)을 오른쪽 빈칸으로 넓힌다.
+ *   재료비 |      |       ←  위 줄: 왼쪽 칸에만 글자
+ *   단 가  | 금 액 |       ←  아래 줄: 두 칸 모두 칸 이름
+ * 조건: 위 칸이 비어 있고 병합이 아니며, 바로 아래 칸에 글자가 있고, 왼쪽으로 이어지는 빈칸 끝의 위 칸에도
+ * 아래 칸 글자가 있다(= 여러 칸을 덮는 묶음 머리글). 위 줄에 글자가 다시 나오면 멈춘다.
+ */
+function spreadUpper(sheet: RawSheet, mi: MergeIndex, rows: number[], width: number): Map<number, string> {
+  const out = new Map<number, string>();
+  for (let i = 0; i < rows.length - 1; i++) {
+    const r = rows[i], below = rows[i + 1];
+    let src = "";
+    for (let c = 0; c < width; c++) {
+      const own = filledText(sheet, mi, r, c);
+      const under = filledText(sheet, mi, below, c);
+      if (own) { src = under && !mi.get(r, c) ? own : ""; continue; }
+      if (mi.get(r, c) || !under) { src = ""; continue; }
+      if (src) out.set(r * 20000 + c, src);
+    }
+  }
+  return out;
 }
 
 function isTitleRow(sheet: RawSheet, mi: MergeIndex, r: number, width: number): boolean {

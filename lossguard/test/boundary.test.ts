@@ -37,7 +37,7 @@ const hits: string[] = [];
 for (const f of engineFiles) { const code = stripComments(readFileSync(f, "utf8")); for (const w of WORDS) if (code.includes(w)) hits.push(`${relative(LG, f)}:${w}`); }
 ok(hits.length === 0, `엔진 코드에 업종 낱말 없음 ${hits.slice(0, 8).join(", ")}`);
 // 5) lossguard/ 안의 표 파일은 합성 자료뿐
-const dataFiles = walk(LG).filter((f) => /\.(xlsx|xls|csv|hwp|hwpx|pdf)$/i.test(f));
+const dataFiles = walk(LG).filter((f) => /\.(xlsx|xls|xlsm|csv|tsv|html?|hwp|hwpx|pdf|docx?)$/i.test(f));
 const notSynthetic = dataFiles.filter((f) => !/^synthetic-/.test(f.split("/").pop()!));
 ok(notSynthetic.length === 0, `lossguard/ 의 표 · 문서 파일 ${dataFiles.length}개가 모두 synthetic- 로 시작 ${notSynthetic.map((f) => relative(ROOT, f)).join(", ")}`);
 // 6) 비공개 결과 폴더는 커밋 대상에서 빠짐
