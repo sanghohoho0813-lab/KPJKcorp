@@ -30,11 +30,12 @@ export function isNumeric(c: RawCell | undefined): boolean {
 }
 
 /**
- * 글자로 적힌 숫자가 반올림되어 보였을 수 있는 폭 — CSV · HTML 표처럼 "보이는 값"만 남은 파일용.
- * 소수 자릿수 기준 ±0.5 단위(예: "560" → 0.5, "559.6" → 0.05). 숫자 칸(저장된 값)은 0.
+ * 보이던 글자만 남은 칸(CSV · HTML 표, RawCell.shown)의 숫자가 반올림되어 보였을 수 있는 폭.
+ * 소수 자릿수 기준 ±0.5 단위(예: "560" → 0.5, "559.6" → 0.05).
+ * 저장된 값이 있는 칸(엑셀의 숫자 칸 · 엑셀에 글자로 적은 숫자)은 0 — 적힌 그대로가 값이다.
  */
 export function displayStep(c: RawCell | undefined): number {
-  if (!c || c.t !== "text" || parseNum(c, true) === undefined) return 0;
+  if (!c || c.t !== "text" || !c.shown || parseNum(c, true) === undefined) return 0;
   const m = /\.(\d+)/.exec(c.v.replace(/,/g, ""));
   return 0.5 * 10 ** -(m ? m[1].length : 0);
 }

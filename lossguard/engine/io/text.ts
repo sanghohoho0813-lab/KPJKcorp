@@ -13,7 +13,8 @@ export function decodeText(b: Uint8Array): string {
   return new TextDecoder("utf-8").decode(b);
 }
 
-const cell = (s: string): RawCell => (s.trim() ? { v: s.trim(), t: "text" } : { v: "", t: "empty" });
+/** 글자 파일의 칸은 모두 "보이던 글자"다(shown) — 숫자가 반올림되어 보였을 수 있다 */
+const cell = (s: string): RawCell => (s.trim() ? { v: s.trim(), t: "text", shown: true } : { v: "", t: "empty" });
 
 /** 구분자 짐작: 따옴표 밖 개수가 줄마다 고르게 나오는 것 */
 function guessDelimiter(text: string): string {

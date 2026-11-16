@@ -64,5 +64,11 @@ const FX = join(__dirname, "fixtures");
   const d01 = r.findings.filter((f) => f.detector === "D01");
   ok(wb.format === "csv" && d01.length === 1 && d01[0].message.includes("자재 마"), `반올림된 수량(560 ≈ 559.6)은 오탐 없음, 실제 1,000원 차이는 탐지 (D01 ${d01.length}건)`);
 
+  // 같은 글자 숫자라도 엑셀 파일 안의 글자 칸(저장된 값)은 반올림 여유를 주지 않는다 — 평가에서 놓친 오류(E1b) 재발 방지
+  const asText = csv.replace("560,30000,16788000", "560,30000,16800000").replace("10,1000,11000", "1,10000,10400").replace("16826500", "16837900").split("\n").map((l) => l.split(",").map((v) => (v ? { v, t: "text" as const } : { v: "", t: "empty" as const })));
+  const wbX = { fileName: "t.xlsx", sheets: [{ name: "내역", hidden: false, rows: asText, merges: [], hiddenRows: [], hiddenCols: [] }] };
+  const rX = analyze({ docs: [{ docId: "c", kind: "contract", workbook: wbX }], meta: { vat: "excluded" }, pack });
+  ok(rX.findings.some((f) => f.detector === "D01" && f.message.includes("자재 마")), "엑셀 글자 칸의 숫자(1 × 10,000 ≠ 10,400)는 반올림 여유 없이 탐지");
+
   process.exit(fail ? 1 : 0);
 })();

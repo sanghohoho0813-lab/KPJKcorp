@@ -6,8 +6,11 @@
 
 // ── 원본(읽은 그대로) ────────────────────────────────────────────────
 export type CellType = "text" | "num" | "empty";
-/** v: 파일에 적힌 글자(숫자는 저장된 값의 글자), n: 숫자 칸이면 그 값, f: 수식 칸 */
-export interface RawCell { v: string; t: CellType; n?: number; f?: boolean }
+/**
+ * v: 파일에 적힌 글자(숫자는 저장된 값의 글자), n: 숫자 칸이면 그 값, f: 수식 칸,
+ * shown: 저장된 값이 아니라 화면에 보이던 글자만 남은 칸(CSV · HTML 표) — 숫자가 표시 자릿수로 반올림되어 있을 수 있다
+ */
+export interface RawCell { v: string; t: CellType; n?: number; f?: boolean; shown?: boolean }
 /** 병합 범위(0부터, 끝 포함) */
 export interface Merge { r1: number; c1: number; r2: number; c2: number }
 export interface RawSheet {
