@@ -75,7 +75,7 @@ export function detectD10(ledgers: ParsedLedger[], raw: Map<string, RawWorkbook>
         message: `${L.sheet} — ${a.vendor}${a.item ? ` · ${a.item}` : ""} · ${fmt(a.amount)}원: ${a.date ?? "날짜 없음"}(${a.row + 1}행) / ${b.date ?? "날짜 없음"}(${b.row + 1}행)${extra}`,
         amount: Math.abs(b.amount),
         evidence: [ev(a, "base"), ev(b, "compare")],
-        calc: { expr: `같은 거래처 · 같은 금액${a.item ? " · 같은 품목" : ""}${gap !== undefined ? ` · 날짜 차이 ${gap}일` : ""}${extra ? " ·" + extra : ""}`, inputs: { amount: a.amount, ...(gap !== undefined ? { days: gap } : {}) } },
+        calc: { expr: `같은 거래처 · 같은 금액${a.item ? " · 같은 품목" : ""}${gap !== undefined ? ` · 날짜 차이 ${gap}일` : ""}${extra}`, inputs: { amount: a.amount, ...(gap !== undefined ? { days: gap } : {}) } },
         caveat: CAVEAT[check],
       });
     };

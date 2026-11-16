@@ -1,0 +1,76 @@
+{
+ "note": "가상(합성) 공사자료 — 실제 기업 자료가 아니다",
+ "sites": [
+  {
+   "key": "A",
+   "name": "[가상] 현장 A · 가나54 병원 내부 개보수",
+   "status": "completed",
+   "contractAmount": 79128000,
+   "vat": "excluded",
+   "changes": [
+    {
+     "round": 1,
+     "prevAmount": 79128000,
+     "newAmount": 67456000
+    }
+   ],
+   "files": [
+    {
+     "path": "synthetic-A-contract.xlsx",
+     "display": "[가상] 계약내역서.xlsx",
+     "kind": "contract"
+    },
+    {
+     "path": "synthetic-A-change1.xlsx",
+     "display": "[가상] 변경내역서 1차.xlsx",
+     "kind": "change",
+     "round": 1
+    },
+    {
+     "path": "synthetic-A-settlement.xls",
+     "display": "[가상] 정산서.xls",
+     "kind": "settlement"
+    },
+    {
+     "path": "synthetic-A-cost.csv",
+     "display": "[가상] 매입 장부.csv",
+     "kind": "cost"
+    }
+   ],
+   "story": "계약 · 변경 1차 · 정산 · 매입 장부. 줄 계산 · 합계 · 변경 대조 결과와 '확인 필요' 연결 2건, 매입 장부의 중복 가능성이 들어 있다"
+  },
+  {
+   "key": "B",
+   "name": "[가상] 현장 B · 가나76 매장 인테리어",
+   "status": "completed",
+   "contractAmount": 122389000,
+   "vat": "excluded",
+   "changes": [
+    {
+     "round": 1,
+     "prevAmount": 122389000,
+     "newAmount": 116881000
+    }
+   ],
+   "files": [
+    {
+     "path": "synthetic-B-contract.xlsx",
+     "display": "[가상] 계약내역서.xlsx",
+     "kind": "contract"
+    },
+    {
+     "path": "synthetic-B-change1.xlsx",
+     "display": "[가상] 변경내역서 1차.xlsx",
+     "kind": "change",
+     "round": 1
+    },
+    {
+     "path": "synthetic-B-settlement.xlsx",
+     "display": "[가상] 정산서.xlsx",
+     "kind": "settlement"
+    }
+   ],
+   "story": "현장 A 와 같은 '사전에 없는 다른 이름'이 다시 나온다 — A 에서 회사 규칙으로 확인한 판단이 B 에서 다시 쓰이는지 본다"
+  }
+ ]
+}

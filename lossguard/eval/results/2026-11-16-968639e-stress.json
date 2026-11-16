@@ -1,0 +1,486 @@
+{
+  "startedAt": "2026-11-16T09:32:36.215Z",
+  "commit": "968639e",
+  "engine": "0.4.1",
+  "n": 30,
+  "sets": {
+    "base": {
+      "label": "기준(개발 때와 같은 분포)",
+      "gt": 450,
+      "auto": 425,
+      "autoTP": 425,
+      "review": 25,
+      "reviewTP": 25,
+      "baselineExactName": 184,
+      "baselineNormalized": 305,
+      "causes": {
+        "확인 대기": 25
+      },
+      "byTransform": {
+        "space": [
+          81,
+          77
+        ],
+        "unitForm": [
+          102,
+          96
+        ],
+        "synonym:dict": [
+          42,
+          42
+        ],
+        "none": [
+          146,
+          146
+        ],
+        "specInName": [
+          63,
+          59
+        ],
+        "specNotation": [
+          26,
+          24
+        ],
+        "order": [
+          33,
+          31
+        ],
+        "synonym:nodict": [
+          53,
+          43
+        ],
+        "synonym:hard": [
+          26,
+          11
+        ],
+        "tag": [
+          36,
+          35
+        ]
+      }
+    },
+    "holdout": {
+      "label": "처음 보는 품목 · 사전에 없는 다른 이름",
+      "gt": 365,
+      "auto": 339,
+      "autoTP": 339,
+      "review": 26,
+      "reviewTP": 26,
+      "baselineExactName": 99,
+      "baselineNormalized": 191,
+      "causes": {
+        "확인 대기": 26
+      },
+      "byTransform": {
+        "synonym:hard": [
+          72,
+          46
+        ],
+        "specInName": [
+          84,
+          74
+        ],
+        "unitForm": [
+          102,
+          92
+        ],
+        "synonym:nodict": [
+          83,
+          83
+        ],
+        "none": [
+          66,
+          66
+        ],
+        "space": [
+          103,
+          91
+        ],
+        "order": [
+          39,
+          36
+        ],
+        "tag": [
+          32,
+          30
+        ],
+        "specNotation": [
+          19,
+          13
+        ]
+      }
+    },
+    "price": {
+      "label": "다른 문서 단가 재견적(±5~30%)",
+      "gt": 450,
+      "auto": 414,
+      "autoTP": 414,
+      "review": 35,
+      "reviewTP": 35,
+      "baselineExactName": 181,
+      "baselineNormalized": 291,
+      "causes": {
+        "확인 대기": 35,
+        "이름 유사도 낮음": 1
+      },
+      "byTransform": {
+        "space": [
+          74,
+          67
+        ],
+        "unitForm": [
+          99,
+          92
+        ],
+        "tag": [
+          41,
+          39
+        ],
+        "none": [
+          146,
+          146
+        ],
+        "order": [
+          34,
+          30
+        ],
+        "synonym:hard": [
+          30,
+          10
+        ],
+        "synonym:nodict": [
+          69,
+          53
+        ],
+        "specInName": [
+          52,
+          47
+        ],
+        "specNotation": [
+          21,
+          21
+        ],
+        "synonym:dict": [
+          42,
+          42
+        ]
+      }
+    },
+    "shuffle": {
+      "label": "구간 안 항목 순서 섞임",
+      "gt": 450,
+      "auto": 406,
+      "autoTP": 406,
+      "review": 41,
+      "reviewTP": 26,
+      "baselineExactName": 178,
+      "baselineNormalized": 305,
+      "causes": {
+        "확인 대기": 26,
+        "다른 기준 항목과 확인 대기": 15,
+        "기준 항목을 다른 줄이 가져감": 1,
+        "점수는 넘었으나 후보에서 빠짐": 1,
+        "이름 유사도 낮음": 1
+      },
+      "byTransform": {
+        "space": [
+          81,
+          72
+        ],
+        "unitForm": [
+          102,
+          92
+        ],
+        "synonym:dict": [
+          42,
+          40
+        ],
+        "none": [
+          146,
+          143
+        ],
+        "specInName": [
+          63,
+          55
+        ],
+        "specNotation": [
+          26,
+          23
+        ],
+        "order": [
+          33,
+          31
+        ],
+        "synonym:nodict": [
+          53,
+          39
+        ],
+        "synonym:hard": [
+          26,
+          6
+        ],
+        "tag": [
+          36,
+          34
+        ]
+      }
+    },
+    "resection": {
+      "label": "구간(공종)을 층 · 구역으로 다시 묶음",
+      "gt": 450,
+      "auto": 406,
+      "autoTP": 406,
+      "review": 41,
+      "reviewTP": 41,
+      "baselineExactName": 180,
+      "baselineNormalized": 305,
+      "causes": {
+        "확인 대기": 41,
+        "이름 유사도 낮음": 2,
+        "점수는 넘었으나 후보에서 빠짐": 1
+      },
+      "byTransform": {
+        "space": [
+          81,
+          73
+        ],
+        "unitForm": [
+          102,
+          92
+        ],
+        "synonym:dict": [
+          42,
+          36
+        ],
+        "none": [
+          146,
+          146
+        ],
+        "specInName": [
+          63,
+          57
+        ],
+        "specNotation": [
+          26,
+          24
+        ],
+        "order": [
+          33,
+          31
+        ],
+        "synonym:nodict": [
+          53,
+          39
+        ],
+        "synonym:hard": [
+          26,
+          2
+        ],
+        "tag": [
+          36,
+          34
+        ]
+      }
+    },
+    "typo": {
+      "label": "이름 오타(30%)",
+      "gt": 450,
+      "auto": 424,
+      "autoTP": 424,
+      "review": 26,
+      "reviewTP": 26,
+      "baselineExactName": 157,
+      "baselineNormalized": 236,
+      "causes": {
+        "확인 대기": 26
+      },
+      "byTransform": {
+        "space": [
+          81,
+          80
+        ],
+        "unitForm": [
+          104,
+          99
+        ],
+        "typo": [
+          138,
+          121
+        ],
+        "none": [
+          110,
+          110
+        ],
+        "synonym:dict": [
+          42,
+          34
+        ],
+        "specNotation": [
+          36,
+          34
+        ],
+        "synonym:nodict": [
+          50,
+          43
+        ],
+        "order": [
+          24,
+          22
+        ],
+        "specInName": [
+          60,
+          58
+        ],
+        "tag": [
+          26,
+          25
+        ],
+        "synonym:hard": [
+          21,
+          10
+        ]
+      }
+    },
+    "neardup": {
+      "label": "이름 같고 규격만 다른 항목 다수",
+      "gt": 720,
+      "auto": 704,
+      "autoTP": 704,
+      "review": 16,
+      "reviewTP": 16,
+      "baselineExactName": 259,
+      "baselineNormalized": 540,
+      "causes": {
+        "확인 대기": 16
+      },
+      "byTransform": {
+        "tag": [
+          42,
+          41
+        ],
+        "synonym:dict": [
+          51,
+          51
+        ],
+        "order": [
+          53,
+          53
+        ],
+        "unitForm": [
+          160,
+          157
+        ],
+        "specNotation": [
+          70,
+          69
+        ],
+        "specInName": [
+          106,
+          105
+        ],
+        "none": [
+          221,
+          221
+        ],
+        "synonym:nodict": [
+          56,
+          50
+        ],
+        "space": [
+          150,
+          145
+        ],
+        "synonym:hard": [
+          20,
+          10
+        ]
+      }
+    },
+    "all": {
+      "label": "위 조건 전부 겹침",
+      "gt": 635,
+      "auto": 517,
+      "autoTP": 517,
+      "review": 99,
+      "reviewTP": 99,
+      "baselineExactName": 94,
+      "baselineNormalized": 326,
+      "causes": {
+        "확인 대기": 99,
+        "이름 유사도 낮음": 19
+      },
+      "byTransform": {
+        "space": [
+          216,
+          183
+        ],
+        "unitForm": [
+          191,
+          164
+        ],
+        "none": [
+          90,
+          87
+        ],
+        "synonym:nodict": [
+          72,
+          42
+        ],
+        "synonym:hard": [
+          62,
+          9
+        ],
+        "order": [
+          75,
+          58
+        ],
+        "specNotation": [
+          65,
+          57
+        ],
+        "typo": [
+          185,
+          128
+        ],
+        "tag": [
+          72,
+          61
+        ],
+        "specInName": [
+          123,
+          104
+        ]
+      }
+    }
+  },
+  "packAblation": {
+    "full": {
+      "t1": [
+        544,
+        544
+      ],
+      "t3": [
+        2382,
+        2382
+      ],
+      "tp": 47,
+      "fp": 0,
+      "err": 47,
+      "found": 47
+    },
+    "mini": {
+      "t1": [
+        483,
+        544
+      ],
+      "t3": [
+        2166,
+        2382
+      ],
+      "tp": 35,
+      "fp": 3,
+      "err": 47,
+      "found": 35
+    }
+  }
+}

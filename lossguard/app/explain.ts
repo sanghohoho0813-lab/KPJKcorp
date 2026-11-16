@@ -67,4 +67,12 @@ export function amountLabel(f: Finding): string {
   return f.detector === "D10" ? `확인 필요 금액 ${won(f.amount)}` : `차이 금액 ${won(f.amount)}`;
 }
 
+/** 근거 칸 이름(엔진의 열쇠 → 사람이 읽는 말) */
+const KEYNAME: Record<string, string> = { name: "품명", spec: "규격", unit: "단위", qty: "수량", unitPrice: "단가", amount: "금액", date: "날짜", vendor: "거래처", item: "품목", supply: "공급가액", total: "합계", docNo: "문서번호", tax: "세액" };
+const GROUPNAME: Record<string, string> = { mat: "재료비 ", lab: "노무비 ", exp: "경비 ", sum: "합계 ", before: "변경 전 ", after: "변경 후 ", delta: "증감 " };
+export function keyLabel(k: string): string {
+  const [g, r] = k.includes(".") ? k.split(".") : ["", k];
+  return `${GROUPNAME[g] ?? ""}${KEYNAME[r] ?? r}`;
+}
+
 export const NOT_LOSS = "이 금액은 문서 사이의 차이이며 손실로 확정된 금액이 아닙니다.";

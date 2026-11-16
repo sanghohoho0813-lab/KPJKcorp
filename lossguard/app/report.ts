@@ -1,6 +1,6 @@
 import type { Finding } from "../engine/types";
 import type { AnalysisView, FindingCase, Judgment, Run, Site, StoredFile } from "./model";
-import { CATEGORY, DETECTOR, STATUS, amountLabel, calcSteps, plainWhy } from "./explain";
+import { CATEGORY, DETECTOR, STATUS, amountLabel, calcSteps, keyLabel, plainWhy } from "./explain";
 import { categoryOf, unlinked } from "./analysis";
 import { reflectedTotal } from "./workflow";
 
@@ -47,7 +47,7 @@ export function buildReport(site: Site, files: StoredFile[], run: Run, view: Ana
     return {
       no: i + 1, key: f.key, category: CATEGORY[categoryOf(f)].label, detector: `${f.detector} ${DETECTOR[f.detector] ?? ""}`.trim(),
       title: f.title, message: f.message, amount: amountLabel(f), why: plainWhy(f), steps: calcSteps(f),
-      evidence: f.evidence.map((e) => `${e.fileName} › ${e.sheet} › ${e.row + 1}행 — ${Object.entries(e.values).map(([k, v]) => `${k}: ${v || "(빈칸)"}`).join(" · ")}`),
+      evidence: f.evidence.map((e) => `${e.fileName} › ${e.sheet} › ${e.row + 1}행 — ${Object.entries(e.values).map(([k, v]) => `${keyLabel(k)} ${v || "(빈칸)"}`).join(" · ")}`),
       caveat: f.caveat, status: c ? STATUS[c.status].label : STATUS.open.label, action: c?.action,
       reflected: c?.reflected ? (c.reflected.amount === null ? `반영 금액 없음(${c.reflected.by} 선택)` : `${won(c.reflected.amount)} — ${c.reflected.note || "근거 메모 없음"} (${c.reflected.by})`) : undefined,
       history: (c?.history ?? []).map((h) => `${h.at.slice(0, 16).replace("T", " ")} ${h.by} — ${h.type === "status" ? `${STATUS[h.from!].label} → ${STATUS[h.to!].label}` : h.type === "reflected" ? `반영 금액 ${h.amount === null ? "없음" : won(h.amount ?? 0)}` : h.type === "action" ? "조치" : h.type === "note" ? "메모" : "자동"}${h.text ? `: ${h.text}` : ""}`),
