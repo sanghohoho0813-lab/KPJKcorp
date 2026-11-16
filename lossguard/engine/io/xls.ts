@@ -106,6 +106,7 @@ export function readXls(bytes: Uint8Array, fileName = ""): RawWorkbook {
   for (let i = 0; i < recs.length; i++) {
     const r = recs[i];
     if (r.type === 0x000a) break;
+    if (r.type === 0x002f) throw new XlsError("암호가 걸린 파일입니다. 엑셀에서 암호를 푼 뒤 다시 저장해 주세요(암호는 받지 않습니다)."); // FILEPASS
     const dv = new DataView(r.data.buffer, r.data.byteOffset, r.data.byteLength);
     if (r.type === 0x0085 && r.data.length >= 8) {
       if (r.data[5] !== 0) continue; // 차트 · 매크로 시트 제외

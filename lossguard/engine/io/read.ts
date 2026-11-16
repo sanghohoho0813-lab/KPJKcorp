@@ -11,13 +11,14 @@ import { csvSheet, decodeText, htmlSheets } from "./text";
  */
 export class FormatError extends Error {}
 
-export type DetectedFormat = "xlsx" | "xls" | "csv" | "html" | "spreadsheetml" | "pdf" | "hwp" | "doc" | "zip-other" | "unknown";
+export type DetectedFormat = "xlsx" | "xls" | "csv" | "html" | "spreadsheetml" | "pdf" | "hwp" | "doc" | "encrypted" | "unknown";
 
 export function detectFormat(b: Uint8Array): DetectedFormat {
   if (b.length >= 4 && b[0] === 0x50 && b[1] === 0x4b && b[2] === 0x03 && b[3] === 0x04) return "xlsx";
   if (isCfb(b)) {
     try {
       const names = [...readCfb(b).keys()];
+      if (names.includes("EncryptedPackage") || names.includes("EncryptionInfo")) return "encrypted"; // 암호를 건 .xlsx 는 OLE2 로 싸여 있다
       if (names.includes("Workbook") || names.includes("Book")) return "xls";
       if (names.some((n) => /hwp/i.test(n)) || names.includes("FileHeader")) return "hwp";
       if (names.includes("WordDocument")) return "doc";
@@ -44,6 +45,7 @@ export async function readWorkbook(bytes: Uint8Array, fileName = ""): Promise<Ra
     case "xls": return { ...readXls(bytes, fileName), format };
     case "csv": return { fileName, sheets: [csvSheet(decodeText(bytes), baseName(fileName))], format };
     case "html": return { fileName, sheets: htmlSheets(decodeText(bytes), baseName(fileName)), format };
+    case "encrypted": throw new FormatError("암호가 걸린 파일입니다. 엑셀에서 암호를 푼 뒤 다시 저장해 주세요(암호는 받지 않습니다).");
     case "spreadsheetml": throw new FormatError("Excel 2003 XML 형식은 아직 읽지 않습니다. 엑셀에서 .xlsx 로 저장해 주세요.");
     case "pdf": throw new FormatError("PDF 는 아직 읽지 않습니다(표 인식 정확도 문제). 원본 엑셀 파일을 부탁드립니다.");
     case "hwp": throw new FormatError("한글(.hwp) 파일은 읽지 않습니다. 표를 엑셀로 옮기거나 원본 엑셀을 부탁드립니다.");

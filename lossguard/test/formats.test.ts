@@ -57,6 +57,22 @@ const FX = join(__dirname, "fixtures");
   try { await readWorkbook(loop, "loop.xls"); handled++; } catch { handled++; }
   ok(handled === 5, "잘린 · 순환 고리가 있는 .xls 를 오류 또는 부분 읽기로 처리(멈추지 않음)");
 
+  // 암호가 걸린 파일: OLE2 안의 EncryptedPackage(.xlsx 암호) · BIFF 의 FILEPASS 레코드(.xls 암호) → 이유를 알려 주는 오류
+  const enc1 = xls.slice();
+  const wbName = new Uint8Array([..."Workbook"].flatMap((ch) => [ch.charCodeAt(0), 0]));
+  let at = -1;
+  for (let i = 0; i + wbName.length <= enc1.length && at < 0; i++) if (wbName.every((x, k) => enc1[i + k] === x)) at = i;
+  [..."EncryptedPackage"].forEach((ch, k) => { enc1[at + 2 * k] = ch.charCodeAt(0); enc1[at + 2 * k + 1] = 0; });
+  enc1[at + 32] = 0; enc1[at + 33] = 0; enc1[at + 0x40] = 34; enc1[at + 0x41] = 0;
+  const enc2 = xls.slice();
+  let bof = -1;
+  for (let i = 0; i + 6 <= enc2.length && bof < 0; i++) if (enc2[i] === 0x09 && enc2[i + 1] === 0x08 && enc2[i + 4] === 0x00 && enc2[i + 5] === 0x06) bof = i;
+  const next = bof + 4 + (enc2[bof + 2] | (enc2[bof + 3] << 8));
+  enc2[next] = 0x2f; enc2[next + 1] = 0x00;
+  let encMsgs = 0;
+  for (const b of [enc1, enc2]) { try { await readWorkbook(b, "암호.xls"); } catch (e) { if (e instanceof Error && e.message.includes("암호")) encMsgs++; } }
+  ok(at > 0 && bof > 0 && encMsgs === 2 && detectFormat(enc1) === "encrypted", "암호가 걸린 .xlsx(OLE2 EncryptedPackage) · .xls(FILEPASS) → '암호를 풀어 달라'는 안내");
+
   // 보이는 값(반올림)과 계산 검산: 수량 559.6 이 "560" 으로 보이는 CSV — 오탐 없음, 진짜 오류는 그대로 잡음
   const csv = ["품명,규격,단위,수량,단가,금액", "자재 가,,m2,560,30000,16788000", "자재 나,,m2,12,1000,12000", "자재 다,,m2,3,500,1500", "자재 라,,m2,7,2000,14000", "자재 마,,m2,10,1000,11000", "합계,,,,,16826500"].join("\n");
   const wb = await readWorkbook(enc(csv), "t.csv");
