@@ -31,6 +31,17 @@ ok(toLg.length === 0, `src/ 가 lossguard/ 를 불러오지 않음 ${toLg.map((f
 // 3) 엔진은 업종 묶음 · 생성기 · 평가 · Node 모듈을 불러오지 않음(브라우저 · 서버 공용)
 const bad = engineFiles.filter((f) => imports(readFileSync(f, "utf8")).some((i) => !i.startsWith(".") || /\.\.\/(\.\.\/)?(packs|synth|eval|cli|test)\b/.test(i) || i.startsWith("node:")));
 ok(bad.length === 0, `엔진이 상대 경로의 엔진 파일만 불러옴 ${bad.map((f) => relative(ROOT, f)).join(", ")}`);
+// 3-2) 제품 로직(app/)은 엔진 · 업종 묶음 타입만 쓰고 Node 모듈 · 생성기 · 평가 · 화면을 불러오지 않음(브라우저 · 서버 공용)
+const appFiles = lgFiles.filter((f) => relative(LG, f).startsWith("app"));
+const badApp = appFiles.filter((f) => imports(readFileSync(f, "utf8")).some((i) => !i.startsWith(".") || i.startsWith("node:") || /\.\.\/(synth|eval|cli|test|demo)\b/.test(i)));
+ok(appFiles.length > 0 && badApp.length === 0, `제품 로직(app/)이 Node · 생성기 · 평가 · 화면을 불러오지 않음 ${badApp.map((f) => relative(ROOT, f)).join(", ")}`);
+// 3-3) 고객 자료가 밖으로 나가지 않는 구조: 엔진 · 제품 로직 · 화면 코드에 네트워크 호출이 없다(시연 서버는 정적 파일만 내준다)
+const NET = /\bfetch\s*\(|XMLHttpRequest|WebSocket|EventSource|sendBeacon|navigator\.share|\bimport\(\s*["'`]https?:|https?:\/\/(?!localhost|127\.0\.0\.1)[a-z0-9.-]+\.[a-z]{2,}/i;
+const clientFiles = lgFiles.concat(walk(LG).filter((f) => /\.tsx$/.test(f))).filter((f) => /^(engine|app|demo\/src)\//.test(relative(LG, f)));
+const netHits = clientFiles.filter((f) => NET.test(stripComments(readFileSync(f, "utf8"))));
+ok(clientFiles.length > 0 && netHits.length === 0, `엔진 · 제품 로직 · 화면 코드(${clientFiles.length}개)에 네트워크 호출 · 외부 주소 없음 ${netHits.map((f) => relative(ROOT, f)).join(", ")}`);
+const aiHits = walk(LG).filter((f) => /\.(ts|tsx|mjs|js)$/.test(f) && !f.endsWith("boundary.test.ts")).filter((f) => /anthropic|openai|generativelanguage|api\.cohere|claude\.ai\/api/i.test(stripComments(readFileSync(f, "utf8"))));
+ok(aiHits.length === 0, `lossguard/ 코드에 AI API 호출 없음 ${aiHits.map((f) => relative(ROOT, f)).join(", ")}`);
 // 4) 엔진 코드(주석 제외)에 건설 업종 낱말이 없음 — 업종 지식은 업종 묶음에만
 const WORDS = ["공종", "내역서", "타일", "석고", "철거", "도장", "경량", "목공", "방수", "미장", "천정", "천장", "창호", "일위대가", "집계표", "갑지", "을지", "기성", "하도급", "공사", "인테리어", "건설", "단수정리", "부가가치세", "공과잡비", "품명", "규격"];
 const hits: string[] = [];
