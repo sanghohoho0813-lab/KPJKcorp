@@ -1,6 +1,6 @@
 import type { IndustryPack, Line, LineageItem, Link, LinkDecision, MatchOptions, NormName } from "../types";
 import { bigrams, dice, jaccard } from "../normalize/text";
-import { numsOverlap } from "../normalize/spec";
+import { specNumSim } from "../normalize/spec";
 import type { Normalizer } from "../normalize/name";
 import { makeNormalizer } from "../normalize/name";
 
@@ -36,8 +36,10 @@ export function pairScore(a: NormName, b: NormName, pa: number | undefined, pb: 
     a.canon && a.canon === b.canon ? 1 : 0,
     aw && aw === bw ? 1 : (a.specWords.length || b.specWords.length) ? dice(bigrams(aw), bigrams(bw)) : 0,
     containment(a, b),
+    // 오타(비슷한 글자 · 받침 차이)는 자모 단위로 비교 — 같은 이름보다는 낮게 친다
+    a.jamo.length && b.jamo.length ? 0.95 * dice(a.jamo, b.jamo) : 0,
   );
-  const ov = numsOverlap(a.specNums, b.specNums);
+  const ov = specNumSim(a.specNums, b.specNums);
   let spec = ov === undefined ? 0.5 : ov;
   if (ov === undefined && (a.specWords.length || b.specWords.length)) {
     const inOther = (x: NormName, y: NormName) => x.specWords.length > 0 && x.specWords.every((w) => y.specWords.includes(w) || y.tokens.includes(w) || y.canon.includes(w));
@@ -109,9 +111,36 @@ export function matchLines(base: Line[], other: Line[], pack: IndustryPack, norm
   secScores.sort((x, y) => y[0] - x[0] || (x[1] < y[1] ? -1 : x[1] > y[1] ? 1 : 0) || (x[2] < y[2] ? -1 : x[2] > y[2] ? 1 : 0));
   const pairedB = new Set<string>();
   for (const [, sa, sb] of secScores) { if (secPair.has(sa) || pairedB.has(sb)) continue; secPair.set(sa, sb); pairedB.add(sb); }
-  const secSim = (a: Item, b: Item) => (!a.sec || !b.sec ? 0.5 : secPair.get(a.sec) === b.sec ? 1 : 0);
+  // 구간 구성이 서로 대응할 때만 구간 일치를 근거로 쓴다(층 · 구역으로 다시 묶은 문서처럼 대응하지 않으면 중립)
+  const pairedShare = (xs: Item[], has: (sec: string) => boolean) => (xs.length ? xs.filter((x) => x.sec && has(x.sec)).length / xs.length : 0);
+  const sectionsCorrespond = pairedShare(A, (sec) => secPair.has(sec)) >= 0.5 && pairedShare(B, (sec) => pairedB.has(sec)) >= 0.5;
+  const secSim = (a: Item, b: Item) => {
+    if (!sectionsCorrespond || !a.sec || !b.sec) return 0.5;
+    const pa = secPair.get(a.sec);
+    if (pa === b.sec) return 1;
+    // 두 구간 모두 다른 짝이 있을 때만 "다른 구간"으로 본다 — 짝이 없는 구간은 근거가 없으므로 중립
+    return pa !== undefined && pairedB.has(b.sec) ? 0 : 0.5;
+  };
   const score = (a: Item, b: Item) => pairScore(a.norm, b.norm, a.line.unitPrice, b.line.unitPrice, secSim(a, b), pack, opts);
   const allowed = (a: Item, b: Item) => !forbid.has(`${a.line.fp}|${b.line.fp}`);
+
+  /** 순서 증거: 서로 가장 잘 맞는 강한 짝(0.9 이상)들의 순서가 80% 이상 보존되면 참. 짝이 3개 미만이면 판단 불가 → 참 */
+  const orderEvidence = (xs: Item[], ys: Item[]): boolean => {
+    const bestOf = (x: Item, pool: Item[]) => { let b: Item | undefined, bs = 0; for (const y of pool) { const sc = pairScore(x.norm, y.norm, x.line.unitPrice, y.line.unitPrice, 1, pack, opts).score; if (sc > bs) { bs = sc; b = y; } } return [b, bs] as const; };
+    const strong: [number, number][] = [];
+    for (const x of xs) {
+      const [y, sc] = bestOf(x, ys);
+      if (!y || sc < 0.9) continue;
+      const [x2] = bestOf(y, xs);
+      if (x2 === x) strong.push([xs.indexOf(x), ys.indexOf(y)]);
+    }
+    if (strong.length < 3) return true;
+    // 최장 증가 부분열 길이
+    const seq = strong.sort((p, q) => p[0] - q[0]).map((p) => p[1]);
+    const tails: number[] = [];
+    for (const v of seq) { let lo = 0, hi = tails.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (tails[mid] < v) lo = mid + 1; else hi = mid; } tails[lo] = v; }
+    return tails.length / seq.length >= 0.8;
+  };
 
   // 2) 순서 정렬
   if (useAlign) {
@@ -119,6 +148,7 @@ export function matchLines(base: Line[], other: Line[], pack: IndustryPack, norm
       const xs = A.filter((x) => x.sec === sa && !usedA.has(x.idx));
       const ys = B.filter((y) => y.sec === sb && !usedB.has(y.idx));
       if (!xs.length || !ys.length || xs.length * ys.length > 250000) continue;
+      if (!orderEvidence(xs, ys)) continue;
       const S: (Scored | null)[][] = xs.map((x) => ys.map((y) => { if (!allowed(x, y)) return null; const s = score(x, y); return s.score >= P.tAlign ? s : null; }));
       const n = xs.length, m = ys.length;
       const dp: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));

@@ -120,7 +120,7 @@ export function makeSettlement(r: Rng, ch: ChangeModel | null, p: Project): { se
 }
 
 // ── 다른 문서에서 이름을 다르게 적기 ─────────────────────────────────
-export type Transform = "space" | "specInName" | "specNotation" | "unitForm" | "synonym:dict" | "synonym:nodict" | "synonym:hard" | "order" | "tag";
+export type Transform = "space" | "specInName" | "specNotation" | "unitForm" | "synonym:dict" | "synonym:nodict" | "synonym:hard" | "order" | "tag" | "typo";
 export interface Named { name: string; spec: string; unit: string; transforms: Transform[] }
 
 const UNIT_FORMS: Record<string, string[]> = { "㎡": ["M2", "m2", "m²"], "M": ["m"], "개": ["EA", "ea"], "식": ["LS", "L.S"], "개소": ["개소"], "조": ["SET", "조"], "대": ["대"], "면": ["면"] };

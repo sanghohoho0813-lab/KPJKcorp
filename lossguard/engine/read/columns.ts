@@ -224,6 +224,23 @@ export function inferColumns(
     const q = colOf("qty", qg), p = colOf("unitPrice", pg), a = colOf("amount", ag);
     if (q !== undefined && p !== undefined && a !== undefined) {
       const r = rateOf(q, p, a);
+      // 같은 칸 이름을 품은 열이 둘 이상이면(예: 계약수량 · 정산수량) 이름만으로는 고를 수 없다 → 계산이 더 잘 맞는 열로
+      if (r < 0.95 && block) {
+        const nameHas = (c: number, role: LeafRole) => block.keys[c]?.some((k) => matchLeaf(k, idx)?.role === role) ?? false;
+        let best: [number, number, number, number] = [q, p, a, r];
+        for (const c of numeric) {
+          if (c === q || c === p || c === a) continue;
+          if (nameHas(c, "qty")) { const rr = rateOf(c, p, a); if (rr > best[3] + 0.15) best = [c, p, a, rr]; }
+          if (nameHas(c, "amount")) { const rr = rateOf(q, p, c); if (rr > best[3] + 0.15) best = [q, p, c, rr]; }
+        }
+        if (best[3] > r) {
+          diagnostics.push(`같은 이름의 열이 여럿이라 계산이 맞는 열로 고름(${Math.round(r * 100)}% → ${Math.round(best[3] * 100)}%)`);
+          if (best[0] !== q) put(best[0], "qty", qg, "arith", { name: 0.8, arith: best[3] });
+          if (best[2] !== a) put(best[2], "amount", ag, "arith", { name: 0.8, arith: best[3] });
+          for (const c of [best[0], best[1], best[2]]) { const x = assigned.get(c); if (x) x.evidence.arith = best[3]; }
+          return;
+        }
+      }
       if (r >= 0.5 || !allowOverride) { for (const c of [q, p, a]) { const x = assigned.get(c); if (x) x.evidence.arith = r; } return; }
       const t = triples[0];
       if (t && t.rate >= 0.8) {

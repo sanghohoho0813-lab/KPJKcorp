@@ -45,3 +45,15 @@ export function jaccard(a: string[], b: string[]): number {
   for (const x of sa) if (sb.has(x)) inter++;
   return inter / (sa.size + sb.size - inter);
 }
+
+/** 한글 음절 → 자모(초성 · 중성 · 종성) 글자열. 한글이 아닌 글자는 그대로 */
+export function jamoText(s: string): string {
+  let out = "";
+  for (const ch of s) {
+    const code = ch.charCodeAt(0) - 0xac00;
+    if (code < 0 || code > 11171) { out += ch; continue; }
+    const l = Math.floor(code / 588), v = Math.floor((code % 588) / 28), t = code % 28;
+    out += String.fromCharCode(0x1100 + l, 0x1161 + v) + (t ? String.fromCharCode(0x11a7 + t) : "");
+  }
+  return out;
+}

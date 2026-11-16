@@ -95,7 +95,12 @@ function crossSheet(out: Finding[], ctx: DetectCtx, doc: ParsedDoc, norm: Return
   const secs = details.flatMap((d) => sectionsOf(d, norm));
   const tol = (n: number) => Math.max(1, n * ctx.pack.params.sumTolPerLine);
   for (const sm of summaries) {
-    const rows = sm.lines.filter((l) => l.kind === "item" && !l.flags.includes("overhead") && l.amount !== undefined);
+    // 요약 시트의 "구간 목록"은 첫 합계 줄 앞까지다 — 그 뒤의 줄(간접비 · 조정 등)은 세부 시트의 구간과 비교하지 않는다(낱말 사전 없이 구조로 판단)
+    const firstSum = sm.lines.findIndex((l) => l.kind === "subtotal" || l.kind === "total");
+    const block = firstSum >= 0 ? sm.lines.slice(0, firstSum) : sm.lines;
+    const rows = block.filter((l) => l.kind === "item" && !l.flags.includes("overhead") && l.amount !== undefined);
+    let matchedRows = 0;
+    const unmatched: Finding[] = [];
     const used = new Set<string>();
     const byCanon = new Map<string, Sec[]>();
     for (const s of secs) { const arr = byCanon.get(s.canon); if (arr) arr.push(s); else byCanon.set(s.canon, [s]); }
@@ -113,7 +118,7 @@ function crossSheet(out: Finding[], ctx: DetectCtx, doc: ParsedDoc, norm: Return
         }
       }
       if (!best || bestS < 0.75) {
-        out.push({
+        unmatched.push({
           key: findingKey(["D02", "summary-unmatched", docTag(doc), r.fp]),
           detector: "D02", check: "summary-unmatched", severity: "low", certainty: "inferred",
           title: "요약 시트의 구간을 세부 시트에서 찾지 못했습니다",
@@ -125,6 +130,7 @@ function crossSheet(out: Finding[], ctx: DetectCtx, doc: ParsedDoc, norm: Return
         continue;
       }
       used.add(best.key);
+      matchedRows++;
       const v = r.amount!;
       const okVals = [best.sum, best.subtotal?.amount, best.header?.amount].filter((x): x is number => x !== undefined);
       if (okVals.some((x) => Math.abs(x - v) <= tol(best!.items.length))) continue;
@@ -142,6 +148,11 @@ function crossSheet(out: Finding[], ctx: DetectCtx, doc: ParsedDoc, norm: Return
       });
     }
     // 세부에는 있는데 요약에 없는 구간(최상위 · 그다음 단계만)
+    // 이름이 맞지 않는 요약 줄은, 요약 시트의 대부분이 세부 시트와 맞을 때만 알린다(대부분 안 맞으면 읽기 문제일 가능성이 크다)
+    if (rows.length && matchedRows >= rows.length * 0.5) out.push(...unmatched);
+    // 요약 시트를 구간 목록으로 제대로 읽었는지: 맞춘 구간이 너무 적으면(절반 미만) "요약에 없는 구간" 판정을 하지 않는다
+    const topSecs = secs.filter((x) => !x.key.slice(1).includes("/"));
+    if (matchedRows < Math.max(2, Math.ceil(topSecs.length * 0.5)) && rows.length > 0 && matchedRows < rows.length * 0.5) continue;
     let topLevel = Infinity;
     for (const s of secs) topLevel = Math.min(topLevel, s.header?.level ?? 1);
     // 쓰인 구간의 조상 열쇠 모음(하위 구간이 요약에 있으면 상위 구간은 빠진 것이 아니다)

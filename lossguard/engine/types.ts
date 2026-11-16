@@ -50,6 +50,8 @@ export interface NormName {
   canon: string;
   tokens: string[];
   bigrams: string[];
+  /** 한글을 자모로 풀어 만든 글자 두 개 묶음(오타 비교용) */
+  jamo: string[];
   specNums: string[];
   specWords: string[];
   unit: string;

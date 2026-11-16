@@ -1,5 +1,5 @@
 import type { IndustryPack, NormName } from "../types";
-import { bigrams, compactText } from "./text";
+import { bigrams, compactText, jamoText } from "./text";
 import { specTokens } from "./spec";
 
 export type NumberingStyle = "roman" | "dash" | "digit" | "hangul" | "paren" | "circle";
@@ -110,6 +110,7 @@ export function makeNormalizer(pack: IndustryPack, opts: { synonyms?: boolean } 
       canon: canonName,
       tokens,
       bigrams: bigrams(canonName),
+      jamo: bigrams(jamoText(canonName)),
       specNums: [...st.nums].sort(),
       specWords: [...new Set(st.words)].sort(),
       unit: unit(rawUnit),

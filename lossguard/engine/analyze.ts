@@ -67,7 +67,18 @@ export function analyze(input: AnalyzeInput): AnalyzeResult {
     base = (sm && totalsOf(sm).preTax?.amount) || itemSum(detailItems(contract)) || undefined;
   }
   const ctx: DetectCtx = { pack, meta, docs, raw, base, links };
-  const found: Finding[] = [...detectD01(ctx), ...detectD02(ctx), ...detectD03(ctx)];
+  const raw0: Finding[] = [...detectD01(ctx), ...detectD02(ctx), ...detectD03(ctx)];
+  // 안전장치: 읽기 신뢰도가 문턱보다 낮은 시트를 근거로 한 결과는 경고로 내지 않고 보류한다
+  //  (처음 보는 양식을 잘못 읽은 채로 틀린 경고를 쏟아내지 않게 — 사람이 열 지정을 확인한 뒤 다시 분석)
+  const conf = new Map<string, { c: number; n: number }>();
+  for (const d of docs) for (const s of d.sheets) if (s.lines.length) conf.set(`${d.docId}|${s.sheet}`, { c: s.confidence, n: 0 });
+  const found: Finding[] = [];
+  for (const f of raw0) {
+    const low = f.evidence.map((e) => conf.get(`${e.docId}|${e.sheet}`)).find((x) => x && x.c < pack.params.confidenceThreshold);
+    if (low) { low.n++; continue; }
+    found.push(f);
+  }
+  for (const [k, v] of conf) if (v.n) skipped.push({ detector: "읽기 신뢰도", reason: `${k.replace("|", " / ")}: 신뢰도 ${v.c} — 결과 ${v.n}건 보류(열 지정을 확인한 뒤 다시 분석)` });
   if (!docs.some((d) => d.kind === "change")) skipped.push({ detector: "D03", reason: "변경 문서가 없음" });
   if (meta.contractAmount === undefined) skipped.push({ detector: "D02:contract-amount", reason: "계약금액이 입력되지 않음" });
 

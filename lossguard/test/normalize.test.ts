@@ -1,6 +1,6 @@
 // 정규화 — 숫자 표기 · 규격 · 단위 · 이름(같은 뜻 낱말 · 꼬리표 · 괄호 규격) · 번호
 import { parseNum } from "../engine/normalize/number";
-import { specTokens, numsOverlap } from "../engine/normalize/spec";
+import { specTokens, numsOverlap, specNumSim } from "../engine/normalize/spec";
 import { compactText, headerKey } from "../engine/normalize/text";
 import { makeNormalizer, stripNumbering, numberingOfNoCell } from "../engine/normalize/name";
 import { pairScore } from "../engine/match/match";
@@ -26,6 +26,7 @@ ok(parseNum(T("１２，０００")) === 12000, "전각 숫자 · 쉼표");
 ok(JSON.stringify(specTokens("600*600").nums) === JSON.stringify(specTokens("600×600").nums) && specTokens("600x600").nums.join() === "600,600", "규격 600*600 = 600×600 = 600x600");
 ok(specTokens("9.5T").nums.join() === "9.5" && specTokens("T9.5").nums.join() === "9.5", "9.5T = T9.5");
 ok(numsOverlap(["9.5"], ["12.5"]) === 0 && numsOverlap(["600", "600"], ["600", "600"]) === 1 && numsOverlap([], ["1"]) === undefined, "규격 겹침");
+ok(specNumSim(["600", "600"], ["300", "600"]) === 0 && specNumSim(["65"], ["0.8", "65"]) === 0.7 && specNumSim(["600", "600"], ["600", "600"]) === 1, "규격 비교: 숫자 하나 공유(600x600 ↔ 300x600)는 다른 규격 · 포함은 0.7");
 
 // 글자
 ok(compactText("석고 보드 (9.5T)") === "석고보드9.5t", "압축 글자");
@@ -53,6 +54,7 @@ ok(plain.name("천장몰딩", "", "M").canon !== plain.name("천정 몰딩", "",
 const sc = (x: [string, string, string, number], y: [string, string, string, number]) => pairScore(n.name(x[0], x[1], x[2]), n.name(y[0], y[1], y[2]), x[3], y[3], 1, pack, {}).score;
 ok(sc(["석고보드", "9.5T", "㎡", 6800], ["석고보드", "9.5T", "㎡", 6800]) === 1, "같은 항목 = 1");
 ok(sc(["석고보드", "9.5T", "㎡", 6800], ["석고보드", "12.5T", "㎡", 8200]) <= 0.5, "규격이 다른 같은 이름은 자동 연결 안 됨");
+ok(sc(["포세린 타일", "600x600", "㎡", 58000], ["포세린 타일", "300x600", "㎡", 58000]) <= 0.5, "숫자 하나를 공유하는 다른 규격(600x600 ↔ 300x600)도 자동 연결 안 됨");
 ok(sc(["양변기", "원피스", "조", 420000], ["양변기(원피스)", "", "조", 420000]) >= pack.params.tAuto, "숫자 없는 규격이 이름 괄호로 간 경우");
 ok(sc(["기존 천정 철거", "텍스 포함", "㎡", 9000], ["천정기존철거", "텍스 포함", "M2", 9000]) >= pack.params.tAuto, "낱말 순서 + 띄어쓰기");
 ok(sc(["LED 다운라이트", "6인치 15W", "개", 38000], ["콘센트", "2구", "개", 24000]) < pack.params.tReview, "다른 항목은 연결 후보도 아님");
