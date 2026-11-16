@@ -1,0 +1,1595 @@
+{
+  "splits": {
+    "dev": {
+      "cases": 40,
+      "docs": 101,
+      "lines": 4869,
+      "templates": {
+        "V4": 3,
+        "S2": 18,
+        "V3": 4,
+        "C1": 9,
+        "V5*": 8,
+        "S1": 11,
+        "V1": 9,
+        "V1*": 5,
+        "V2": 6,
+        "C2": 7,
+        "V6*": 5,
+        "V6": 4,
+        "V5": 5,
+        "V3*": 5,
+        "V4*": 2
+      },
+      "structure": {
+        "overall": {
+          "t1Engine": 1,
+          "t1Baseline": 0.8314763231197771,
+          "t1Full": 1,
+          "t2Engine": 1,
+          "t2EngineBinary": 1,
+          "t2BaselineBinary": 0.5762990347093859,
+          "t3Engine": 1,
+          "naiveSumAbsError": 1.465418497404989
+        },
+        "byTemplate": {
+          "C1": {
+            "sheets": 9,
+            "t1Engine": 1,
+            "t1Baseline": 0.6666666666666666,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.3700980392156863,
+            "t3": 1,
+            "naiveSumAbsError": 1,
+            "confidenceCorrectMin": 0.986,
+            "confidenceWrong": []
+          },
+          "C2": {
+            "sheets": 7,
+            "t1Engine": 1,
+            "t1Baseline": 0.6666666666666666,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.2689075630252101,
+            "t3": 1,
+            "naiveSumAbsError": 1,
+            "confidenceCorrectMin": 0.95,
+            "confidenceWrong": []
+          },
+          "S1": {
+            "sheets": 11,
+            "t1Engine": 1,
+            "t1Baseline": 0.6666666666666666,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.3766519823788546,
+            "t3": 1,
+            "naiveSumAbsError": 1,
+            "confidenceCorrectMin": 0.967,
+            "confidenceWrong": []
+          },
+          "S2": {
+            "sheets": 18,
+            "t1Engine": 1,
+            "t1Baseline": 0.6666666666666666,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.3699731903485255,
+            "t3": 1,
+            "naiveSumAbsError": 1,
+            "confidenceCorrectMin": 0.973,
+            "confidenceWrong": []
+          },
+          "V1": {
+            "sheets": 9,
+            "t1Engine": 1,
+            "t1Baseline": 1,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.810126582278481,
+            "t3": 1,
+            "naiveSumAbsError": 2.000419156000095,
+            "confidenceCorrectMin": 0.963,
+            "confidenceWrong": []
+          },
+          "V1*": {
+            "sheets": 5,
+            "t1Engine": 1,
+            "t1Baseline": 0.9,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.8029556650246306,
+            "t3": 1,
+            "naiveSumAbsError": 2,
+            "confidenceCorrectMin": 1,
+            "confidenceWrong": []
+          },
+          "V1*-S": {
+            "sheets": 5,
+            "t1Engine": 1,
+            "t1Baseline": 1,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.6428571428571429,
+            "t3": 1,
+            "naiveSumAbsError": null,
+            "confidenceCorrectMin": 0.88,
+            "confidenceWrong": []
+          },
+          "V1-S": {
+            "sheets": 9,
+            "t1Engine": 1,
+            "t1Baseline": 1,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.6511627906976745,
+            "t3": 1,
+            "naiveSumAbsError": null,
+            "confidenceCorrectMin": 0.88,
+            "confidenceWrong": []
+          },
+          "V2": {
+            "sheets": 6,
+            "t1Engine": 1,
+            "t1Baseline": 0.6666666666666666,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.37398373983739835,
+            "t3": 1,
+            "naiveSumAbsError": 1,
+            "confidenceCorrectMin": 0.967,
+            "confidenceWrong": []
+          },
+          "V2-S": {
+            "sheets": 6,
+            "t1Engine": 1,
+            "t1Baseline": 1,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.6470588235294118,
+            "t3": 1,
+            "naiveSumAbsError": null,
+            "confidenceCorrectMin": 0.88,
+            "confidenceWrong": []
+          },
+          "V3": {
+            "sheets": 4,
+            "t1Engine": 1,
+            "t1Baseline": 1,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.8013245033112583,
+            "t3": 1,
+            "naiveSumAbsError": 2,
+            "confidenceCorrectMin": 1,
+            "confidenceWrong": []
+          },
+          "V3*": {
+            "sheets": 5,
+            "t1Engine": 1,
+            "t1Baseline": 0.8666666666666667,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.6831683168316832,
+            "t3": 1,
+            "naiveSumAbsError": 1.599540857499039,
+            "confidenceCorrectMin": 0.952,
+            "confidenceWrong": []
+          },
+          "V3*-S": {
+            "sheets": 5,
+            "t1Engine": 1,
+            "t1Baseline": 1,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.6428571428571429,
+            "t3": 1,
+            "naiveSumAbsError": null,
+            "confidenceCorrectMin": 0.88,
+            "confidenceWrong": []
+          },
+          "V3-S": {
+            "sheets": 4,
+            "t1Engine": 1,
+            "t1Baseline": 1,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.6296296296296297,
+            "t3": 1,
+            "naiveSumAbsError": null,
+            "confidenceCorrectMin": 0.88,
+            "confidenceWrong": []
+          },
+          "V4": {
+            "sheets": 3,
+            "t1Engine": 1,
+            "t1Baseline": 1,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.7985074626865671,
+            "t3": 1,
+            "naiveSumAbsError": 2.0009915146916324,
+            "confidenceCorrectMin": 0.946,
+            "confidenceWrong": []
+          },
+          "V4*": {
+            "sheets": 2,
+            "t1Engine": 1,
+            "t1Baseline": 0.8333333333333334,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.8058252427184466,
+            "t3": 1,
+            "naiveSumAbsError": 2,
+            "confidenceCorrectMin": 0.982,
+            "confidenceWrong": []
+          },
+          "V4*-S": {
+            "sheets": 2,
+            "t1Engine": 1,
+            "t1Baseline": 1,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.6875,
+            "t3": 1,
+            "naiveSumAbsError": null,
+            "confidenceCorrectMin": 0.88,
+            "confidenceWrong": []
+          },
+          "V4-S": {
+            "sheets": 3,
+            "t1Engine": 1,
+            "t1Baseline": 1,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.6666666666666666,
+            "t3": 1,
+            "naiveSumAbsError": null,
+            "confidenceCorrectMin": 0.88,
+            "confidenceWrong": []
+          },
+          "V5": {
+            "sheets": 5,
+            "t1Engine": 1,
+            "t1Baseline": 1,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.7616279069767442,
+            "t3": 1,
+            "naiveSumAbsError": 2,
+            "confidenceCorrectMin": 1,
+            "confidenceWrong": []
+          },
+          "V5*": {
+            "sheets": 8,
+            "t1Engine": 1,
+            "t1Baseline": 0.9166666666666666,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.7653429602888087,
+            "t3": 1,
+            "naiveSumAbsError": 2.000028694627561,
+            "confidenceCorrectMin": 0.967,
+            "confidenceWrong": []
+          },
+          "V5*-S": {
+            "sheets": 8,
+            "t1Engine": 1,
+            "t1Baseline": 1,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.6460176991150443,
+            "t3": 1,
+            "naiveSumAbsError": null,
+            "confidenceCorrectMin": 0.88,
+            "confidenceWrong": []
+          },
+          "V5-S": {
+            "sheets": 5,
+            "t1Engine": 1,
+            "t1Baseline": 1,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.647887323943662,
+            "t3": 1,
+            "naiveSumAbsError": null,
+            "confidenceCorrectMin": 0.88,
+            "confidenceWrong": []
+          },
+          "V6": {
+            "sheets": 4,
+            "t1Engine": 1,
+            "t1Baseline": 1,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.813953488372093,
+            "t3": 1,
+            "naiveSumAbsError": 2.0013408594522923,
+            "confidenceCorrectMin": 0.963,
+            "confidenceWrong": []
+          },
+          "V6*": {
+            "sheets": 5,
+            "t1Engine": 1,
+            "t1Baseline": 0.8,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.7134831460674157,
+            "t3": 1,
+            "naiveSumAbsError": 1.7994448015006603,
+            "confidenceCorrectMin": 0.95,
+            "confidenceWrong": []
+          },
+          "V6*-S": {
+            "sheets": 5,
+            "t1Engine": 1,
+            "t1Baseline": 1,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.6153846153846154,
+            "t3": 1,
+            "naiveSumAbsError": null,
+            "confidenceCorrectMin": 0.88,
+            "confidenceWrong": []
+          },
+          "V6-S": {
+            "sheets": 4,
+            "t1Engine": 1,
+            "t1Baseline": 1,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.6428571428571429,
+            "t3": 1,
+            "naiveSumAbsError": null,
+            "confidenceCorrectMin": 0.88,
+            "confidenceWrong": []
+          }
+        }
+      },
+      "matching": {
+        "엔진(전체)": {
+          "gt": 1530,
+          "auto": 1437,
+          "autoTP": 1437,
+          "precision": 1,
+          "recall": 0.9392156862745098,
+          "recallWithReview": 0.9973856209150327,
+          "review": 91,
+          "reviewTP": 89,
+          "byTransform": {
+            "none": {
+              "n": 483,
+              "recall": 1
+            },
+            "space": {
+              "n": 282,
+              "recall": 0.9361702127659575
+            },
+            "synonym:dict": {
+              "n": 163,
+              "recall": 1
+            },
+            "order": {
+              "n": 85,
+              "recall": 0.8823529411764706
+            },
+            "unitForm": {
+              "n": 353,
+              "recall": 0.9405099150141643
+            },
+            "specInName": {
+              "n": 184,
+              "recall": 0.9184782608695652
+            },
+            "tag": {
+              "n": 111,
+              "recall": 0.9279279279279279
+            },
+            "synonym:hard": {
+              "n": 84,
+              "recall": 0.2976190476190476
+            },
+            "synonym:nodict": {
+              "n": 229,
+              "recall": 0.851528384279476
+            },
+            "specNotation": {
+              "n": 94,
+              "recall": 0.9042553191489362
+            }
+          }
+        },
+        "엔진 − 같은 뜻 사전": {
+          "gt": 1530,
+          "auto": 1395,
+          "autoTP": 1395,
+          "precision": 1,
+          "recall": 0.9117647058823529,
+          "recallWithReview": 0.9954248366013072,
+          "review": 130,
+          "reviewTP": 128,
+          "byTransform": {
+            "none": {
+              "n": 483,
+              "recall": 1
+            },
+            "space": {
+              "n": 282,
+              "recall": 0.9113475177304965
+            },
+            "synonym:dict": {
+              "n": 163,
+              "recall": 0.754601226993865
+            },
+            "order": {
+              "n": 85,
+              "recall": 0.788235294117647
+            },
+            "unitForm": {
+              "n": 353,
+              "recall": 0.8980169971671388
+            },
+            "specInName": {
+              "n": 184,
+              "recall": 0.8913043478260869
+            },
+            "tag": {
+              "n": 111,
+              "recall": 0.8918918918918919
+            },
+            "synonym:hard": {
+              "n": 84,
+              "recall": 0.27380952380952384
+            },
+            "synonym:nodict": {
+              "n": 229,
+              "recall": 0.851528384279476
+            },
+            "specNotation": {
+              "n": 94,
+              "recall": 0.8936170212765957
+            }
+          }
+        },
+        "엔진 − 순서 정렬": {
+          "gt": 1530,
+          "auto": 1406,
+          "autoTP": 1406,
+          "precision": 1,
+          "recall": 0.918954248366013,
+          "recallWithReview": 0.9869281045751634,
+          "review": 104,
+          "reviewTP": 104,
+          "byTransform": {
+            "none": {
+              "n": 483,
+              "recall": 1
+            },
+            "space": {
+              "n": 282,
+              "recall": 0.925531914893617
+            },
+            "synonym:dict": {
+              "n": 163,
+              "recall": 0.9815950920245399
+            },
+            "order": {
+              "n": 85,
+              "recall": 0.8470588235294118
+            },
+            "unitForm": {
+              "n": 353,
+              "recall": 0.9235127478753541
+            },
+            "specInName": {
+              "n": 184,
+              "recall": 0.9130434782608695
+            },
+            "tag": {
+              "n": 111,
+              "recall": 0.918918918918919
+            },
+            "synonym:hard": {
+              "n": 84,
+              "recall": 0.14285714285714285
+            },
+            "synonym:nodict": {
+              "n": 229,
+              "recall": 0.7860262008733624
+            },
+            "specNotation": {
+              "n": 94,
+              "recall": 0.9042553191489362
+            }
+          }
+        },
+        "엔진 − 규격 · 단가 특징": {
+          "gt": 1530,
+          "auto": 1378,
+          "autoTP": 1366,
+          "precision": 0.9912917271407837,
+          "recall": 0.8928104575163399,
+          "recallWithReview": 0.9712418300653595,
+          "review": 128,
+          "reviewTP": 120,
+          "byTransform": {
+            "none": {
+              "n": 483,
+              "recall": 0.9917184265010351
+            },
+            "space": {
+              "n": 282,
+              "recall": 0.900709219858156
+            },
+            "synonym:dict": {
+              "n": 163,
+              "recall": 0.9815950920245399
+            },
+            "order": {
+              "n": 85,
+              "recall": 0.8117647058823529
+            },
+            "unitForm": {
+              "n": 353,
+              "recall": 0.9121813031161473
+            },
+            "specInName": {
+              "n": 184,
+              "recall": 0.8913043478260869
+            },
+            "tag": {
+              "n": 111,
+              "recall": 0.9009009009009009
+            },
+            "synonym:hard": {
+              "n": 84,
+              "recall": 0.03571428571428571
+            },
+            "synonym:nodict": {
+              "n": 229,
+              "recall": 0.6943231441048034
+            },
+            "specNotation": {
+              "n": 94,
+              "recall": 0.851063829787234
+            }
+          }
+        },
+        "exactName": {
+          "gt": 1530,
+          "auto": 669,
+          "autoTP": 626,
+          "precision": 0.9357249626307922,
+          "recall": 0.4091503267973856,
+          "recallWithReview": 0.4091503267973856,
+          "review": 0,
+          "reviewTP": 0,
+          "byTransform": {
+            "none": {
+              "n": 483,
+              "recall": 0.9503105590062112
+            },
+            "space": {
+              "n": 282,
+              "recall": 0.014184397163120567
+            },
+            "synonym:dict": {
+              "n": 163,
+              "recall": 0
+            },
+            "order": {
+              "n": 85,
+              "recall": 0
+            },
+            "unitForm": {
+              "n": 353,
+              "recall": 0.37960339943342775
+            },
+            "specInName": {
+              "n": 184,
+              "recall": 0
+            },
+            "tag": {
+              "n": 111,
+              "recall": 0
+            },
+            "synonym:hard": {
+              "n": 84,
+              "recall": 0
+            },
+            "synonym:nodict": {
+              "n": 229,
+              "recall": 0.017467248908296942
+            },
+            "specNotation": {
+              "n": 94,
+              "recall": 0.44680851063829785
+            }
+          }
+        },
+        "exactNameSpecUnit": {
+          "gt": 1530,
+          "auto": 486,
+          "autoTP": 486,
+          "precision": 1,
+          "recall": 0.3176470588235294,
+          "recallWithReview": 0.3176470588235294,
+          "review": 0,
+          "reviewTP": 0,
+          "byTransform": {
+            "none": {
+              "n": 483,
+              "recall": 1
+            },
+            "space": {
+              "n": 282,
+              "recall": 0.010638297872340425
+            },
+            "synonym:dict": {
+              "n": 163,
+              "recall": 0
+            },
+            "order": {
+              "n": 85,
+              "recall": 0
+            },
+            "unitForm": {
+              "n": 353,
+              "recall": 0
+            },
+            "specInName": {
+              "n": 184,
+              "recall": 0
+            },
+            "tag": {
+              "n": 111,
+              "recall": 0
+            },
+            "synonym:hard": {
+              "n": 84,
+              "recall": 0
+            },
+            "synonym:nodict": {
+              "n": 229,
+              "recall": 0.013100436681222707
+            },
+            "specNotation": {
+              "n": 94,
+              "recall": 0
+            }
+          }
+        },
+        "normalized": {
+          "gt": 1530,
+          "auto": 1020,
+          "autoTP": 1020,
+          "precision": 1,
+          "recall": 0.6666666666666666,
+          "recallWithReview": 0.6666666666666666,
+          "review": 0,
+          "reviewTP": 0,
+          "byTransform": {
+            "none": {
+              "n": 483,
+              "recall": 1
+            },
+            "space": {
+              "n": 282,
+              "recall": 0.6666666666666666
+            },
+            "synonym:dict": {
+              "n": 163,
+              "recall": 0
+            },
+            "order": {
+              "n": 85,
+              "recall": 0
+            },
+            "unitForm": {
+              "n": 353,
+              "recall": 0.6657223796033994
+            },
+            "specInName": {
+              "n": 184,
+              "recall": 0.5163043478260869
+            },
+            "tag": {
+              "n": 111,
+              "recall": 0.6666666666666666
+            },
+            "synonym:hard": {
+              "n": 84,
+              "recall": 0
+            },
+            "synonym:nodict": {
+              "n": 229,
+              "recall": 0.2052401746724891
+            },
+            "specNotation": {
+              "n": 94,
+              "recall": 0.7446808510638298
+            }
+          }
+        }
+      },
+      "detection": {
+        "byType": {
+          "E1": {
+            "n": 8,
+            "detected": 8
+          },
+          "E3": {
+            "n": 10,
+            "detected": 10
+          },
+          "E1c": {
+            "n": 7,
+            "detected": 7
+          },
+          "E4": {
+            "n": 6,
+            "detected": 6
+          },
+          "E9": {
+            "n": 4,
+            "detected": 4
+          },
+          "E7": {
+            "n": 5,
+            "detected": 5
+          },
+          "E1b": {
+            "n": 4,
+            "detected": 4
+          },
+          "E5": {
+            "n": 5,
+            "detected": 5
+          },
+          "E8": {
+            "n": 2,
+            "detected": 2
+          },
+          "E11": {
+            "n": 3,
+            "detected": 3
+          },
+          "E6": {
+            "n": 4,
+            "detected": 4
+          },
+          "E10": {
+            "n": 6,
+            "detected": 6
+          }
+        },
+        "tp": 64,
+        "consequences": 20,
+        "fp": 0,
+        "byDetector": {
+          "D01": {
+            "tp": 19,
+            "cons": 2,
+            "fp": 0
+          },
+          "D02": {
+            "tp": 30,
+            "cons": 2,
+            "fp": 0
+          },
+          "D03": {
+            "tp": 15,
+            "cons": 16,
+            "fp": 0
+          }
+        },
+        "fpSamples": [],
+        "cleanDocs": 23,
+        "cleanDocFindings": 0,
+        "evidenceCells": {
+          "n": 277,
+          "ok": 277
+        }
+      }
+    },
+    "eval": {
+      "cases": 40,
+      "docs": 100,
+      "lines": 4727,
+      "templates": {
+        "V4*": 2,
+        "S2": 11,
+        "V3": 4,
+        "S1": 15,
+        "V5*": 5,
+        "C2": 13,
+        "V2": 6,
+        "V8": 12,
+        "V6*": 6,
+        "C1": 3,
+        "V6": 3,
+        "V1*": 6,
+        "V7": 7,
+        "V4": 2,
+        "V1": 1,
+        "V5": 4
+      },
+      "structure": {
+        "overall": {
+          "t1Engine": 1,
+          "t1Baseline": 0.7673410404624278,
+          "t1Full": 1,
+          "t2Engine": 1,
+          "t2EngineBinary": 1,
+          "t2BaselineBinary": 0.49100909667865456,
+          "t3Engine": 1,
+          "naiveSumAbsError": 1.2699973543077465
+        },
+        "byTemplate": {
+          "C1": {
+            "sheets": 3,
+            "t1Engine": 1,
+            "t1Baseline": 0.6666666666666666,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.35947712418300654,
+            "t3": 1,
+            "naiveSumAbsError": 1,
+            "confidenceCorrectMin": 1,
+            "confidenceWrong": []
+          },
+          "C2": {
+            "sheets": 13,
+            "t1Engine": 1,
+            "t1Baseline": 0.6666666666666666,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.25773195876288657,
+            "t3": 1,
+            "naiveSumAbsError": 1,
+            "confidenceCorrectMin": 0.95,
+            "confidenceWrong": []
+          },
+          "S1": {
+            "sheets": 15,
+            "t1Engine": 1,
+            "t1Baseline": 0.6666666666666666,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.3673139158576052,
+            "t3": 1,
+            "naiveSumAbsError": 1,
+            "confidenceCorrectMin": 0.963,
+            "confidenceWrong": []
+          },
+          "S2": {
+            "sheets": 11,
+            "t1Engine": 1,
+            "t1Baseline": 0.6666666666666666,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.35824175824175825,
+            "t3": 1,
+            "naiveSumAbsError": 1,
+            "confidenceCorrectMin": 0.983,
+            "confidenceWrong": []
+          },
+          "V1": {
+            "sheets": 1,
+            "t1Engine": 1,
+            "t1Baseline": 1,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.8148148148148148,
+            "t3": 1,
+            "naiveSumAbsError": 2,
+            "confidenceCorrectMin": 1,
+            "confidenceWrong": []
+          },
+          "V1*": {
+            "sheets": 6,
+            "t1Engine": 1,
+            "t1Baseline": 0.7777777777777778,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.5714285714285714,
+            "t3": 1,
+            "naiveSumAbsError": 1.5,
+            "confidenceCorrectMin": 0.982,
+            "confidenceWrong": []
+          },
+          "V1*-S": {
+            "sheets": 6,
+            "t1Engine": 1,
+            "t1Baseline": 1,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.6590909090909091,
+            "t3": 1,
+            "naiveSumAbsError": null,
+            "confidenceCorrectMin": 0.88,
+            "confidenceWrong": []
+          },
+          "V1-S": {
+            "sheets": 1,
+            "t1Engine": 1,
+            "t1Baseline": 1,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.6875,
+            "t3": 1,
+            "naiveSumAbsError": null,
+            "confidenceCorrectMin": 0.88,
+            "confidenceWrong": []
+          },
+          "V2": {
+            "sheets": 6,
+            "t1Engine": 1,
+            "t1Baseline": 0.6666666666666666,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.3686274509803922,
+            "t3": 1,
+            "naiveSumAbsError": 1,
+            "confidenceCorrectMin": 1,
+            "confidenceWrong": []
+          },
+          "V2-S": {
+            "sheets": 6,
+            "t1Engine": 1,
+            "t1Baseline": 1,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.6511627906976745,
+            "t3": 1,
+            "naiveSumAbsError": null,
+            "confidenceCorrectMin": 0.88,
+            "confidenceWrong": []
+          },
+          "V3": {
+            "sheets": 4,
+            "t1Engine": 1,
+            "t1Baseline": 1,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.7971014492753623,
+            "t3": 1,
+            "naiveSumAbsError": 1.9999338576936638,
+            "confidenceCorrectMin": 0.95,
+            "confidenceWrong": []
+          },
+          "V3-S": {
+            "sheets": 4,
+            "t1Engine": 1,
+            "t1Baseline": 1,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.6153846153846154,
+            "t3": 1,
+            "naiveSumAbsError": null,
+            "confidenceCorrectMin": 0.88,
+            "confidenceWrong": []
+          },
+          "V4": {
+            "sheets": 2,
+            "t1Engine": 1,
+            "t1Baseline": 1,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.8115942028985508,
+            "t3": 1,
+            "naiveSumAbsError": 2,
+            "confidenceCorrectMin": 1,
+            "confidenceWrong": []
+          },
+          "V4*": {
+            "sheets": 2,
+            "t1Engine": 1,
+            "t1Baseline": 0.9166666666666666,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.7945205479452054,
+            "t3": 1,
+            "naiveSumAbsError": 2,
+            "confidenceCorrectMin": 1,
+            "confidenceWrong": []
+          },
+          "V4*-S": {
+            "sheets": 2,
+            "t1Engine": 1,
+            "t1Baseline": 1,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.6296296296296297,
+            "t3": 1,
+            "naiveSumAbsError": null,
+            "confidenceCorrectMin": 0.88,
+            "confidenceWrong": []
+          },
+          "V4-S": {
+            "sheets": 2,
+            "t1Engine": 1,
+            "t1Baseline": 1,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.6,
+            "t3": 1,
+            "naiveSumAbsError": null,
+            "confidenceCorrectMin": 0.88,
+            "confidenceWrong": []
+          },
+          "V5": {
+            "sheets": 4,
+            "t1Engine": 1,
+            "t1Baseline": 1,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.7664233576642335,
+            "t3": 1,
+            "naiveSumAbsError": 2,
+            "confidenceCorrectMin": 1,
+            "confidenceWrong": []
+          },
+          "V5*": {
+            "sheets": 5,
+            "t1Engine": 1,
+            "t1Baseline": 0.9,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.6666666666666666,
+            "t3": 1,
+            "naiveSumAbsError": 1.8,
+            "confidenceCorrectMin": 0.967,
+            "confidenceWrong": []
+          },
+          "V5*-S": {
+            "sheets": 5,
+            "t1Engine": 1,
+            "t1Baseline": 1,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.6323529411764706,
+            "t3": 1,
+            "naiveSumAbsError": null,
+            "confidenceCorrectMin": 0.88,
+            "confidenceWrong": []
+          },
+          "V5-S": {
+            "sheets": 4,
+            "t1Engine": 1,
+            "t1Baseline": 1,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.6428571428571429,
+            "t3": 1,
+            "naiveSumAbsError": null,
+            "confidenceCorrectMin": 0.88,
+            "confidenceWrong": []
+          },
+          "V6": {
+            "sheets": 3,
+            "t1Engine": 1,
+            "t1Baseline": 1,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.81875,
+            "t3": 1,
+            "naiveSumAbsError": 2,
+            "confidenceCorrectMin": 0.982,
+            "confidenceWrong": []
+          },
+          "V6*": {
+            "sheets": 6,
+            "t1Engine": 1,
+            "t1Baseline": 0.9166666666666666,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.6742424242424242,
+            "t3": 1,
+            "naiveSumAbsError": 1.6666666666666667,
+            "confidenceCorrectMin": 0.98,
+            "confidenceWrong": []
+          },
+          "V6*-S": {
+            "sheets": 6,
+            "t1Engine": 1,
+            "t1Baseline": 1,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.6551724137931034,
+            "t3": 1,
+            "naiveSumAbsError": null,
+            "confidenceCorrectMin": 0.88,
+            "confidenceWrong": []
+          },
+          "V6-S": {
+            "sheets": 3,
+            "t1Engine": 1,
+            "t1Baseline": 1,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.6808510638297872,
+            "t3": 1,
+            "naiveSumAbsError": null,
+            "confidenceCorrectMin": 0.88,
+            "confidenceWrong": []
+          },
+          "V7": {
+            "sheets": 7,
+            "t1Engine": 1,
+            "t1Baseline": 0.6666666666666666,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.41637010676156583,
+            "t3": 1,
+            "naiveSumAbsError": 1,
+            "confidenceCorrectMin": 0.975,
+            "confidenceWrong": []
+          },
+          "V7-S": {
+            "sheets": 7,
+            "t1Engine": 1,
+            "t1Baseline": 1,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.6195652173913043,
+            "t3": 1,
+            "naiveSumAbsError": null,
+            "confidenceCorrectMin": 0.88,
+            "confidenceWrong": []
+          },
+          "V8": {
+            "sheets": 12,
+            "t1Engine": 1,
+            "t1Baseline": 0.5,
+            "t2Engine": 1,
+            "t2BaselineBinary": 0.36046511627906974,
+            "t3": 1,
+            "naiveSumAbsError": 1,
+            "confidenceCorrectMin": 0.963,
+            "confidenceWrong": []
+          }
+        }
+      },
+      "matching": {
+        "엔진(전체)": {
+          "gt": 1531,
+          "auto": 1428,
+          "autoTP": 1428,
+          "precision": 1,
+          "recall": 0.9327237099934683,
+          "recallWithReview": 0.9980404964075767,
+          "review": 101,
+          "reviewTP": 100,
+          "byTransform": {
+            "order": {
+              "n": 95,
+              "recall": 0.8631578947368421
+            },
+            "space": {
+              "n": 305,
+              "recall": 0.9311475409836065
+            },
+            "specInName": {
+              "n": 201,
+              "recall": 0.9502487562189055
+            },
+            "unitForm": {
+              "n": 357,
+              "recall": 0.9495798319327731
+            },
+            "none": {
+              "n": 461,
+              "recall": 1
+            },
+            "tag": {
+              "n": 149,
+              "recall": 0.9194630872483222
+            },
+            "synonym:nodict": {
+              "n": 195,
+              "recall": 0.8205128205128205
+            },
+            "synonym:dict": {
+              "n": 152,
+              "recall": 1
+            },
+            "specNotation": {
+              "n": 115,
+              "recall": 0.9391304347826087
+            },
+            "synonym:hard": {
+              "n": 100,
+              "recall": 0.32
+            }
+          }
+        },
+        "엔진 − 같은 뜻 사전": {
+          "gt": 1531,
+          "auto": 1378,
+          "autoTP": 1378,
+          "precision": 1,
+          "recall": 0.9000653167864141,
+          "recallWithReview": 0.9934683213585892,
+          "review": 144,
+          "reviewTP": 143,
+          "byTransform": {
+            "order": {
+              "n": 95,
+              "recall": 0.8105263157894737
+            },
+            "space": {
+              "n": 305,
+              "recall": 0.8885245901639345
+            },
+            "specInName": {
+              "n": 201,
+              "recall": 0.9154228855721394
+            },
+            "unitForm": {
+              "n": 357,
+              "recall": 0.9187675070028011
+            },
+            "none": {
+              "n": 461,
+              "recall": 1
+            },
+            "tag": {
+              "n": 149,
+              "recall": 0.8859060402684564
+            },
+            "synonym:nodict": {
+              "n": 195,
+              "recall": 0.8205128205128205
+            },
+            "synonym:dict": {
+              "n": 152,
+              "recall": 0.6842105263157895
+            },
+            "specNotation": {
+              "n": 115,
+              "recall": 0.9391304347826087
+            },
+            "synonym:hard": {
+              "n": 100,
+              "recall": 0.3
+            }
+          }
+        },
+        "엔진 − 순서 정렬": {
+          "gt": 1531,
+          "auto": 1397,
+          "autoTP": 1397,
+          "precision": 1,
+          "recall": 0.9124755062050947,
+          "recallWithReview": 0.9823644676681907,
+          "review": 107,
+          "reviewTP": 107,
+          "byTransform": {
+            "order": {
+              "n": 95,
+              "recall": 0.8526315789473684
+            },
+            "space": {
+              "n": 305,
+              "recall": 0.9081967213114754
+            },
+            "specInName": {
+              "n": 201,
+              "recall": 0.9154228855721394
+            },
+            "unitForm": {
+              "n": 357,
+              "recall": 0.9299719887955182
+            },
+            "none": {
+              "n": 461,
+              "recall": 1
+            },
+            "tag": {
+              "n": 149,
+              "recall": 0.912751677852349
+            },
+            "synonym:nodict": {
+              "n": 195,
+              "recall": 0.7743589743589744
+            },
+            "synonym:dict": {
+              "n": 152,
+              "recall": 0.9736842105263158
+            },
+            "specNotation": {
+              "n": 115,
+              "recall": 0.9217391304347826
+            },
+            "synonym:hard": {
+              "n": 100,
+              "recall": 0.14
+            }
+          }
+        },
+        "엔진 − 규격 · 단가 특징": {
+          "gt": 1531,
+          "auto": 1376,
+          "autoTP": 1372,
+          "precision": 0.997093023255814,
+          "recall": 0.8961463096015676,
+          "recallWithReview": 0.977139124755062,
+          "review": 124,
+          "reviewTP": 124,
+          "byTransform": {
+            "order": {
+              "n": 95,
+              "recall": 0.8526315789473684
+            },
+            "space": {
+              "n": 305,
+              "recall": 0.8950819672131147
+            },
+            "specInName": {
+              "n": 201,
+              "recall": 0.9054726368159204
+            },
+            "unitForm": {
+              "n": 357,
+              "recall": 0.9215686274509803
+            },
+            "none": {
+              "n": 461,
+              "recall": 0.9978308026030369
+            },
+            "tag": {
+              "n": 149,
+              "recall": 0.8859060402684564
+            },
+            "synonym:nodict": {
+              "n": 195,
+              "recall": 0.7128205128205128
+            },
+            "synonym:dict": {
+              "n": 152,
+              "recall": 0.9802631578947368
+            },
+            "specNotation": {
+              "n": 115,
+              "recall": 0.9043478260869565
+            },
+            "synonym:hard": {
+              "n": 100,
+              "recall": 0.03
+            }
+          }
+        },
+        "exactName": {
+          "gt": 1531,
+          "auto": 651,
+          "autoTP": 611,
+          "precision": 0.9385560675883257,
+          "recall": 0.3990855649902025,
+          "recallWithReview": 0.3990855649902025,
+          "review": 0,
+          "reviewTP": 0,
+          "byTransform": {
+            "order": {
+              "n": 95,
+              "recall": 0
+            },
+            "space": {
+              "n": 305,
+              "recall": 0.006557377049180328
+            },
+            "specInName": {
+              "n": 201,
+              "recall": 0
+            },
+            "unitForm": {
+              "n": 357,
+              "recall": 0.3753501400560224
+            },
+            "none": {
+              "n": 461,
+              "recall": 0.9457700650759219
+            },
+            "tag": {
+              "n": 149,
+              "recall": 0
+            },
+            "synonym:nodict": {
+              "n": 195,
+              "recall": 0.010256410256410256
+            },
+            "synonym:dict": {
+              "n": 152,
+              "recall": 0
+            },
+            "specNotation": {
+              "n": 115,
+              "recall": 0.43478260869565216
+            },
+            "synonym:hard": {
+              "n": 100,
+              "recall": 0
+            }
+          }
+        },
+        "exactNameSpecUnit": {
+          "gt": 1531,
+          "auto": 462,
+          "autoTP": 462,
+          "precision": 1,
+          "recall": 0.30176355323318094,
+          "recallWithReview": 0.30176355323318094,
+          "review": 0,
+          "reviewTP": 0,
+          "byTransform": {
+            "order": {
+              "n": 95,
+              "recall": 0
+            },
+            "space": {
+              "n": 305,
+              "recall": 0.003278688524590164
+            },
+            "specInName": {
+              "n": 201,
+              "recall": 0
+            },
+            "unitForm": {
+              "n": 357,
+              "recall": 0
+            },
+            "none": {
+              "n": 461,
+              "recall": 1
+            },
+            "tag": {
+              "n": 149,
+              "recall": 0
+            },
+            "synonym:nodict": {
+              "n": 195,
+              "recall": 0.005128205128205128
+            },
+            "synonym:dict": {
+              "n": 152,
+              "recall": 0
+            },
+            "specNotation": {
+              "n": 115,
+              "recall": 0
+            },
+            "synonym:hard": {
+              "n": 100,
+              "recall": 0
+            }
+          }
+        },
+        "normalized": {
+          "gt": 1531,
+          "auto": 1021,
+          "autoTP": 1021,
+          "precision": 1,
+          "recall": 0.666884389288047,
+          "recallWithReview": 0.666884389288047,
+          "review": 0,
+          "reviewTP": 0,
+          "byTransform": {
+            "order": {
+              "n": 95,
+              "recall": 0
+            },
+            "space": {
+              "n": 305,
+              "recall": 0.6557377049180327
+            },
+            "specInName": {
+              "n": 201,
+              "recall": 0.5074626865671642
+            },
+            "unitForm": {
+              "n": 357,
+              "recall": 0.6834733893557423
+            },
+            "none": {
+              "n": 461,
+              "recall": 1
+            },
+            "tag": {
+              "n": 149,
+              "recall": 0.6577181208053692
+            },
+            "synonym:nodict": {
+              "n": 195,
+              "recall": 0.14871794871794872
+            },
+            "synonym:dict": {
+              "n": 152,
+              "recall": 0
+            },
+            "specNotation": {
+              "n": 115,
+              "recall": 0.7478260869565218
+            },
+            "synonym:hard": {
+              "n": 100,
+              "recall": 0
+            }
+          }
+        }
+      },
+      "detection": {
+        "byType": {
+          "E4": {
+            "n": 9,
+            "detected": 9
+          },
+          "E6": {
+            "n": 5,
+            "detected": 5
+          },
+          "E5": {
+            "n": 9,
+            "detected": 9
+          },
+          "E11": {
+            "n": 3,
+            "detected": 3
+          },
+          "E1b": {
+            "n": 2,
+            "detected": 2
+          },
+          "E3": {
+            "n": 3,
+            "detected": 3
+          },
+          "E1": {
+            "n": 6,
+            "detected": 6
+          },
+          "E1c": {
+            "n": 4,
+            "detected": 4
+          },
+          "E10": {
+            "n": 4,
+            "detected": 4
+          },
+          "E7": {
+            "n": 1,
+            "detected": 1
+          },
+          "E8": {
+            "n": 1,
+            "detected": 1
+          },
+          "E9": {
+            "n": 1,
+            "detected": 1
+          }
+        },
+        "tp": 48,
+        "consequences": 13,
+        "fp": 0,
+        "byDetector": {
+          "D02": {
+            "tp": 27,
+            "cons": 1,
+            "fp": 0
+          },
+          "D03": {
+            "tp": 9,
+            "cons": 11,
+            "fp": 0
+          },
+          "D01": {
+            "tp": 12,
+            "cons": 1,
+            "fp": 0
+          }
+        },
+        "fpSamples": [],
+        "cleanDocs": 40,
+        "cleanDocFindings": 0,
+        "evidenceCells": {
+          "n": 211,
+          "ok": 211
+        }
+      }
+    }
+  },
+  "reproducibility": {
+    "cases": 10,
+    "identical": 10,
+    "findingsKeysChecked": 27,
+    "keysKeptAfterRowShift": 27
+  },
+  "selfCheck": {
+    "금액 ↔ 단가 열 바꿈": {
+      "sheets": 36,
+      "flagged": 36
+    },
+    "수량 · 단가 · 금액 열을 한 칸씩 돌림": {
+      "sheets": 36,
+      "flagged": 36
+    },
+    "수량 ↔ 단가 열 바꿈": {
+      "sheets": 36,
+      "flagged": 0
+    }
+  },
+  "performance": {
+    "documents": 5,
+    "contractItems": 6149,
+    "linesRead": 38111,
+    "readMs": 495,
+    "analyzeMsMedian": 1731,
+    "analyzeMs": [
+      1646,
+      1731,
+      1813
+    ],
+    "findings": 0,
+    "links": 19319,
+    "node": "v22.23.4"
+  },
+  "meta": {
+    "startedAt": "2026-11-16T07:41:27.738Z",
+    "engine": "0.1.0",
+    "pack": "construction-interior@0.1.0",
+    "commit": "d2f9d6b",
+    "dirty": false,
+    "nDev": 40,
+    "nEval": 40,
+    "totalMs": 9721
+  }
+}
