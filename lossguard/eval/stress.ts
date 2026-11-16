@@ -31,14 +31,14 @@ async function load(docs: { docId: string; kind: DocInput["kind"]; round?: numbe
 }
 const key = (docId: string, sheet: string, row: number) => `${docId}|${sheet}|${row}`;
 
-const CAUSES = ["확인 대기", "다른 기준 항목에 잘못 연결", "기준 항목을 다른 줄이 가져감", "이름 유사도 낮음", "규격 충돌(점수 상한)", "단위 불일치(점수 상한)", "단가 차이", "합산 점수 부족(구간 등)", "점수는 넘었으나 후보에서 빠짐"] as const;
+const CAUSES = ["확인 대기", "다른 기준 항목과 확인 대기", "다른 기준 항목에 자동 연결(틀림)", "기준 항목을 다른 줄이 가져감", "이름 유사도 낮음", "규격 충돌(점수 상한)", "단위 불일치(점수 상한)", "단가 차이", "합산 점수 부족(구간 등)", "점수는 넘었으나 후보에서 빠짐"] as const;
 
 function causeOf(res: AnalyzeResult, g: GtLink, A: Map<string, Line>, B: Map<string, Line>, norm: ReturnType<typeof makeNormalizer>): string {
   const aKey = key(g.a.docId, g.a.sheet, g.a.row), bKey = key(g.b.docId, g.b.sheet, g.b.row);
   const lb = res.links.find((l) => key(l.b.docId, l.b.sheet, l.b.row) === bKey);
   const la = res.links.find((l) => key(l.a.docId, l.a.sheet, l.a.row) === aKey);
   if (lb && key(lb.a.docId, lb.a.sheet, lb.a.row) === aKey && lb.state === "review") return "확인 대기";
-  if (lb) return "다른 기준 항목에 잘못 연결";
+  if (lb) return lb.state === "review" ? "다른 기준 항목과 확인 대기" : "다른 기준 항목에 자동 연결(틀림)";
   if (la) return "기준 항목을 다른 줄이 가져감";
   const a = A.get(aKey), b = B.get(bKey);
   if (!a || !b) return "합산 점수 부족(구간 등)";
@@ -113,7 +113,7 @@ async function main() {
     (json.sets as Record<string, unknown>)[set.key] = { label: set.label, gt, auto, autoTP, review, reviewTP, baselineExactName: b1, baselineNormalized: b3, causes: Object.fromEntries(causes), byTransform: Object.fromEntries(byTf) };
   }
   md.push(``, `## 2. 놓친 연결의 원인 (자동 연결이 되지 않은 정답 쌍)`, ``, `| 조건 | 놓친 쌍 | ${CAUSES.join(" | ")} |`, `|---|---|${CAUSES.map(() => "---").join("|")}|`, ...causeRows);
-  md.push(``, `원인 분류: 엔진이 그 쌍을 확인 대기로 둠 / 비교 문서의 줄을 다른 기준 항목과 자동 연결(틀린 연결) / 기준 항목이 다른 줄과 연결됨 / 둘 다 연결 없음 — 정답 쌍의 점수를 다시 계산해 가장 약한 요소로 분류.`);
+  md.push(``, `원인 분류: 엔진이 그 쌍을 확인 대기로 둠 / 비교 문서의 줄이 다른 기준 항목과 확인 대기 · 자동 연결(자동이면 틀린 연결 — 정밀도에 반영) / 기준 항목이 다른 줄과 연결됨 / 둘 다 연결 없음 — 정답 쌍의 점수를 다시 계산해 가장 약한 요소로 분류.`);
   md.push(``, `## 3. 바꿔 적은 방식별 자동 연결 재현율`, ``, `| 조건 | 방식별 재현율(쌍 수) |`, `|---|---|`, ...tfRows);
 
   // 업종 사전을 줄였을 때(구조 인식 · 탐지)
