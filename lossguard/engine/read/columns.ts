@@ -18,6 +18,8 @@ import { matchGroup, matchLeaf } from "./header";
 export interface ColStat {
   col: number;
   nonEmpty: number;
+  /** 코드 모양 글자(DE-001 · A12 · LG_002)의 수 — 이름 열이 아니라 코드 열일 가능성 */
+  codeLike: number;
   num: number;
   unitHits: number;
   avgLen: number;
@@ -33,7 +35,7 @@ export function columnStats(sheet: RawSheet, rows: number[], width: number, pack
   for (const u of pack.units) for (const f of u.forms) unitForms.add(compactText(f));
   const out: ColStat[] = [];
   for (let c = 0; c < width; c++) {
-    let nonEmpty = 0, num = 0, unitHits = 0, len = 0, digitText = 0, numbering = 0, decimals = 0;
+    let nonEmpty = 0, num = 0, unitHits = 0, len = 0, digitText = 0, numbering = 0, decimals = 0, codeLike = 0;
     const seen = new Set<string>();
     const vals: number[] = [];
     for (const r of rows) {
@@ -54,11 +56,12 @@ export function columnStats(sheet: RawSheet, rows: number[], width: number, pack
       if (unitForms.has(compactText(t))) unitHits++;
       if (/\d/.test(t)) digitText++;
       if (numberingOfNoCell(t)) numbering++;
+      if (/^[A-Za-z]{1,4}[-_. ]?\d{1,6}([-_.]\d{1,4})?$/.test(t)) codeLike++;
     }
     vals.sort((a, b) => a - b);
     const texts = nonEmpty - num;
     out.push({
-      col: c, nonEmpty, num, unitHits, digitText, numbering, decimals,
+      col: c, nonEmpty, codeLike, num, unitHits, digitText, numbering, decimals,
       avgLen: texts ? len / texts : 0,
       distinct: texts ? seen.size / texts : 0,
       median: vals.length ? vals[Math.floor(vals.length / 2)] : 0,
@@ -129,6 +132,9 @@ export function inferColumns(
     byKey.set(k, col);
   };
 
+  /** 머리글이 어떤 역할 낱말을 품었는지(배정되지 않았어도) — 모양으로 이름 열을 고를 때 다른 역할의 머리글은 빼려고 */
+  const headerRole = new Map<number, LeafRole>();
+
   // ① 이름
   if (block) {
     const cands: { col: number; role: LeafRole; group?: GroupKey; score: number }[] = [];
@@ -147,6 +153,7 @@ export function inferColumns(
       if (!leaf && group) cands.push({ col: c, role: "amount", group, score: 0.7 });
       else if (leaf) cands.push({ col: c, role: leaf.role, group, score: leaf.score });
     }
+    for (const x of cands) if (!headerRole.has(x.col)) headerRole.set(x.col, x.role);
     cands.sort((a, b) => b.score - a.score || a.col - b.col);
     for (const x of cands) {
       const k = keyOf(x.role, x.group);
@@ -176,10 +183,15 @@ export function inferColumns(
   }
   if (colOf("name") === undefined) {
     let bestC = -1, best = 0;
-    const firstNum = stats.find((s) => isNumCol(s.col))?.col ?? width;
+    // 이름 열은 첫 숫자 열(번호 열은 빼고)보다 왼쪽에 있다. 코드 모양(DE-001)이 대부분인 열은 이름이 아니라 코드다
+    //  다른 역할 낱말을 품은 머리글(예: "비고(산출)")의 열은 이름 후보에서 뺀다
+    const firstNum = stats.find((s) => isNumCol(s.col) && assigned.get(s.col)?.role !== "no" && headerRole.get(s.col) !== "no")?.col ?? width;
     for (const s of stats) {
       if (assigned.has(s.col) || !isTextCol(s.col) || s.col > firstNum) continue;
-      const score = s.avgLen * (0.5 + s.distinct) - s.numbering;
+      const hr = headerRole.get(s.col);
+      if (hr && hr !== "name") continue;
+      const texts = Math.max(1, s.nonEmpty - s.num);
+      const score = (s.avgLen * (0.5 + s.distinct) - s.numbering) * (s.codeLike / texts >= 0.6 ? 0.2 : 1);
       if (s.avgLen >= 2 && score > best) { best = score; bestC = s.col; }
     }
     if (bestC >= 0) put(bestC, "name", undefined, "shape", { shape: 0.6 });

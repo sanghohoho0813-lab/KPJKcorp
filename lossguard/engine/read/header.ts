@@ -21,8 +21,16 @@ export function aliasIndex(pack: IndustryPack): AliasIndex {
 export function matchLeaf(key: string, idx: AliasIndex): { role: LeafRole; score: number; alias: string } | undefined {
   if (!key || key.length > 14) return undefined;
   for (const [a, role] of idx.leaf) if (key === a) return { role, score: 1, alias: a };
-  for (const [a, role] of idx.leaf) if (a.length >= 2 && key.includes(a)) return { role, score: 0.8, alias: a };
-  return undefined;
+  // 별칭을 여럿 품으면 끝에 오는 별칭을 고른다 — 한국어 복합 명사는 뒤 낱말이 중심("공종코드"는 코드, "품명및규격"은 별칭 그대로)
+  let best: { role: LeafRole; score: number; alias: string; end: number } | undefined;
+  for (const [a, role] of idx.leaf) {
+    if (a.length < 2) continue;
+    const at = key.lastIndexOf(a);
+    if (at < 0) continue;
+    const end = at + a.length;
+    if (!best || end > best.end || (end === best.end && a.length > best.alias.length)) best = { role, score: 0.8, alias: a, end };
+  }
+  return best ? { role: best.role, score: best.score, alias: best.alias } : undefined;
 }
 
 export function matchGroup(key: string, idx: AliasIndex, exclude?: string): GroupKey | undefined {
