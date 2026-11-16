@@ -20,6 +20,8 @@ export interface ColStat {
   nonEmpty: number;
   /** 코드 모양 글자(DE-001 · A12 · LG_002)의 수 — 이름 열이 아니라 코드 열일 가능성 */
   codeLike: number;
+  /** 단위 글자가 붙은 숫자(12개 · 1식)까지 센 숫자 칸 수 — 수량 열 판정용 */
+  numLenient: number;
   num: number;
   unitHits: number;
   avgLen: number;
@@ -35,7 +37,7 @@ export function columnStats(sheet: RawSheet, rows: number[], width: number, pack
   for (const u of pack.units) for (const f of u.forms) unitForms.add(compactText(f));
   const out: ColStat[] = [];
   for (let c = 0; c < width; c++) {
-    let nonEmpty = 0, num = 0, unitHits = 0, len = 0, digitText = 0, numbering = 0, decimals = 0, codeLike = 0;
+    let nonEmpty = 0, num = 0, unitHits = 0, len = 0, digitText = 0, numbering = 0, decimals = 0, codeLike = 0, numLenient = 0;
     const seen = new Set<string>();
     const vals: number[] = [];
     for (const r of rows) {
@@ -43,6 +45,7 @@ export function columnStats(sheet: RawSheet, rows: number[], width: number, pack
       if (cell.t === "empty") continue;
       nonEmpty++;
       const n = parseNum(cell);
+      if (n !== undefined || parseNum(cell, true) !== undefined) numLenient++;
       if (n !== undefined) {
         num++;
         vals.push(Math.abs(n));
@@ -61,7 +64,7 @@ export function columnStats(sheet: RawSheet, rows: number[], width: number, pack
     vals.sort((a, b) => a - b);
     const texts = nonEmpty - num;
     out.push({
-      col: c, nonEmpty, codeLike, num, unitHits, digitText, numbering, decimals,
+      col: c, nonEmpty, codeLike, numLenient, num, unitHits, digitText, numbering, decimals,
       avgLen: texts ? len / texts : 0,
       distinct: texts ? seen.size / texts : 0,
       median: vals.length ? vals[Math.floor(vals.length / 2)] : 0,
@@ -169,7 +172,9 @@ export function inferColumns(
 
   // 이름으로 숫자 역할을 받은 열이 실제로는 글자 열이면 버린다(예: "공사비" 가 제목인 경우)
   for (const a of [...assigned.values()]) {
-    if ((a.role === "qty" || a.role === "unitPrice" || a.role === "amount") && st(a.col) && st(a.col).nonEmpty >= 3 && !isNumCol(a.col)) {
+    // 수량은 "12개 · 1식"처럼 단위 글자가 붙어도 숫자로 본다
+    const numberish = (c: number) => isNumCol(c) || (a.role === "qty" && st(c) && st(c).numLenient / Math.max(1, st(c).nonEmpty) >= 0.6);
+    if ((a.role === "qty" || a.role === "unitPrice" || a.role === "amount") && st(a.col) && st(a.col).nonEmpty >= 3 && !numberish(a.col)) {
       assigned.delete(a.col); byKey.delete(keyOf(a.role, a.group));
       diagnostics.push(`열 ${a.col + 1}: 머리글은 ${a.role} 이지만 숫자가 아니라서 버림`);
     }

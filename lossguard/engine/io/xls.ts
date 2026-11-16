@@ -58,6 +58,8 @@ class Cursor {
       }
       const avail = this.cur.length - this.off;
       const take = Math.min(cch, high ? Math.floor(avail / 2) : avail);
+      // 손상 파일: 2바이트 글자인데 1바이트만 남으면 더 나아갈 수 없다 → 다음 조각으로(무한 반복 방지)
+      if (take === 0) { this.off = this.cur.length; continue; }
       s += high ? utf16(this.cur, this.off, take) : latin1(this.cur, this.off, take);
       this.off += high ? take * 2 : take;
       cch -= take;

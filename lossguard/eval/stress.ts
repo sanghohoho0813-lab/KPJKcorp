@@ -76,8 +76,9 @@ async function main() {
   const json: Record<string, unknown> = { startedAt, commit, engine: ENGINE_VERSION, n: N, sets: {} };
   const causeRows: string[] = [];
   const tfRows: string[] = [];
+  const rateRows: string[] = [];
   for (const set of STRESS_SETS) {
-    let gt = 0, auto = 0, autoTP = 0, review = 0, reviewTP = 0, b1 = 0, b3 = 0;
+    let gt = 0, auto = 0, autoTP = 0, review = 0, reviewTP = 0, b1 = 0, b3 = 0, otherItems = 0, unlinkedOther = 0;
     const causes = new Map<string, number>();
     const byTf = new Map<string, [number, number]>();
     for (let i = 1; i <= N; i++) {
@@ -89,6 +90,9 @@ async function main() {
       const B = new Map(detailItems(other).map((l) => [key(l.docId, l.sheet, l.row), l]));
       const truth = new Map(c.links.map((g) => [key(g.b.docId, g.b.sheet, g.b.row), key(g.a.docId, g.a.sheet, g.a.row)]));
       gt += c.links.length;
+      otherItems += B.size;
+      const linkedB = new Set(res.links.map((l) => key(l.b.docId, l.b.sheet, l.b.row)));
+      unlinkedOther += [...B.keys()].filter((k) => !linkedB.has(k)).length;
       const autoHit = new Set<string>();
       for (const l of res.links) {
         const ok = truth.get(key(l.b.docId, l.b.sheet, l.b.row)) === key(l.a.docId, l.a.sheet, l.a.row);
@@ -109,9 +113,13 @@ async function main() {
     md.push(`| ${set.label} | ${gt} | ${pc(autoTP, auto)} (${autoTP}/${auto}) | **${pc(autoTP, gt)}** | ${pc(autoTP + reviewTP, gt)} | ${review} | ${pc(b1, gt)} | ${pc(b3, gt)} |`);
     const missed = gt - autoTP;
     causeRows.push(`| ${set.label} | ${missed} | ${CAUSES.map((cz) => causes.get(cz) ?? 0).join(" | ")} |`);
+    rateRows.push(`| ${set.label} | ${otherItems} | ${pc(auto - autoTP, auto)} (${auto - autoTP}/${auto}) | ${pc(review, otherItems)} (${review}) | ${pc(review - reviewTP, review)} | ${pc(unlinkedOther, otherItems)} (${unlinkedOther}) |`);
     tfRows.push(`| ${set.label} | ${[...byTf.entries()].sort().map(([t, [n, h]]) => `${t} ${pc(h, n)}(${n})`).join(" · ")} |`);
     (json.sets as Record<string, unknown>)[set.key] = { label: set.label, gt, auto, autoTP, review, reviewTP, baselineExactName: b1, baselineNormalized: b3, causes: Object.fromEntries(causes), byTransform: Object.fromEntries(byTf) };
   }
+  md.push(``, `## 1-2. 자동 연결의 오탐 · 확인 대기 · 연결 안 됨 비율(비교 문서 항목 기준)`, ``,
+    `사람이 처리해야 하는 양을 본다: 확인 대기는 사람이 "같다 · 다르다"를 정할 줄, 연결 안 됨은 새 항목이거나 사람이 짝을 찾아야 할 줄이다.`, ``,
+    `| 조건 | 비교 문서 항목 | 자동 연결 오탐률(틀린 자동 ÷ 자동) | 확인 대기 비율 | 확인 대기 중 틀린 후보 | 연결 안 됨 비율 |`, `|---|---|---|---|---|---|`, ...rateRows);
   md.push(``, `## 2. 놓친 연결의 원인 (자동 연결이 되지 않은 정답 쌍)`, ``, `| 조건 | 놓친 쌍 | ${CAUSES.join(" | ")} |`, `|---|---|${CAUSES.map(() => "---").join("|")}|`, ...causeRows);
   md.push(``, `원인 분류: 엔진이 그 쌍을 확인 대기로 둠 / 비교 문서의 줄이 다른 기준 항목과 확인 대기 · 자동 연결(자동이면 틀린 연결 — 정밀도에 반영) / 기준 항목이 다른 줄과 연결됨 / 둘 다 연결 없음 — 정답 쌍의 점수를 다시 계산해 가장 약한 요소로 분류.`);
   md.push(``, `## 3. 바꿔 적은 방식별 자동 연결 재현율`, ``, `| 조건 | 방식별 재현율(쌍 수) |`, `|---|---|`, ...tfRows);

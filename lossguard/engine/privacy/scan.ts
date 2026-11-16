@@ -18,7 +18,7 @@ import { compactText } from "../normalize/text";
  *  - info  : 일반 전화, 사업자등록번호, 글 속 주소 → 알려만 준다(대부분 회사 · 현장 정보)
  */
 export type PiiLevel = "block" | "warn" | "info";
-export type PiiKind = "rrn" | "card" | "mobile" | "email" | "account" | "person" | "rrnPartial" | "birth" | "address" | "phone" | "bizno";
+export type PiiKind = "rrn" | "license" | "passport" | "card" | "mobile" | "email" | "account" | "person" | "rrnPartial" | "birth" | "address" | "phone" | "bizno";
 
 export interface PiiHit {
   kind: PiiKind;
@@ -42,14 +42,14 @@ export interface PiiReport {
 }
 
 export const PII_LABEL: Record<PiiKind, string> = {
-  rrn: "주민 · 외국인등록번호", card: "카드번호", mobile: "휴대전화", email: "이메일", account: "계좌번호", person: "사람 이름",
+  rrn: "주민 · 외국인등록번호", license: "운전면허번호", passport: "여권번호", card: "카드번호", mobile: "휴대전화", email: "이메일", account: "계좌번호", person: "사람 이름",
   rrnPartial: "생년월일 · 성별(일부 가린 등록번호)", birth: "생년월일", address: "주소(주소 열)", phone: "일반 전화", bizno: "사업자등록번호",
 };
 const LEVEL: Record<PiiKind, PiiLevel> = {
-  rrn: "block", card: "block", mobile: "warn", email: "warn", account: "warn", person: "warn", rrnPartial: "warn", birth: "warn", address: "warn", phone: "info", bizno: "info",
+  rrn: "block", license: "block", passport: "block", card: "block", mobile: "warn", email: "warn", account: "warn", person: "warn", rrnPartial: "warn", birth: "warn", address: "warn", phone: "info", bizno: "info",
 };
 const TOKEN: Record<PiiKind, string> = {
-  rrn: "[등록번호 삭제]", card: "[카드번호 삭제]", mobile: "[휴대전화 삭제]", email: "[이메일 삭제]", account: "[계좌번호 삭제]", person: "",
+  rrn: "[등록번호 삭제]", license: "[면허번호 삭제]", passport: "[여권번호 삭제]", card: "[카드번호 삭제]", mobile: "[휴대전화 삭제]", email: "[이메일 삭제]", account: "[계좌번호 삭제]", person: "",
   rrnPartial: "[등록번호 삭제]", birth: "[생년월일 삭제]", address: "[주소 삭제]", phone: "", bizno: "",
 };
 
@@ -62,11 +62,14 @@ const luhn = (digits: string) => { let s = 0; for (let i = 0; i < digits.length;
 interface Pat { kind: PiiKind; re: RegExp; ok?: (m: RegExpExecArray) => boolean; needs?: RegExp }
 const BANK = /은행|뱅크|농협|수협|신협|새마을|우체국|저축|계좌|통장|예금주|입금|bank/i;
 const PATTERNS: Pat[] = [
-  { kind: "rrn", re: /(?<![\d-])(\d{2})(\d{2})(\d{2})\s*[-–]?\s*([1-8])\d{6}(?![\d-])/g, ok: (m) => validDate(m[1], m[2], m[3]) },
+  { kind: "rrn", re: /(?<![\d-])(\d{2})(\d{2})(\d{2})\s*[-–.]?\s*([1-8])\d{6}(?![\d-])/g, ok: (m) => validDate(m[1], m[2], m[3]) },
+  { kind: "license", re: /(?<![\d-])\d{2}-\d{2}-\d{6}-\d{2}(?![\d-])/g },
   { kind: "rrnPartial", re: /(?<![\d-])(\d{2})(\d{2})(\d{2})\s*[-–]\s*[1-8][*xX●○■□]{3,6}/g, ok: (m) => validDate(m[1], m[2], m[3]) },
-  { kind: "card", re: /(?<![\d-])(\d{4})[- ](\d{4})[- ](\d{4})[- ](\d{4})(?![\d-])/g, ok: (m) => luhn(m[1] + m[2] + m[3] + m[4]) },
+  { kind: "card", re: /(?<![\d-])(\d{4})[- ]?(\d{4})[- ]?(\d{4})[- ]?(\d{4})(?![\d-])/g, ok: (m) => luhn(m[1] + m[2] + m[3] + m[4]) },
   { kind: "mobile", re: /(?<![\d-])01[016789][-.\s)]?\d{3,4}[-.\s]?\d{4}(?![\d-])/g },
+  { kind: "mobile", re: /\+?82[-.\s]?\(?0?\)?1[016789][-.\s]?\d{3,4}[-.\s]?\d{4}(?!\d)/g },
   { kind: "email", re: /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g },
+  { kind: "email", re: /[\w.+-]+\s*[([]\s*(?:at|골뱅이)\s*[)\]]\s*[\w-]+(?:\.[\w-]+)+/gi },
   { kind: "account", re: /(?<![\d-])\d{2,6}-\d{2,6}-\d{2,8}(?:-\d{1,3})?(?![\d-])/g, needs: BANK, ok: (m) => !dateLike(m[0]) },
   { kind: "bizno", re: /(?<![\d-])\d{3}-\d{2}-\d{5}(?![\d-])/g },
   { kind: "phone", re: /(?<![\d-])0(?:2|[3-6][1-5]|70|50\d)[-)\s]\s*\d{3,4}-\d{4}(?![\d-])/g },
@@ -85,13 +88,20 @@ const NOT_NAME = new Set(["확인", "서명", "날인", "검토", "승인", "결
 /** 개인정보 머리글 → 그 열의 값 종류 */
 const HEADER: [RegExp, PiiKind][] = [
   [/^(주민(등록)?번호|주민등록|외국인등록번호|외국인번호)$/, "rrn"],
+  [/^(운전면허번호|면허번호|운전면허)$/, "license"],
+  [/^(여권번호|여권)$/, "passport"],
   [/^(생년월일|생일)$/, "birth"],
   [/^(연락처|전화|전화번호|휴대폰|핸드폰|휴대전화|휴대폰번호|핸드폰번호|hp|tel|mobile|phone)$/, "mobile"],
   [/^(이메일|email|메일|전자우편)$/, "email"],
   [/^(계좌|계좌번호|입금계좌|통장|통장번호)$/, "account"],
   [/^(주소|거주지|자택주소|집주소|현주소)$/, "address"],
-  [/^(성명|이름|성함|담당자|대표자|작업자|근로자|기능공|인부|예금주|수령인|입금자)$/, "person"],
+  [/^(성명|이름|성함|(담당자|대표자|작업자|근로자|기능공|인부|예금주|수령인|입금자)(명|이름|성명)?)$/, "person"],
 ];
+
+/** 전각 숫자 · 기호(한글 입력기)를 반각으로 — 글자 수가 그대로라 지울 위치가 어긋나지 않는다 */
+function half(s: string): string {
+  return s.replace(/[\uff10-\uff19]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xff10 + 48)).replace(/[\uff0d\ufe63\u2212\u2013\u2014]/g, "-").replace(/\uff0e/g, ".").replace(/\uff0b/g, "+").replace(/\uff20/g, "@").replace(/\u3000/g, " ");
+}
 
 export function shapeOf(s: string): string {
   return s.slice(0, 24).replace(/\d/g, "#").replace(/[가-힣]/g, "○").replace(/[a-z]/gi, "a");
@@ -126,6 +136,8 @@ const looksLikeValue = (kind: PiiKind, cell: RawCell): boolean => {
     case "person": return cell.t === "text" && /^[가-힣]{2,4}(\s*\(?인\)?)?$/.test(v) && !NOT_NAME.has(v);
     case "mobile": return /\d{3,4}\D?\d{4}$/.test(v) && v.replace(/\D/g, "").length >= 9;
     case "rrn": case "birth": return /\d{6}/.test(v.replace(/\D/g, "")) || /\d{2,4}[-./년]\s?\d{1,2}[-./월]\s?\d{1,2}/.test(v);
+    case "license": return /\d{2}\D?\d{2}\D?\d{6}\D?\d{2}/.test(v);
+    case "passport": return /^[A-Za-z]{1,2}\d{7,8}$|^[A-Za-z]\d{3}[A-Za-z]\d{4}$/.test(v.replace(/\s/g, ""));
     case "account": return /\d{2,}-?\d{2,}/.test(v);
     case "email": return v.includes("@");
     case "address": return cell.t === "text" && v.length >= 4;
@@ -134,7 +146,8 @@ const looksLikeValue = (kind: PiiKind, cell: RawCell): boolean => {
 };
 
 /** 한 칸에서 찾은 것(겹치면 앞선 종류만) */
-function cellFinds(text: string, rowText: string): { kind: PiiKind; start: number; end: number; via: PiiHit["via"]; name?: string }[] {
+function cellFinds(raw: string, rowText: string): { kind: PiiKind; start: number; end: number; via: PiiHit["via"]; name?: string }[] {
+  const text = half(raw);
   const out: { kind: PiiKind; start: number; end: number; via: PiiHit["via"]; name?: string }[] = [];
   const taken = (s: number, e: number) => out.some((o) => s < o.end && e > o.start);
   for (const p of PATTERNS) {
@@ -183,6 +196,15 @@ function plan(wb: RawWorkbook): Plan {
         const hidden = sheet.hidden || hr.has(r) || hc.has(c);
         const key = `${si}|${r}|${c}`;
         const base = { sheet: sheet.name, row: r, col: c, hidden, shape: shapeOf(cell.v) };
+        // 두 칸에 나눠 적은 등록번호: 앞 6자리(날짜) | 뒤 7자리(1~8 시작) — 단가 · 금액 칸과 구분하려고 "주민" 머리글이나 낱말이 있을 때만
+        const digits = (x?: RawCell) => (x && x.t !== "empty" ? half(x.v).replace(/[\s-]/g, "") : "");
+        const d6 = digits(cell), d7 = digits(row[c + 1]);
+        const rrnContext = cols.get(c)?.kind === "rrn" || cols.get(c + 1)?.kind === "rrn" || labelLeft(row, c) === "rrn" || /주민|외국인등록/.test(rowText);
+        if (rrnContext && /^\d{6}$/.test(d6) && /^[1-8]\d{6}$/.test(d7) && validDate(d6.slice(0, 2), d6.slice(2, 4), d6.slice(4, 6))) {
+          for (const cc of [c, c + 1]) { hits.push({ ...base, col: cc, shape: shapeOf(row[cc].v), hidden: sheet.hidden || hr.has(r) || hc.has(cc), kind: "rrn", level: "block", via: "pattern" }); edits.set(`${si}|${r}|${cc}`, { whole: "rrn" }); }
+          c++;
+          continue;
+        }
         // 머리글 아래 열의 값, 또는 같은 줄에서 머리글 낱말 바로 오른쪽 값(표지의 "담당자 | 홍길동")
         const hcol = cols.get(c);
         const left = labelLeft(row, c);
