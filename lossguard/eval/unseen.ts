@@ -39,7 +39,7 @@ const OUT = args.includes("--out") ? args[args.indexOf("--out") + 1] : "lossguar
     `| 지표 | 값 |`, `|---|---|`,
     `| 세부 시트 | ${sheets} |`, `| 열을 하나라도 틀린 시트 | ${bad} |`, `| 핵심 열 정확도(T1) | ${((100 * hit) / n).toFixed(2)}% (${hit}/${n}) |`,
     `| 항목 값 일치(품명 · 수량 · 금액) | ${((100 * itemHit) / items).toFixed(2)}% (${itemHit}/${items}) |`, `| 오류를 넣지 않은 현장의 문서 ${cleanDocs}개에서 나온 결과 | ${fp}건 |`, "",
-    "고치기 전(엔진 0.4.0, 커밋 61405ba): 열을 틀린 시트 10개 · T1 99.74%(3,847/3,857) — DEV_RECORD §5.", "",
+    "고치기 전(엔진 0.4.0 — 커밋 abab717 시점의 작업 트리): 열을 틀린 시트 10개 · T1 99.74%(3,847/3,857) — DEV_RECORD §5.", "",
     ...(badList.length ? ["## 틀린 시트", "", ...badList.map((b) => `- ${b}`)] : []),
   ];
   mkdirSync(OUT, { recursive: true });
