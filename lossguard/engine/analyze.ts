@@ -9,12 +9,14 @@ import { itemSum, totalsOf, type DetectCtx } from "./detect/common";
 import { detectD01 } from "./detect/d01";
 import { detectD02 } from "./detect/d02";
 import { detectD03 } from "./detect/d03";
+import { detectD10 } from "./detect/d10";
+import { readLedgers } from "./ledger/read";
 
 /**
  * 엔진의 입구 — 화면도, 명령줄 도구도, 시험도 이 함수 하나만 부른다.
  * 같은 파일 + 같은 업종 묶음 + 같은 사람 판단이면 결과가 글자 하나까지 같다(문서를 넣는 순서와 무관).
  */
-const KIND_ORDER = { contract: 0, change: 1, settlement: 2, other: 3 } as const;
+const KIND_ORDER = { contract: 0, change: 1, settlement: 2, other: 3, cost: 4 } as const;
 
 export function inputHash(docs: { docId: string; workbook: RawWorkbook }[], meta: unknown): string {
   const parts: string[] = [];
@@ -38,7 +40,9 @@ export function analyze(input: AnalyzeInput): AnalyzeResult {
   const docsIn = [...input.docs].sort((a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || (a.round ?? 0) - (b.round ?? 0) || (a.docId < b.docId ? -1 : a.docId > b.docId ? 1 : 0));
   const norm = makeNormalizer(pack);
   const idx = aliasIndex(pack);
-  const docs = docsIn.map((d) => parseDoc(d, pack, idx, norm, input.decisions?.columns));
+  // 매입 · 지급 장부(cost)는 내역서로 읽지 않고 장부로 읽는다
+  const docs = docsIn.filter((d) => d.kind !== "cost").map((d) => parseDoc(d, pack, idx, norm, input.decisions?.columns));
+  const ledgers = docsIn.filter((d) => d.kind === "cost").flatMap((d) => readLedgers(d.docId, d.workbook, pack));
   const raw = new Map(docsIn.map((d) => [d.docId, d.workbook]));
 
   // 문서 간 항목 정합: 기준 = 계약 문서
@@ -68,6 +72,12 @@ export function analyze(input: AnalyzeInput): AnalyzeResult {
   }
   const ctx: DetectCtx = { pack, meta, docs, raw, base, links };
   const raw0: Finding[] = [...detectD01(ctx), ...detectD02(ctx), ...detectD03(ctx)];
+  const costDocs = docsIn.filter((d) => d.kind === "cost");
+  if (costDocs.length) {
+    const usable = ledgers.filter((l) => l.records.length);
+    if (!usable.length) skipped.push({ detector: "D10", reason: "매입 · 지급 자료에서 거래처 · 금액 열을 찾지 못해 중복 가능성 점검을 하지 않음" });
+    raw0.push(...detectD10(usable, raw, pack));
+  }
   // 안전장치: 읽기 신뢰도가 문턱보다 낮은 시트를 근거로 한 결과는 경고로 내지 않고 보류한다
   //  (처음 보는 양식을 잘못 읽은 채로 틀린 경고를 쏟아내지 않게 — 사람이 열 지정을 확인한 뒤 다시 분석)
   const conf = new Map<string, { c: number; n: number }>();
@@ -102,6 +112,7 @@ export function analyze(input: AnalyzeInput): AnalyzeResult {
     lineage: lin,
     findings,
     skipped,
+    ledgers,
     versions: { engine: ENGINE_VERSION, pack: `${pack.key}@${pack.version}`, inputHash: inputHash(docsIn, meta) },
   };
 }

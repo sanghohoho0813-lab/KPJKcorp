@@ -7,7 +7,7 @@ import type { IndustryPack } from "../../engine/types";
  */
 export const constructionInterior: IndustryPack = {
   key: "construction-interior",
-  version: "0.1.0",
+  version: "0.2.0",
   label: "건설 · 인테리어",
   headerAliases: {
     no: ["번호", "순번", "no", "no.", "항목번호", "코드", "code"],
@@ -84,6 +84,22 @@ export const constructionInterior: IndustryPack = {
     ["콘센트", "전원콘센트"],
     ["배관", "파이프"],
   ],
+  // 매입 · 지급 장부(홈택스 세금계산서 목록 · 거래명세서 목록 · 지급 내역 등 — 실제 장부의 열 이름은 실증에서 보강) [가설]
+  ledgerAliases: {
+    date: ["거래일자", "작성일자", "일자", "날짜", "발행일", "발행일자", "지급일", "지급일자", "입고일", "거래일", "전표일자", "date"],
+    vendor: ["거래처", "거래처명", "공급자", "공급자상호", "상호", "업체", "업체명", "지급처", "매입처", "vendor"],
+    vendorId: ["사업자번호", "사업자등록번호", "공급자사업자등록번호", "등록번호"],
+    item: ["품목", "품목명", "품명", "적요", "내용", "내역", "item"],
+    spec: ["규격"],
+    qty: ["수량"],
+    unitPrice: ["단가"],
+    supply: ["공급가액", "공급가", "금액", "매입금액"],
+    tax: ["세액", "부가세", "부가가치세"],
+    total: ["합계", "합계금액", "총액", "지급액", "결제금액", "총금액"],
+    docNo: ["승인번호", "전표번호", "문서번호", "명세서번호", "송장번호", "거래번호", "계산서번호"],
+    site: ["현장", "현장명", "프로젝트"],
+    note: ["비고", "메모"],
+  },
   params: {
     lineAbsTol: 10,
     lineRelTol: 0.0001,
@@ -94,6 +110,7 @@ export const constructionInterior: IndustryPack = {
     confidenceThreshold: 0.7,
     severityHigh: 0.01,
     severityMid: 0.001,
+    dupWindowDays: 3,
   },
 };
 

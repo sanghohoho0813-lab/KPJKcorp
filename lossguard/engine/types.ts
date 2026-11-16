@@ -29,7 +29,8 @@ export type LeafRole = "no" | "name" | "spec" | "unit" | "qty" | "unitPrice" | "
 export type GroupKey = "mat" | "lab" | "exp" | "sum" | "before" | "after" | "delta";
 export type SheetKind = "cover" | "summary" | "detail" | "unitcost" | "other";
 export type LineKind = "item" | "section" | "subtotal" | "total" | "adjust" | "tax" | "note";
-export type DocKind = "contract" | "change" | "settlement" | "other";
+/** cost: 매입 · 지급 장부(세금계산서 목록 · 거래명세서 목록 · 지급 내역) — 내역서 읽기가 아니라 장부 읽기로 읽는다 */
+export type DocKind = "contract" | "change" | "settlement" | "cost" | "other";
 export type SheetShape = "plain" | "split" | "compare" | "none";
 
 export interface ColumnEvidence { name: number; shape: number; arith: number }
@@ -148,7 +149,7 @@ export interface EvidenceRef {
   values: Record<string, string>;
   role: "base" | "compare";
 }
-export type DetectorKey = "D01" | "D02" | "D03";
+export type DetectorKey = "D01" | "D02" | "D03" | "D10";
 export interface Finding {
   key: string;
   detector: DetectorKey;
@@ -190,7 +191,38 @@ export interface AnalyzeResult {
   lineage: LineageItem[];
   findings: Finding[];
   skipped: { detector: string; reason: string }[];
+  /** 매입 · 지급 장부(cost 문서)를 읽은 결과 */
+  ledgers: ParsedLedger[];
   versions: { engine: string; pack: string; inputHash: string };
+}
+
+// ── 매입 · 지급 장부 ────────────────────────────────────────────────
+export type LedgerRole = "date" | "vendor" | "vendorId" | "item" | "spec" | "qty" | "unitPrice" | "supply" | "tax" | "total" | "docNo" | "site" | "note";
+export interface LedgerRecord {
+  row: number;
+  /** YYYY-MM-DD (읽지 못하면 없음) */
+  date?: string;
+  /** 1970-01-01 부터 센 날 수(간격 계산용) */
+  day?: number;
+  vendor: string;
+  item: string;
+  /** 비교에 쓰는 금액: 공급가액이 있으면 공급가액, 없으면 합계 */
+  amount: number;
+  docNo: string;
+  /** 값이 나온 칸: 역할 → 열 번호 */
+  cols: Partial<Record<LedgerRole, number>>;
+  /** 거래 지문 — 행 번호를 넣지 않는다 */
+  fp: string;
+}
+export interface ParsedLedger {
+  docId: string;
+  fileName: string;
+  sheet: string;
+  sheetIndex: number;
+  headerRow: number;
+  columns: { col: number; role: LedgerRole; label: string }[];
+  records: LedgerRecord[];
+  diagnostics: string[];
 }
 
 // ── 업종 묶음 ───────────────────────────────────────────────────────
@@ -209,6 +241,8 @@ export interface PackParams {
   /** 계약금액 대비 비율로 정하는 심각도 */
   severityHigh: number;
   severityMid: number;
+  /** D10: 같은 거래처 · 같은 금액을 "가까운 날"로 보는 최대 날 수(초기 가설) */
+  dupWindowDays: number;
 }
 export interface IndustryPack {
   key: string;
@@ -228,5 +262,7 @@ export interface IndustryPack {
   units: { code: string; forms: string[] }[];
   unitConversions: { a: string; b: string; factor: number }[];
   synonyms: string[][];
+  /** 매입 · 지급 장부의 머리글 별칭 */
+  ledgerAliases: Record<LedgerRole, string[]>;
   params: PackParams;
 }
