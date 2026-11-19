@@ -17,6 +17,9 @@ const OUT = process.env.OUT || path.join(HERE, 'out');
 const R = JSON.parse(fs.readFileSync(path.join(OUT, 'results.json'), 'utf8'));
 const Q = fs.existsSync(path.join(OUT, 'quality.json')) ? JSON.parse(fs.readFileSync(path.join(OUT, 'quality.json'), 'utf8')) : null;
 const PARTY = { gap: '주식회사 케이피제이케이코퍼레이션', eul: '미래 AI 랩' };
+// 보낼 때 아는 값만 채운다 — 없으면 빈칸으로 두고 손으로 적는다. 예: TEST_URL=https://… SENT_DATE=2026-11-20 node tools/acceptance/report.mjs
+const TEST_URL = (process.env.TEST_URL || '').trim();
+const SENT_DATE = (process.env.SENT_DATE || '').trim();
 
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const d = new Date(R.finishedAt);
@@ -56,7 +59,7 @@ const ART5 = [
 
 const critRows = R.criteria.map((c) => {
   if (c.id === 'C6') {
-    return `<tr><td class="n">${c.id.slice(1)}</td><td>${esc(c.text)}</td><td>본 보고서와 시험버전 주소를 전자문서·메신저로 전달</td><td colspan="2" class="c">전달로 충족<br><span class="small">전달일 ____________</span></td></tr>`;
+    return `<tr><td class="n">${c.id.slice(1)}</td><td>${esc(c.text)}</td><td>본 보고서와 시험버전 주소를 전자문서·메신저로 전달</td><td colspan="2" class="c">전달로 충족<br><span class="small">전달일 ${SENT_DATE ? esc(SENT_DATE) : '____________'}</span></td></tr>`;
   }
   const pc = allOk(c.id, 'pc'); const mo = allOk(c.id, 'mobile');
   const n = byCrit(c.id, 'pc').length + byCrit(c.id, 'mobile').length;
@@ -101,7 +104,7 @@ ul { margin: 4px 0; padding-left: 18px; } li { margin: 2px 0; }
 <tr><td><b>수신</b></td><td>${PARTY.gap} (갑)</td></tr>
 <tr><td><b>발신</b></td><td>${PARTY.eul} (을)</td></tr>
 <tr><td><b>작성일</b></td><td>${ymd}</td></tr>
-<tr><td><b>시험버전 주소</b></td><td>________________________________________</td></tr>
+<tr><td><b>시험버전 주소</b></td><td>${TEST_URL ? esc(TEST_URL) : '________________________________________'}</td></tr>
 </tbody></table>
 
 <div class="box">
@@ -168,14 +171,14 @@ ${Q ? `<p style="margin-top:10px"><b>품질 확인 (${esc(Q.measuredAt)} 측정)
 
 <h2>8. 1차 범위 밖이거나 이후에 이어지는 일</h2>
 <ul>
-<li><b>서버 실연결</b> — 갑 명의의 Supabase 프로젝트에 설치 SQL 을 실행하고 연결 정보 두 줄을 넣으면 여러 기기에서 같은 데이터를 씁니다. 설치 안내(supabase/README.md)와 설정 화면의 <b>연결 점검</b> 버튼을 제공합니다.</li>
+<li><b>운영 서버 관리</b> — 실제 서버(Supabase)에 연결해 여러 기기에서 같은 데이터를 씁니다. 설정 화면의 <b>연결 점검</b>으로 서버 상태(표 · 권한 · 파일 보관함)를 언제든 확인할 수 있고, 서버 구조가 바뀌면 설치 SQL 을 다시 실행합니다(기존 데이터는 지워지지 않습니다). 설치 안내는 supabase/README.md 에 있습니다.</li>
 <li><b>실제 고객 자료 적용</b> — 현재 화면은 샘플 자료입니다. 실제 고객 정보는 고객 동의와 갑의 내부 확인 후 적용합니다(제17조 제3항).</li>
 <li><b>실제 운영 피드백 반영</b> — 별지 제1호에 따라 실제 운영 후 오류 수정·사용편의 개선·기존 범위 내 UI/UX·업무규칙·대시보드·실증지표 보완은 계약기간 1년 동안 이어서 반영합니다.</li>
 <li><b>제6조 1차 제외 범위</b> — 금융·정책기관·ERP·회계·전자계약 실시간 자동연동(API), 대량 문자·카카오 발송, 앱스토어용 전용 앱, 전자결제, 완성형 전자계약·정산, 대량 기존자료 일괄 이전, 전용 AI 모델 학습은 포함하지 않습니다.</li>
 <li>개선율·절감시간 같은 성과 수치는 도입 전 기준선과 실제 사용 기록이 쌓인 뒤에만 계산하며, 본 보고서에는 넣지 않았습니다.</li>
 </ul>
 
-<h2>9. 확인</h2>
+<h2 class="pb">9. 확인</h2>
 <table class="sign"><tbody>
 <tr><th style="width:18%">갑 확인</th><td colspan="3">□ 이상 없음 — 최종검수 완료 &nbsp;&nbsp;&nbsp; □ 보완 필요 (아래에 구체적으로 기재)</td></tr>
 <tr><th>보완 사항</th><td colspan="3" style="height:70px"></td></tr>

@@ -22,7 +22,7 @@ bootstrap() {
 }
 case "$1" in
   start)
-    npx -y supabase@latest start -x studio,imgproxy,edge-runtime,logflare,vector,realtime,supavisor,mailpit,postgres-meta >/dev/null
+    npx -y supabase@latest start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,mailpit,postgres-meta >/dev/null
     bootstrap
     # 실제 서버용 .env.local 을 덮지 않는다
     if [ -f "$ROOT/.env.local" ] && ! grep -q "127.0.0.1:54321" "$ROOT/.env.local"; then

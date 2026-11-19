@@ -43,8 +43,29 @@ node tools/pilot/setup.mjs && node tools/pilot/loop.mjs pc && node tools/pilot/l
 tools/pilot/local-supabase.sh reset      # 처음 상태로
 ```
 
+- 실시간(realtime)도 함께 띄운다(2026-11-19부터). 빼고 띄우면 화면이 실시간 연결을 시도하다 경고를 남겨 `baseline` · `link` · `roles` 의 "화면 오류 없음"이 실패하고, `live` 는 시험할 수 없다.
+- 이미지를 받다가 `toomanyrequests`(공용 저장소 요청 제한)가 나면 GitHub 저장소에서 받는다: `SUPABASE_INTERNAL_IMAGE_REGISTRY=ghcr.io tools/pilot/local-supabase.sh start`.
+
 실제 Supabase 프로젝트로 돌리려면 `PILOT_DB_URL`(Database 연결 문자열)과 계정 비밀번호
 `PILOT_CEO_PW · PILOT_CON_PW · PILOT_C1_PW · PILOT_C2_PW` 를 환경변수로 넣습니다. 비밀번호는 코드에 두지 않습니다.
+
+## 2026-11-19 결과 (로컬 Supabase · Postgres 17 · 실시간 포함 · 처음 상태에서)
+
+4단계 최종검수 요청 전 재확인. 앱 코드는 main `da6fc27` 과 같다.
+
+| 묶음 | 결과 |
+|---|---|
+| setup | 19 / 19 |
+| loop pc · loop mobile | 37 / 37 · 37 / 37 |
+| persist | 31 / 31 |
+| fallback | 18 / 18 |
+| baseline | 5 / 5 |
+| link | 38 / 38 |
+| live (실시간) | 9 / 9 |
+| cycle | 46 / 46 |
+| roles | 33 / 33 |
+| 합계 | **273 / 273** |
+| 서버 권한 SQL (`supabase/test/run-rls.sh`) | 202 / 0 |
 
 ## 2026-09-30 결과 (로컬 Supabase · Postgres 17 · 처음 상태에서)
 

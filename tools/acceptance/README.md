@@ -28,4 +28,4 @@ Playwright 가 없으면 `npm i --no-save playwright && npx playwright install c
 - 데모 모드(샘플 데이터)에서 돕니다. 실제 고객 데이터로 돌리지 마세요.
 - `out/quality.json`(선택)에 회귀 시험·서버 권한 시험 결과를 넣으면 측정일과 함께 실립니다.
   `{ "measuredAt": "2026-09-29", "items": ["…", "…"] }`
-- 보내기 직전에 다시 뽑으면 날짜와 캡처가 최신으로 바뀝니다. "시험버전 주소"와 "전달일" 칸은 비워 두었습니다 — 직접 적어 주세요.
+- 보내기 직전에 다시 뽑으면 날짜와 캡처가 최신으로 바뀝니다. "시험버전 주소"와 "전달일" 칸은 비워 두었습니다 — 직접 적거나, 뽑을 때 `TEST_URL=https://… SENT_DATE=2026-11-20 node tools/acceptance/report.mjs` 로 채웁니다.
