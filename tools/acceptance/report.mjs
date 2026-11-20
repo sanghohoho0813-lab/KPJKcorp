@@ -16,14 +16,14 @@ const OUT = process.env.OUT || path.join(HERE, 'out');
 
 const R = JSON.parse(fs.readFileSync(path.join(OUT, 'results.json'), 'utf8'));
 const Q = fs.existsSync(path.join(OUT, 'quality.json')) ? JSON.parse(fs.readFileSync(path.join(OUT, 'quality.json'), 'utf8')) : null;
-const PARTY = { gap: '주식회사 케이피제이케이코퍼레이션', eul: '미래 AI 랩' };
+const PARTY = { gap: '주식회사 케이피제이케이코퍼레이션', eul: '미래에이아이랩' };
 // 보낼 때 아는 값만 채운다 — 없으면 빈칸으로 두고 손으로 적는다. 예: TEST_URL=https://… SENT_DATE=2026-11-20 node tools/acceptance/report.mjs
 const TEST_URL = (process.env.TEST_URL || '').trim();
 const SENT_DATE = (process.env.SENT_DATE || '').trim();
 
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const d = new Date(R.finishedAt);
-const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+// 작성일 · 요청일은 문서를 뽑는 날(한국 시간). 검수를 돌린 시각은 본문 '확인 일시'에 따로 적힌다. REPORT_DATE=2026-11-20 으로 정할 수 있다
+const ymd = (process.env.REPORT_DATE || '').trim() || new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 const img = (rel) => `data:image/png;base64,${fs.readFileSync(path.join(OUT, rel)).toString('base64')}`;
 const byCrit = (id, vp) => R.checks.filter((c) => c.criteria === id && c.viewport === vp);
 const allOk = (id, vp) => { const cs = byCrit(id, vp); return cs.length > 0 && cs.every((c) => c.ok); };
@@ -99,7 +99,7 @@ ul { margin: 4px 0; padding-left: 18px; } li { margin: 2px 0; }
 </style></head><body>
 
 <h1>1차 개발 완료 보고 및 최종검수 요청</h1>
-<div class="sub">경영컨설팅 AX 시스템 구축 및 사업화 지원 계약 제12조 제3항 · 별지 제1호 완료·검수 기준 대조</div>
+<div class="sub">경영컨설팅 AX 시스템 구축 및 사업화 지원 계약(2026. 9. 10.) 제12조 제3항 · 별지 제1호 완료·검수 기준 대조</div>
 <table class="meta" style="margin-top:10px"><tbody>
 <tr><td><b>수신</b></td><td>${PARTY.gap} (갑)</td></tr>
 <tr><td><b>발신</b></td><td>${PARTY.eul} (을)</td></tr>
@@ -111,7 +111,7 @@ ul { margin: 4px 0; padding-left: 18px; } li { margin: 2px 0; }
 <p><b>요청 요지</b></p>
 <p>계약 제2조의 1차 개발범위(별지 제1호 6개 핵심모듈)를 완료하였기에 보고드리며, 제12조 제3항에 따라 최종검수를 요청드립니다.</p>
 <p>별지 제1호 「완료·검수 기준」 6개 항목을 PC와 휴대폰 화면에서 실제로 실행해 확인하였고, 그 결과는 <b>자동 검수 ${R.checks.length}개 항목 중 ${pass}개 통과</b>입니다(페이지 오류 ${R.pageErrors.length}건).</p>
-<p>검토 후 미충족 또는 보완이 필요한 사항이 있으면 제12조 제2항에 따라 구체적으로 알려 주시기 바랍니다. 이상이 없으면 마지막 쪽의 확인란에 표시해 주시면 됩니다.</p>
+<p>보완이 필요한 사항이 있으면 제12조 제2항에 따라 받으신 날부터 10영업일 안에 별지 제1호 완료기준 중 미충족 사항을 구체적으로 적어 서면 또는 전자문서로 알려 주시기 바랍니다. 이상이 없으면 마지막 쪽의 확인란에 표시하시거나 메신저·이메일로 회신해 주시면 됩니다(제20조 제2항).</p>
 </div>
 
 <h2>1. 별지 제1호 완료·검수 기준 대조</h2>
@@ -172,13 +172,14 @@ ${Q ? `<p style="margin-top:10px"><b>품질 확인 (${esc(Q.measuredAt)} 측정)
 <h2>8. 1차 범위 밖이거나 이후에 이어지는 일</h2>
 <ul>
 <li><b>운영 서버 관리</b> — 실제 서버(Supabase)에 연결해 여러 기기에서 같은 데이터를 씁니다. 설정 화면의 <b>연결 점검</b>으로 서버 상태(표 · 권한 · 파일 보관함)를 언제든 확인할 수 있고, 서버 구조가 바뀌면 설치 SQL 을 다시 실행합니다(기존 데이터는 지워지지 않습니다). 설치 안내는 supabase/README.md 에 있습니다.</li>
-<li><b>실제 고객 자료 적용</b> — 현재 화면은 샘플 자료입니다. 실제 고객 정보는 고객 동의와 갑의 내부 확인 후 적용합니다(제17조 제3항).</li>
-<li><b>실제 운영 피드백 반영</b> — 별지 제1호에 따라 실제 운영 후 오류 수정·사용편의 개선·기존 범위 내 UI/UX·업무규칙·대시보드·실증지표 보완은 계약기간 1년 동안 이어서 반영합니다.</li>
-<li><b>제6조 1차 제외 범위</b> — 금융·정책기관·ERP·회계·전자계약 실시간 자동연동(API), 대량 문자·카카오 발송, 앱스토어용 전용 앱, 전자결제, 완성형 전자계약·정산, 대량 기존자료 일괄 이전, 전용 AI 모델 학습은 포함하지 않습니다.</li>
+<li><b>고객 자료</b> — 이 보고서의 화면 캡처와 시험은 모두 샘플 자료로 했습니다. 실제 고객 자료는 계약서 제17조에 따라 다룹니다.</li>
+<li><b>계약기간 무상 유지·개선</b> — 제2조 제5항·제14조 제1항에 따라 계약기간(2026. 9. 10.부터 1년) 동안 기존 기능의 오류 수정, 경미한 문구·화면 조정, 사용 편의를 위한 UI/UX 개선, 데이터 표시·대시보드·업무상태·분류·규칙의 합리적 조정, 실제 운영 불편사항 개선, 로그·지표·리포트 보완을 이어서 반영합니다. 이는 무제한 신규개발을 의미하지 않으며, 새로운 핵심기능 추가·화면과 업무구조의 대규모 변경·새로운 외부 자동연동 등은 별도 개발입니다(제14조 제2항).</li>
+<li><b>제6조 1차 개발 제외범위</b> — 은행·보증기관·정부기관·세무회계 프로그램·ERP·전자계약 등 외부서비스와의 실시간 자동연동(API), 대규모 CRM 자동마케팅과 문자·카카오 알림 대량발송, 앱스토어용 전용 모바일 앱, 전자결제, 완성형 전자계약·정산 시스템, 갑 전용 AI 모델 신규 학습·파인튜닝, 많은 기존 자료의 일괄 수집·이전, 전문자격사 고유 판단을 자동으로 대체하는 기능, 별지 범위를 현저히 초과하는 신규 기능은 포함하지 않습니다.</li>
+<li><b>계약 외 추가 개발</b> — 정부지원사업 기능(기업마당 공고 자동 연결·고객별 매칭·알림, 로그인 없는 지원사업 찾기, 정책자금 준비 서류, 공고별 신청 서류 묶음, 스스로 준비하기)은 갑의 요청으로 계약 내용과 별도로 추가 개발한 것으로, 이번 최종검수 대상에 포함하지 않습니다(제6조·제14조 제2항).</li>
 <li>개선율·절감시간 같은 성과 수치는 도입 전 기준선과 실제 사용 기록이 쌓인 뒤에만 계산하며, 본 보고서에는 넣지 않았습니다.</li>
 </ul>
 
-<h2 class="pb">9. 확인</h2>
+<div style="break-inside: avoid"><h2>9. 확인</h2>
 <table class="sign"><tbody>
 <tr><th style="width:18%">갑 확인</th><td colspan="3">□ 이상 없음 — 최종검수 완료 &nbsp;&nbsp;&nbsp; □ 보완 필요 (아래에 구체적으로 기재)</td></tr>
 <tr><th>보완 사항</th><td colspan="3" style="height:70px"></td></tr>
@@ -186,7 +187,7 @@ ${Q ? `<p style="margin-top:10px"><b>품질 확인 (${esc(Q.measuredAt)} 측정)
 <tr><th>확인자</th><td></td><th>서명</th><td></td></tr>
 <tr><th>을</th><td>${PARTY.eul}</td><th>요청일</th><td>${ymd}</td></tr>
 </tbody></table>
-<p class="small">제12조 제3항: 최종검수 완료는 갑과 을의 상호 확인을 원칙으로 하며, 카카오톡·이메일 등 상호 확인 가능한 방식으로 요청합니다. 본 확인란 대신 메신저·이메일 회신으로 확인하셔도 됩니다.</p>
+<p class="small">제12조 제3항: 최종검수 완료는 갑과 을의 상호 확인을 원칙으로 하며, 갑은 별지 제1호의 완료기준이 충족된 경우 정당한 사유 없이 최종검수를 거절하거나 지연하지 않고, 보완이 필요한 경우 미충족 사항을 구체적으로 통지합니다. 본 확인란 대신 메신저·이메일 회신으로 확인하셔도 됩니다(제20조 제2항).</p></div>
 </body></html>`;
 
 fs.writeFileSync(path.join(OUT, 'report.html'), html);
